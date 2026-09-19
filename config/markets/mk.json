@@ -1,0 +1,25 @@
+{
+  "name": "Северная Македония",
+  "origin": "Инчон",
+  "originCountry": "Кореја",
+  "port": "Драч",
+  "portCountry": "Албанија",
+  "language": "mk",
+  "freightUsd": 1500,
+  "whatsapp": "+82 10 5865 4344",
+  "site": "kmotors.shop",
+  "texts": {
+    "hookTagline": "Директно од Кореја",
+    "priceLabel": "Цена до {port}",
+    "priceNoteIncluded": "Поморскиот транспорт е вклучен.",
+    "priceNoteExcluded": "Царинските давачки не се вклучени.",
+    "ctaTitle": "Пресметка\nдо клуч",
+    "ctaAccent": "за 24 часа",
+    "ctaBenefit": "Работиме без провизија",
+    "whatsappLabel": "WhatsApp"
+  },
+  "music": {
+    "track": "mixkit-house-02",
+    "volume": 0.8
+  }
+}

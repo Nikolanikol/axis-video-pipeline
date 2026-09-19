@@ -1,0 +1,13 @@
+// Экраны инструментов: «пайплайн/инструмент» → компонент (грузится при открытии).
+// Новый инструмент: запись в config/pipelines.json со status "ready" и строка здесь.
+import {lazy} from 'react';
+
+export const TOOLS = {
+  'ads/lot': lazy(() => import('./ads/LotTool').then((m) => ({default: m.LotTool}))),
+  'reviews/edit': lazy(() => import('./reviews/ReviewTool').then((m) => ({default: m.ReviewTool}))),
+  'settings/markets': lazy(() => import('./settings/SettingsTool').then((m) => ({default: m.MarketsTool}))),
+  'settings/brand': lazy(() => import('./settings/SettingsTool').then((m) => ({default: m.BrandTool}))),
+} as const;
+
+export type ToolKey = keyof typeof TOOLS;
+export const hasTool = (key: string): key is ToolKey => key in TOOLS;

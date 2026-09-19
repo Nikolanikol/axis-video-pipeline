@@ -1,0 +1,23 @@
+{
+  "market": "mk",
+  "brand": "Audi",
+  "model": "A6",
+  "trim": "35 TDI",
+  "year": 2018,
+  "specs": [
+    "78 498 км",
+    "Дизел · автоматик",
+    "Кожен ентериер",
+    "Шибер · HUD · навигација"
+  ],
+  "carPriceUsd": null,
+  "carPriceKrw": 12300000,
+  "krwPerUsd": 1390,
+  "photos": [
+    "lots/audi-a6-2018/front.jpg",
+    "lots/audi-a6-2018/seat.jpg",
+    "lots/audi-a6-2018/console.jpg",
+    "lots/audi-a6-2018/cluster.jpg",
+    "lots/audi-a6-2018/mmi.jpg"
+  ]
+}

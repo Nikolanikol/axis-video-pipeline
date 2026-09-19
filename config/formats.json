@@ -1,0 +1,30 @@
+[
+  {
+    "id": "price-ad",
+    "title": "Авто с ценой",
+    "description": "Хук → характеристики → маршрут и цена до порта → призыв. 15 секунд.",
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "durationInFrames": 450,
+    "bpm": 120,
+    "scenes": [
+      {"id": "hook", "title": "Хук", "from": 0, "frames": 90, "preview": 75},
+      {"id": "specs", "title": "Характеристики", "from": 90, "frames": 120, "preview": 190},
+      {"id": "price", "title": "Цена", "from": 210, "frames": 135, "preview": 335},
+      {"id": "cta", "title": "CTA", "from": 345, "frames": 105, "preview": 440}
+    ],
+    "requires": ["photos", "specs", "price"],
+    "photoRoles": ["Хук", "Характеристики 1", "Характеристики 2"],
+    "texts": [
+      {"key": "hookTagline", "label": "Подзаголовок хука", "hint": "сцена 1, под годом"},
+      {"key": "priceLabel", "label": "Подпись над ценой", "hint": "{port} заменится на порт"},
+      {"key": "priceNoteIncluded", "label": "Под ценой: что включено", "hint": "сцена 3"},
+      {"key": "priceNoteExcluded", "label": "Под ценой: что не включено", "hint": "сцена 3, серым"},
+      {"key": "ctaTitle", "label": "Заголовок CTA", "hint": "Enter — перенос строки", "multiline": true},
+      {"key": "ctaAccent", "label": "Акцент CTA (медью)", "hint": "последняя строка заголовка"},
+      {"key": "ctaBenefit", "label": "Преимущество (с рукопожатием)", "hint": "сцена 4"},
+      {"key": "whatsappLabel", "label": "Подпись над номером", "hint": "сцена 4"}
+    ]
+  }
+]

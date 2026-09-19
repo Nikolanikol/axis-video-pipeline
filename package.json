@@ -1,0 +1,41 @@
+{
+  "name": "axis-video",
+  "version": "1.0.0",
+  "description": "AXIS: рекламные вертикальные ролики авто из Кореи",
+  "scripts": {
+    "app": "node --env-file-if-exists=.env server/index.mjs",
+    "studio": "remotion studio src/index.ts",
+    "render": "node render.mjs",
+    "stills": "node stills.mjs",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "vitest run --project unit",
+    "test:render": "vitest run --project render",
+    "test:all": "npm run typecheck && vitest run"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@fontsource/montserrat": "^5.3.0",
+    "@fontsource/oswald": "^5.3.0",
+    "@remotion/bundler": "4.0.525",
+    "@remotion/cli": "4.0.525",
+    "@remotion/player": "4.0.525",
+    "@remotion/renderer": "4.0.525",
+    "express": "^5.2.1",
+    "multer": "^2.4.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "remotion": "4.0.525",
+    "sharp": "^0.35.4"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.31",
+    "@types/react-dom": "^18.3.7",
+    "@vitejs/plugin-react": "^5.2.0",
+    "typescript": "^5.9.3",
+    "vite": "^7.3.6",
+    "vitest": "^5.0.1"
+  },
+  "type": "module"
+}
