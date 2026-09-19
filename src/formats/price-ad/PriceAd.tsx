@@ -16,7 +16,7 @@ const Hook: React.FC<{ad: Ad}> = ({ad}) => (
     <Photo src={ad.photos[0]} dur={useVideoConfig().durationInFrames} />
     <Shade />
     <CarTitle brand={ad.brand} model={ad.model} year={ad.year} trim={ad.trim} tagline={ad.texts.hookTagline} />
-    <TopLogo />
+    <TopLogo scrim={false} />
   </AbsoluteFill>
 );
 
@@ -43,7 +43,7 @@ const Specs: React.FC<{ad: Ad}> = ({ad}) => {
           );
         })}
       </AbsoluteFill>
-      <TopLogo />
+      <TopLogo scrim={false} />
     </AbsoluteFill>
   );
 };
@@ -93,7 +93,7 @@ const Route: React.FC<{ad: Ad}> = ({ad}) => {
         <text x={P[3][0]} y={600} textAnchor="middle" fill={C.grey} style={country}>{ad.portCountry}</text>
       </svg>
       <PriceTag ad={ad} delay={45} />
-      <TopLogo />
+      <TopLogo scrim={false} />
     </AbsoluteFill>
   );
 };

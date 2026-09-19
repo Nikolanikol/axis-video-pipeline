@@ -85,9 +85,28 @@ export const Shade: React.FC = () => {
   return <AbsoluteFill style={{background: `linear-gradient(180deg, ${a(0.75)} 0%, ${a(0)} 14%, ${a(0)} 36%, ${a(0.8)} 54%, ${a(0.95)} 66%, ${bg} 76%)`}} />;
 };
 
-// Горизонтальный логотип вверху кадра
-export const TopLogo: React.FC = () => (
-  <AbsoluteFill style={{alignItems: 'center', paddingTop: 170}}>
-    <Img src={staticFile('brand/logo-horizontal.svg')} style={{height: 78}} />
-  </AbsoluteFill>
-);
+/**
+ * Горизонтальный логотип вверху кадра.
+ * Поверх съёмки логотип легко теряется: светлое небо съедает и медь, и белую подпись.
+ * Поэтому под ним своя подложка — короткий градиент, плотный там, где лежит логотип (9–13 %
+ * высоты кадра), и сходящий на нет к 20 %: небо остаётся небом, а не тёмной полосой.
+ * Плюс мягкая тень на самих буквах — отделяет их от светлого фона, когда градиента мало.
+ * scrim={false} — там, где затемнение уже есть (в рекламе это делает Shade) и второе лишнее.
+ */
+export const TopLogo: React.FC<{scrim?: boolean}> = ({scrim = true}) => {
+  const {bg} = useTheme();
+  const a = (o: number) => `${bg}${Math.round(o * 255).toString(16).padStart(2, '0')}`;
+  return (
+    <>
+      {scrim && (
+        <AbsoluteFill style={{
+          background: `linear-gradient(180deg, ${a(0.55)} 0%, ${a(0.45)} 9%, ${a(0.3)} 13%, ${a(0)} 20%)`,
+        }} />
+      )}
+      <AbsoluteFill style={{alignItems: 'center', paddingTop: 170}}>
+        <Img src={staticFile('brand/logo-horizontal.svg')}
+          style={{height: 78, filter: scrim ? 'drop-shadow(0 3px 10px rgba(0,0,0,0.5))' : undefined}} />
+      </AbsoluteFill>
+    </>
+  );
+};
