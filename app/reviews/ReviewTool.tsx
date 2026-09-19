@@ -4,7 +4,7 @@ import {Player, PlayerRef} from '@remotion/player';
 import {ReviewShort} from '../../src/reviews/ReviewShort';
 import {
   MAX_REVIEW_SEC, REVIEW_FPS, TEMPLATE_V1, applyTemplate, buildTimeline, cutPauses,
-  reviewFrames, segmentSeconds, voiceTimeline, wholeReview,
+  reviewFrames, sanitizeSegments, segmentSeconds, voiceTimeline, wholeReview,
 } from '../../src/shared/timeline.js';
 import type {Market, ReviewProps, ReviewSegment} from '../../src/shared/types';
 import {lotTitle} from '../ads/LotTool';
@@ -156,7 +156,8 @@ export const ReviewTool: React.FC = () => {
   const replaceSegments = (next: ReviewSegment[], what: string) => {
     if (!source) return;
     if (segments.length && !window.confirm(`Заменить ${segments.length} фрагм. ${what}?`)) return;
-    setSegments(next);
+    // Через ту же чистку, что и на сервере: иначе превью покажет одно, а рендер выдаст другое
+    setSegments(sanitizeSegments(next, source.duration) as ReviewSegment[]);
     setSelectedId(null);
   };
   // Шаблон v1 — нарезка под музыку: 11 кадров по 25 с, точные моменты подбираются на таймлайне
@@ -175,7 +176,7 @@ export const ReviewTool: React.FC = () => {
     const now = next.reduce((n, s) => n + segmentSeconds(s), 0);
     if (next.length === segments.length && now >= was) { report(new Error('Длинных пауз не нашлось')); return; }
     if (!window.confirm(`Убрать паузы: ${sec(was)} → ${sec(now)}, фрагментов ${segments.length} → ${next.length}?`)) return;
-    setSegments(next);
+    setSegments(sanitizeSegments(next, source?.duration) as ReviewSegment[]);
     setSelectedId(null);
   };
 

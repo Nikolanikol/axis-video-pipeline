@@ -1,30 +1,40 @@
-// Обзор авто (review-short): фрагменты своего вертикального видео + оформление AXIS.
-// Хук с моделью → фрагменты с плашками → финал с ценой до порта и контактами. Тайминги — src/shared/timeline.js.
+// Обзор авто (review-short): съёмка + оформление AXIS двумя независимыми дорожками.
+// Съёмка идёт непрерывными кусками (timeline.js → videoRuns): плашка — это наложение,
+// резать под неё видео не нужно, иначе на каждой плашке перематывается файл и дёргается кадр.
+// Само оформление — src/reviews/Overlays.tsx. Тайминги — src/shared/timeline.js.
 import React from 'react';
-import {AbsoluteFill, Audio, Img, OffthreadVideo, Sequence, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
-import {CarTitle, Contacts, PriceTag} from '../shared/blocks';
+import {AbsoluteFill, OffthreadVideo, Sequence, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
 import {defined, resolveAd, themeOf} from '../shared/model';
 import {BackgroundMusic} from '../shared/music';
-import {lineText, linesForSegment, voiceForSegment} from '../shared/subtitles.js';
-import {REVIEW_BPM, buildTimeline} from '../shared/timeline.js';
-import type {ReviewProps, ReviewSegment, ReviewSource, SubtitleLine} from '../shared/types';
-import {BODY, HEAD, Metal, PAD, Shade, ThemeProvider, TopLogo, clamp, useTheme} from '../shared/ui';
+import {linesForSegment, voiceForSegment} from '../shared/subtitles.js';
+import {REVIEW_BPM, buildTimeline, videoRuns} from '../shared/timeline.js';
+import type {ReviewProps, ReviewSegment, ReviewSource} from '../shared/types';
+import {ThemeProvider, clamp} from '../shared/ui';
+import {Empty, SegmentOverlay, SubtitleCue} from './Overlays';
 
 const FADE_IN = 9;   // 0,3 с
 const FADE_OUT = 12; // 0,4 с
+const AUDIO_FADE = 3; // кадра: снимает щелчок живого звука на склейке
 
 // Фрагмент исходника. Вертикальное видео — на весь кадр; горизонтальное — целиком, на размытом фоне.
-const Clip: React.FC<{source: ReviewSource; seg: ReviewSegment; volume: number}> = ({source, seg, volume}) => {
+const Clip: React.FC<{source: ReviewSource; seg: ReviewSegment; frames: number; volume: number}> = ({source, seg, frames, volume}) => {
   const {fps} = useVideoConfig();
   const portrait = (source.width ?? 9) / (source.height ?? 16) < 0.7;
   const muted = !volume || seg.speed !== 1;
+  // Живой звук вводим и выводим плавно: встык склейка даёт щелчок, а обрезанная
+  // на полуслове реплика звучит оборванной. Музыка так устроена с самого начала.
+  const fade = Math.min(AUDIO_FADE, Math.floor(frames / 3));
+  const level = frames >= 6 && fade >= 1
+    ? (f: number) => interpolate(f, [0, fade, frames - fade, frames - 1], [0, volume, volume, 0], clamp)
+    : volume;
   const video = (style: React.CSSProperties, withSound: boolean) => (
     <OffthreadVideo
       src={source.proxy!}
-      trimBefore={seg.start * fps}
+      // Целый кадр: seg.start — секунды с тремя знаками, дробного trimBefore Remotion не ждёт
+      trimBefore={Math.round(seg.start * fps)}
       playbackRate={seg.speed}
       muted={!withSound || muted}
-      volume={volume}
+      volume={level}
       style={{width: '100%', height: '100%', ...style}}
     />
   );
@@ -33,87 +43,6 @@ const Clip: React.FC<{source: ReviewSource; seg: ReviewSegment; volume: number}>
     <AbsoluteFill>
       <AbsoluteFill style={{filter: 'blur(50px) brightness(0.35)', transform: 'scale(1.3)'}}>{video({objectFit: 'cover'}, false)}</AbsoluteFill>
       <AbsoluteFill>{video({objectFit: 'contain'}, true)}</AbsoluteFill>
-    </AbsoluteFill>
-  );
-};
-
-// Плашка фрагмента: тёмная с медной полосой или медная (акцент)
-const CaptionPlate: React.FC<{text: string; accent?: boolean}> = ({text, accent}) => {
-  const C = useTheme();
-  const f = useCurrentFrame(); const {fps} = useVideoConfig();
-  const a = spring({frame: f - 4, fps, config: {damping: 200}});
-  const style: React.CSSProperties = {fontFamily: BODY, fontWeight: 600, fontSize: 52, padding: '22px 34px', color: accent ? C.bg : C.white};
-  return (
-    <AbsoluteFill style={{justifyContent: 'flex-end', alignItems: 'flex-start', padding: PAD}}>
-      <div style={{opacity: a, transform: `translateX(${(1 - a) * -60}px)`}}>
-        {accent
-          ? <Metal style={style}>{text}</Metal>
-          : (
-            <div style={{display: 'flex', alignItems: 'stretch', background: `${C.panel}e0`}}>
-              <Metal style={{width: 12}} />
-              <div style={style}>{text}</div>
-            </div>
-          )}
-      </div>
-    </AbsoluteFill>
-  );
-};
-
-// Субтитры: над плашкой, по центру, внутри безопасной зоны
-const Subtitle: React.FC<{text: string}> = ({text}) => {
-  const C = useTheme();
-  const f = useCurrentFrame();
-  const a = interpolate(f, [0, 4], [0, 1], clamp);
-  return (
-    <AbsoluteFill style={{justifyContent: 'flex-end', alignItems: 'center', padding: '0 150px 500px 80px', opacity: a}}>
-      <div style={{fontFamily: BODY, fontWeight: 600, fontSize: 46, lineHeight: 1.25, color: C.white, textAlign: 'center',
-        background: `${C.bg}cc`, borderRadius: 8, padding: '14px 24px', maxWidth: 850}}>
-        {text}
-      </div>
-    </AbsoluteFill>
-  );
-};
-
-// Финал поверх последнего фрагмента: затемнение, логотип, цена до порта, контакты
-const FinalCard: React.FC<{props: ReviewProps}> = ({props}) => {
-  const C = useTheme();
-  const f = useCurrentFrame(); const {fps} = useVideoConfig();
-  const dim = interpolate(f, [0, 8], [0, 1], clamp);
-  const logo = spring({frame: f - 2, fps, config: {damping: 200}});
-  const contacts = spring({frame: f - 12, fps, config: {damping: 200}});
-  const {lot, market} = props;
-  const ad = lot ? resolveAd({lot, market}) : null;
-  const texts = ad?.texts ?? market.texts;
-  return (
-    <AbsoluteFill>
-      <AbsoluteFill style={{background: `${C.bg}c8`, opacity: dim}} />
-      <AbsoluteFill style={{alignItems: 'center', paddingTop: 190}}>
-        <Img src={staticFile('brand/logo-stacked.svg')} style={{height: 200, opacity: logo, transform: `scale(${0.9 + 0.1 * logo})`}} />
-      </AbsoluteFill>
-      {ad
-        ? <PriceTag ad={ad} delay={4} padding="0 150px 720px 80px" />
-        : (
-          <AbsoluteFill style={{justifyContent: 'center', padding: '0 150px 0 80px'}}>
-            <div style={{fontFamily: HEAD, fontWeight: 700, fontSize: 96, lineHeight: 1.05, color: C.white, textTransform: 'uppercase', opacity: logo}}>
-              {texts.ctaAccent}
-            </div>
-          </AbsoluteFill>
-        )}
-      <AbsoluteFill style={{justifyContent: 'flex-end', padding: PAD}}>
-        <div style={{opacity: contacts, transform: `translateY(${(1 - contacts) * 40}px)`}}>
-          <Contacts whatsapp={ad ? ad.whatsapp : market.whatsapp} whatsappLabel={texts.whatsappLabel} site={ad ? ad.site : market.site} />
-        </div>
-      </AbsoluteFill>
-    </AbsoluteFill>
-  );
-};
-
-const Empty: React.FC<{text: string}> = ({text}) => {
-  const C = useTheme();
-  return (
-    <AbsoluteFill style={{alignItems: 'center', justifyContent: 'center', padding: 120, textAlign: 'center',
-      fontFamily: BODY, fontWeight: 600, fontSize: 48, color: C.grey}}>
-      {text}
     </AbsoluteFill>
   );
 };
@@ -141,32 +70,34 @@ export const ReviewShort: React.FC<ReviewProps> = (props) => {
       <AbsoluteFill style={{background: theme.bg}}>
         {!source && <Empty text={review.source?.status === 'processing' ? 'Видео готовится…' : 'Загрузи видео обзора'} />}
         {source && !items.length && <Empty text="Добавь фрагменты" />}
+        {/* Съёмка: непрерывные куски играют одним элементом, без перемотки на стыке */}
+        {source && videoRuns(items, fps).map((run) => (
+          <Sequence key={`clip-${run.seg.id}`} from={run.from} durationInFrames={run.frames} name={`съёмка ${run.seg.note || run.seg.kind}`}>
+            <Clip source={source} seg={run.seg} frames={run.frames} volume={voiceOn ? 0 : review.sourceVolume ?? 0} />
+          </Sequence>
+        ))}
+        {/* Оформление: плашки, субтитры, карточки — поверх съёмки, своими слоями */}
         {source && items.map(({seg, from, frames}) => {
           const lines = review.speech?.lines ?? [];
           // Озвучка перевода заменяет живой звук: иначе в кадре два голоса разом
           const voice = voiceOn ? voiceForSegment(lines, review.voice!.clips, seg, frames, fps) : [];
           // С озвучкой субтитр держится ровно столько, сколько звучит фраза
-          const subtitles: {id: string; from: number; frames: number; line: SubtitleLine}[] =
+          const subtitles: SubtitleCue[] =
             !review.subtitles?.enabled || !lines.length ? []
               : voice.length ? voice
                 : linesForSegment(lines, seg, frames, fps);
           return (
-          <Sequence key={seg.id} from={from} durationInFrames={frames} name={seg.note || seg.kind}>
-            <Clip source={source} seg={seg} volume={voiceOn ? 0 : review.sourceVolume ?? 0} />
-            {voice.map(({id, from: at, frames: dur, file}) => (
-              <Sequence key={`${seg.id}-voice-${id}`} from={at} durationInFrames={dur} name={`озвучка ${id}`}>
-                <Audio src={file} volume={review.voice?.volume ?? 1} />
-              </Sequence>
-            ))}
-            {seg.kind === 'hook' && <><Shade /><CarTitle {...title} /></>}
-            {seg.kind === 'caption' && seg.caption ? <CaptionPlate text={seg.caption} accent={seg.accent} /> : null}
-            {seg.kind === 'caption' && subtitles.map(({id, from, frames: dur, line}) => (
-              <Sequence key={`${seg.id}-${id}`} from={from} durationInFrames={dur} name={`субтитр ${id}`}>
-                <Subtitle text={lineText(line, Boolean(review.subtitles?.useTranslation))} />
-              </Sequence>
-            ))}
-            {seg.kind === 'final' ? <FinalCard props={props} /> : <TopLogo />}
-          </Sequence>
+            <Sequence key={seg.id} from={from} durationInFrames={frames} name={seg.note || seg.kind}>
+              <SegmentOverlay
+                seg={seg}
+                props={props}
+                title={title}
+                voice={voice}
+                subtitles={subtitles}
+                useTranslation={Boolean(review.subtitles?.useTranslation)}
+                voiceVolume={review.voice?.volume ?? 1}
+              />
+            </Sequence>
           );
         })}
         <Fade />

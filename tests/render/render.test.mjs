@@ -121,10 +121,25 @@ describe('обзор review-short', () => {
     return {out, comp};
   };
 
-  it('длительность по фрагментам: шаблон v1 — 25 с', async () => {
+  // Длительность композиции обязана совпадать с таймлайном, а не с числом из шаблона:
+  // тестовый исходник 12 с, а шаблон v1 просит 31 с материала (ускоренный пункт — 3 с экрана × 3).
+  // Полные 25 с из короткой съёмки получались бы только повтором материала — это и есть
+  // прыжок назад на склейке. Сам договор «31 с исходника → ровно 25 с экрана» проверяет
+  // быстрый тест в tests/unit/timeline.test.ts, без рендера.
+  it('длительность композиции совпадает с таймлайном', async () => {
+    const {reviewFrames} = await import('../../src/shared/timeline.js');
     const comp = await selectComposition({serveUrl, id: 'review-short', inputProps: base, puppeteerInstance: browser});
-    expect(comp.durationInFrames).toBe(25 * 30);
+    expect(comp.durationInFrames).toBe(reviewFrames(base.review.segments));
     expect([comp.width, comp.height]).toEqual([1080, 1920]);
+  });
+
+  it('шаблон не показывает материал дважды', async () => {
+    let prevEnd = 0;
+    for (const s of base.review.segments) {
+      expect(s.start, `${s.note} начинается раньше конца предыдущего`).toBeGreaterThanOrEqual(prevEnd - 1e-9);
+      prevEnd = s.start + s.duration;
+    }
+    expect(prevEnd).toBeLessThanOrEqual(base.review.source.duration + 1e-9);
   });
 
   it('кадры раскадровки: видео и оформление на месте', async () => {
@@ -140,9 +155,11 @@ describe('обзор review-short', () => {
   });
 
   it('ролик с музыкой рынка: звук есть, доли попадают в склейки', async () => {
+    const {reviewFrames} = await import('../../src/shared/timeline.js');
     const {out} = await renderReview('music', base);
     const streams = await probe(out);
-    expect(Number(streams.find((s) => s.codec_type === 'video').duration)).toBeCloseTo(25, 1);
+    expect(Number(streams.find((s) => s.codec_type === 'video').duration))
+      .toBeCloseTo(reviewFrames(base.review.segments) / 30, 1);
     const audio = await decodeAudio(out);
     expect(peak(audio)).toBeGreaterThan(0.05);
     const offset = beatOffset(audio, 0.5);

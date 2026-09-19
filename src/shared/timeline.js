@@ -38,6 +38,38 @@ export const segmentSeconds = (seg) => {
   return Math.max(BEAT_SEC, Math.round(raw / BEAT_SEC) * BEAT_SEC);
 };
 
+/** Шаг, которым может меняться экранное время фрагмента: доля темпа, у exact — кадр */
+const screenStep = (seg) => (seg.exact ? 1 / REVIEW_FPS : BEAT_SEC);
+
+/**
+ * Прижимает фрагмент к исходнику так, чтобы его экранное время в него помещалось.
+ * segmentSeconds округляет длину ВВЕРХ к доле — без этой поправки ролик читает
+ * дальше конца съёмки, и последний кадр подмерзает. В voiceTimeline такая защита
+ * уже стоит; здесь она общая для всех раскладок.
+ * @param {Segment} seg
+ * @param {number} limit — длительность исходника
+ * @returns {Segment}
+ */
+export const fitToSource = (seg, limit) => {
+  if (!Number.isFinite(limit) || limit <= 0) return seg;
+  // Метку автора не двигаем НИКОГДА: сдвиг начала назад каскадом ломает стык
+  // с предыдущим фрагментом. Ужимается только длина.
+  const room = Math.max(0, limit - seg.start); // исходника доступно с метки
+  // Доля темпа при ускорении съедает вдвое-втрое больше съёмки: 0,5 с экрана при x3 — это 1,5 с.
+  // Если места не хватает даже на минимум, сперва снимаем ускорение…
+  let speed = seg.speed;
+  while (speed > 1 && BEAT_SEC * speed > room) speed -= 1;
+  // …но только если это и правда помогло: когда доля не влезает даже на x1, снижение
+  // ускорения ничего не даёт, и менять замысел автора незачем — вернём как было.
+  if (BEAT_SEC * speed > room) speed = seg.speed;
+  // Доля не влезла — считаем этот фрагмент по кадрам, а не по долям темпа
+  const fitted = {...seg, speed, exact: seg.exact || BEAT_SEC * speed > room};
+  const step = screenStep(fitted);
+  const maxScreen = Math.floor((room / speed) / step) * step;
+  const screen = Math.max(step, Math.min(segmentSeconds(fitted), maxScreen));
+  return {...fitted, duration: round(Math.min(screen * speed, room))};
+};
+
 /**
  * @param {Segment[]} segments
  * @returns {{items: {seg: Segment, index: number, from: number, frames: number}[], durationInFrames: number}}
@@ -51,6 +83,28 @@ export const buildTimeline = (segments, fps = REVIEW_FPS) => {
     return item;
   });
   return {items, durationInFrames: from};
+};
+
+/**
+ * Непрерывные куски съёмки: соседние фрагменты, идущие по исходнику подряд и с той же
+ * скоростью, — это один кусок, и рвать его нечем. Каждый новый элемент видео заново
+ * перематывает файл, и на стыке дёргается кадр; при этом разреза в СОДЕРЖАНИИ там нет.
+ * Плашки, субтитры и карточки от разреза не зависят — они ложатся поверх отдельными слоями.
+ * @param {{seg: Segment, index: number, from: number, frames: number}[]} items — из buildTimeline
+ * @returns {{seg: Segment, from: number, frames: number}[]}
+ */
+export const videoRuns = (items, fps = REVIEW_FPS) => {
+  const runs = [];
+  for (const it of items) {
+    const last = runs[runs.length - 1];
+    // Докуда предыдущий кусок уже прочитал исходник
+    const readTo = last ? last.seg.start + (last.frames / fps) * last.seg.speed : 0;
+    // Полкадра допуска: длины хранятся в секундах и округляются
+    const joins = last && last.seg.speed === it.seg.speed && Math.abs(readTo - it.seg.start) < 0.5 / fps;
+    if (joins) last.frames += it.frames;
+    else runs.push({seg: it.seg, from: it.from, frames: it.frames});
+  }
+  return runs;
 };
 
 /** Длительность ролика в кадрах (у пустого проекта — заглушка) */
@@ -100,7 +154,18 @@ export const sanitizeSegments = (raw, sourceDuration) => {
       note: typeof s.note === 'string' ? s.note.slice(0, MAX_CAPTION) : '',
     });
   }
-  return out;
+  // Длины правим одним проходом и обязательно по ИСХОДНОЙ разметке: fitToSource
+  // переписывает duration округлённой длиной, и после него уже не отличить,
+  // пересекались фрагменты у автора или наползли от округления.
+  return out.map((cur, i) => {
+    const next = out[i + 1];
+    // Предел — конец съёмки, а если следом идёт фрагмент дальше по исходнику и автор
+    // не размечал перекрытия, то и его начало: иначе округление длины вверх заедет
+    // на соседа, и тот отмотает картинку назад. Авторский нахлёст и прыжки по съёмке
+    // не трогаем — это монтаж.
+    const abuts = next && next.start > cur.start && cur.start + cur.duration <= next.start + 1e-9;
+    return fitToSource(cur, abuts ? Math.min(limit, next.start) : limit);
+  });
 };
 
 // Шаблон v1: обход авто, 25 с. spec — какая строка характеристик лота идёт в плашку.
@@ -139,11 +204,17 @@ export const wholeReview = (sourceDuration) => {
       {id: id(2), start: hook, duration: round(total - hook), speed: 1, kind: 'final', caption: '', accent: false, note: 'Цена и контакты'},
     ];
   }
-  const finalStart = round(total - WHOLE_FINAL_SEC);
+  // Середину берём целым числом долей. Иначе segmentSeconds округлит её вверх, кусок
+  // вычитает исходник дальше начала финала — и на стыке картинка прыгает назад.
+  // Ровные стыки важны ещё и потому, что непрерывную съёмку ролик играет одним куском.
+  const middle = Math.max(BEAT_SEC, Math.floor((total - WHOLE_HOOK_SEC - WHOLE_FINAL_SEC) / BEAT_SEC) * BEAT_SEC);
+  const finalStart = round(WHOLE_HOOK_SEC + middle);
   return [
     {id: id(1), start: 0, duration: WHOLE_HOOK_SEC, speed: 1, kind: 'hook', caption: '', accent: false, note: 'Заставка поверх начала'},
-    {id: id(2), start: WHOLE_HOOK_SEC, duration: round(finalStart - WHOLE_HOOK_SEC), speed: 1, kind: 'caption', caption: '', accent: false, note: 'Обзор целиком'},
-    {id: id(3), start: finalStart, duration: WHOLE_FINAL_SEC, speed: 1, kind: 'final', caption: '', accent: false, note: 'Цена и контакты'},
+    {id: id(2), start: WHOLE_HOOK_SEC, duration: round(middle), speed: 1, kind: 'caption', caption: '', accent: false, note: 'Обзор целиком'},
+    // Финал длится ровно WHOLE_FINAL_SEC. Остаток съёмки (меньше доли) не добираем:
+    // иначе длина перестанет быть кратной доле и стык уедет с бита.
+    {id: id(3), start: finalStart, duration: round(Math.min(WHOLE_FINAL_SEC, total - finalStart)), speed: 1, kind: 'final', caption: '', accent: false, note: 'Цена и контакты'},
   ];
 };
 
@@ -291,19 +362,31 @@ export const cutPauses = (segments, lines, {minGap = PAUSE_MIN_GAP, keep = PAUSE
  * @param {string[]} specs
  * @returns {Segment[]}
  */
-export const applyTemplate = (sourceDuration, specs = [], template = TEMPLATE_V1) =>
-  template.map((t, i) => {
-    const wanted = t.seconds * t.speed;
-    const duration = Math.min(wanted, sourceDuration);
-    const maxStart = Math.max(0, sourceDuration - duration);
+export const applyTemplate = (sourceDuration, specs = [], template = TEMPLATE_V1) => {
+  const total = Number(sourceDuration) > 0 ? Number(sourceDuration) : 0;
+  const specList = specs.filter(Boolean);
+  // Сколько исходника съедает каждый пункт: экранные секунды × ускорение
+  let want = template.map((t) => t.seconds * t.speed);
+  const need = want.reduce((a, b) => a + b, 0);
+  // Материала меньше, чем просит шаблон, — ужимаем всё пропорционально
+  if (need > total && need > 0) want = want.map((w) => (w * total) / need);
+  // Раздаём не старты, а ПРОМЕЖУТКИ: иначе у ускоренных пунктов свой «максимальный старт»,
+  // порядок ломается и фрагменты налезают друг на друга — картинка прыгает назад
+  const spare = Math.max(0, total - want.reduce((a, b) => a + b, 0));
+  const gap = template.length > 1 ? spare / (template.length - 1) : 0;
+  let at = 0;
+  return template.map((t, i) => {
+    const start = at;
+    at = start + want[i] + gap;
     return {
       id: `s${i + 1}-${Math.random().toString(36).slice(2, 6)}`,
-      start: round((maxStart * i) / Math.max(1, template.length - 1)),
-      duration: round(duration),
+      start: round(start),
+      duration: round(want[i]),
       speed: t.speed,
       kind: t.kind,
-      caption: t.spec === undefined ? '' : (specs.filter(Boolean)[t.spec] ?? ''),
+      caption: t.spec === undefined ? '' : (specList[t.spec] ?? ''),
       accent: false,
       note: t.note,
     };
   });
+};
