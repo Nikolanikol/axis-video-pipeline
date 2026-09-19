@@ -198,7 +198,8 @@ const ingest = async (id, uploadedPath, originalName) => {
 };
 
 // Прокси + миниатюры. Результат — в review.json; прогресс — в памяти.
-const processVideo = (id, file, duration, colour = {}) => {
+// sourceColour — сведения о цвете исходника (HDR и его кривая), не цветокоррекция
+const processVideo = (id, file, duration, sourceColour = {}) => {
   if (progress.has(id)) return;
   progress.set(id, 0);
   (async () => {
@@ -207,7 +208,7 @@ const processVideo = (id, file, duration, colour = {}) => {
     const proxy = `proxy-${version}.mp4`;
     const thumbs = `thumbs-${version}`;
     try {
-      await makeProxy(path.join(dir, file), path.join(dir, `${proxy}.part`), duration, (p) => progress.set(id, p * 0.9), colour);
+      await makeProxy(path.join(dir, file), path.join(dir, `${proxy}.part`), duration, (p) => progress.set(id, p * 0.9), sourceColour);
       await fs.rename(path.join(dir, `${proxy}.part`), path.join(dir, proxy));
       const info = await probe(path.join(dir, proxy));
       progress.set(id, 0.95);
