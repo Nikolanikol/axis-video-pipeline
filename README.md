@@ -168,7 +168,10 @@ python3 tools/prep_photos.py lots/<лот> ../audi/Unknown.jpeg:front:blur=0,109
 python3 tools/brand_assets.py /путь/к/брендбуку
 ```
 
-Нужны Pillow и Google Chrome.
+Нужны Pillow и Google Chrome. На Windows вместо `python3` — `python`.
+
+Chrome `brand_assets.py` ищет сам: обычные места установки на macOS и Windows, на Linux — `PATH`.
+Нестандартную сборку можно указать в `CHROME_PATH`.
 
 ## Музыка
 

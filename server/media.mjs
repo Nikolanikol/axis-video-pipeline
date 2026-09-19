@@ -4,11 +4,11 @@ import {spawn} from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {ROOT} from './store.mjs';
+import {remotionTool} from './remotion-bin.mjs';
 
-const REMOTION_BIN = path.join(ROOT, 'node_modules', '.bin', 'remotion');
 const tool = (name) => {
   const custom = process.env[name === 'ffmpeg' ? 'FFMPEG_PATH' : 'FFPROBE_PATH'];
-  return custom ? {cmd: custom, pre: []} : {cmd: REMOTION_BIN, pre: [name]};
+  return custom ? {cmd: custom, pre: []} : remotionTool(name);
 };
 
 export const run = (name, args, {onLine} = {}) => new Promise((resolve, reject) => {

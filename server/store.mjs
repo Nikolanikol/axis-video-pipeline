@@ -38,11 +38,26 @@ export const readJson = async (file) => {
   }
 };
 
+// Windows держит файл открытым дольше, чем ждёшь: антивирус или индексатор успевают
+// вцепиться в только что записанный .tmp, и rename падает с EPERM. Блокировка снимается
+// за миллисекунды, поэтому пара попыток закрывает вопрос. На macOS и Linux не срабатывает.
+const LOCKED = new Set(['EPERM', 'EBUSY', 'EACCES']);
+const renameWithRetry = async (from, to, tries = 5) => {
+  for (let i = 1; ; i++) {
+    try {
+      return await fs.rename(from, to);
+    } catch (e) {
+      if (!LOCKED.has(e.code) || i >= tries) throw e;
+      await new Promise((r) => setTimeout(r, i * 20));
+    }
+  }
+};
+
 export const writeJson = async (file, data) => {
   await fs.mkdir(path.dirname(file), {recursive: true});
   const tmp = `${file}.tmp`;
   await fs.writeFile(tmp, JSON.stringify(data, null, 2) + '\n');
-  await fs.rename(tmp, file);
+  await renameWithRetry(tmp, file);
 };
 
 // Бренд

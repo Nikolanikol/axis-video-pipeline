@@ -5,6 +5,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {execFile} from 'node:child_process';
 import {promisify} from 'node:util';
+import {remotionTool} from '../server/remotion-bin.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -21,8 +22,10 @@ export const useTempEnv = async () => {
 
 // ffmpeg/ffprobe из Remotion
 const run = promisify(execFile);
-export const remotionBin = (tool, args) =>
-  run(path.join(ROOT, 'node_modules', '.bin', 'remotion'), [tool, ...args], {cwd: ROOT, maxBuffer: 64 * 1024 * 1024});
+export const remotionBin = (tool, args) => {
+  const {cmd, pre} = remotionTool(tool);
+  return run(cmd, [...pre, ...args], {cwd: ROOT, maxBuffer: 64 * 1024 * 1024});
+};
 
 export const probe = async (file) => {
   const {stdout} = await remotionBin('ffprobe', ['-v', 'error', '-show_entries', 'stream=codec_type,duration,nb_frames', '-of', 'json', file]);
