@@ -117,6 +117,18 @@ describe('проекты обзоров', () => {
     expect(body.music).toEqual({track: null, volume: 1});
   });
 
+  it('настройки цвета сохраняются и чистятся', async () => {
+    const {body: r} = await call('POST', '/api/reviews', {title: 'Цвет'});
+    expect(r.colour).toEqual({exposure: 0, contrast: 0, saturation: 0, warmth: 0});
+    const {body} = await call('PUT', `/api/reviews/${r.id}`, {
+      ...r, colour: {exposure: 500, contrast: 12.4, saturation: -20, warmth: 'тепло', lift: 9},
+    });
+    expect(body.colour).toEqual({exposure: 100, contrast: 12, saturation: -20, warmth: 0});
+    // Поле не прислали — прежние настройки на месте
+    const {body: kept} = await call('PUT', `/api/reviews/${r.id}`, {...body, colour: undefined});
+    expect(kept.colour).toEqual(body.colour);
+  });
+
   it('сохранение поверх чужих правок отклоняется, а не затирает их', async () => {
     const {body: r} = await call('POST', '/api/reviews', {title: 'Версии'});
     // Форму открыли на этой версии
@@ -145,7 +157,7 @@ describe('видео', {timeout: 120_000}, () => {
     dir = await fs.mkdtemp(path.join(env.dir, 'videos-'));
   }, 30_000);
 
-  it('вертикальное видео с поворотом (как с iPhone) → прокси 1080×1920 и миниатюры', async () => {
+  it('видео с поворотом (как с iPhone) разворачивается, даёт прокси и миниатюры', async () => {
     const file = await makeTestVideo(path.join(dir, 'iphone.mp4'), {width: 320, height: 180, seconds: 4, rotation: 90});
     const {status, body} = await uploadVideo(review.id, file, 'IMG_0001.MOV');
     expect(status).toBe(200);
@@ -154,14 +166,64 @@ describe('видео', {timeout: 120_000}, () => {
 
     const done = await ready(review.id);
     const s = done.source;
-    expect([s.width, s.height]).toEqual([1080, 1920]);
+    // Поворот применён, пропорции сохранены, маленький исходник не растянут
+    expect([s.width, s.height]).toEqual([180, 320]);
     expect(s.duration).toBeCloseTo(4, 0);
     expect(s.thumbs.fps).toBe(2);
     expect(s.thumbs.count).toBeGreaterThanOrEqual(7);
     const info = await probe(onDisk(s.proxy));
-    expect(info.video).toMatchObject({codec: 'h264', width: 1080, height: 1920, fps: 30, rotation: 0});
+    expect(info.video).toMatchObject({codec: 'h264', width: 180, height: 320, fps: 30, rotation: 0});
     expect(await fs.readdir(onDisk(s.thumbs.base))).toContain('0001.jpg');
     review = done;
+  });
+
+  it('большой исходник ужимается до 1080 по ширине', async () => {
+    const {body: r} = await call('POST', '/api/reviews', {title: 'Большой'});
+    const file = await makeTestVideo(path.join(dir, 'big.mp4'), {width: 1600, height: 2848, seconds: 2});
+    await uploadVideo(r.id, file, 'big.mp4');
+    const done = await ready(r.id);
+    // Вписан в 1080×1920 с сохранением пропорций: кадр выше 9:16, поэтому упирается в высоту
+    expect(done.source.width).toBeLessThan(1600);
+    expect(done.source.width).toBeLessThanOrEqual(1080);
+    expect(done.source.height).toBeLessThanOrEqual(1920);
+    expect(done.source.height).toBeGreaterThan(1900);
+  });
+
+  it('HDR с телефона переводится в обычный цвет, а теги не врут', async () => {
+    const {body: r} = await call('POST', '/api/reviews', {title: 'HDR'});
+    const file = await makeTestVideo(path.join(dir, 'hdr.mp4'), {width: 180, height: 320, seconds: 2, hdr: true});
+    const {body: up} = await uploadVideo(r.id, file, 'IMG_HDR.MOV');
+    expect(up.source.original.hdr).toBe(true);
+    const done = await ready(r.id);
+    const info = await probe(onDisk(done.source.proxy));
+    // Рабочая копия — обычный BT.709: иначе плееры трактуют её по-разному и картинка выходит вялой
+    expect(info.video.hdr).toBe(false);
+    expect(info.video.transfer).not.toBe('arib-std-b67');
+  });
+
+  it('маленький исходник не растягивается: апскейл только весит', async () => {
+    const {body: r} = await call('POST', '/api/reviews', {title: 'Мелкий'});
+    const file = await makeTestVideo(path.join(dir, 'small.mp4'), {width: 240, height: 426, seconds: 2});
+    await uploadVideo(r.id, file, 'small.mp4');
+    const done = await ready(r.id);
+    expect(done.source.width).toBeLessThanOrEqual(240);
+    expect(done.source.height).toBeLessThanOrEqual(426);
+  });
+
+  it('«Пересобрать видео» делает копию заново из того же файла', async () => {
+    const {body: r} = await call('POST', '/api/reviews', {title: 'Пересборка'});
+    expect((await call('POST', `/api/reviews/${r.id}/reprocess`)).status).toBe(400);   // видео ещё нет
+
+    const file = await makeTestVideo(path.join(dir, 'again.mp4'), {width: 180, height: 320, seconds: 2});
+    await uploadVideo(r.id, file, 'again.mp4');
+    const first = await ready(r.id);
+    const {body: started} = await call('POST', `/api/reviews/${r.id}/reprocess`);
+    expect(started.source.status).toBe('processing');
+    const second = await ready(r.id);
+    // Новая версия копии, исходник тот же, фрагменты и речь на месте
+    expect(second.source.proxy).not.toBe(first.source.proxy);
+    expect(second.source.name).toBe('again.mp4');
+    await fs.access(onDisk(second.source.proxy));
   });
 
   it('фрагменты обрезаются по длине готового видео', async () => {

@@ -72,8 +72,10 @@ export type ReviewSource = {
   hasAudio?: boolean;
   // Миниатюры для таймлайна: <base>/0001.jpg … каждые 1/fps секунды
   thumbs?: {fps: number; count: number; base: string};
-  original?: {codec?: string; width?: number; height?: number; fps?: number; rotation?: number; duration?: number; size?: number};
+  // hdr — снято в HDR (iPhone: Dolby Vision + HLG); при сборке рабочей копии цвет переводится в BT.709
+  original?: {codec?: string; width?: number; height?: number; fps?: number; rotation?: number; duration?: number; size?: number; hdr?: boolean; transfer?: string};
 };
+export type {Colour} from './colour.js';
 export type {Line as SubtitleLine} from './subtitles.js';
 // Распознанная речь: слова с таймингами (сервер) и строки субтитров (можно править)
 export type ReviewSpeech = {
@@ -113,6 +115,8 @@ export type Review = {
   music?: Music;
   // Громкость живого звука с видео (0 — выключен; на ускоренных фрагментах всегда выключен)
   sourceVolume?: number;
+  // Цветокоррекция съёмки на весь ролик (оформление не трогает)
+  colour?: import('./colour.js').Colour;
   // Речь: язык исходника (ISO-639, например rus), распознавание и показ субтитров
   speechLanguage?: string;
   // Язык субтитров-перевода и озвучки (пусто — берём язык рынка)

@@ -12,8 +12,8 @@ import {getFormat, listFormats, storyboardFrames} from './formats.mjs';
 import {addPhoto, applyBlur, photoInfo, removePhoto} from './photos.mjs';
 import {enqueue, getJob, listJobs} from './renderer.mjs';
 import {
-  UPLOAD_TMP, createReview, defaultMarketFor, getReview, ingestSource, listReviews, rebuildLines, transcribeReview,
-  updateReview, voiceReview,
+  UPLOAD_TMP, createReview, defaultMarketFor, getReview, ingestSource, listReviews, rebuildLines, reprocessSource,
+  transcribeReview, updateReview, voiceReview,
 } from './reviews.mjs';
 import {hasKey, hasVoice} from './speech.mjs';
 
@@ -108,6 +108,7 @@ export const createApp = ({photoOrigin}) => {
     if (!req.file) throw new HttpError(400, 'Нет файла видео');
     return ingestSource(req.params.id, req.file.path, req.file.originalname);
   }));
+  api.post('/reviews/:id/reprocess', wrap((req) => reprocessSource(checkId(req.params.id))));
   api.post('/reviews/:id/transcribe', wrap((req) => transcribeReview(checkId(req.params.id))));
   api.post('/reviews/:id/relines', wrap((req) => rebuildLines(checkId(req.params.id))));
   api.post('/reviews/:id/voice', wrap(async (req) => {

@@ -15,6 +15,7 @@ import {Field} from '../LotForm';
 import {MusicFields} from '../MusicFields';
 import {Scrubber, Seek, sec} from './Scrubber';
 import {SegmentList} from './SegmentList';
+import {ColourPanel} from './ColourPanel';
 import {SpeechPanel} from './SpeechPanel';
 
 type SaveState = 'saved' | 'dirty' | 'saving' | 'error';
@@ -119,6 +120,12 @@ export const ReviewTool: React.FC = () => {
       setSave('saved');
     } catch (e) { report(e); }
   };
+  // Пересборка рабочей копии из того же файла: перезаливать 400 МБ ради смены обработки незачем
+  const reprocess = async () => {
+    if (!review) return;
+    if (!window.confirm('Собрать рабочую копию заново? Фрагменты и распознанная речь останутся.')) return;
+    try { adoptServer(await api.reprocessVideo(review.id)); } catch (e) { report(e); }
+  };
   const sendVideo = async (file?: File) => {
     if (!file || !review) return;
     if (save === 'dirty') await persist();
@@ -132,6 +139,8 @@ export const ReviewTool: React.FC = () => {
   const marketId = lot?.market ?? review?.market ?? config.defaultMarket;
   const market = markets.find((m) => m.id === marketId) ?? markets[0];
   const source = review?.source?.status === 'ready' ? review.source : null;
+  // Видео из мессенджера приходит сильно меньше 1080p — никакой обработкой резкость не вернуть
+  const smallSource = Boolean(source?.original?.width && Math.max(source.original.width, source.original.height ?? 0) < 1280);
   const segments = review?.segments ?? [];
   const selected = segments.find((s) => s.id === selectedId) ?? null;
   const timeline = useMemo(() => buildTimeline(segments, REVIEW_FPS), [segments]);
@@ -246,11 +255,23 @@ export const ReviewTool: React.FC = () => {
                         <span className="muted">
                           {sec(source.duration ?? 0)} · {source.original?.width}×{source.original?.height}
                           {source.original?.fps ? ` · ${source.original.fps} fps` : ''}{source.original?.codec ? ` · ${source.original.codec.toUpperCase()}` : ''}
+                          {source.original?.hdr ? ' · HDR' : ''}
                         </span>
                       </div>
                     )}
-                    <button className="btn" onClick={() => fileRef.current?.click()}>{source ? 'Заменить видео' : 'Загрузить видео'}</button>
+                    <div className="btn-row">
+                      <button className="btn" onClick={() => fileRef.current?.click()}>{source ? 'Заменить видео' : 'Загрузить видео'}</button>
+                      {source && (
+                        <button className="btn ghost" onClick={reprocess}
+                          title="Собрать рабочую копию заново из того же файла — нужно, когда поменялась обработка (например, перевод HDR в обычный цвет)">
+                          Пересобрать видео
+                        </button>
+                      )}
+                    </div>
                     <span className="muted">или перетащи файл сюда (.mov / .mp4 с iPhone)</span>
+                    {source && smallSource && (
+                      <span className="warn-inline">Это сжатая копия ({source.original?.width}×{source.original?.height}) — залей оригинал из галереи телефона, качество заметно выше</span>
+                    )}
                   </>
                 )}
                 <input ref={fileRef} type="file" accept="video/*,.mov,.mp4,.m4v" hidden
@@ -305,6 +326,11 @@ export const ReviewTool: React.FC = () => {
                 onError={report}
                 onSeek={(t) => seekRef.current?.(t)}
               />
+
+              {source && (
+                <ColourPanel colour={review.colour} hdrSource={source.original?.hdr}
+                  onChange={(colour) => edit({colour})} />
+              )}
 
               <h2>Звук</h2>
               <MusicFields value={review.music} inherited={market?.music ?? {track: null}} onChange={(music) => edit({music})} />

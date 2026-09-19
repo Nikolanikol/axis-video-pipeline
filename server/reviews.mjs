@@ -3,6 +3,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {linesFromWords, sanitizeLines} from '../src/shared/subtitles.js';
 import {canSpeak, findLanguage, languageName, targetLanguageOf} from '../src/shared/languages.js';
+import {sanitizeColour} from '../src/shared/colour.js';
 import {sanitizeSegments} from '../src/shared/timeline.js';
 import {makeProxy, makeThumbs, probe} from './media.mjs';
 import {extractAudio, hasKey, hasVoice, synthesize, transcribe, voiceHash, voiceId} from './speech.mjs';
@@ -72,7 +73,7 @@ export const createReview = async ({lotId, title} = {}) => {
     name = [lot.brand, lot.model, lot.year].filter(Boolean).join(' ');
   }
   await fs.mkdir(reviewDir(id), {recursive: true});
-  return write(id, {title: name || 'Новый обзор', lotId: linked, market: undefined, source: null, segments: [], sourceVolume: 0});
+  return write(id, {title: name || 'Новый обзор', lotId: linked, market: undefined, source: null, segments: [], sourceVolume: 0, colour: sanitizeColour(null)});
 };
 
 // Сохранение из формы. Видео (source) меняется только загрузкой; фрагменты чистятся по длине исходника.
@@ -115,6 +116,7 @@ export const updateReview = (id, body) => withLock(`review:${id}`, async () => {
     },
     music,
     sourceVolume: Number.isFinite(body.sourceVolume) ? Math.min(1, Math.max(0, body.sourceVolume)) : current.sourceVolume ?? 0,
+    colour: sanitizeColour(body.colour ?? current.colour),
   });
 });
 
@@ -127,6 +129,26 @@ const cleanMedia = async (id, keep = []) => {
     if (keep.includes(f)) continue;
     if (/^(source\.|proxy-|thumbs-)/.test(f)) await fs.rm(path.join(dir, f), {recursive: true, force: true});
   }
+};
+
+/**
+ * Пересобрать рабочую копию из уже загруженного исходника — перезаливать файл не нужно.
+ * Нужна, когда поменялась сама обработка: например, добавился перевод HDR в обычный цвет.
+ * Фрагменты и речь не трогаем: их тайминги считаются от длительности, а она не меняется.
+ */
+export const reprocessSource = async (id) => {
+  const review = await read(id);
+  const s = review.source;
+  if (!s?.file) throw new HttpError(400, 'Видео не загружено — пересобирать нечего');
+  if (progress.has(id) || ingesting.has(id)) throw new HttpError(409, 'Видео уже обрабатывается');
+  const info = await probe(path.join(reviewDir(id), s.file)).catch(() => null);
+  if (!info?.video) throw new HttpError(400, 'Исходник не читается — загрузи видео заново');
+  const saved = await setSource(id, {
+    ...s, status: 'processing', progress: 0, error: undefined,
+    original: {...info.video, duration: info.duration, size: info.size},
+  });
+  processVideo(id, s.file, info.duration, {hdr: Boolean(info.video.hdr), transfer: info.video.transfer});
+  return saved;
 };
 
 // Загрузка исходника: проверяем, что это видео, и запускаем обработку в фоне
@@ -171,12 +193,12 @@ const ingest = async (id, uploadedPath, originalName) => {
   await fs.rename(uploadedPath, path.join(reviewDir(id), file));
   const original = {...info.video, duration: info.duration, size: info.size};
   const saved = await setSource(id, {status: 'processing', progress: 0, name: String(originalName).slice(0, 200), file, original});
-  processVideo(id, file, info.duration);
+  processVideo(id, file, info.duration, {hdr: Boolean(info.video?.hdr), transfer: info.video?.transfer});
   return saved;
 };
 
 // Прокси + миниатюры. Результат — в review.json; прогресс — в памяти.
-const processVideo = (id, file, duration) => {
+const processVideo = (id, file, duration, colour = {}) => {
   if (progress.has(id)) return;
   progress.set(id, 0);
   (async () => {
@@ -185,7 +207,7 @@ const processVideo = (id, file, duration) => {
     const proxy = `proxy-${version}.mp4`;
     const thumbs = `thumbs-${version}`;
     try {
-      await makeProxy(path.join(dir, file), path.join(dir, `${proxy}.part`), duration, (p) => progress.set(id, p * 0.9));
+      await makeProxy(path.join(dir, file), path.join(dir, `${proxy}.part`), duration, (p) => progress.set(id, p * 0.9), colour);
       await fs.rename(path.join(dir, `${proxy}.part`), path.join(dir, proxy));
       const info = await probe(path.join(dir, proxy));
       progress.set(id, 0.95);
@@ -212,7 +234,7 @@ const processVideo = (id, file, duration) => {
 const resumeIfStale = (review) => {
   const s = review.source;
   if (s?.status === 'processing' && !progress.has(review.id) && s.file) {
-    processVideo(review.id, s.file, s.original?.duration ?? 0);
+    processVideo(review.id, s.file, s.original?.duration ?? 0, {hdr: Boolean(s.original?.hdr), transfer: s.original?.transfer});
   }
 };
 

@@ -57,6 +57,7 @@ export const api = {
   createReview: (data: {lotId?: string | null; title?: string}) => request<ReviewEntry>('POST', '/api/reviews', data),
   saveReview: (r: ReviewEntry, baseUpdatedAt?: string) => request<ReviewEntry>('PUT', `/api/reviews/${r.id}`, {...r, baseUpdatedAt}),
   renderReview: (id: string, silent: boolean) => request<Job>('POST', `/api/reviews/${id}/render`, {silent}),
+  reprocessVideo: (id: string) => request<ReviewEntry>('POST', `/api/reviews/${id}/reprocess`),
   transcribe: (id: string) => request<ReviewEntry>('POST', `/api/reviews/${id}/transcribe`),
   rebuildLines: (id: string) => request<ReviewEntry>('POST', `/api/reviews/${id}/relines`),
   voiceReview: (id: string) => request<ReviewEntry>('POST', `/api/reviews/${id}/voice`),

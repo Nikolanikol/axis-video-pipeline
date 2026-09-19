@@ -34,11 +34,22 @@ export const run = (name, args, {onLine} = {}) => new Promise((resolve, reject) 
   });
 });
 
-// Сведения о видео: длительность, размер кадра с учётом поворота, частота, есть ли звук
+// Телефоны снимают в HDR (iPhone — Dolby Vision с кривой HLG). Такой цвет нужно перевести
+// в обычный BT.709, иначе картинка выходит вялой: серое небо, приглушённые цвета.
+// Размечено бывает по-разному: у одних файлов есть все три тега, у других только часть.
+// Любой признак широкого охвата означает, что цвет надо переводить.
+const HDR_TRANSFERS = ['arib-std-b67', 'smpte2084'];
+const isHdr = (v) => Boolean(v && (
+  HDR_TRANSFERS.includes(v.color_transfer)
+  || v.color_primaries === 'bt2020'
+  || String(v.color_space ?? '').startsWith('bt2020')
+));
+
+// Сведения о видео: длительность, размер кадра с учётом поворота, частота, есть ли звук, цвет
 export const probe = async (file) => {
   const out = await run('ffprobe', [
     '-v', 'error', '-show_entries',
-    'format=duration,size:stream=codec_type,codec_name,width,height,r_frame_rate:stream_side_data=rotation',
+    'format=duration,size:stream=codec_type,codec_name,width,height,r_frame_rate,pix_fmt,color_space,color_transfer,color_primaries:stream_side_data=rotation',
     '-of', 'json', file,
   ]);
   const data = JSON.parse(out.slice(out.indexOf('{')));
@@ -56,16 +67,35 @@ export const probe = async (file) => {
       height: turned ? v.width : v.height,
       fps: den ? Math.round((num / den) * 100) / 100 : 0,
       rotation,
+      hdr: isHdr(v),
+      transfer: v.color_transfer ?? '',
     } : null,
   };
 };
 
 // Рабочая копия: H.264, до 1080×1920 с сохранением пропорций, 30 fps, ключевой кадр каждые 0,5 с (быстрая перемотка)
-export const makeProxy = async (input, output, duration, onProgress) => {
-  await run('ffmpeg', [
+// Уменьшаем до 1080×1920, но никогда не увеличиваем: апскейл резкости не добавляет,
+// а вес файла и время рендера растут (сжатая копия 464×832 давала 53 МБ вместо 11).
+const SCALE = "scale=w='min(1080,iw)':h='min(1920,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2";
+
+/**
+ * HDR → BT.709. Без этого шага 10-битная картинка HLG пишется как 8-битная, но с тегами HDR:
+ * плееры трактуют её по-разному, и в ролике она выходит вялой — серое небо, приглушённые цвета.
+ * Вход задаём явно: у части файлов размечен не весь цвет, и тогда zscale не знает, откуда переводить.
+ */
+const tonemapChain = (transfer) => {
+  const tin = transfer === 'smpte2084' ? 'smpte2084' : 'arib-std-b67';
+  return `zscale=tin=${tin}:min=bt2020nc:pin=bt2020:t=linear:npl=100,format=gbrpf32le,`
+    + 'tonemap=tonemap=hable:desat=0,zscale=p=bt709:t=bt709:m=bt709:r=tv,';
+};
+
+export const makeProxy = async (input, output, duration, onProgress, {hdr = false, transfer = ''} = {}) => {
+  const encode = (filters) => run('ffmpeg', [
     '-hide_banner', '-v', 'error', '-y', '-hwaccel', 'auto', '-i', input,
     '-map', '0:v:0', '-map', '0:a:0?',
-    '-vf', 'scale=w=1080:h=1920:force_original_aspect_ratio=decrease:force_divisible_by=2,format=yuv420p',
+    '-vf', filters,
+    // Теги цвета пишем честные — иначе файл снова объявит себя HDR
+    '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
     '-r', '30', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-g', '15', '-keyint_min', '15', '-sc_threshold', '0',
     '-c:a', 'aac', '-b:a', '128k', '-ac', '2', '-movflags', '+faststart',
     // Пишем во временный файл (.part) — формат указываем явно
@@ -76,6 +106,16 @@ export const makeProxy = async (input, output, duration, onProgress) => {
       if (m && duration > 0) onProgress?.(Math.min(1, Number(m[1]) / 1e6 / duration));
     },
   });
+
+  const plain = `${SCALE},format=yuv420p`;
+  if (!hdr) return encode(plain);
+  try {
+    return await encode(`${tonemapChain(transfer)}${plain}`);
+  } catch (e) {
+    // Размеченный не по стандарту файл не должен ронять загрузку: берём его как есть
+    console.warn('Перевод HDR не удался, собираю копию без него:', e.message);
+    return encode(plain);
+  }
 };
 
 // Миниатюры для таймлайна: fps штук в секунду, 180 px по ширине

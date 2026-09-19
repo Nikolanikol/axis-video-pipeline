@@ -98,7 +98,7 @@ export const beatOffset = ({samples, sampleRate: sr}, period, {skipSec = 0.5, ta
 export const peak = ({samples}) => samples.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
 
 // Тестовое видео: градиент с бегущим прямоугольником. rotation — поворот в метаданных, как у iPhone.
-export const makeTestVideo = async (file, {width, height, seconds, fps = 10, rotation = 0, audio = false}) => {
+export const makeTestVideo = async (file, {width, height, seconds, fps = 10, rotation = 0, audio = false, hdr = false}) => {
   const {default: sharp} = await import('sharp');
   const frames = await fs.mkdtemp(path.join(os.tmpdir(), 'axis-frames-'));
   const total = Math.round(seconds * fps);
@@ -120,8 +120,12 @@ export const makeTestVideo = async (file, {width, height, seconds, fps = 10, rot
     await fs.writeFile(wav, sineWav(seconds));
     audioIn = ['-i', wav, '-c:a', 'aac', '-b:a', '96k', '-shortest'];
   }
+  // hdr — помечаем файл как HLG/BT.2020, как это делает iPhone
+  const color = hdr
+    ? ['-pix_fmt', 'yuv420p10le', '-colorspace', 'bt2020nc', '-color_primaries', 'bt2020', '-color_trc', 'arib-std-b67']
+    : ['-pix_fmt', 'yuv420p'];
   await remotionBin('ffmpeg', ['-hide_banner', '-v', 'error', '-y', ...videoIn, ...audioIn,
-    '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-r', '30', plain]);
+    '-c:v', 'libx264', ...color, '-r', '30', plain]);
   if (rotation) {
     await remotionBin('ffmpeg', ['-hide_banner', '-v', 'error', '-y', '-display_rotation', String(rotation), '-i', plain, '-c', 'copy', file]);
     await fs.rm(plain, {force: true});
