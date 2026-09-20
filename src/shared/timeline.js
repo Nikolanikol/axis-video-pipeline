@@ -1,18 +1,22 @@
 // Таймлайн обзора: фрагменты исходного видео → кадры ролика.
+// (clipOf — из narration.js: длина фразы берётся из начитки)
 // Общий модуль (JS) — его используют ролик, интерфейс, сервер и тесты.
 
 /**
  * @typedef {'hook' | 'caption' | 'final'} SegmentKind
  * @typedef {{
  *   id: string, start: number, duration: number, speed: number,
- *   kind: SegmentKind, caption?: string, accent?: boolean, note?: string, exact?: boolean,
+ *   kind: SegmentKind, caption?: string, accent?: boolean, note?: string, exact?: boolean, voiceLine?: string,
  * }} Segment
  * start и duration — секунды исходника; speed — ускорение (1, 2, 3).
  * exact — длину не привязывать к доле (раскладка под озвучку: ритм задаёт речь).
  * hook — заставка с моделью, caption — фрагмент с плашкой (пустая — без плашки), final — цена и контакты.
  */
 
-export const REVIEW_FPS = 30;
+// 60 кадров: половина съёмки — проход камеры вокруг машины, и на 30 он заметно дёрганый.
+// Детализация от частоты не зависит, но плавность движения — да. Цена: рендер вдвое дольше
+// и файлы примерно на 40 % тяжелее. Рекламные форматы остаются на своей частоте (config/formats.json).
+export const REVIEW_FPS = 60;
 // Темп монтажа: длительности фрагментов кратны доле, чтобы склейки попадали в музыку
 export const REVIEW_BPM = 120;
 export const BEAT_SEC = 60 / REVIEW_BPM;
@@ -24,6 +28,8 @@ export const MAX_CAPTION = 80;
 export const MAX_REVIEW_SEC = 60;
 // Пустой проект: заглушка на 3 секунды
 export const EMPTY_FRAMES = 3 * REVIEW_FPS;
+
+import {clipOf, narrationSlots} from './narration.js';
 
 const round = (v, digits = 3) => Math.round(v * 10 ** digits) / 10 ** digits;
 
@@ -65,9 +71,15 @@ export const fitToSource = (seg, limit) => {
   // Доля не влезла — считаем этот фрагмент по кадрам, а не по долям темпа
   const fitted = {...seg, speed, exact: seg.exact || BEAT_SEC * speed > room};
   const step = screenStep(fitted);
-  const maxScreen = Math.floor((room / speed) / step) * step;
+  // Допуск на погрешность деления: 2,3333 / (1/30) даёт 69,99999, и без него
+  // фрагмент терял кадр, а стык с соседом расходился и рвал картинку
+  const maxScreen = Math.floor((room / speed) / step + 1e-6) * step;
   const screen = Math.max(step, Math.min(segmentSeconds(fitted), maxScreen));
-  return {...fitted, duration: round(Math.min(screen * speed, room))};
+  const fixed = Math.min(screen * speed, room);
+  // У фрагментов под озвучку длина кратна кадру. Округление до знаков после запятой
+  // ломает кратность (2,3333 → 2,333), стык расходится на кадр, и картинка рвётся там,
+  // где съёмка продолжается: было 20 кусков съёмки вместо 10.
+  return {...fitted, duration: fitted.exact ? Math.floor(fixed * REVIEW_FPS + 1e-6) / REVIEW_FPS : round(fixed)};
 };
 
 /**
@@ -142,12 +154,17 @@ export const sanitizeSegments = (raw, sourceDuration) => {
     seen.add(id);
     const start = Math.min(Math.max(0, Number(s.start) || 0), Math.max(0, limit - 0.1));
     const duration = Math.min(Math.max(0.1, Number(s.duration) || 0), limit - start);
+    // У фрагментов под озвучку длины кратны кадру. Округление до знаков после запятой
+    // ломает эту кратность (2,3333 → 2,333), и следующий стык расходится на кадр —
+    // картинка рвётся там, где съёмка продолжается. Поэтому их держим на сетке кадров.
+    const grid = (v) => (s.exact ? Math.floor(v * REVIEW_FPS + 1e-6) / REVIEW_FPS : round(v));
     out.push({
       id,
-      start: round(start),
-      duration: round(duration),
+      start: grid(start),
+      duration: grid(duration),
       speed: SPEEDS.includes(Number(s.speed)) ? Number(s.speed) : 1,
       exact: Boolean(s.exact),
+      voiceLine: typeof s.voiceLine === 'string' && /^[\w-]{1,20}$/.test(s.voiceLine) ? s.voiceLine : undefined,
       kind: KINDS.includes(s.kind) ? s.kind : 'caption',
       caption: typeof s.caption === 'string' ? s.caption.slice(0, MAX_CAPTION) : '',
       accent: Boolean(s.accent),
@@ -220,19 +237,28 @@ export const wholeReview = (sourceDuration) => {
 
 // Между фразами оставляем воздух, иначе озвучка звучит очередью
 export const VOICE_GAP = 0.15;
+// Щель короче этого считаем случайной и склеиваем встык: длины округляются вниз до целого кадра,
+// курсор понемногу отстаёт, и картинка рвалась там, где съёмка на деле продолжается.
+export const VOICE_SNAP = 0.25;
 
 /**
  * Раскладка под озвучку: по фрагменту на строку перевода, длина — под синтезированный клип.
  * Кадр остаётся тот же, что был под этой фразой у автора, поэтому картинка не разъезжается с речью.
  * @param {{id: string, start: number, end: number}[]} lines
- * @param {Record<string, {duration: number}>} clips — клипы озвучки по id строки
+ * @param {{clips?: object, track?: {file: string}} | null | undefined} voice — озвучка: начитка или прежние клипы
  * @param {number} sourceDuration
  * @returns {Segment[]}
  */
-export const voiceTimeline = (lines, clips, sourceDuration, {gap = VOICE_GAP} = {}) => {
+export const voiceTimeline = (lines, voice, sourceDuration, {gap = VOICE_GAP} = {}) => {
   const limit = Number(sourceDuration) > 0 ? Number(sourceDuration) : Infinity;
-  const usable = (Array.isArray(lines) ? lines : []).filter((l) => Number(clips?.[l?.id]?.duration) > 0);
-  const want = usable.map((l) => round(clips[l.id].duration + gap));
+  const usable = (Array.isArray(lines) ? lines : []).filter((l) => clipOf(voice, l?.id));
+  // Длина фразы на экране — из начитки: у единой дорожки паузы уже внутри неё
+  const slots = narrationSlots(usable, voice, {gap});
+  // Сразу прижимаем к целому кадру: план и таймлайн должны считать одинаково, иначе
+  // между фрагментами копится щель и картинка рвётся на ровном месте.
+  // Округлять до знаков после запятой нельзя: 2,3333 станет 2,333, а прижатие к кадру
+  // срежет с этого ещё кадр — ровно та щель, из-за которой появлялись лишние склейки.
+  const want = slots.map((s) => Math.floor(s.seconds * REVIEW_FPS) / REVIEW_FPS);
   const total = want.reduce((a, b) => a + b, 0);
 
   // Курсор по исходнику идёт только вперёд: отмотка назад показала бы кусок дважды — это и читается как рывок.
@@ -241,7 +267,9 @@ export const voiceTimeline = (lines, clips, sourceDuration, {gap = VOICE_GAP} = 
     const starts = [];
     let pos = 0;
     usable.forEach((line, i) => {
-      const start = pos + Math.max(0, line.start - pos) * factor;
+      const wanted = pos + Math.max(0, line.start - pos) * factor;
+      // Почти нулевой перескок — это не монтажное решение, а остаток округления
+      const start = wanted - pos <= VOICE_SNAP ? pos : wanted;
       starts.push(start);
       pos = start + want[i];
     });
@@ -264,18 +292,24 @@ export const voiceTimeline = (lines, clips, sourceDuration, {gap = VOICE_GAP} = 
     const wanted = want[i];
     // Материала может не хватить, только если озвучка длиннее самой съёмки
     const start = Math.min(starts[i], Math.max(0, limit - wanted));
-    // Длину прижимаем к целому кадру вниз: округление вверх вылезло бы за исходник и подморозило последний кадр
+    // За исходник не вылезаем: у самого конца съёмки фрагмент может оказаться короче фразы
     const room = Math.min(wanted, limit - start);
-    const duration = Math.max(1 / REVIEW_FPS, Math.floor(room * REVIEW_FPS) / REVIEW_FPS);
+    // Длина уже кратна кадру — режем только если упёрлись в конец съёмки
+    const duration = room >= wanted ? wanted : Math.max(1 / REVIEW_FPS, Math.floor(room * REVIEW_FPS) / REVIEW_FPS);
     out.push({
       id: `v${i + 1}-${line.id}`.slice(0, 40),
-      start: round(start),
+      // Старт тоже держим на целом кадре: округление до знаков после запятой сдвигало
+      // его вверх и последний фрагмент вылезал за конец съёмки
+      start: Math.floor(start * REVIEW_FPS) / REVIEW_FPS,
       duration,
       speed: 1,
       exact: true,
       kind: i === 0 ? 'hook' : i === usable.length - 1 ? 'final' : 'caption',
       caption: '',
       accent: false,
+      // Какую фразу озвучки играет этот фрагмент. Связываем явно: старты поджимаются под остаток
+      // материала, и фрагмент может начаться позже своей фразы — по совпадению времён её не найти.
+      voiceLine: line.id,
       note: i === 0 ? 'Заставка' : i === usable.length - 1 ? 'Цена и контакты' : `Фраза ${i + 1}`,
     });
   });

@@ -9,6 +9,7 @@ export type PhotoInfo = {path: string; source: string; regions: Region[]};
 export type Config = {
   brand: Theme; markets: MarketEntry[]; defaultMarket: string; formats: FormatMeta[]; pipelines: unknown[];
   features: {speech: boolean; voice: boolean};
+  voices?: import('../src/shared/types').VoiceRegistry;
 };
 export type ReviewEntry = Review & {id: string};
 export type JobQuery = {lot?: string; review?: string};
@@ -61,6 +62,12 @@ export const api = {
   transcribe: (id: string) => request<ReviewEntry>('POST', `/api/reviews/${id}/transcribe`),
   rebuildLines: (id: string) => request<ReviewEntry>('POST', `/api/reviews/${id}/relines`),
   voiceReview: (id: string) => request<ReviewEntry>('POST', `/api/reviews/${id}/voice`),
+  // Прослушать спикера: сервер отдаёт mp3, играем его сразу
+  previewVoice: async (speaker: string, language: string, text: string) => {
+    const res = await fetch('/api/voices/preview', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({speaker, language, text})});
+    if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? 'Не удалось озвучить');
+    return URL.createObjectURL(await res.blob());
+  },
   // Загрузка видео с прогрессом (fetch его не умеет)
   uploadVideo: (id: string, file: File, onProgress: (share: number) => void) => new Promise<ReviewEntry>((resolve, reject) => {
     const xhr = new XMLHttpRequest();

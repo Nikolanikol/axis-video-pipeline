@@ -15,6 +15,7 @@ import {Field} from '../LotForm';
 import {MusicFields} from '../MusicFields';
 import {Scrubber, Seek, sec} from './Scrubber';
 import {SegmentList} from './SegmentList';
+import {speechStale} from '../../src/shared/subtitles.js';
 import {ColourPanel} from './ColourPanel';
 import {SpeechPanel} from './SpeechPanel';
 
@@ -174,7 +175,7 @@ export const ReviewTool: React.FC = () => {
   // Целиком — ничего не режем, только заставка и финал по краям
   const applyWhole = () => replaceSegments(wholeReview(source?.duration ?? 0), 'обзором целиком');
   // Под озвучку — кадр на фразу, длина каждого под длину синтезированного клипа
-  const applyVoice = () => replaceSegments(voiceTimeline(speechLines, review?.voice?.clips ?? {}, source?.duration ?? 0), 'раскладкой под озвучку');
+  const applyVoice = () => replaceSegments(voiceTimeline(speechLines, review?.voice, source?.duration ?? 0), 'раскладкой под озвучку');
 
   const speechLines = review?.speech?.lines ?? [];
   const voiceClips = Object.keys(review?.voice?.clips ?? {}).length;
@@ -197,6 +198,7 @@ export const ReviewTool: React.FC = () => {
     totalSec > MAX_REVIEW_SEC && `ролик ${sec(totalSec)} — длиннее ${MAX_REVIEW_SEC} с`,
     !lot && 'обзор не привязан к лоту — без марки и цены',
     lot && !lot.carPriceUsd && !(lot.carPriceKrw && lot.krwPerUsd) && 'у лота нет цены — будет «XX XXX $»',
+    speechStale(review?.speech, source) && 'речь распознана по другому видео — субтитры и озвучка лягут мимо кадра',
   ].filter(Boolean) as string[];
 
   if (!loaded) return <div className="boot">Загрузка обзоров…</div>;
@@ -320,6 +322,8 @@ export const ReviewTool: React.FC = () => {
                 available={config.features?.speech ?? false}
                 canVoice={config.features?.voice ?? false}
                 market={market as {language?: string} | null}
+                voices={config.voices}
+                source={source}
                 ready={Boolean(source)}
                 onChange={edit}
                 onServer={adoptServer}

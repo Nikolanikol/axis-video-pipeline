@@ -57,32 +57,68 @@ export const transcribe = async (file, {language} = {}) => {
   };
 };
 
-// Озвучка: только модели v3 умеют македонский, остальные — нет
+// Озвучка: модель и голос приходят из реестра спикеров (config/voices.json).
+// Только модели v3 умеют македонский; английский лучше звучит на multilingual_v2 — поэтому
+// модель задаётся на язык, а не одна на всё.
 const TTS_MODEL = process.env.ELEVENLABS_TTS_MODEL || 'eleven_v3';
-export const voiceId = () => process.env.ELEVENLABS_VOICE_ID || '';
-export const hasVoice = () => Boolean(hasKey() && voiceId());
+export const hasVoice = () => hasKey();
 
-/** Ключ клипа: тот же текст тем же голосом не переозвучиваем */
-export const voiceHash = (text, {voice = voiceId(), model = TTS_MODEL, language = ''} = {}) =>
-  crypto.createHash('sha1').update(`${voice}|${model}|${language}|${text}`).digest('hex').slice(0, 10);
+/** Ключ клипа: тот же текст тем же голосом, моделью и настройками не переозвучиваем */
+export const voiceHash = (text, {voice = '', model = TTS_MODEL, language = '', settings} = {}) =>
+  crypto.createHash('sha1')
+    .update(`${voice}|${model}|${language}|${settings ? JSON.stringify(settings) : ''}|${text}`)
+    .digest('hex').slice(0, 10);
 
 /**
- * Текст → mp3 голосом из ELEVENLABS_VOICE_ID.
+ * Текст → mp3 указанным голосом.
  * @param {string} text
- * @param {{language?: string, voice?: string, model?: string}} options
+ * @param {{language?: string, voice?: string, model?: string, settings?: object}} options
  * @returns {Promise<Buffer>}
  */
-export const synthesize = async (text, {language, voice = voiceId(), model = TTS_MODEL} = {}) => {
+export const synthesize = async (text, {language, voice, model = TTS_MODEL, settings} = {}) => {
   if (!hasKey()) throw new HttpError(400, 'Нет ключа ElevenLabs: добавь ELEVENLABS_API_KEY в .env и перезапусти сервер');
-  if (!voice) throw new HttpError(400, 'Не выбран голос: добавь ELEVENLABS_VOICE_ID в .env и перезапусти сервер');
+  if (!voice) throw new HttpError(400, 'Не выбран голос: проверь config/voices.json');
   const res = await fetch(`${BASE}/v1/text-to-speech/${encodeURIComponent(voice)}?output_format=mp3_44100_128`, {
     method: 'POST',
     headers: {'xi-api-key': process.env.ELEVENLABS_API_KEY, 'Content-Type': 'application/json'},
-    body: JSON.stringify({text, model_id: model, ...(language ? {language_code: language} : {})}),
+    body: JSON.stringify({
+      text, model_id: model,
+      ...(language ? {language_code: language} : {}),
+      ...(settings ? {voice_settings: settings} : {}),
+    }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new HttpError(res.status === 401 || res.status === 403 ? 400 : 502, message(res.status, body, 'Text to Speech'));
   }
   return Buffer.from(await res.arrayBuffer());
+};
+
+/**
+ * Начитка одним запросом: весь текст + разметка по символам.
+ * Так голос ровный на всём переводе, а паузы между фразами ставит сама модель.
+ * @param {string} text
+ * @param {{language?: string, voice?: string, model?: string, settings?: object}} options
+ * @returns {Promise<{audio: Buffer, alignment: object}>}
+ */
+export const synthesizeScript = async (text, {language, voice, model = TTS_MODEL, settings} = {}) => {
+  if (!hasKey()) throw new HttpError(400, 'Нет ключа ElevenLabs: добавь ELEVENLABS_API_KEY в .env и перезапусти сервер');
+  if (!voice) throw new HttpError(400, 'Не выбран голос: проверь config/voices.json');
+  const res = await fetch(`${BASE}/v1/text-to-speech/${encodeURIComponent(voice)}/with-timestamps?output_format=mp3_44100_128`, {
+    method: 'POST',
+    headers: {'xi-api-key': process.env.ELEVENLABS_API_KEY, 'Content-Type': 'application/json'},
+    body: JSON.stringify({
+      text, model_id: model,
+      ...(language ? {language_code: language} : {}),
+      ...(settings ? {voice_settings: settings} : {}),
+    }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    throw new HttpError(res.status === 401 || res.status === 403 ? 400 : 502, message(res.status, body, 'Text to Speech'));
+  }
+  const body = await res.json();
+  if (!body?.audio_base64) throw new HttpError(502, 'ElevenLabs вернул начитку без звука');
+  // alignment размечен по отправленному тексту, normalized_alignment — по приведённому
+  return {audio: Buffer.from(body.audio_base64, 'base64'), alignment: body.alignment ?? body.normalized_alignment};
 };

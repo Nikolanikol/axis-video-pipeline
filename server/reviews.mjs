@@ -6,13 +6,18 @@ import {canSpeak, findLanguage, languageName, targetLanguageOf} from '../src/sha
 import {sanitizeColour} from '../src/shared/colour.js';
 import {sanitizeSegments} from '../src/shared/timeline.js';
 import {makeProxy, makeThumbs, probe} from './media.mjs';
-import {extractAudio, hasKey, hasVoice, synthesize, transcribe, voiceHash, voiceId} from './speech.mjs';
-import {DATA_DIR, DEFAULT_MARKET, HttpError, checkId, getLot, readJson, withLock, writeJson} from './store.mjs';
+import {apiSettings, resolveSpeaker, voiceConfig} from '../src/shared/voices.js';
+import {buildScript, lineTimes} from '../src/shared/narration.js';
+import {extractAudio, hasKey, hasVoice, synthesizeScript, transcribe, voiceHash} from './speech.mjs';
+import {CONFIG_DIR, DATA_DIR, DEFAULT_MARKET, HttpError, checkId, getLot, readJson, withLock, writeJson} from './store.mjs';
 
 export const REVIEWS_DIR = path.join(DATA_DIR, 'reviews');
 export const UPLOAD_TMP = path.join(DATA_DIR, 'tmp');
 export const MAX_SOURCE_SEC = 10 * 60;
 export const THUMBS_FPS = 2;
+
+// Реестр спикеров озвучки — общий на проект, читаем при каждой озвучке (правится редко, файл крошечный)
+export const voiceRegistry = () => readJson(path.join(CONFIG_DIR, 'voices.json')).catch(() => ({speakers: [], defaults: {}}));
 
 const reviewDir = (id) => path.join(REVIEWS_DIR, checkId(id));
 const reviewFile = (id) => path.join(reviewDir(id), 'review.json');
@@ -98,6 +103,8 @@ export const updateReview = (id, body) => withLock(`review:${id}`, async () => {
     // Язык речи в видео — для распознавания; язык перевода — для субтитров и озвучки
     speechLanguage: typeof body.speechLanguage === 'string' ? body.speechLanguage.slice(0, 8) : current.speechLanguage,
     targetLanguage: findLanguage(body.targetLanguage) ? body.targetLanguage : current.targetLanguage,
+    // Спикер озвучки: проверяем при синтезе, здесь просто запоминаем выбор
+    voiceSpeaker: typeof body.voiceSpeaker === 'string' ? body.voiceSpeaker.slice(0, 40) : current.voiceSpeaker,
     segments: sanitizeSegments(body.segments ?? current.segments, current.source?.duration),
     // Слова и статус распознавания меняет только сервер; из формы принимаем правки строк
     speech: current.speech && {
@@ -263,7 +270,13 @@ export const transcribeReview = async (id) => {
     try {
       const audio = await extractAudio(path.join(dir, path.basename(review.source.proxy)), path.join(dir, 'speech.m4a'));
       const result = await transcribe(audio, {language: review.speechLanguage || undefined});
-      await saveSpeech({...result, status: 'ready', updatedAt: new Date().toISOString()});
+      // Запоминаем, по какому видео считаны тайминги: его можно заменить, а строки останутся
+      const src = (await read(id)).source ?? {};
+      await saveSpeech({
+        ...result, status: 'ready',
+        source: {name: src.name ?? '', duration: src.duration ?? 0},
+        updatedAt: new Date().toISOString(),
+      });
     } catch (e) {
       console.error(`Распознавание ${id}:`, e.message);
       await saveSpeech({...(await read(id).catch(() => ({}))).speech, status: 'error', error: String(e?.message || e)}).catch(() => {});
@@ -283,7 +296,12 @@ export const voiceReview = async (id, {language, market} = {}) => {
   const lines = (review.speech?.lines ?? []).filter((l) => (l.translation || '').trim());
   if (!lines.length) throw new HttpError(400, 'Нечего озвучивать: у строк нет перевода');
   if (!canSpeak(target)) throw new HttpError(400, `Голос не умеет говорить на языке «${languageName(target)}» — субтитры на нём делать можно, озвучку нет`);
-  if (!hasVoice()) throw new HttpError(400, 'Нет голоса: добавь ELEVENLABS_VOICE_ID в .env и перезапусти сервер');
+  if (!hasVoice()) throw new HttpError(400, 'Нет ключа ElevenLabs: добавь ELEVENLABS_API_KEY в .env и перезапусти сервер');
+  // Голос, модель и настройки — из реестра: на разных языках один спикер читается по-разному
+  const registry = await voiceRegistry();
+  const speaker = resolveSpeaker(registry, target, review.voiceSpeaker);
+  const config = voiceConfig(speaker, target);
+  if (!config) throw new HttpError(400, `Нет спикера для языка «${languageName(target)}» — добавь его в config/voices.json`);
   if (voicing.has(id)) throw new HttpError(409, 'Озвучка уже идёт');
   voicing.set(id, {done: 0, total: lines.length});
   const saveVoice = (patch) => withLock(`review:${id}`, async () => {
@@ -294,26 +312,31 @@ export const voiceReview = async (id, {language, market} = {}) => {
     const dir = path.join(reviewDir(id), 'voice');
     try {
       await fs.mkdir(dir, {recursive: true});
-      const voice = voiceId();
       const language = target;
-      const kept = new Set();
-      let done = 0;
-      const clips = {...(review.voice?.clips ?? {})};
-      for (const line of lines) {
-        const text = line.translation.trim();
-        const hash = voiceHash(text, {voice, language});
-        const name = `${line.id}-${hash}.mp3`;
-        kept.add(name);
-        if (clips[line.id]?.hash === hash) { voicing.set(id, {done: ++done, total: lines.length}); continue; }
-        await fs.writeFile(path.join(dir, name), await synthesize(text, {language, voice}));
-        const {duration} = await probe(path.join(dir, name));
-        clips[line.id] = {file: reviewUrl(id, `voice/${name}`), duration: Math.round((duration || 0) * 100) / 100, hash};
-        voicing.set(id, {done: ++done, total: lines.length});
+      const {voiceId: voice, model} = config;
+      const settings = apiSettings(config.settings);
+      // Весь перевод — одной начиткой: так голос ровный, а паузы ставит сама модель
+      const {text, spans} = buildScript(lines);
+      const hash = voiceHash(text, {voice, model, language, settings});
+      const name = `track-${hash}.mp3`;
+      const file = path.join(dir, name);
+      let times = review.voice?.track?.hash === hash ? review.voice.clips : null;
+      if (!times) {
+        const {audio, alignment} = await synthesizeScript(text, {language, voice, model, settings});
+        await fs.writeFile(file, audio);
+        times = lineTimes(spans, alignment);
+        if (!Object.keys(times).length) throw new HttpError(502, 'ElevenLabs вернул начитку без разметки по символам');
       }
-      // Строки, которых больше нет, и старые версии клипов не копим
-      for (const key of Object.keys(clips)) if (!lines.some((l) => l.id === key)) delete clips[key];
-      for (const f of await fs.readdir(dir)) if (!kept.has(f)) await fs.rm(path.join(dir, f), {force: true});
-      await saveVoice({status: 'ready', error: '', enabled: true, voiceId: voice, language, clips, done: undefined, total: undefined, updatedAt: new Date().toISOString()});
+      voicing.set(id, {done: lines.length, total: lines.length});
+      const {duration} = await probe(file);
+      // Прежние файлы (в том числе построчные клипы старых обзоров) не копим
+      for (const f of await fs.readdir(dir)) if (f !== name) await fs.rm(path.join(dir, f), {force: true});
+      await saveVoice({
+        status: 'ready', error: '', enabled: true,
+        voiceId: voice, speaker: speaker.id, speakerName: speaker.name, model, language,
+        track: {file: reviewUrl(id, `voice/${name}`), duration: Math.round((duration || 0) * 100) / 100, hash},
+        clips: times, done: undefined, total: undefined, updatedAt: new Date().toISOString(),
+      });
     } catch (e) {
       console.error(`Озвучка ${id}:`, e.message);
       await saveVoice({status: 'error', error: String(e?.message || e)}).catch(() => {});
@@ -321,7 +344,7 @@ export const voiceReview = async (id, {language, market} = {}) => {
       voicing.delete(id);
     }
   })();
-  return {...review, voice: {...review.voice, status: 'running', done: 0, total: lines.length}};
+  return {...review, voice: {...review.voice, status: 'running', done: 0, total: lines.length, speaker: speaker.id, speakerName: speaker.name}};
 };
 
 export const defaultMarketFor = (review, lot) => lot?.market || review.market || DEFAULT_MARKET;

@@ -4,6 +4,7 @@ import http from 'node:http';
 import path from 'node:path';
 import {afterAll, beforeAll, describe, expect, it} from 'vitest';
 import {makeTestVideo, sineWav, useTempEnv, waitFor} from '../helpers.mjs';
+import {REVIEW_FPS} from '../../src/shared/timeline.js';
 
 const env = await useTempEnv();
 
@@ -17,11 +18,21 @@ const eleven = await (async () => {
     state.requests++;
     state.lastKey = req.headers['xi-api-key'];
     state.lastBody = Buffer.concat(chunks).toString('latin1');
-    // Озвучка: отдаём короткий тон — сервер по нему померит длительность клипа
+    // Озвучка одной начиткой: тон плюс разметка по символам (по 0,05 с на символ)
     if (req.url.startsWith('/v1/text-to-speech/') && state.status === 200) {
       state.tts++;
-      res.writeHead(200, {'Content-Type': 'audio/mpeg'});
-      res.end(sineWav(0.8));
+      const text = JSON.parse(state.lastBody || '{}').text ?? '';
+      const chars = [...text];
+      const step = 0.05;
+      res.writeHead(200, {'Content-Type': 'application/json'});
+      res.end(JSON.stringify({
+        audio_base64: sineWav(Math.max(0.5, chars.length * step)).toString('base64'),
+        alignment: {
+          characters: chars,
+          character_start_times_seconds: chars.map((_, i) => +(i * step).toFixed(3)),
+          character_end_times_seconds: chars.map((_, i) => +((i + 1) * step).toFixed(3)),
+        },
+      }));
       return;
     }
     res.writeHead(state.status, {'Content-Type': 'application/json'});
@@ -172,7 +183,8 @@ describe('видео', {timeout: 120_000}, () => {
     expect(s.thumbs.fps).toBe(2);
     expect(s.thumbs.count).toBeGreaterThanOrEqual(7);
     const info = await probe(onDisk(s.proxy));
-    expect(info.video).toMatchObject({codec: 'h264', width: 180, height: 320, fps: 30, rotation: 0});
+    // частота копии равна частоте обзора: лишние кадры обрабатывать незачем, недостающие взять неоткуда
+    expect(info.video).toMatchObject({codec: 'h264', width: 180, height: 320, fps: REVIEW_FPS, rotation: 0});
     expect(await fs.readdir(onDisk(s.thumbs.base))).toContain('0001.jpg');
     review = done;
   });
@@ -399,11 +411,10 @@ describe('озвучка перевода', {timeout: 120_000}, () => {
     review = back;
   });
 
-  it('озвучивает построчно и показывает, сколько готово', async () => {
+  it('весь перевод — одной начиткой, отрезки строк берутся из разметки', async () => {
     const before = eleven.state.tts;
     const {status, body} = await call('POST', `/api/reviews/${review.id}/voice`);
     expect(status).toBe(200);
-    // Прогресс виден сразу: синтез идёт в фоне, а форме есть что показать
     expect(body.voice).toMatchObject({status: 'running', done: 0, total: 2});
 
     const done = await waitFor(async () => {
@@ -411,20 +422,36 @@ describe('озвучка перевода', {timeout: 120_000}, () => {
       if (r.voice?.status === 'error') throw new Error(r.voice.error);
       return r.voice?.status === 'ready' ? r : null;
     });
-    expect(eleven.state.tts).toBe(before + 2);
-    expect(Object.keys(done.voice.clips)).toHaveLength(2);
-    for (const clip of Object.values(done.voice.clips)) {
-      expect(clip.duration).toBeGreaterThan(0);
-      expect(clip.file).toMatch(/^\/data\/reviews\/.+\/voice\/.+\.mp3$/);
-      await fs.access(onDisk(clip.file));
+    // Один запрос на весь текст, а не по запросу на строку: иначе голос «прыгает» между фразами
+    expect(eleven.state.tts).toBe(before + 1);
+    expect(done.voice.track.file).toMatch(/^\/data\/reviews\/.+\/voice\/track-.+\.mp3$/);
+    await fs.access(onDisk(done.voice.track.file));
+    expect(done.voice.track.duration).toBeGreaterThan(0);
+
+    // У каждой строки свой отрезок дорожки, идущий по порядку и не пустой
+    const ids = review.speech.lines.map((l) => l.id);
+    let prev = -1;
+    for (const id of ids) {
+      const c = done.voice.clips[id];
+      expect(c.to).toBeGreaterThan(c.from);
+      expect(c.from).toBeGreaterThanOrEqual(prev);
+      prev = c.to;
     }
-    expect(done.voice).toMatchObject({enabled: true, language: 'mk', voiceId: 'test-voice'});
+    expect(done.voice).toMatchObject({enabled: true, language: 'mk', speaker: 'nikolai'});
     review = done;
   });
 
-  it('повторная озвучка трогает только изменённые строки', async () => {
+  it('текст не менялся — начитку не переделываем; поменялся — переозвучиваем целиком', async () => {
+    const same = eleven.state.tts;
+    await call('POST', `/api/reviews/${review.id}/voice`);
+    await waitFor(async () => {
+      const {body: r} = await call('GET', `/api/reviews/${review.id}`);
+      return r.voice?.status === 'ready' && !r.voice.total ? r : null;
+    });
+    expect(eleven.state.tts).toBe(same);
+
     const before = eleven.state.tts;
-    const lines = review.speech.lines.map((l, i) => ({...l, translation: i === 0 ? 'Здраво' : 'Друг текст'}));
+    const lines = review.speech.lines.map((l, i) => ({...l, translation: i === 0 ? 'Здраво' : 'Сосема друг текст'}));
     const {body} = await call('PUT', `/api/reviews/${review.id}`, {...review, speech: {...review.speech, lines}});
     review = body;
     await call('POST', `/api/reviews/${review.id}/voice`);
@@ -432,7 +459,7 @@ describe('озвучка перевода', {timeout: 120_000}, () => {
       const {body: r} = await call('GET', `/api/reviews/${review.id}`);
       return r.voice?.status === 'ready' && !r.voice.total ? r : null;
     });
-    // Первая строка не изменилась — её клип взят с диска
+    // Правка любой строки переозвучивает весь текст: иначе в этом месте голос снова «прыгнет»
     expect(eleven.state.tts).toBe(before + 1);
     expect(Object.keys(done.voice.clips)).toHaveLength(2);
   });

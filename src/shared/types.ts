@@ -76,6 +76,7 @@ export type ReviewSource = {
   original?: {codec?: string; width?: number; height?: number; fps?: number; rotation?: number; duration?: number; size?: number; hdr?: boolean; transfer?: string};
 };
 export type {Colour} from './colour.js';
+export type {Speaker, VoiceRegistry} from './voices.js';
 export type {Line as SubtitleLine} from './subtitles.js';
 // Распознанная речь: слова с таймингами (сервер) и строки субтитров (можно править)
 export type ReviewSpeech = {
@@ -85,6 +86,8 @@ export type ReviewSpeech = {
   language?: string;
   text?: string;
   words?: {text: string; start: number; end: number; type?: string}[];
+  // По какому видео считаны тайминги: его можно заменить, а строки останутся
+  source?: {name?: string; duration?: number};
   lines: import('./subtitles.js').Line[];
   updatedAt?: string;
 };
@@ -96,13 +99,18 @@ export type ReviewVoice = {
   volume?: number;
   voiceId?: string;
   voiceName?: string;
+  // Чем озвучено: спикер из реестра и модель синтеза
+  speaker?: string;
+  speakerName?: string;
   model?: string;
   language?: string;
   // Пока идёт озвучка: сколько строк готово из скольких
   done?: number;
   total?: number;
-  // ключ — id строки субтитров
-  clips: Record<string, {file: string; duration: number; hash: string}>;
+  // Единая начитка всего перевода: один файл на обзор
+  track?: {file: string; duration: number; hash: string};
+  // ключ — id строки субтитров. from/to — отрезок дорожки; file/duration — прежний способ (свой клип на строку)
+  clips: Record<string, {from?: number; to?: number; file?: string; duration?: number; hash?: string}>;
   updatedAt?: string;
 };
 export type Review = {
@@ -121,6 +129,8 @@ export type Review = {
   speechLanguage?: string;
   // Язык субтитров-перевода и озвучки (пусто — берём язык рынка)
   targetLanguage?: string;
+  // Кто читает перевод: id спикера из config/voices.json (пусто — по умолчанию для языка)
+  voiceSpeaker?: string;
   speech?: ReviewSpeech | null;
   subtitles?: {enabled: boolean; useTranslation: boolean};
   voice?: ReviewVoice | null;

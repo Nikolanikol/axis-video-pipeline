@@ -3,19 +3,23 @@
 // резать под неё видео не нужно, иначе на каждой плашке перематывается файл и дёргается кадр.
 // Само оформление — src/reviews/Overlays.tsx. Тайминги — src/shared/timeline.js.
 import React from 'react';
-import {AbsoluteFill, OffthreadVideo, Sequence, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
+import {AbsoluteFill, Audio, OffthreadVideo, Sequence, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
 import {defined, resolveAd, themeOf} from '../shared/model';
 import {BackgroundMusic} from '../shared/music';
 import {linesForSegment, voiceForSegment} from '../shared/subtitles.js';
 import {colourFilter, isNeutral, warmthChannels} from '../shared/colour.js';
+import {voicePlan} from '../shared/narration.js';
 import {REVIEW_BPM, buildTimeline, videoRuns} from '../shared/timeline.js';
 import type {ReviewProps, ReviewSegment, ReviewSource} from '../shared/types';
 import {ThemeProvider, clamp} from '../shared/ui';
 import {Empty, SegmentOverlay, SubtitleCue} from './Overlays';
 
-const FADE_IN = 9;   // 0,3 с
-const FADE_OUT = 12; // 0,4 с
-const AUDIO_FADE = 3; // кадра: снимает щелчок живого звука на склейке
+// Тайминги оформления задаём в СЕКУНДАХ и переводим в кадры по частоте композиции.
+// В кадрах их держать нельзя: при переходе обзоров на 60 кадров всё оформление стало
+// вдвое быстрее, и затемнение под карточкой цены начало читаться как обрыв съёмки.
+const FADE_IN_SEC = 0.3;
+const FADE_OUT_SEC = 0.4;
+const AUDIO_FADE_SEC = 0.1; // снимает щелчок живого звука на склейке
 
 // Фрагмент исходника. Вертикальное видео — на весь кадр; горизонтальное — целиком, на размытом фоне.
 const Clip: React.FC<{source: ReviewSource; seg: ReviewSegment; frames: number; volume: number}> = ({source, seg, frames, volume}) => {
@@ -24,7 +28,7 @@ const Clip: React.FC<{source: ReviewSource; seg: ReviewSegment; frames: number; 
   const muted = !volume || seg.speed !== 1;
   // Живой звук вводим и выводим плавно: встык склейка даёт щелчок, а обрезанная
   // на полуслове реплика звучит оборванной. Музыка так устроена с самого начала.
-  const fade = Math.min(AUDIO_FADE, Math.floor(frames / 3));
+  const fade = Math.min(Math.round(AUDIO_FADE_SEC * fps), Math.floor(frames / 3));
   const level = frames >= 6 && fade >= 1
     ? (f: number) => interpolate(f, [0, fade, frames - fade, frames - 1], [0, volume, volume, 0], clamp)
     : volume;
@@ -63,8 +67,10 @@ const WarmthFilter: React.FC<{id: string; r: number; b: number}> = ({id, r, b}) 
 const WARMTH_ID = 'axis-warmth';
 
 const Fade: React.FC = () => {
-  const f = useCurrentFrame(); const {durationInFrames} = useVideoConfig();
-  const o = Math.max(interpolate(f, [0, FADE_IN], [1, 0], clamp), interpolate(f, [durationInFrames - FADE_OUT, durationInFrames - 1], [0, 1], clamp));
+  const f = useCurrentFrame(); const {durationInFrames, fps} = useVideoConfig();
+  const inFrames = Math.round(FADE_IN_SEC * fps);
+  const outFrames = Math.round(FADE_OUT_SEC * fps);
+  const o = Math.max(interpolate(f, [0, inFrames], [1, 0], clamp), interpolate(f, [durationInFrames - outFrames, durationInFrames - 1], [0, 1], clamp));
   return <AbsoluteFill style={{background: '#000', opacity: o}} />;
 };
 
@@ -78,6 +84,8 @@ export const ReviewShort: React.FC<ReviewProps> = (props) => {
   const music = {...market.music, ...defined(review.music ?? {})};
   const voiceOn = Boolean(review.voice?.enabled && review.voice.clips && Object.keys(review.voice.clips).length);
   // Цветокоррекция: фильтр на слой съёмки, теплота — через SVG-матрицу
+  // Озвучка считается один раз по всему таймлайну
+  const cues = voiceOn ? voicePlan(items, review.speech?.lines ?? [], review.voice, fps) : [];
   const grade = {
     filter: isNeutral(review.colour) ? undefined : colourFilter(review.colour, WARMTH_ID),
     warm: review.colour?.warmth ? warmthChannels(review.colour) : null,
@@ -102,15 +110,23 @@ export const ReviewShort: React.FC<ReviewProps> = (props) => {
             ))}
           </AbsoluteFill>
         )}
+        {/* Озвучка — одним слоем на весь ролик: начитка непрерывна, и граница фрагмента
+            картинки не должна обрывать фразу на полуслове */}
+        {source && cues.map(({id, from, frames, file, offset}) => (
+          <Sequence key={`voice-${id}`} from={from} durationInFrames={frames} name={`озвучка ${id}`}>
+            <Audio src={file} volume={review.voice?.volume ?? 1} trimBefore={Math.round(offset * fps)} />
+          </Sequence>
+        ))}
         {/* Оформление: плашки, субтитры, карточки — поверх съёмки, своими слоями */}
         {source && items.map(({seg, from, frames}) => {
           const lines = review.speech?.lines ?? [];
-          // Озвучка перевода заменяет живой звук: иначе в кадре два голоса разом
-          const voice = voiceOn ? voiceForSegment(lines, review.voice!.clips, seg, frames, fps) : [];
-          // С озвучкой субтитр держится ровно столько, сколько звучит фраза
+          // Субтитр держится ровно столько, сколько звучит фраза; без озвучки — по речи автора
+          const spoken = cues
+            .filter((c) => c.from >= from && c.from < from + frames)
+            .map((c) => ({...c, from: c.from - from, frames: Math.min(c.frames, from + frames - c.from)}));
           const subtitles: SubtitleCue[] =
             !review.subtitles?.enabled || !lines.length ? []
-              : voice.length ? voice
+              : spoken.length ? spoken
                 : linesForSegment(lines, seg, frames, fps);
           return (
             <Sequence key={seg.id} from={from} durationInFrames={frames} name={seg.note || seg.kind}>
@@ -118,10 +134,8 @@ export const ReviewShort: React.FC<ReviewProps> = (props) => {
                 seg={seg}
                 props={props}
                 title={title}
-                voice={voice}
                 subtitles={subtitles}
                 useTranslation={Boolean(review.subtitles?.useTranslation)}
-                voiceVolume={review.voice?.volume ?? 1}
               />
             </Sequence>
           );

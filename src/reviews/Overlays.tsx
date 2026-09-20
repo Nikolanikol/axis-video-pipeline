@@ -13,11 +13,15 @@ import {lineText} from '../shared/subtitles.js';
 import type {ReviewProps, ReviewSegment, SubtitleLine} from '../shared/types';
 import {BODY, HEAD, Metal, PAD, Shade, TopLogo, clamp, useTheme} from '../shared/ui';
 
+// Тайминги оформления — в секундах: в кадрах они зависели бы от частоты композиции,
+// и на 60 кадрах всё оформление шло вдвое быстрее (затемнение финала читалось как обрыв).
+const atSec = (sec: number, fps: number) => Math.round(sec * fps);
+
 /** Плашка фрагмента: тёмная с медной полосой или медная (акцент) */
 export const CaptionPlate: React.FC<{text: string; accent?: boolean}> = ({text, accent}) => {
   const C = useTheme();
   const f = useCurrentFrame(); const {fps} = useVideoConfig();
-  const a = spring({frame: f - 4, fps, config: {damping: 200}});
+  const a = spring({frame: f - atSec(0.13, fps), fps, config: {damping: 200}});
   const style: React.CSSProperties = {fontFamily: BODY, fontWeight: 600, fontSize: 52, padding: '22px 34px', color: accent ? C.bg : C.white};
   return (
     <AbsoluteFill style={{justifyContent: 'flex-end', alignItems: 'flex-start', padding: PAD}}>
@@ -38,8 +42,8 @@ export const CaptionPlate: React.FC<{text: string; accent?: boolean}> = ({text, 
 /** Субтитры: над плашкой, по центру, внутри безопасной зоны */
 export const Subtitle: React.FC<{text: string}> = ({text}) => {
   const C = useTheme();
-  const f = useCurrentFrame();
-  const a = interpolate(f, [0, 4], [0, 1], clamp);
+  const f = useCurrentFrame(); const {fps} = useVideoConfig();
+  const a = interpolate(f, [0, atSec(0.13, fps)], [0, 1], clamp);
   return (
     <AbsoluteFill style={{justifyContent: 'flex-end', alignItems: 'center', padding: '0 150px 500px 80px', opacity: a}}>
       <div style={{fontFamily: BODY, fontWeight: 600, fontSize: 46, lineHeight: 1.25, color: C.white, textAlign: 'center',
@@ -54,9 +58,9 @@ export const Subtitle: React.FC<{text: string}> = ({text}) => {
 export const FinalCard: React.FC<{props: ReviewProps}> = ({props}) => {
   const C = useTheme();
   const f = useCurrentFrame(); const {fps} = useVideoConfig();
-  const dim = interpolate(f, [0, 8], [0, 1], clamp);
-  const logo = spring({frame: f - 2, fps, config: {damping: 200}});
-  const contacts = spring({frame: f - 12, fps, config: {damping: 200}});
+  const dim = interpolate(f, [0, atSec(0.27, fps)], [0, 1], clamp);
+  const logo = spring({frame: f - atSec(0.07, fps), fps, config: {damping: 200}});
+  const contacts = spring({frame: f - atSec(0.4, fps), fps, config: {damping: 200}});
   const {lot, market} = props;
   const ad = lot ? resolveAd({lot, market}) : null;
   const texts = ad?.texts ?? market.texts;
@@ -67,7 +71,7 @@ export const FinalCard: React.FC<{props: ReviewProps}> = ({props}) => {
         <Img src={staticFile('brand/logo-stacked.svg')} style={{height: 200, opacity: logo, transform: `scale(${0.9 + 0.1 * logo})`}} />
       </AbsoluteFill>
       {ad
-        ? <PriceTag ad={ad} delay={4} padding="0 150px 720px 80px" />
+        ? <PriceTag ad={ad} delay={atSec(0.13, fps)} padding="0 150px 720px 80px" />
         : (
           <AbsoluteFill style={{justifyContent: 'center', padding: '0 150px 0 80px'}}>
             <div style={{fontFamily: HEAD, fontWeight: 700, fontSize: 96, lineHeight: 1.05, color: C.white, textTransform: 'uppercase', opacity: logo}}>
@@ -94,7 +98,8 @@ export const Empty: React.FC<{text: string}> = ({text}) => {
   );
 };
 
-export type VoiceClip = {id: string; from: number; frames: number; file: string};
+// offset — с какой секунды файла играть: в единой начитке это отрезок общей дорожки
+export type VoiceClip = {id: string; from: number; frames: number; file: string; offset: number};
 export type SubtitleCue = {id: string; from: number; frames: number; line: SubtitleLine};
 
 /**
@@ -105,17 +110,10 @@ export const SegmentOverlay: React.FC<{
   seg: ReviewSegment;
   props: ReviewProps;
   title: {brand: string; model: string; year?: number; trim?: string; tagline: string};
-  voice: VoiceClip[];
   subtitles: SubtitleCue[];
   useTranslation: boolean;
-  voiceVolume: number;
-}> = ({seg, props, title, voice, subtitles, useTranslation, voiceVolume}) => (
+}> = ({seg, props, title, subtitles, useTranslation}) => (
   <>
-    {voice.map(({id, from, frames, file}) => (
-      <Sequence key={`voice-${id}`} from={from} durationInFrames={frames} name={`озвучка ${id}`}>
-        <Audio src={file} volume={voiceVolume} />
-      </Sequence>
-    ))}
     {seg.kind === 'hook' && <><Shade /><CarTitle {...title} /></>}
     {seg.kind === 'caption' && seg.caption ? <CaptionPlate text={seg.caption} accent={seg.accent} /> : null}
     {seg.kind === 'caption' && subtitles.map(({id, from, frames, line}) => (

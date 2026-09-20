@@ -13,9 +13,10 @@ import {addPhoto, applyBlur, photoInfo, removePhoto} from './photos.mjs';
 import {enqueue, getJob, listJobs} from './renderer.mjs';
 import {
   UPLOAD_TMP, createReview, defaultMarketFor, getReview, ingestSource, listReviews, rebuildLines, reprocessSource,
-  transcribeReview, updateReview, voiceReview,
+  transcribeReview, updateReview, voiceRegistry, voiceReview,
 } from './reviews.mjs';
-import {hasKey, hasVoice} from './speech.mjs';
+import {apiSettings, resolveSpeaker, voiceConfig} from '../src/shared/voices.js';
+import {hasKey, hasVoice, synthesize} from './speech.mjs';
 
 // Медиа с путями /data/... браузер рендера берёт по полному адресу этого сервера
 const absolute = (origin, url) => (url && url.startsWith('/') ? `${origin}${url}` : url);
@@ -32,6 +33,8 @@ export const createApp = ({photoOrigin}) => {
   api.get('/config', wrap(async () => ({
     brand: await getBrand(), markets: await listMarkets(), defaultMarket: DEFAULT_MARKET, formats: await listFormats(),
     pipelines: await readJson(path.join(CONFIG_DIR, 'pipelines.json')),
+    // Спикеры озвучки: интерфейс показывает только тех, кто умеет выбранный язык
+    voices: await voiceRegistry(),
     // Что доступно: распознавание речи включается ключом ElevenLabs в .env
     features: {speech: hasKey(), voice: hasVoice()},
   })));
@@ -111,6 +114,18 @@ export const createApp = ({photoOrigin}) => {
   api.post('/reviews/:id/reprocess', wrap((req) => reprocessSource(checkId(req.params.id))));
   api.post('/reviews/:id/transcribe', wrap((req) => transcribeReview(checkId(req.params.id))));
   api.post('/reviews/:id/relines', wrap((req) => rebuildLines(checkId(req.params.id))));
+  // Прослушать спикера: одна фраза вместо озвучки всего обзора. Отдаёт mp3, а не JSON.
+  api.post('/voices/preview', (req, res, next) => (async () => {
+    const language = typeof req.body?.language === 'string' ? req.body.language : 'mk';
+    const registry = await voiceRegistry();
+    const speaker = resolveSpeaker(registry, language, req.body?.speaker);
+    const config = voiceConfig(speaker, language);
+    if (!config) throw new HttpError(400, 'Нет такого спикера для этого языка');
+    const text = String(req.body?.text || '').trim().slice(0, 300);
+    if (!text) throw new HttpError(400, 'Нечего читать: пришли текст фразы');
+    const audio = await synthesize(text, {language, voice: config.voiceId, model: config.model, settings: apiSettings(config.settings)});
+    res.set('Content-Type', 'audio/mpeg').set('Cache-Control', 'no-store').send(audio);
+  })().catch(next));
   api.post('/reviews/:id/voice', wrap(async (req) => {
     const review = await getReview(checkId(req.params.id));
     const lot = review.lotId ? await getLot(review.lotId).catch(() => null) : null;
@@ -129,8 +144,10 @@ export const createApp = ({photoOrigin}) => {
         source: {...review.source, proxy: absolute(photoOrigin, review.source.proxy)},
         voice: review.voice && {
           ...review.voice,
+          // Единая начитка — один файл; у прежних обзоров файл был у каждой строки
+          track: review.voice.track && {...review.voice.track, file: absolute(photoOrigin, review.voice.track.file)},
           clips: Object.fromEntries(Object.entries(review.voice.clips ?? {})
-            .map(([id, c]) => [id, {...c, file: absolute(photoOrigin, c.file)}])),
+            .map(([id, c]) => [id, c.file ? {...c, file: absolute(photoOrigin, c.file)} : c])),
         },
       },
       lot: withAbsolutePhotos(lot, photoOrigin), market, theme,

@@ -3,6 +3,7 @@
 import {spawn} from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import {REVIEW_FPS} from '../src/shared/timeline.js';
 import {ROOT} from './store.mjs';
 import {remotionTool} from './remotion-bin.mjs';
 
@@ -96,7 +97,10 @@ export const makeProxy = async (input, output, duration, onProgress, {hdr = fals
     '-vf', filters,
     // Теги цвета пишем честные — иначе файл снова объявит себя HDR
     '-colorspace', 'bt709', '-color_primaries', 'bt709', '-color_trc', 'bt709', '-color_range', 'tv',
-    '-r', '30', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-g', '15', '-keyint_min', '15', '-sc_threshold', '0',
+    // Частота та же, что у ролика: лишние кадры обрабатывать незачем, недостающие взять неоткуда.
+    // Ключевой кадр каждые полсекунды — от этого зависит, как быстро рендер перематывает копию.
+    '-r', String(REVIEW_FPS), '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20',
+    '-g', String(REVIEW_FPS / 2), '-keyint_min', String(REVIEW_FPS / 2), '-sc_threshold', '0',
     '-c:a', 'aac', '-b:a', '128k', '-ac', '2', '-movflags', '+faststart',
     // Пишем во временный файл (.part) — формат указываем явно
     '-progress', 'pipe:1', '-nostats', '-f', 'mp4', output,
@@ -109,8 +113,13 @@ export const makeProxy = async (input, output, duration, onProgress, {hdr = fals
 
   const plain = `${SCALE},format=yuv420p`;
   if (!hdr) return encode(plain);
+  // Уменьшаем ДО перевода цвета: тонмаппинг раскладывает каждый кадр в линейный свет с
+  // плавающей точкой, и в 4K это вчетверо больше работы, чем в 1080. Замер на M1:
+  // 110 с против 41 с на пяти секундах съёмки. Картинка при этом расходится на 0,6 из 255
+  // по каналам — глазом не отличить.
+  const fast = `${SCALE},${tonemapChain(transfer)}format=yuv420p`;
   try {
-    return await encode(`${tonemapChain(transfer)}${plain}`);
+    return await encode(fast);
   } catch (e) {
     // Размеченный не по стандарту файл не должен ронять загрузку: берём его как есть
     console.warn('Перевод HDR не удался, собираю копию без него:', e.message);

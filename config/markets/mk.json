@@ -9,12 +9,12 @@
   "whatsapp": "+82 10 5865 4344",
   "site": "kmotors.shop",
   "texts": {
-    "hookTagline": "Директно од Кореја",
+    "hookTagline": "From Korea",
     "priceLabel": "Цена до {port}",
     "priceNoteIncluded": "Поморскиот транспорт е вклучен.",
     "priceNoteExcluded": "Царинските давачки не се вклучени.",
     "ctaTitle": "Пресметка\nдо клуч",
-    "ctaAccent": "за 24 часа",
+    "ctaAccent": "in 24 hours",
     "ctaBenefit": "Работиме без провизија",
     "whatsappLabel": "WhatsApp"
   },

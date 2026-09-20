@@ -1,0 +1,69 @@
+{
+  "defaults": {
+    "mk": "nikolai",
+    "en": "nikolai",
+    "sr": "nikolai",
+    "bg": "yakim",
+    "hr": "nikolai",
+    "el": "nikolai",
+    "de": "nikolai",
+    "ru": "nikolai"
+  },
+  "speakers": [
+    {
+      "id": "nikolai",
+      "name": "Николай — свой голос",
+      "voiceId": "JHEaCkr7pvpQMnZ1J7r4",
+      "note": "клон владельца: в кадре он же, поэтому голос узнаваемый",
+      "model": "eleven_v3",
+      "languages": ["mk", "en", "ru", "sr", "bg", "hr", "el", "de"],
+      "perLanguage": {
+        "en": {
+          "model": "eleven_multilingual_v2",
+          "settings": {"stability": 0.4, "similarityBoost": 0.25, "style": 0},
+          "note": "подобрано на слух: речь чище и заметно быстрее, чем на eleven_v3"
+        }
+      }
+    },
+    {
+      "id": "yakim",
+      "name": "Yakim — болгарин, диктор",
+      "voiceId": "NG3DzyUGmLkog1AFB5iv",
+      "note": "болгарская артикуляция ближе к македонской, чем англоязычные голоса",
+      "model": "eleven_v3",
+      "languages": ["mk", "bg", "sr", "ru"]
+    },
+    {
+      "id": "georgi",
+      "name": "Georgi — болгарин, рекламный",
+      "voiceId": "Ywe24jn5elUzaO9vm6vG",
+      "note": "моложе и напористее Yakim",
+      "model": "eleven_v3",
+      "languages": ["mk", "bg", "sr", "ru"]
+    },
+    {
+      "id": "eric",
+      "name": "Eric — американец, спокойный",
+      "voiceId": "cjVigY5qzO86Huf0OWal",
+      "note": "самый быстрый из английских: меньше давит на хронометраж",
+      "model": "eleven_multilingual_v2",
+      "languages": ["en", "de"]
+    },
+    {
+      "id": "george",
+      "name": "George — британец, размеренный",
+      "voiceId": "JBFqnCBsd6RMkjVDRZzb",
+      "note": "солиднее, но медленнее — ролик выходит длиннее",
+      "model": "eleven_multilingual_v2",
+      "languages": ["en"]
+    },
+    {
+      "id": "liam",
+      "name": "Liam — молодой, для соцсетей",
+      "voiceId": "TX3LPaxmHKxFdv7VOQHJ",
+      "note": "энергичный, менее солидный",
+      "model": "eleven_multilingual_v2",
+      "languages": ["en"]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 // Субтитры: слова с таймингами → строки, чистка правок, привязка к фрагментам
 import {describe, expect, it} from 'vitest';
-import {MAX_LINE_CHARS, lineText, linesForSegment, linesFromWords, sanitizeLines, voiceForSegment} from '../../src/shared/subtitles.js';
+import {MAX_LINE_CHARS, lineText, linesForSegment, linesFromWords, sanitizeLines, speechStale, voiceForSegment} from '../../src/shared/subtitles.js';
 
 const words = (...items: [string, number, number][]) => items.map(([text, start, end]) => ({text, start, end, type: 'word'}));
 
@@ -70,11 +70,16 @@ describe('озвучка внутри фрагмента', () => {
     {id: 'l2', start: 4, end: 6, text: 'вторая'},
     {id: 'l3', start: 10, end: 12, text: 'третья'},
   ];
-  const clips = {
+  // Прежний способ: свой файл на строку — такие обзоры ещё есть
+  const clips = {clips: {
     l1: {file: '/v/l1.mp3', duration: 2.5},
     l2: {file: '/v/l2.mp3', duration: 1},
     l3: {file: '/v/l3.mp3', duration: 3},
-  };
+  }};
+  // Единая начитка: отрезки общей дорожки
+  const track = {track: {file: '/v/track.mp3'}, clips: {
+    l1: {from: 0, to: 2.5}, l2: {from: 3, to: 4}, l3: {from: 5, to: 8},
+  }};
 
   it('фраза звучит там, где она была у автора, — озвучка не убегает от картинки', () => {
     const out = voiceForSegment(lines, clips, {start: 0, duration: 8, speed: 1}, 240, 30);
@@ -85,7 +90,7 @@ describe('озвучка внутри фрагмента', () => {
   });
 
   it('если клип длиннее паузы, следующая фраза сдвигается, а не накладывается', () => {
-    const long = {l1: {file: '/v/l1.mp3', duration: 5}, l2: {file: '/v/l2.mp3', duration: 1}};
+    const long = {clips: {l1: {file: '/v/l1.mp3', duration: 5}, l2: {file: '/v/l2.mp3', duration: 1}}};
     const out = voiceForSegment(lines, long, {start: 0, duration: 8, speed: 1}, 240, 30);
     expect(out[0]).toMatchObject({from: 0, frames: 150});
     expect(out[1].from).toBe(150);                       // 4-я секунда занята — встаём следом
@@ -103,8 +108,28 @@ describe('озвучка внутри фрагмента', () => {
     expect(out[0]).toMatchObject({id: 'l3', from: 0, frames: 60});
   });
 
+  it('единая начитка: фраза играет отрезком общей дорожки', () => {
+    const out = voiceForSegment(lines, track, {start: 0, duration: 8, speed: 1}, 240, 30);
+    expect(out.map((o) => o.id)).toEqual(['l1', 'l2']);
+    // файл один на всех, а откуда играть — задаёт offset
+    expect(out[0]).toMatchObject({file: '/v/track.mp3', offset: 0, frames: 75});
+    expect(out[1]).toMatchObject({file: '/v/track.mp3', offset: 3, frames: 30});
+  });
+
+  it('фрагмент со своей фразой играет её, даже если начался позже неё', () => {
+    // Раскладка «под озвучку» поджимает старты: фрагмент начинается на 4,2 с, а фраза была на 4 с
+    const seg = {start: 4.2, duration: 2, speed: 1, voiceLine: 'l2'};
+    const out = voiceForSegment(lines, track, seg, 60, 30);
+    expect(out.map((o) => o.id)).toEqual(['l2']);
+    expect(out[0]).toMatchObject({from: 0, offset: 3, frames: 30});
+  });
+
+  it('фрагмент ссылается на несуществующую фразу — тишина, а не чужой голос', () => {
+    expect(voiceForSegment(lines, track, {start: 0, duration: 2, speed: 1, voiceLine: 'нет'}, 60, 30)).toEqual([]);
+  });
+
   it('без клипов и на ускоренном фрагменте — пусто', () => {
-    expect(voiceForSegment(lines, {}, {start: 0, duration: 8, speed: 1}, 240, 30)).toEqual([]);
+    expect(voiceForSegment(lines, {clips: {}}, {start: 0, duration: 8, speed: 1}, 240, 30)).toEqual([]);
     expect(voiceForSegment(lines, clips, {start: 0, duration: 8, speed: 2}, 120, 30)).toEqual([]);
   });
 });
@@ -131,5 +156,29 @@ describe('строки внутри фрагмента', () => {
 
   it('фрагмент без речи — пусто', () => {
     expect(linesForSegment(lines, {start: 7, duration: 2, speed: 1}, 60, 30)).toEqual([]);
+  });
+});
+
+describe('речь и видео должны быть об одном', () => {
+  const lines = [{id: 'l1', start: 0, end: 2, text: 'а'}, {id: 'l2', start: 58, end: 62, text: 'б'}];
+
+  it('видео заменили — речь помечается чужой', () => {
+    const speech = {source: {name: 'IMG_3678.MOV', duration: 62.7}, lines};
+    expect(speechStale(speech, {name: 'IMG_3678.MOV', duration: 62.7})).toBe(false);
+    expect(speechStale(speech, {name: 'IMG_3640.MOV', duration: 85.3})).toBe(true);
+    // тот же файл, но перезалит другой длины — тоже чужая
+    expect(speechStale(speech, {name: 'IMG_3678.MOV', duration: 85.3})).toBe(true);
+  });
+
+  it('у старых обзоров пометки нет — ловим явное: речь длиннее съёмки', () => {
+    const speech = {lines};
+    expect(speechStale(speech, {duration: 85.3})).toBe(false);
+    expect(speechStale(speech, {duration: 30})).toBe(true);
+  });
+
+  it('без речи или без видео сравнивать нечего', () => {
+    expect(speechStale({lines: []}, {duration: 10})).toBe(false);
+    expect(speechStale(null, {duration: 10})).toBe(false);
+    expect(speechStale({lines}, null)).toBe(false);
   });
 });

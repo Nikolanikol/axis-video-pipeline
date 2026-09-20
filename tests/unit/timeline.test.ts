@@ -29,8 +29,10 @@ describe('длительность фрагмента', () => {
 describe('таймлайн', () => {
   it('фрагменты идут подряд, склейки — на долях', () => {
     const {items, durationInFrames} = buildTimeline([seg({id: 'a', duration: 3}), seg({id: 'b', duration: 9, speed: 3}), seg({id: 'c', duration: 1.1})]);
-    expect(items.map((i) => [i.from, i.frames])).toEqual([[0, 90], [90, 90], [180, 30]]);
-    expect(durationInFrames).toBe(210);
+    // Считаем от REVIEW_FPS: частоту ролика меняли, ожидания не должны её фиксировать
+    const f = (sec: number) => Math.round(sec * REVIEW_FPS);
+    expect(items.map((i) => [i.from, i.frames])).toEqual([[0, f(3)], [f(3), f(3)], [f(6), f(1)]]);
+    expect(durationInFrames).toBe(f(7));
     const beat = BEAT_SEC * REVIEW_FPS;
     for (const i of items) expect(i.from % beat).toBe(0);
   });
@@ -45,9 +47,9 @@ describe('таймлайн', () => {
     const total = reviewFrames(segments);
     const frames = reviewStoryboard(segments);
     expect(frames.length).toBe(4);
-    expect(frames[0]).toBeLessThan(90);                 // хук — первые 3 с
-    expect(frames[frames.length - 1]).toBeGreaterThanOrEqual(total - 90); // финал — последние 3 с
-    expect(frames[frames.length - 1]).toBeLessThan(total - 12);            // но не в затемнении в конце
+    expect(frames[0]).toBeLessThan(3 * REVIEW_FPS);                              // хук — первые 3 с
+    expect(frames[frames.length - 1]).toBeGreaterThanOrEqual(total - 3 * REVIEW_FPS); // финал — последние 3 с
+    expect(frames[frames.length - 1]).toBeLessThan(total - 0.4 * REVIEW_FPS);     // но не в затемнении в конце
     for (const f of frames) {
       expect(f).toBeGreaterThanOrEqual(0);
       expect(f).toBeLessThan(total);
@@ -125,24 +127,42 @@ describe('раскладка под озвучку', () => {
     {id: 'l2', start: 10, end: 12, text: 'б'},
     {id: 'l3', start: 20, end: 22, text: 'в'},
   ];
-  const clips = {l1: {duration: 3.4}, l2: {duration: 1.2}, l3: {duration: 2.0}};
+  // Единая начитка: длина фразы — её отрезок дорожки
+  const clips = {track: {file: '/v/track.mp3'}, clips: {
+    l1: {from: 0, to: 3.4}, l2: {from: 4, to: 5.2}, l3: {from: 6, to: 8},
+  }};
 
-  it('фрагмент на строку: кадр от автора, длина ровно под клип плюс воздух', () => {
+  it('фрагмент на строку: кадр от автора, длина — из начитки вместе с её паузами', () => {
     const s = voiceTimeline(lines, clips, 30, {gap: 0.15});
     expect(s).toHaveLength(3);
     expect(s.map((x) => x.kind)).toEqual(['hook', 'caption', 'final']);
     expect(s.map((x) => x.start)).toEqual([0.5, 10, 20]);
-    // клип + воздух, прижатое к целому кадру: 3,55 / 1,35 / 2,15 с
-    s.forEach((x, i) => expect(x.duration).toBeCloseTo([3.533, 1.333, 2.133][i], 3));
+    // Фразе отведено время до начала следующей (4 и 2 с), последней — её длина плюс хвост.
+    // Свой зазор не добавляем: паузы модели уже внутри дорожки, иначе их вырежет и заменит тишиной.
+    const floorFrame = (sec: number) => Math.floor(sec * REVIEW_FPS) / REVIEW_FPS;
+    s.forEach((x, i) => expect(x.duration).toBeCloseTo(floorFrame([4, 2, 2.15][i]), 5));
     // длина не привязана к доле: под озвучку ритм задаёт речь, а не бит
     expect(s.every((x) => x.exact === true)).toBe(true);
     s.forEach((x) => expect(segmentSeconds(x)).toBeCloseTo(x.duration, 6));
     expect(s.every((x) => x.speed === 1)).toBe(true);
   });
 
+  it('почти нулевые перескоки склеиваются встык: лишние склейки рвут картинку на ровном месте', () => {
+    // Фразы идут подряд по съёмке, между ними доли секунды — это не монтаж, а остаток округления
+    const tight = [{id: 'l1', start: 0, end: 2}, {id: 'l2', start: 2.04, end: 4}, {id: 'l3', start: 4.1, end: 6}];
+    const voice = {track: {file: '/v/t.mp3'}, clips: {
+      l1: {from: 0, to: 2}, l2: {from: 2, to: 4}, l3: {from: 4, to: 6},
+    }};
+    const s = voiceTimeline(tight, voice, 30);
+    for (let i = 1; i < s.length; i++) {
+      const end = s[i - 1].start + segmentSeconds(s[i - 1]);
+      expect(s[i].start, `стык ${i}`).toBeCloseTo(end, 5);
+    }
+  });
+
   it('назад не отматывает: кусок съёмки не показывается дважды', () => {
     // клипы длиннее пауз между фразами — наивная раскладка ушла бы назад
-    const tight = {l1: {duration: 6}, l2: {duration: 6}, l3: {duration: 6}};
+    const tight = {track: {file: '/v/t.mp3'}, clips: {l1: {from: 0, to: 6}, l2: {from: 6, to: 12}, l3: {from: 12, to: 18}}};
     const s = voiceTimeline(lines, tight, 30, {gap: 0});
     for (let i = 1; i < s.length; i++) {
       expect(s[i].start).toBeGreaterThanOrEqual(s[i - 1].start + segmentSeconds(s[i - 1]) - 1 / REVIEW_FPS);
@@ -157,14 +177,15 @@ describe('раскладка под озвучку', () => {
       expect(s[i].start).toBeGreaterThanOrEqual(s[i - 1].start + segmentSeconds(s[i - 1]) - 1 / REVIEW_FPS);
     }
     // длительности озвучки не режутся: фразы звучат целиком
-    s.forEach((x, i) => expect(x.duration).toBeCloseTo([3.533, 1.333, 2.133][i], 3));
+    const floorFrame = (sec: number) => Math.floor(sec * REVIEW_FPS) / REVIEW_FPS;
+    s.forEach((x, i) => expect(x.duration).toBeCloseTo(floorFrame([4, 2, 2.15][i]), 5));
   });
 
   it('строки без озвучки пропускаются', () => {
-    const s = voiceTimeline(lines, {l2: {duration: 1.2}}, 30);
+    const s = voiceTimeline(lines, {track: {file: '/v/t.mp3'}, clips: {l2: {from: 0, to: 1.2}}}, 30);
     expect(s).toHaveLength(1);
     expect(s[0]).toMatchObject({start: 10, kind: 'hook'});
-    expect(voiceTimeline(lines, {}, 30)).toEqual([]);
+    expect(voiceTimeline(lines, {clips: {}}, 30)).toEqual([]);
   });
 
   it('id уникальны', () => {

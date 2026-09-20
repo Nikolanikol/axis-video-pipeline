@@ -7,12 +7,17 @@ import {BODY, CopperText, HEAD, Metal, PAD, clamp, useTheme} from './ui';
 
 export type CarTitleProps = {brand: string; model: string; year?: number | string; trim?: string; tagline?: string};
 
+// Тайминги задаём в секундах и переводим в кадры по частоте композиции: в кадрах они
+// зависели бы от частоты, а обзоры идут в 60, реклама в 30 — одни и те же блоки играли бы
+// с разной скоростью. На 30 кадрах значения совпадают с прежними.
+const atSec = (sec: number, fps: number) => Math.round(sec * fps);
+
 // Марка, модель, год, версия и подзаголовок — выезжают снизу
 export const CarTitle: React.FC<CarTitleProps> = ({brand, model, year, trim, tagline}) => {
   const C = useTheme();
   const f = useCurrentFrame(); const {fps} = useVideoConfig();
-  const up = spring({frame: f - 6, fps, config: {damping: 200}});
-  const bar = interpolate(f, [18, 42], [0, 1], {...clamp, easing: Easing.out(Easing.cubic)});
+  const up = spring({frame: f - atSec(0.2, fps), fps, config: {damping: 200}});
+  const bar = interpolate(f, [atSec(0.6, fps), atSec(1.4, fps)], [0, 1], {...clamp, easing: Easing.out(Easing.cubic)});
   return (
     <AbsoluteFill style={{justifyContent: 'flex-end', padding: PAD}}>
       <div style={{transform: `translateY(${(1 - up) * 80}px)`, opacity: up}}>
@@ -40,15 +45,17 @@ export const CarTitle: React.FC<CarTitleProps> = ({brand, model, year, trim, tag
 };
 
 // Цена до порта (счётчик) и оговорка. delay — кадр появления внутри сцены.
-export const PriceTag: React.FC<{ad: Ad; delay?: number; padding?: string}> = ({ad, delay = 45, padding = PAD}) => {
+// delay — во сколько кадров композиции появляется цена (по умолчанию через 1,5 с)
+export const PriceTag: React.FC<{ad: Ad; delay?: number; padding?: string}> = ({ad, delay, padding = PAD}) => {
   const C = useTheme();
   const f = useCurrentFrame(); const {fps} = useVideoConfig();
+  const from = delay ?? atSec(1.5, fps);
   const total = totalUsd(ad);
-  const count = interpolate(f, [delay, delay + 40], [0, 1], {...clamp, easing: Easing.out(Easing.cubic)});
+  const count = interpolate(f, [from, from + atSec(1.33, fps)], [0, 1], {...clamp, easing: Easing.out(Easing.cubic)});
   const num = total === null ? null : count >= 1 ? total : Math.round((total * count) / 10) * 10;
   const label = num === null ? 'XX XXX $' : `${fmt(num)} $`;
-  const priceIn = spring({frame: f - delay, fps, config: {damping: 14, mass: 0.6}});
-  const note = interpolate(f, [delay + 35, delay + 50], [0, 1], clamp);
+  const priceIn = spring({frame: f - from, fps, config: {damping: 14, mass: 0.6}});
+  const note = interpolate(f, [from + atSec(1.17, fps), from + atSec(1.67, fps)], [0, 1], clamp);
   return (
     <AbsoluteFill style={{justifyContent: 'flex-end', padding}}>
       <div style={{fontFamily: BODY, fontWeight: 600, fontSize: 40, color: C.grey, textTransform: 'uppercase', letterSpacing: 6}}>
