@@ -1,51 +1,15 @@
 [
   {
-    "id": "mixkit-house-02",
-    "file": "music/mixkit-house-02.mp3",
-    "title": "House 02",
-    "artist": "Lily J",
-    "source": "Mixkit (Envato), трек №744, скачан 2026-09-17 — deep house, гипнотичный",
-    "license": "Mixkit Stock Music Free License",
-    "url": "https://mixkit.co/license/#musicFree",
-    "startSec": 15.737,
-    "bpm": 123,
-    "gain": 0.89
-  },
-  {
-    "id": "mixkit-deep-urban",
-    "file": "music/mixkit-deep-urban.mp3",
-    "title": "Deep Urban",
-    "artist": "Eugenio Mininni",
-    "source": "Mixkit (Envato), трек №623, скачан 2026-09-17 — tech house, «едущий»",
-    "license": "Mixkit Stock Music Free License",
-    "url": "https://mixkit.co/license/#musicFree",
-    "startSec": 186.373,
-    "bpm": 124,
-    "gain": 0.74
-  },
-  {
-    "id": "mixkit-slow-trance-morning",
-    "file": "music/mixkit-slow-trance-morning.mp3",
-    "title": "Slow Trance Morning",
-    "artist": "Alejandro Magaña (A. M.)",
-    "source": "Mixkit (Envato), трек №123, скачан 2026-09-17 — tech house, «гламурный»",
-    "license": "Mixkit Stock Music Free License",
-    "url": "https://mixkit.co/license/#musicFree",
-    "startSec": 54.234,
-    "bpm": 124,
-    "gain": 0.63
-  },
-  {
-    "id": "mixkit-deep-house",
-    "file": "music/mixkit-deep-house.mp3",
-    "title": "Deep House",
-    "artist": "Arulo",
-    "source": "Mixkit (Envato), трек №196, скачан 2026-09-17 — мощный, механический",
-    "license": "Mixkit Stock Music Free License",
-    "url": "https://mixkit.co/license/#musicFree",
-    "startSec": 16.022,
-    "bpm": 124,
-    "gain": 1.4
+    "id": "eleven-balkan-trap",
+    "file": "music/eleven-balkan-trap.mp3",
+    "title": "Балканский трэп",
+    "artist": "Eleven Music",
+    "source": "ElevenLabs Eleven Music (music_v2_5), сгенерирован 2026-09-21 — струнно-кларнетный мотив поверх трэповых барабанов, инструментал",
+    "license": "Коммерческая лицензия платного тарифа ElevenLabs: онлайн и офлайн, кроме кино, ТВ, радио и Studio Games",
+    "url": "https://elevenlabs.io/eleven-music-model-specific-terms",
+    "startSec": 2.03,
+    "bpm": 120,
+    "gain": 1
   },
   {
     "id": "test-metronome-120",
