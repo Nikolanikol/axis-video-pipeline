@@ -12,12 +12,24 @@ const tool = (name) => {
   return custom ? {cmd: custom, pre: []} : remotionTool(name);
 };
 
-export const run = (name, args, {onLine} = {}) => new Promise((resolve, reject) => {
+// Сроки. Зависший ffmpeg ничем себя не выдаёт: процесс жив, вывода нет, промис не завершается —
+// и обзор остаётся «в обработке» навсегда, потому что замок снимается только в finally.
+// Копия 94-секундной съёмки собирается 223 с, то есть примерно 2,4 с на секунду материала;
+// при потолке исходника в 10 минут это около получаса. Час — с запасом втрое, но конечен.
+// ffprobe только читает заголовок, ему хватает минуты.
+const LIMITS = {ffmpeg: 60 * 60 * 1000, ffprobe: 60 * 1000};
+
+export const run = (name, args, {onLine, timeout = LIMITS[name] ?? LIMITS.ffmpeg} = {}) => new Promise((resolve, reject) => {
   const {cmd, pre} = tool(name);
   const child = spawn(cmd, [...pre, ...args], {cwd: ROOT, stdio: ['ignore', 'pipe', 'pipe']});
   let out = '';
   let err = '';
   let pending = '';
+  let killed = false;
+  const timer = setTimeout(() => {
+    killed = true;
+    child.kill('SIGKILL');
+  }, timeout);
   child.stdout.on('data', (chunk) => {
     const text = String(chunk);
     out += text;
@@ -27,8 +39,10 @@ export const run = (name, args, {onLine} = {}) => new Promise((resolve, reject) 
     for (const line of parts) onLine(line.trim());
   });
   child.stderr.on('data', (chunk) => { err += chunk; });
-  child.on('error', reject);
+  child.on('error', (e) => { clearTimeout(timer); reject(e); });
   child.on('close', (code) => {
+    clearTimeout(timer);
+    if (killed) return reject(new Error(`${name}: не уложился в ${Math.round(timeout / 60000)} мин и был остановлен`));
     if (code === 0) return resolve(out);
     const tail = err.trim().split('\n').filter((l) => !l.includes('root directory')).slice(-3).join(' ');
     reject(new Error(`${name}: ${tail || `код ${code}`}`));

@@ -7,6 +7,23 @@ import {run} from './media.mjs';
 import {HttpError} from './store.mjs';
 
 const BASE = process.env.ELEVENLABS_BASE_URL || 'https://api.elevenlabs.io';
+// У fetch в Node своего срока нет: оборванное соединение висит вечно, а вместе с ним —
+// распознавание или озвучка, потому что замок снимается только после ответа. Файлы здесь
+// до 10 минут звука, ответ обычно за минуту; пятнадцать — потолок, а не ожидаемое время.
+const CALL_TIMEOUT_MS = Number(process.env.ELEVENLABS_TIMEOUT_MS || 15 * 60 * 1000);
+const deadline = () => AbortSignal.timeout(CALL_TIMEOUT_MS);
+// Обрыв по сроку приходит как TimeoutError — переводим на человеческий, иначе в статусе обзора
+// окажется «The operation was aborted due to timeout»
+const call = async (url, init) => {
+  try {
+    return await fetch(url, {...init, signal: deadline()});
+  } catch (e) {
+    if (e?.name === 'TimeoutError') {
+      throw new HttpError(504, `ElevenLabs не ответил за ${Math.round(CALL_TIMEOUT_MS / 60000)} мин — попробуй ещё раз`);
+    }
+    throw new HttpError(502, `Не достучались до ElevenLabs: ${e?.message || e}`);
+  }
+};
 const MODEL = process.env.ELEVENLABS_STT_MODEL || 'scribe_v2';
 export const hasKey = () => Boolean(process.env.ELEVENLABS_API_KEY);
 
@@ -39,7 +56,7 @@ export const transcribe = async (file, {language} = {}) => {
   if (language) form.append('language_code', language);
   form.append('file', new Blob([await fs.readFile(file)]), path.basename(file));
 
-  const res = await fetch(`${BASE}/v1/speech-to-text`, {
+  const res = await call(`${BASE}/v1/speech-to-text`, {
     method: 'POST',
     headers: {'xi-api-key': process.env.ELEVENLABS_API_KEY},
     body: form,
@@ -78,7 +95,7 @@ export const voiceHash = (text, {voice = '', model = TTS_MODEL, language = '', s
 export const synthesize = async (text, {language, voice, model = TTS_MODEL, settings} = {}) => {
   if (!hasKey()) throw new HttpError(400, 'Нет ключа ElevenLabs: добавь ELEVENLABS_API_KEY в .env и перезапусти сервер');
   if (!voice) throw new HttpError(400, 'Не выбран голос: проверь config/voices.json');
-  const res = await fetch(`${BASE}/v1/text-to-speech/${encodeURIComponent(voice)}?output_format=mp3_44100_128`, {
+  const res = await call(`${BASE}/v1/text-to-speech/${encodeURIComponent(voice)}?output_format=mp3_44100_128`, {
     method: 'POST',
     headers: {'xi-api-key': process.env.ELEVENLABS_API_KEY, 'Content-Type': 'application/json'},
     body: JSON.stringify({
@@ -104,7 +121,7 @@ export const synthesize = async (text, {language, voice, model = TTS_MODEL, sett
 export const synthesizeScript = async (text, {language, voice, model = TTS_MODEL, settings} = {}) => {
   if (!hasKey()) throw new HttpError(400, 'Нет ключа ElevenLabs: добавь ELEVENLABS_API_KEY в .env и перезапусти сервер');
   if (!voice) throw new HttpError(400, 'Не выбран голос: проверь config/voices.json');
-  const res = await fetch(`${BASE}/v1/text-to-speech/${encodeURIComponent(voice)}/with-timestamps?output_format=mp3_44100_128`, {
+  const res = await call(`${BASE}/v1/text-to-speech/${encodeURIComponent(voice)}/with-timestamps?output_format=mp3_44100_128`, {
     method: 'POST',
     headers: {'xi-api-key': process.env.ELEVENLABS_API_KEY, 'Content-Type': 'application/json'},
     body: JSON.stringify({

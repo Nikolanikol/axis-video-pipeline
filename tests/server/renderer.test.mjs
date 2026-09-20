@@ -4,9 +4,11 @@
 import {afterAll, beforeAll, describe, expect, it, vi} from 'vitest';
 import {useTempEnv} from '../helpers.mjs';
 
+const closed = {count: 0};
 vi.mock('@remotion/bundler', () => ({bundle: async () => 'serve://тест'}));
 vi.mock('@remotion/renderer', () => ({
-  openBrowser: async () => ({close: async () => {}}),
+  makeCancelSignal: () => ({cancelSignal: Symbol('отмена'), cancel: () => {}}),
+  openBrowser: async () => ({close: async () => { closed.count++; }}),
   selectComposition: async () => ({id: 'review-short', durationInFrames: 60, fps: 60, width: 1080, height: 1920}),
   renderMedia: () => new Promise(() => {}),   // никогда не заканчивается: задание висит в работе
   renderStill: async () => ({buffer: Buffer.alloc(0)}),

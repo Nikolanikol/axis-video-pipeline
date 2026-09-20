@@ -2,7 +2,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {bundle} from '@remotion/bundler';
-import {openBrowser, renderMedia, renderStill, selectComposition} from '@remotion/renderer';
+import {makeCancelSignal, openBrowser, renderMedia, renderStill, selectComposition} from '@remotion/renderer';
 import sharp from 'sharp';
 import {HttpError, RENDERS_DIR, ROOT, readJson, writeJson} from './store.mjs';
 const browserExecutable = process.env.CHROME_PATH || null;
@@ -96,17 +96,41 @@ const pump = async () => {
   }
 };
 
+// Сколько рендер может простоять без движения, прежде чем считать его мёртвым.
+// Считаем не общее время — минутный обзор идёт четверть часа, десятиминутный будет идти часы, —
+// а застой: прогресс и шаг не менялись. Живой рендер двигает прогресс каждые несколько секунд.
+const STALL_MS = Number(process.env.RENDER_STALL_MS || 10 * 60 * 1000);
+
 const run = async (job) => {
-  await fs.mkdir(RENDERS_DIR, {recursive: true});
-  job.status = 'running';
-  job.stage = 'Сборка проекта';
-  const serveUrl = await getServeUrl();
-  const browser = await openBrowser('chrome', {browserExecutable});
-  try {
+  let browser = null;
+  const {cancelSignal, cancel} = makeCancelSignal();
+  let stop;
+  const stalled = new Promise((_, reject) => { stop = reject; });
+  let mark = {progress: -1, stage: '', at: Date.now()};
+  const watchdog = setInterval(() => {
+    if (job.progress !== mark.progress || job.stage !== mark.stage) {
+      mark = {progress: job.progress, stage: job.stage, at: Date.now()};
+      return;
+    }
+    if (Date.now() - mark.at < STALL_MS) return;
+    clearInterval(watchdog);
+    cancel();
+    stop(new Error(`Завис на шаге «${job.stage}»: ${Math.round(STALL_MS / 60000)} мин без движения, задание снято`));
+    // Проверяем вчетверо чаще срока, но не чаще раза в четверть секунды и не реже раза в 15 с
+  }, Math.min(15 * 1000, Math.max(250, STALL_MS / 4)));
+
+  // Гонка со сторожем: если работа застряла там, где отмена не помогает (например, на сборке
+  // проекта), очередь всё равно поедет дальше, а браузер закроется в finally
+  const body = (async () => {
+    await fs.mkdir(RENDERS_DIR, {recursive: true});
+    job.status = 'running';
+    job.stage = 'Сборка проекта';
+    const serveUrl = await getServeUrl();
+    browser = await openBrowser('chrome', {browserExecutable});
     const inputProps = job.input;
     const composition = await selectComposition({serveUrl, id: job.format, inputProps, puppeteerInstance: browser});
     // enforceAudioTrack: без аудиодорожки мессенджеры и соцсети принимают mp4 за GIF — всегда пишем хотя бы тишину
-    const media = {composition, serveUrl, codec: 'h264', crf, colorSpace: 'bt709', concurrency, puppeteerInstance: browser, enforceAudioTrack: true};
+    const media = {composition, serveUrl, codec: 'h264', crf, colorSpace: 'bt709', concurrency, puppeteerInstance: browser, enforceAudioTrack: true, cancelSignal};
     const share = job.videoSilent ? 45 : 90;
     job.stage = 'Рендер видео';
     await renderMedia({
@@ -129,7 +153,7 @@ const run = async (job) => {
     job.stage = 'Раскадровка';
     const tiles = [];
     for (const frame of job.frames) {
-      const {buffer} = await renderStill({composition, serveUrl, frame, inputProps, puppeteerInstance: browser, imageFormat: 'jpeg'});
+      const {buffer} = await renderStill({composition, serveUrl, frame, inputProps, puppeteerInstance: browser, imageFormat: 'jpeg', cancelSignal});
       tiles.push(await sharp(buffer).resize(360, 640).toBuffer());
       job.progress += 2;
     }
@@ -139,8 +163,16 @@ const run = async (job) => {
       .jpeg({quality: 88})
       .toFile(path.join(RENDERS_DIR, `${job.id}.jpg`));
     job.progress = 100;
+  })();
+
+  try {
+    await Promise.race([body, stalled]);
   } finally {
-    await browser.close({silent: true});
+    clearInterval(watchdog);
+    // Снятая работа может упасть уже после гонки — её отказ нужно принять, иначе он всплывёт
+    // как необработанный и попадёт в журнал пугающей простынёй
+    body.catch(() => {});
+    await browser?.close({silent: true}).catch(() => {});
   }
 };
 
