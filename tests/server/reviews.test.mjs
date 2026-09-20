@@ -142,6 +142,33 @@ describe('проекты обзоров', () => {
     expect(long.tagline).toHaveLength(60);
   });
 
+  it('звуки машины: форма включает слой, но не подменяет дорожку', async () => {
+    const {body: r} = await call('POST', '/api/reviews', {title: 'Звуки'});
+    // Дорожки нет — включать нечего, и поле не появляется от одного желания формы
+    const {body: empty} = await call('PUT', `/api/reviews/${r.id}`, {...r, ambience: {enabled: true}});
+    expect(empty.ambience).toBeUndefined();
+
+    // Дорожку создаёт только сервер; здесь подкладываем её в файл напрямую, как это сделал бы он
+    const file = path.join(env.data, 'reviews', r.id, 'review.json');
+    const stored = JSON.parse(await fs.readFile(file, 'utf8'));
+    stored.ambience = {status: 'ready', file: '/data/reviews/x/ambience-1.m4a', enabled: false};
+    await fs.writeFile(file, JSON.stringify(stored));
+
+    const {body: open} = await call('GET', `/api/reviews/${r.id}`);
+    const {body: on} = await call('PUT', `/api/reviews/${r.id}`, {
+      ...open,
+      // Форма пытается заодно подсунуть свой файл и статус — их ведёт сервер
+      ambience: {enabled: true, file: '/etc/passwd', status: 'error'},
+    });
+    expect(on.ambience.enabled).toBe(true);
+    expect(on.ambience.file).toBe('/data/reviews/x/ambience-1.m4a');
+    expect(on.ambience.status).toBe('ready');
+
+    const {body: off} = await call('PUT', `/api/reviews/${r.id}`, {...on, ambience: {enabled: false}});
+    expect(off.ambience.enabled).toBe(false);
+    expect(off.ambience.file).toBe('/data/reviews/x/ambience-1.m4a');   // выключили слой, не стёрли работу
+  });
+
   it('настройки цвета сохраняются и чистятся', async () => {
     const {body: r} = await call('POST', '/api/reviews', {title: 'Цвет'});
     expect(r.colour).toEqual({exposure: 0, contrast: 0, saturation: 0, warmth: 0});

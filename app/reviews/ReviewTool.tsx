@@ -14,6 +14,7 @@ import {MusicFields} from '../MusicFields';
 import {Scrubber, Seek, sec} from './Scrubber';
 import {SegmentList} from './SegmentList';
 import {speechStale} from '../../src/shared/subtitles.js';
+import {AmbiencePanel} from './AmbiencePanel';
 import {ColourPanel} from './ColourPanel';
 import {SpeechPanel} from './SpeechPanel';
 
@@ -87,10 +88,11 @@ export const ReviewTool: React.FC = () => {
     const current = reviewRef.current;
     if (current) edit({segments: current.segments.map((s) => (s.id === id ? {...s, ...patch} : s))});
   }, [edit]);
-  // Ответ сервера про видео, речь и озвучку: эти поля ведёт сервер, правки формы не трогаем
+  // Ответ сервера про видео, речь, озвучку и звуки машины: эти поля ведёт сервер,
+  // правки формы не трогаем
   const adoptServer = useCallback((server: ReviewEntry) => {
     versionRef.current = server.updatedAt;
-    const patch = {source: server.source, speech: server.speech, voice: server.voice};
+    const patch = {source: server.source, speech: server.speech, voice: server.voice, ambience: server.ambience};
     setReview((r) => (r && r.id === server.id ? {...r, ...patch} : r));
     setReviews((rs) => rs.map((r) => (r.id === server.id ? {...r, ...patch} : r)));
   }, []);
@@ -137,6 +139,8 @@ export const ReviewTool: React.FC = () => {
   // Озвучка считается включённой ровно так же, как в композиции: есть начитка и она не выключена
   const voiceClips = Object.keys(review?.voice?.clips ?? {}).length;
   const voiceOn = Boolean(review?.voice?.enabled && voiceClips);
+  // Звуки машины играют вместо живого звука: это выделенная дорожка того же кадра, без голоса
+  const ambienceOn = Boolean(review?.ambience?.enabled && review.ambience.file);
   const lot = lots.find((l) => l.id === review?.lotId) ?? null;
   const marketId = lot?.market ?? review?.market ?? config.defaultMarket;
   const market = markets.find((m) => m.id === marketId) ?? markets[0];
@@ -316,13 +320,21 @@ export const ReviewTool: React.FC = () => {
                     onChange={(e) => edit({voice: {...review.voice!, volume: Number(e.target.value) / 100}})} />
                 </Field>
               )}
-              {/* При озвучке живой звук глушится в композиции наглухо, и ползунок бесполезен:
+              {source && config.features?.ambience && <AmbiencePanel review={review} source={source}
+                onChange={(ambience) => edit({ambience})} onServer={adoptServer} onError={report} />}
+              {/* Ползунок управляет живым звуком, а при включённых звуках машины — ими: это одна
+                  и та же «громкость того, что записано в кадре», просто дорожки разные.
+                  При озвучке без звуков машины живой звук глушится, и ползунок бесполезен —
                   показываем это прямо, а не оставляем регулятор, который ни на что не влияет */}
-              <Field label={`Живой звук с видео: ${voiceOn ? 'выключен' : `${Math.round((review.sourceVolume ?? 0) * 100)}%`}`}
-                hint={voiceOn
+              <Field label={ambienceOn
+                ? `Звуки машины: ${Math.round((review.sourceVolume ?? 0) * 100)}%`
+                : `Живой звук с видео: ${voiceOn ? 'выключен' : `${Math.round((review.sourceVolume ?? 0) * 100)}%`}`}
+              hint={ambienceOn
+                ? 'играет выделенная дорожка без голоса — сырой живой звук выключен'
+                : voiceOn
                   ? 'при озвучке живой звук выключен: иначе в кадре говорят два голоса разом'
                   : 'на ускоренных фрагментах всегда выключен'}>
-                <input type="range" min={0} max={100} step={5} disabled={voiceOn}
+                <input type="range" min={0} max={100} step={5} disabled={voiceOn && !ambienceOn}
                   value={Math.round((review.sourceVolume ?? 0) * 100)}
                   onChange={(e) => edit({sourceVolume: Number(e.target.value) / 100})} />
               </Field>

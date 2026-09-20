@@ -8,7 +8,8 @@ export type LotEntry = Lot & {id: string; updatedAt?: string; note?: string; blu
 export type PhotoInfo = {path: string; source: string; regions: Region[]};
 export type Config = {
   brand: Theme; markets: MarketEntry[]; defaultMarket: string; formats: FormatMeta[]; pipelines: unknown[];
-  features: {speech: boolean; voice: boolean};
+  // ambience — установлено ли локальное окружение для выделения звуков машины (проба)
+  features: {speech: boolean; voice: boolean; ambience?: boolean};
   voices?: import('../src/shared/types').VoiceRegistry;
 };
 export type ReviewEntry = Review & {id: string};
@@ -60,6 +61,8 @@ export const api = {
   renderReview: (id: string, silent: boolean) => request<Job>('POST', `/api/reviews/${id}/render`, {silent}),
   reprocessVideo: (id: string) => request<ReviewEntry>('POST', `/api/reviews/${id}/reprocess`),
   transcribe: (id: string) => request<ReviewEntry>('POST', `/api/reviews/${id}/transcribe`),
+  // Выделить звуки машины без голоса (проба; работает, если установлено окружение с моделью)
+  separateAmbience: (id: string) => request<ReviewEntry>('POST', `/api/reviews/${id}/ambience`),
   rebuildLines: (id: string) => request<ReviewEntry>('POST', `/api/reviews/${id}/relines`),
   voiceReview: (id: string) => request<ReviewEntry>('POST', `/api/reviews/${id}/voice`),
   // Прослушать спикера: сервер отдаёт mp3, играем его сразу

@@ -113,6 +113,26 @@ export type ReviewVoice = {
   clips: Record<string, {from?: number; to?: number; file?: string; duration?: number; hash?: string}>;
   updatedAt?: string;
 };
+/**
+ * Звуки машины без голоса — проба. Модель разделения (Demucs) делит дорожку рабочей копии
+ * на речь и всё остальное; мы берём «всё остальное»: двери, двигатель, шаги.
+ * Нужно потому, что при озвучке живой звук глушится целиком, а вместе с ним пропадает машина.
+ * Разделение неидеальное: местами голос просачивается и накладывается на начитку, поэтому
+ * включается вручную и так же выключается.
+ */
+export type ReviewAmbience = {
+  status: 'running' | 'ready' | 'error';
+  error?: string;
+  // Какой шаг идёт сейчас — работа длится минуты, и молчащая кнопка выглядит зависшей
+  stage?: string;
+  // Использовать в ролике. Файл может быть готов, а слой выключен — это разные вещи
+  enabled?: boolean;
+  file?: string;
+  // По какому видео посчитано: исходник можно заменить, а дорожка останется от прежнего
+  source?: {name: string; duration: number};
+  updatedAt?: string;
+};
+
 export type Review = {
   id?: string;
   title: string;
@@ -136,6 +156,7 @@ export type Review = {
   speech?: ReviewSpeech | null;
   subtitles?: {enabled: boolean; useTranslation: boolean};
   voice?: ReviewVoice | null;
+  ambience?: ReviewAmbience | null;
   updatedAt?: string;
 };
 export type ReviewProps = {review: Review; lot?: Lot | null; market: Market; theme?: Partial<Theme>};

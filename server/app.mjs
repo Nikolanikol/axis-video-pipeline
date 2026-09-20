@@ -12,11 +12,12 @@ import {getFormat, listFormats, storyboardFrames} from './formats.mjs';
 import {addPhoto, applyBlur, photoInfo, removePhoto} from './photos.mjs';
 import {enqueue, getJob, listJobs} from './renderer.mjs';
 import {
-  UPLOAD_TMP, createReview, defaultMarketFor, getReview, ingestSource, listReviews, rebuildLines, reprocessSource,
+  UPLOAD_TMP, ambienceReview, createReview, defaultMarketFor, getReview, ingestSource, listReviews, rebuildLines, reprocessSource,
   transcribeReview, updateReview, voiceRegistry, voiceReview,
 } from './reviews.mjs';
 import {apiSettings, resolveSpeaker, voiceConfig} from '../src/shared/voices.js';
 import {hasKey, hasVoice, synthesize} from './speech.mjs';
+import {hasSeparator} from './ambience.mjs';
 
 // Медиа с путями /data/... браузер рендера берёт по полному адресу этого сервера
 const absolute = (origin, url) => (url && url.startsWith('/') ? `${origin}${url}` : url);
@@ -36,7 +37,9 @@ export const createApp = ({photoOrigin}) => {
     // Спикеры озвучки: интерфейс показывает только тех, кто умеет выбранный язык
     voices: await voiceRegistry(),
     // Что доступно: распознавание речи включается ключом ElevenLabs в .env
-    features: {speech: hasKey(), voice: hasVoice()},
+    // Что доступно: речь и озвучка — по ключу ElevenLabs; выделение звуков машины — по
+    // наличию локального окружения с моделью разделения (проба, ставится отдельно)
+    features: {speech: hasKey(), voice: hasVoice(), ambience: await hasSeparator()},
   })));
   api.put('/brand', wrap(async (req) => { await saveBrand(req.body); return getBrand(); }));
   api.put('/markets/:id', wrap(async (req) => {
@@ -132,6 +135,7 @@ export const createApp = ({photoOrigin}) => {
     const market = await getMarket(defaultMarketFor(review, lot));
     return voiceReview(review.id, {language: typeof req.body?.language === 'string' ? req.body.language : undefined, market});
   }));
+  api.post('/reviews/:id/ambience', wrap((req) => ambienceReview(checkId(req.params.id))));
   api.post('/reviews/:id/render', wrap(async (req) => {
     const review = await getReview(checkId(req.params.id));
     if (review.source?.status !== 'ready') throw new HttpError(400, 'Видео ещё не готово');
@@ -142,6 +146,7 @@ export const createApp = ({photoOrigin}) => {
       review: {
         ...review,
         source: {...review.source, proxy: absolute(photoOrigin, review.source.proxy)},
+        ambience: review.ambience?.file ? {...review.ambience, file: absolute(photoOrigin, review.ambience.file)} : review.ambience,
         voice: review.voice && {
           ...review.voice,
           // Единая начитка — один файл; у прежних обзоров файл был у каждой строки

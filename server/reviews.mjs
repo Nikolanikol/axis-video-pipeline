@@ -9,6 +9,7 @@ import {makeProxy, makeThumbs, probe} from './media.mjs';
 import {apiSettings, resolveSpeaker, voiceConfig} from '../src/shared/voices.js';
 import {buildScript, lineTimes} from '../src/shared/narration.js';
 import {extractAudio, hasKey, hasVoice, synthesizeScript, transcribe, voiceHash} from './speech.mjs';
+import {hasSeparator, separateAmbience} from './ambience.mjs';
 import {CONFIG_DIR, DATA_DIR, DEFAULT_MARKET, HttpError, checkId, getLot, readJson, withLock, writeJson} from './store.mjs';
 
 export const REVIEWS_DIR = path.join(DATA_DIR, 'reviews');
@@ -29,6 +30,8 @@ const ingesting = new Set();
 const transcribing = new Set();
 // Идёт озвучка: id → {done, total} по строкам
 const voicing = new Map();
+// Идёт выделение звуков машины: id → название шага
+const separating = new Map();
 
 const withProgress = (review) => {
   const p = progress.get(review.id);
@@ -38,7 +41,9 @@ const withProgress = (review) => {
     : withSource;
   // Озвучка идёт построчно — показываем, сколько уже готово
   const v = voicing.get(review.id);
-  return v ? {...withSpeech, voice: {...withSpeech.voice, status: 'running', done: v.done, total: v.total}} : withSpeech;
+  const withVoice = v ? {...withSpeech, voice: {...withSpeech.voice, status: 'running', done: v.done, total: v.total}} : withSpeech;
+  const a = separating.get(review.id);
+  return a ? {...withVoice, ambience: {...withVoice.ambience, status: 'running', stage: a}} : withVoice;
 };
 
 const read = async (id) => ({...(await readJson(reviewFile(id))), id});
@@ -124,6 +129,8 @@ export const updateReview = (id, body) => withLock(`review:${id}`, async () => {
       enabled: Boolean(body.voice?.enabled),
       volume: Number.isFinite(body.voice?.volume) ? Math.min(1, Math.max(0, body.voice.volume)) : current.voice.volume ?? 1,
     },
+    // Дорожку звуков пишет только сервер; из формы принимаем включатель
+    ambience: current.ambience && {...current.ambience, enabled: Boolean(body.ambience?.enabled)},
     music,
     sourceVolume: Number.isFinite(body.sourceVolume) ? Math.min(1, Math.max(0, body.sourceVolume)) : current.sourceVolume ?? 0,
     colour: sanitizeColour(body.colour ?? current.colour),
@@ -348,6 +355,49 @@ export const voiceReview = async (id, {language, market} = {}) => {
     }
   })();
   return {...review, voice: {...review.voice, status: 'running', done: 0, total: lines.length, speaker: speaker.id, speakerName: speaker.name}};
+};
+
+/**
+ * Выделить звуки машины без голоса. Долгая работа, идёт в фоне, как распознавание и озвучка:
+ * сразу возвращаем обзор со статусом «идёт», результат прилетает опросом.
+ */
+export const ambienceReview = async (id) => {
+  const review = await read(id);
+  if (review.source?.status !== 'ready') throw new HttpError(400, 'Видео ещё не готово');
+  if (!review.source.hasAudio) throw new HttpError(400, 'В этом видео нет звука — выделять нечего');
+  if (!await hasSeparator()) throw new HttpError(400, 'Окружение для разделения не установлено');
+  if (separating.has(id)) throw new HttpError(409, 'Звуки уже выделяются');
+  separating.set(id, 'Готовлю дорожку');
+
+  const save = (patch) => withLock(`review:${id}`, async () => {
+    const current = await read(id);
+    return write(id, {...current, ambience: {...current.ambience, ...patch}});
+  });
+  (async () => {
+    const dir = reviewDir(id);
+    const name = `ambience-${Date.now().toString(36)}.m4a`;
+    try {
+      const proxy = path.join(dir, path.basename(review.source.proxy));
+      await separateAmbience(proxy, path.join(dir, name), (stage) => separating.set(id, stage));
+      // Прежние дорожки не копим: файл на обзор нужен один
+      for (const f of await fs.readdir(dir)) {
+        if (f.startsWith('ambience-') && f !== name) await fs.rm(path.join(dir, f), {force: true}).catch(() => {});
+      }
+      const src = (await read(id)).source ?? {};
+      await save({
+        status: 'ready', error: '', file: reviewUrl(id, name), enabled: true,
+        // Подпись исходника: видео можно заменить, а дорожка останется от прежнего
+        source: {name: src.name ?? '', duration: src.duration ?? 0},
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (e) {
+      console.error(`Звуки машины ${id}:`, e.message);
+      await save({status: 'error', error: String(e?.message || e)}).catch(() => {});
+    } finally {
+      separating.delete(id);
+    }
+  })();
+  return {...review, ambience: {...review.ambience, status: 'running', stage: 'Готовлю дорожку'}};
 };
 
 export const defaultMarketFor = (review, lot) => lot?.market || review.market || DEFAULT_MARKET;

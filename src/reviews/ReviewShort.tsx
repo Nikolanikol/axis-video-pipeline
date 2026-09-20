@@ -90,6 +90,13 @@ export const ReviewShort: React.FC<ReviewProps> = (props) => {
     filter: isNeutral(review.colour) ? undefined : colourFilter(review.colour, WARMTH_ID),
     warm: review.colour?.warmth ? warmthChannels(review.colour) : null,
   };
+  const runs = videoRuns(items, fps);
+  // Звуки машины без голоса: отдельная дорожка, выделенная моделью разделения. Включена —
+  // играет вместо живого звука, и при озвучке её глушить незачем: второго голоса в ней нет.
+  const ambienceOn = Boolean(review.ambience?.enabled && review.ambience.file);
+  // Живой звук при озвучке молчит: иначе в кадре говорят двое. Если играют звуки машины,
+  // сырую дорожку тем более не пускаем — они бы наложились друг на друга.
+  const liveVolume = voiceOn || ambienceOn ? 0 : review.sourceVolume ?? 0;
   // Подпись под названием: своя у обзора, иначе из рынка. Пустую строку уважаем — это «без подписи»
   const tagline = review.tagline ?? market.texts.hookTagline;
   const title = ad
@@ -105,13 +112,25 @@ export const ReviewShort: React.FC<ReviewProps> = (props) => {
         {/* Съёмка: непрерывные куски играют одним элементом, без перемотки на стыке */}
         {source && (
           <AbsoluteFill style={{filter: grade.filter}}>
-            {videoRuns(items, fps).map((run) => (
+            {runs.map((run) => (
               <Sequence key={`clip-${run.seg.id}`} from={run.from} durationInFrames={run.frames} name={`съёмка ${run.seg.note || run.seg.kind}`}>
-                <Clip source={source} seg={run.seg} frames={run.frames} volume={voiceOn ? 0 : review.sourceVolume ?? 0} />
+                <Clip source={source} seg={run.seg} frames={run.frames} volume={liveVolume} />
               </Sequence>
             ))}
           </AbsoluteFill>
         )}
+        {/* Звуки машины без голоса — отдельной дорожкой вместо живого звука. Своим слоем,
+            потому что это другой файл: в съёмке речь и машина вместе, здесь только машина */}
+        {source && ambienceOn && runs.map((run) => (
+          <Sequence key={`amb-${run.seg.id}`} from={run.from} durationInFrames={run.frames} name={`звуки ${run.seg.note || run.seg.kind}`}>
+            <Audio
+              src={review.ambience!.file!}
+              volume={review.sourceVolume ?? 0}
+              trimBefore={Math.round(run.seg.start * fps)}
+              playbackRate={run.seg.speed}
+            />
+          </Sequence>
+        ))}
         {/* Озвучка — одним слоем на весь ролик: начитка непрерывна, и граница фрагмента
             картинки не должна обрывать фразу на полуслове */}
         {source && cues.map(({id, from, frames, file, offset}) => (

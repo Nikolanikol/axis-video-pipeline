@@ -3,3 +3,4 @@ out/
 data/
 .env
 .DS_Store
+.venv-demucs/
