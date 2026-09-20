@@ -3,8 +3,7 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Player, PlayerRef} from '@remotion/player';
 import {ReviewShort} from '../../src/reviews/ReviewShort';
 import {
-  MAX_REVIEW_SEC, REVIEW_FPS, TEMPLATE_V1, applyTemplate, buildTimeline, cutPauses,
-  reviewFrames, sanitizeSegments, segmentSeconds, voiceTimeline, wholeReview,
+  MAX_REVIEW_SEC, REVIEW_FPS, buildTimeline, reviewFrames, sanitizeSegments, wholeReview,
 } from '../../src/shared/timeline.js';
 import type {Market, ReviewProps, ReviewSegment} from '../../src/shared/types';
 import {lotTitle} from '../ads/LotTool';
@@ -170,25 +169,14 @@ export const ReviewTool: React.FC = () => {
     setSegments(sanitizeSegments(next, source.duration) as ReviewSegment[]);
     setSelectedId(null);
   };
-  // Шаблон v1 — нарезка под музыку: 11 кадров по 25 с, точные моменты подбираются на таймлайне
-  const applyV1 = () => replaceSegments(applyTemplate(source?.duration ?? 0, lot?.specs ?? []), 'раскладкой по шаблону v1');
   // Целиком — ничего не режем, только заставка и финал по краям
   const applyWhole = () => replaceSegments(wholeReview(source?.duration ?? 0), 'обзором целиком');
-  // Под озвучку — кадр на фразу, длина каждого под длину синтезированного клипа
-  const applyVoice = () => replaceSegments(voiceTimeline(speechLines, review?.voice, source?.duration ?? 0), 'раскладкой под озвучку');
 
-  const speechLines = review?.speech?.lines ?? [];
-  const voiceClips = Object.keys(review?.voice?.clips ?? {}).length;
-  // Чистка пауз работает поверх текущей раскладки: режет тишину внутри фрагментов, кадры не меняет
-  const cutSilence = () => {
-    const next = cutPauses(segments, speechLines);
-    const was = segments.reduce((n, s) => n + segmentSeconds(s), 0);
-    const now = next.reduce((n, s) => n + segmentSeconds(s), 0);
-    if (next.length === segments.length && now >= was) { report(new Error('Длинных пауз не нашлось')); return; }
-    if (!window.confirm(`Убрать паузы: ${sec(was)} → ${sec(now)}, фрагментов ${segments.length} → ${next.length}?`)) return;
-    setSegments(sanitizeSegments(next, source?.duration) as ReviewSegment[]);
-    setSelectedId(null);
-  };
+  // Остальные раскладки — шаблон v1, «под озвучку», чистка пауз — из интерфейса убраны.
+  // Все три режут материал на куски, а обзор снимается одним кадром и должен таким остаться:
+  // склейки ломают и картинку, и синхрон с начиткой. Код живёт в src/shared/timeline.js
+  // (applyTemplate, voiceTimeline, cutPauses) вместе с тестами — вернём кнопки, когда доведём
+  // режимы до ума. Возвращать по одной и каждую проверять на полном прогоне.
 
   const warnings = [
     !source && 'нет готового видео',
@@ -290,20 +278,7 @@ export const ReviewTool: React.FC = () => {
                     Фрагменты <span className="muted">ролик {sec(totalSec)}{totalSec > MAX_REVIEW_SEC ? ` — больше ${MAX_REVIEW_SEC} с` : ''}</span>
                   </h2>
                   <div className="btn-row">
-                    <button className="btn" onClick={applyV1}>Шаблон v1: {TEMPLATE_V1.length} фрагментов</button>
-                    <button className="btn ghost" onClick={applyWhole} title="Весь материал подряд: заставка в начале, цена в конце">Обзор целиком</button>
-                    {voiceClips > 0 && (
-                      <button className="btn ghost" onClick={applyVoice}
-                        title="По фрагменту на фразу: длина кадра под длину озвучки">
-                        Под озвучку
-                      </button>
-                    )}
-                    {speechLines.length > 0 && (
-                      <button className="btn ghost" onClick={cutSilence} disabled={!segments.length}
-                        title="Вырезать тишину длиннее секунды, оставив дыхание по краям фраз">
-                        Убрать паузы
-                      </button>
-                    )}
+                    <button className="btn" onClick={applyWhole} title="Весь материал подряд, без склеек: заставка в начале, цена в конце">Обзор целиком</button>
                     {segments.length > 0 && <button className="btn ghost" onClick={() => { if (window.confirm('Убрать все фрагменты?')) setSegments([]); }}>Очистить</button>}
                   </div>
                   <SegmentList
