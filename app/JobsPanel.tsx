@@ -41,8 +41,11 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
 
   return (
     <div className="render">
-      <button className="btn primary big" onClick={run} disabled={starting || disabled}>
-        {starting ? 'Запускаю…' : label}
+      {/* Пока задание в очереди или считается — кнопка закрыта: рендер обзора занимает четверть
+          часа, и десять нажатий подряд встанут в очередь одинаковыми роликами. На сервере стоит
+          такая же проверка — вкладку можно открыть дважды, и тогда эта кнопка ничего не знает. */}
+      <button className="btn primary big" onClick={run} disabled={starting || running || disabled}>
+        {starting ? 'Запускаю…' : running ? 'Уже собирается…' : label}
       </button>
       {starting && <div className="bar wait"><div /></div>}
       <label className="check silent-check">

@@ -4,7 +4,7 @@ import path from 'node:path';
 import {bundle} from '@remotion/bundler';
 import {openBrowser, renderMedia, renderStill, selectComposition} from '@remotion/renderer';
 import sharp from 'sharp';
-import {RENDERS_DIR, ROOT, readJson, writeJson} from './store.mjs';
+import {HttpError, RENDERS_DIR, ROOT, readJson, writeJson} from './store.mjs';
 const browserExecutable = process.env.CHROME_PATH || null;
 const concurrency = process.env.RENDER_CONCURRENCY ? Number(process.env.RENDER_CONCURRENCY) : null;
 const crf = Number(process.env.RENDER_CRF || 20);
@@ -37,6 +37,8 @@ const getServeUrl = async () => {
 
 const jobs = new Map();
 const queue = [];
+// Задание ещё не отработало: ждёт очереди или считается прямо сейчас
+const ACTIVE = new Set(['queued', 'running']);
 let running = false;
 
 const publicJob = ({input, silentInput, ...job}) => job;
@@ -50,6 +52,15 @@ export const enqueue = ({owner, composition, compositionTitle, title, frames, in
   const now = new Date();
   const stamp = now.toISOString().replace(/\D/g, '').slice(0, 14);
   const ownerId = owner.lotId ?? owner.reviewId;
+  // Одно задание на обзор (или лот) за раз. Рендер минутного обзора занимает четверть часа и
+  // все ядра: десять нажатий подряд — это два с половиной часа очереди из одинаковых роликов.
+  // Проверяем на сервере, а не только в кнопке: вкладку можно открыть дважды.
+  const busy = [...jobs.values()].find((j) => (j.lotId ?? j.reviewId) === ownerId && ACTIVE.has(j.status));
+  if (busy) {
+    throw new HttpError(409, busy.status === 'running'
+      ? `Рендер уже идёт (${busy.progress}%) — дождись или обнови страницу`
+      : 'Этот ролик уже в очереди на рендер');
+  }
   const id = `${ownerId}-${composition}-${stamp}`;
   const job = {
     id, ...owner, title, format: composition, formatTitle: compositionTitle, frames,
