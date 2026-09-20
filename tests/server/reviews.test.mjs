@@ -128,6 +128,20 @@ describe('проекты обзоров', () => {
     expect(body.music).toEqual({track: null, volume: 1});
   });
 
+  it('подпись под названием: своя сохраняется, пустая значит «без подписи»', async () => {
+    const {body: r} = await call('POST', '/api/reviews', {title: 'Подпись'});
+    expect(r.tagline).toBeUndefined();   // не задана — заставка возьмёт из рынка
+    const {body: own} = await call('PUT', `/api/reviews/${r.id}`, {...r, tagline: '  From Korea  '.trim()});
+    expect(own.tagline).toBe('From Korea');
+    // Пустую строку отличаем от «не прислали»: это осознанный отказ от подписи
+    const {body: none} = await call('PUT', `/api/reviews/${r.id}`, {...own, tagline: ''});
+    expect(none.tagline).toBe('');
+    const {body: kept} = await call('PUT', `/api/reviews/${r.id}`, {...none, tagline: undefined});
+    expect(kept.tagline).toBe('');
+    const {body: long} = await call('PUT', `/api/reviews/${r.id}`, {...kept, tagline: 'я'.repeat(200)});
+    expect(long.tagline).toHaveLength(60);
+  });
+
   it('настройки цвета сохраняются и чистятся', async () => {
     const {body: r} = await call('POST', '/api/reviews', {title: 'Цвет'});
     expect(r.colour).toEqual({exposure: 0, contrast: 0, saturation: 0, warmth: 0});

@@ -98,6 +98,9 @@ export const updateReview = (id, body) => withLock(`review:${id}`, async () => {
   return write(id, {
     ...current,
     title: typeof body.title === 'string' ? body.title.slice(0, 120) : current.title,
+    // Подпись под названием на заставке. Пустая строка — значимое значение: убрать подпись
+    // совсем. Поэтому отличаем «не прислали» (undefined) от «прислали пустую».
+    tagline: typeof body.tagline === 'string' ? body.tagline.slice(0, 60) : current.tagline,
     lotId: body.lotId === undefined ? current.lotId : await checkLot(body.lotId),
     market: typeof body.market === 'string' && body.market ? checkId(body.market) : undefined,
     // Язык речи в видео — для распознавания; язык перевода — для субтитров и озвучки

@@ -90,9 +90,11 @@ export const ReviewShort: React.FC<ReviewProps> = (props) => {
     filter: isNeutral(review.colour) ? undefined : colourFilter(review.colour, WARMTH_ID),
     warm: review.colour?.warmth ? warmthChannels(review.colour) : null,
   };
+  // Подпись под названием: своя у обзора, иначе из рынка. Пустую строку уважаем — это «без подписи»
+  const tagline = review.tagline ?? market.texts.hookTagline;
   const title = ad
-    ? {brand: ad.brand, model: ad.model, year: ad.year, trim: ad.trim, tagline: ad.texts.hookTagline}
-    : {brand: '', model: review.title, tagline: market.texts.hookTagline};
+    ? {brand: ad.brand, model: ad.model, year: ad.year, trim: ad.trim, tagline: review.tagline ?? ad.texts.hookTagline}
+    : {brand: '', model: review.title, tagline};
   return (
     <ThemeProvider value={theme}>
       <AbsoluteFill style={{background: theme.bg}}>

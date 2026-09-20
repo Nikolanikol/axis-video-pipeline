@@ -6,7 +6,6 @@ import {
   MAX_REVIEW_SEC, REVIEW_FPS, buildTimeline, reviewFrames, sanitizeSegments, wholeReview,
 } from '../../src/shared/timeline.js';
 import type {Market, ReviewProps, ReviewSegment} from '../../src/shared/types';
-import {lotTitle} from '../ads/LotTool';
 import {api, LotEntry, ReviewEntry} from '../api';
 import {useConfig} from '../config';
 import {JobsPanel} from '../JobsPanel';
@@ -184,7 +183,6 @@ export const ReviewTool: React.FC = () => {
     segments.length > 0 && !segments.some((s) => s.kind === 'hook') && 'нет хука',
     segments.length > 0 && !segments.some((s) => s.kind === 'final') && 'нет финала с ценой и контактами',
     totalSec > MAX_REVIEW_SEC && `ролик ${sec(totalSec)} — длиннее ${MAX_REVIEW_SEC} с`,
-    !lot && 'обзор не привязан к лоту — без марки и цены',
     lot && !lot.carPriceUsd && !(lot.carPriceKrw && lot.krwPerUsd) && 'у лота нет цены — будет «XX XXX $»',
     speechStale(review?.speech, source) && 'речь распознана по другому видео — субтитры и озвучка лягут мимо кадра',
   ].filter(Boolean) as string[];
@@ -210,19 +208,14 @@ export const ReviewTool: React.FC = () => {
             <div className="form">
               <div className="row">
                 <Field label="Название"><input value={review.title} onChange={(e) => edit({title: e.target.value})} /></Field>
-                <Field label="Лот (марка, цена, характеристики)">
-                  <select value={review.lotId ?? ''} onChange={(e) => edit({lotId: e.target.value || null})}>
-                    <option value="">— без лота —</option>
-                    {lots.map((l) => <option key={l.id} value={l.id}>{lotTitle(l)}</option>)}
-                  </select>
+                <Field label="Подпись под названием">
+                  <input value={review.tagline ?? market.texts.hookTagline}
+                    onChange={(e) => edit({tagline: e.target.value})} maxLength={60} />
                 </Field>
-                {!lot && (
-                  <Field label="Рынок">
-                    <select value={review.market ?? config.defaultMarket} onChange={(e) => edit({market: e.target.value})}>
-                      {markets.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                    </select>
-                  </Field>
-                )}
+                {/* Лот и рынок из формы убраны: лот всегда оставался пустым, а рынок в конфиге один.
+                    Рынок по-прежнему работает под капотом — из него идут контакты, тексты финала и
+                    музыка; обзор берёт рынок по умолчанию (config.defaultMarket). Вернуть выбор
+                    лота имеет смысл, когда на финале обзора понадобится цена: без лота её негде взять. */}
               </div>
 
               <h2>Видео <span className="muted">своя вертикальная съёмка, до 10 минут</span></h2>

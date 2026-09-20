@@ -116,6 +116,8 @@ export type ReviewVoice = {
 export type Review = {
   id?: string;
   title: string;
+  // Подпись под названием на заставке. Не задана — берём из рынка; пустая строка — без подписи
+  tagline?: string;
   lotId?: string | null;
   market?: string;
   source?: ReviewSource | null;
