@@ -134,6 +134,9 @@ export const ReviewTool: React.FC = () => {
     } catch (e) { report(e); } finally { setUpload(null); }
   };
 
+  // Озвучка считается включённой ровно так же, как в композиции: есть начитка и она не выключена
+  const voiceClips = Object.keys(review?.voice?.clips ?? {}).length;
+  const voiceOn = Boolean(review?.voice?.enabled && voiceClips);
   const lot = lots.find((l) => l.id === review?.lotId) ?? null;
   const marketId = lot?.market ?? review?.market ?? config.defaultMarket;
   const market = markets.find((m) => m.id === marketId) ?? markets[0];
@@ -306,8 +309,21 @@ export const ReviewTool: React.FC = () => {
 
               <h2>Звук</h2>
               <MusicFields value={review.music} inherited={market?.music ?? {track: null}} onChange={(music) => edit({music})} />
-              <Field label={`Живой звук с видео: ${Math.round((review.sourceVolume ?? 0) * 100)}%`} hint="на ускоренных фрагментах всегда выключен">
-                <input type="range" min={0} max={100} step={5} value={Math.round((review.sourceVolume ?? 0) * 100)}
+              {review.voice && voiceClips > 0 && (
+                <Field label={`Голос диктора: ${Math.round((review.voice.volume ?? 1) * 100)}%`}
+                  hint={review.voice.enabled ? undefined : 'озвучка выключена — включается в разделе «Речь»'}>
+                  <input type="range" min={0} max={100} step={5} value={Math.round((review.voice.volume ?? 1) * 100)}
+                    onChange={(e) => edit({voice: {...review.voice!, volume: Number(e.target.value) / 100}})} />
+                </Field>
+              )}
+              {/* При озвучке живой звук глушится в композиции наглухо, и ползунок бесполезен:
+                  показываем это прямо, а не оставляем регулятор, который ни на что не влияет */}
+              <Field label={`Живой звук с видео: ${voiceOn ? 'выключен' : `${Math.round((review.sourceVolume ?? 0) * 100)}%`}`}
+                hint={voiceOn
+                  ? 'при озвучке живой звук выключен: иначе в кадре говорят два голоса разом'
+                  : 'на ускоренных фрагментах всегда выключен'}>
+                <input type="range" min={0} max={100} step={5} disabled={voiceOn}
+                  value={Math.round((review.sourceVolume ?? 0) * 100)}
                   onChange={(e) => edit({sourceVolume: Number(e.target.value) / 100})} />
               </Field>
             </div>
