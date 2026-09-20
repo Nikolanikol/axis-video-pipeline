@@ -112,10 +112,10 @@ export const voicePlan = (items, lines, voice, fps) => {
   if (!voice?.clips || !Array.isArray(items) || !items.length) return [];
   const all = Array.isArray(lines) ? lines : [];
   const rollEnd = items[items.length - 1].from + items[items.length - 1].frames;
-  const out = [];
+
+  // 1. Где фраза звучала у автора и сколько она длится в начитке
+  const wanted = [];
   const used = new Set();
-  // Раньше этого кадра ставить нельзя: предыдущая фраза ещё звучит
-  let next = 0;
   for (const {seg, from: segFrom, frames: segFrames} of items) {
     if (seg.speed !== 1) continue;
     // Фрагмент под озвучку знает свою фразу; у обычного берём те, что начинаются внутри него
@@ -129,17 +129,48 @@ export const voicePlan = (items, lines, voice, fps) => {
       if (used.has(line.id)) continue;
       const clip = clipOf(voice, line.id);
       if (!clip) continue;
-      // Фраза звучит там, где она была у автора: время исходника → кадр ролика
-      const want = seg.voiceLine ? segFrom : segFrom + Math.round(((line.start - seg.start) / seg.speed) * fps);
-      const at = Math.max(next, want);
-      if (at >= rollEnd) break;
-      // Обрезаем только концом ролика — граница фрагмента фразе не указ
-      const frames = Math.min(rollEnd - at, Math.round(clip.duration * fps));
-      if (frames < 2) break;
       used.add(line.id);
-      out.push({id: line.id, from: at, frames, file: clip.file, offset: clip.offset, line});
-      next = at + frames;
+      // Время исходника → кадр ролика
+      const want = seg.voiceLine ? segFrom : segFrom + Math.round(((line.start - seg.start) / seg.speed) * fps);
+      wanted.push({line, clip, want, frames: Math.round(clip.duration * fps)});
     }
+  }
+  if (!wanted.length) return [];
+
+  // 2. Укладываем подряд, ничего не накладывая. k сжимает не речь, а паузы между фразами:
+  // все желаемые начала придвигаются к нулю в k раз. Синтез говорит чуть медленнее автора,
+  // и на длинном тексте набегает секунда — без сжатия последняя фраза не влезает в ролик.
+  // При k около 0,99 фраза на 90-й секунде уезжает на секунду вперёд: на слух не заметно,
+  // а паузы между фразами остаются (речи 83 с при 94 с ролика).
+  const endsAt = (k) => {
+    let next = 0;
+    for (const w of wanted) next = Math.max(next, Math.round(w.want * k)) + w.frames;
+    return next;
+  };
+  let k = 1;
+  if (endsAt(1) > rollEnd && endsAt(0) <= rollEnd) {
+    // Речь короче ролика, значит нужное k есть: ищем самое большое, при котором всё влезает
+    let lo = 0;
+    let hi = 1;
+    for (let i = 0; i < 24; i++) {
+      const mid = (lo + hi) / 2;
+      if (endsAt(mid) <= rollEnd) lo = mid; else hi = mid;
+    }
+    k = lo;
+  }
+  // Речи больше, чем ролика (endsAt(0) > rollEnd) — тогда k=1 и хвост честно обрежется концом
+
+  const out = [];
+  // Раньше этого кадра ставить нельзя: предыдущая фраза ещё звучит
+  let next = 0;
+  for (const w of wanted) {
+    const at = Math.max(next, Math.round(w.want * k));
+    if (at >= rollEnd) break;
+    // Обрезаем только концом ролика — граница фрагмента фразе не указ
+    const frames = Math.min(rollEnd - at, w.frames);
+    if (frames < 2) break;
+    out.push({id: w.line.id, from: at, frames, file: w.clip.file, offset: w.clip.offset, line: w.line});
+    next = at + frames;
   }
   return out;
 };

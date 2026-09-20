@@ -147,6 +147,30 @@ describe('укладка озвучки по всему ролику', () => {
     }
   });
 
+  it('если начитка длиннее съёмки — поджимаются паузы, а последняя фраза остаётся', () => {
+    // Синтез говорит чуть медленнее автора: фразы те же, но каждая длиннее, и хвост
+    // не влезает в 14 секунд ролика, если класть их строго по временам исходника
+    const slow = {track: {file: '/v/t.mp3'}, clips: {
+      l1: {from: 0, to: 3}, l2: {from: 3, to: 7.5}, l3: {from: 8, to: 13},
+    }};
+    const plan = voicePlan(items, lines, slow, fps);
+    expect(plan.map((c) => c.id)).toEqual(['l1', 'l2', 'l3']);
+    // все три звучат целиком, ничего не обрезано концом ролика
+    expect(plan.map((c) => c.frames)).toEqual([3 * fps, 4.5 * fps, 5 * fps]);
+    const rollEnd = items[items.length - 1].from + items[items.length - 1].frames;
+    expect(plan.at(-1)!.from + plan.at(-1)!.frames).toBeLessThanOrEqual(rollEnd);
+  });
+
+  it('речи больше, чем ролика — хвост честно обрезается, начало не едет', () => {
+    const tooMuch = {track: {file: '/v/t.mp3'}, clips: {
+      l1: {from: 0, to: 9}, l2: {from: 9, to: 18}, l3: {from: 18, to: 27},
+    }};
+    const plan = voicePlan(items, lines, tooMuch, fps);
+    expect(plan[0].from).toBe(Math.round(0.5 * fps));  // первая — на своём месте
+    const rollEnd = items[items.length - 1].from + items[items.length - 1].frames;
+    for (const c of plan) expect(c.from + c.frames).toBeLessThanOrEqual(rollEnd);
+  });
+
   it('каждая фраза звучит ровно один раз', () => {
     const plan = voicePlan(items, lines, voice, fps);
     expect(new Set(plan.map((c) => c.id)).size).toBe(plan.length);
