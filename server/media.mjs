@@ -88,7 +88,6 @@ export const probe = async (file) => {
   };
 };
 
-// Рабочая копия: H.264, до 1080×1920 с сохранением пропорций, 30 fps, ключевой кадр каждые 0,5 с (быстрая перемотка)
 // Уменьшаем до 1080×1920, но никогда не увеличиваем: апскейл резкости не добавляет,
 // а вес файла и время рендера растут (сжатая копия 464×832 давала 53 МБ вместо 11).
 const SCALE = "scale=w='min(1080,iw)':h='min(1920,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2";
@@ -104,6 +103,18 @@ const tonemapChain = (transfer) => {
     + 'tonemap=tonemap=hable:desat=0,zscale=p=bt709:t=bt709:m=bt709:r=tv,';
 };
 
+/**
+ * Собрать рабочую копию исходника: H.264, до 1080×1920 с сохранением пропорций, частота как
+ * у ролика (REVIEW_FPS), ключевой кадр каждые полсекунды — от этого зависит, как быстро
+ * рендер и таймлайн перематывают копию.
+ *
+ * @param {string} input — файл с телефона
+ * @param {string} output — куда писать (.mp4)
+ * @param {number} duration — длина исходника в секундах, нужна только для доли выполнения
+ * @param {(share: number) => void} [onProgress] — доля 0…1
+ * @param {{hdr?: boolean, transfer?: string}} [info] — из probe(): снято ли в HDR и какая кривая.
+ *   Без этого цвет останется широким, и картинка выйдет вялой — см. tonemapChain
+ */
 export const makeProxy = async (input, output, duration, onProgress, {hdr = false, transfer = ''} = {}) => {
   const encode = (filters) => run('ffmpeg', [
     '-hide_banner', '-v', 'error', '-y', '-hwaccel', 'auto', '-i', input,

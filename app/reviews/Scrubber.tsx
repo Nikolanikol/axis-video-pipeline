@@ -1,6 +1,7 @@
 // Таймлайн исходника: видео, полоса миниатюр с фрагментами, отметки начала/конца.
 // Клавиши: пробел — пуск/пауза, ←/→ — 0,5 с (с Shift — кадр), I — начало, O — конец, Enter — добавить фрагмент.
 import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {REVIEW_FPS} from '../../src/shared/timeline.js';
 import type {ReviewSegment, ReviewSource} from '../../src/shared/types';
 
 export type Seek = (time: number, playFor?: number) => void;
@@ -16,8 +17,10 @@ type Props = {
 };
 
 const THUMB_W = 48;
+// Шаг стрелкой — доля темпа монтажа; с Shift — ровно один кадр ролика.
+// Частоту берём из настроек обзора: с числом «на глаз» Shift перескакивал бы через кадры
 const STEP = 0.5;
-const FRAME = 1 / 30;
+const FRAME = 1 / REVIEW_FPS;
 export const sec = (v: number) => `${v.toFixed(1).replace('.', ',')} с`;
 
 export const thumbUrl = (source: ReviewSource, time: number) => {
@@ -44,6 +47,7 @@ export const Scrubber: React.FC<Props> = ({source, segments, selected, onSelect,
   const pxPerSec = THUMB_W * fps;
   const count = source.thumbs?.count ?? 0;
 
+  // Последний кадр не отдаём: встав ровно на длину записи, <video> показывает чёрное
   const clampTime = useCallback((t: number) => Math.min(Math.max(0, t), Math.max(0, duration - FRAME)), [duration]);
 
   const seek: Seek = useCallback((t, playFor) => {
@@ -88,6 +92,8 @@ export const Scrubber: React.FC<Props> = ({source, segments, selected, onSelect,
     if (x < s.scrollLeft + 20 || x > s.scrollLeft + s.clientWidth - 20) s.scrollLeft = Math.max(0, x - s.clientWidth / 3);
   }, [time, pxPerSec]);
 
+  // Фрагмент из отметок. Нет отметки начала — берём текущее место; нет конца (или он стоит
+  // раньше начала, что бывает при перестановке отметок) — даём две секунды по умолчанию
   const add = useCallback(() => {
     const start = markIn ?? time;
     const end = markOut !== null && markOut > start + 0.2 ? markOut : Math.min(duration, start + 2);
@@ -98,11 +104,14 @@ export const Scrubber: React.FC<Props> = ({source, segments, selected, onSelect,
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Горячие клавиши не должны срабатывать, пока человек пишет в поле: пробел в названии
+      // обзора не обязан запускать видео. Сочетания с Cmd/Ctrl/Alt оставляем браузеру
       if (typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
       const k = e.key.toLowerCase();
       if (k === ' ') { e.preventDefault(); toggle(); }
       else if (k === 'arrowleft') { e.preventDefault(); seek(time - (e.shiftKey ? FRAME : STEP)); }
       else if (k === 'arrowright') { e.preventDefault(); seek(time + (e.shiftKey ? FRAME : STEP)); }
+      // Буквы дублируются в русской раскладке: переключать её ради отметки — лишнее движение
       else if (k === 'i' || k === 'ш') setMarkIn(time);
       else if (k === 'o' || k === 'щ') setMarkOut(time);
       else if (k === 'enter') { e.preventDefault(); add(); }

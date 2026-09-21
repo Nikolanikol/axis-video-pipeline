@@ -1,5 +1,4 @@
 // Субтитры: слова с таймингами → строки для ролика. Общий модуль (ролик, интерфейс, сервер, тесты).
-import {clipOf} from './narration.js';
 
 /**
  * @typedef {{text: string, start: number, end: number, type?: string, speaker_id?: string}} Word
@@ -90,47 +89,6 @@ export const lineText = (line, useTranslation) => (useTranslation && line.transl
  */
 export const lineAtSourceTime = (lines, sourceTime) =>
   lines.find((l) => sourceTime >= l.start && sourceTime <= l.end) ?? null;
-
-/**
- * Куски озвучки внутри фрагмента: фразы идут по своим местам, без нахлёста.
- * Берём строки, которые начинаются внутри фрагмента, — так фраза звучит ровно один раз.
- * offset — откуда играть файл: в единой начитке это отрезок общей дорожки.
- * @param {Line[]} lines
- * @param {{clips?: object, track?: {file: string}} | null | undefined} voice
- * @param {{start: number, duration: number, speed: number, voiceLine?: string}} seg
- * @param {number} segFrames
- * @param {number} fps
- * @returns {{id: string, from: number, frames: number, file: string, offset: number, line: Line}[]}
- */
-export const voiceForSegment = (lines, voice, seg, segFrames, fps) => {
-  if (!voice?.clips || seg.speed !== 1) return [];
-  // Фрагмент знает свою фразу (раскладка «под озвучку») — играем ровно её, с начала фрагмента
-  if (seg.voiceLine) {
-    const line = (Array.isArray(lines) ? lines : []).find((l) => l.id === seg.voiceLine);
-    const clip = line && clipOf(voice, line.id);
-    if (!clip) return [];
-    const frames = Math.min(segFrames, Math.round(clip.duration * fps));
-    return frames < 2 ? [] : [{id: line.id, from: 0, frames, file: clip.file, offset: clip.offset, line}];
-  }
-  const segEnd = seg.start + (segFrames / fps) * seg.speed;
-  const out = [];
-  // Раньше этого кадра ставить нельзя: предыдущая фраза ещё звучит
-  let next = 0;
-  for (const l of Array.isArray(lines) ? lines : []) {
-    if (l.start < seg.start - 1e-6 || l.start >= segEnd) continue;
-    const clip = clipOf(voice, l.id);
-    if (!clip) continue;
-    // Фраза звучит там, где она была у автора, — иначе озвучка убегает вперёд от картинки
-    const want = Math.round(((l.start - seg.start) / seg.speed) * fps);
-    const from = Math.max(next, want);
-    if (from >= segFrames) break;
-    const frames = Math.min(segFrames - from, Math.round(clip.duration * fps));
-    if (frames < 2) break;
-    out.push({id: l.id, from, frames, file: clip.file, offset: clip.offset, line: l});
-    next = from + frames;
-  }
-  return out;
-};
 
 /**
  * Куски строк, попавшие во фрагмент ролика.

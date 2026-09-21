@@ -34,21 +34,27 @@ export const probe = async (file) => {
 
 // Аудио ролика → моно PCM 16 бит
 export const decodeAudio = async (file, sampleRate = 22050) => {
+  // Распаковка идёт рядом с исходным файлом, поэтому убираем за собой: замер на файле из
+  // репозитория (например, на треке из public/music) иначе оставляет мегабайты мусора
   const wav = `${file}.wav`;
-  await remotionBin('ffmpeg', ['-v', 'error', '-y', '-i', file, '-vn', '-ac', '1', '-ar', String(sampleRate), '-c:a', 'pcm_s16le', wav]);
-  const buf = await fs.readFile(wav);
-  let pos = 12;
-  while (pos < buf.length) {
-    const id = buf.toString('ascii', pos, pos + 4);
-    const size = buf.readUInt32LE(pos + 4);
-    if (id === 'data') {
-      const samples = new Float32Array(size / 2);
-      for (let i = 0; i < samples.length; i++) samples[i] = buf.readInt16LE(pos + 8 + i * 2) / 32768;
-      return {samples, sampleRate};
+  try {
+    await remotionBin('ffmpeg', ['-v', 'error', '-y', '-i', file, '-vn', '-ac', '1', '-ar', String(sampleRate), '-c:a', 'pcm_s16le', wav]);
+    const buf = await fs.readFile(wav);
+    let pos = 12;
+    while (pos < buf.length) {
+      const id = buf.toString('ascii', pos, pos + 4);
+      const size = buf.readUInt32LE(pos + 4);
+      if (id === 'data') {
+        const samples = new Float32Array(size / 2);
+        for (let i = 0; i < samples.length; i++) samples[i] = buf.readInt16LE(pos + 8 + i * 2) / 32768;
+        return {samples, sampleRate};
+      }
+      pos += 8 + size + (size % 2);
     }
-    pos += 8 + size + (size % 2);
+    throw new Error(`В ${wav} нет данных`);
+  } finally {
+    await fs.rm(wav, {force: true}).catch(() => {});
   }
-  throw new Error(`В ${wav} нет данных`);
 };
 
 // Низкочастотный фильтр (бочка) без фазового сдвига: RBJ biquad вперёд и назад

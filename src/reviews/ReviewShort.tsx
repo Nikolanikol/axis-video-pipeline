@@ -1,12 +1,22 @@
-// Обзор авто (review-short): съёмка + оформление AXIS двумя независимыми дорожками.
-// Съёмка идёт непрерывными кусками (timeline.js → videoRuns): плашка — это наложение,
-// резать под неё видео не нужно, иначе на каждой плашке перематывается файл и дёргается кадр.
-// Само оформление — src/reviews/Overlays.tsx. Тайминги — src/shared/timeline.js.
+// Обзор авто (review-short). Главное правило: съёмка — один непрерывный кадр, всё остальное
+// накладывается поверх. Резать видео нельзя ничем и никогда.
+//
+// Слои, снизу вверх:
+//   съёмка      — непрерывные куски (timeline.js → videoRuns). Плашка это наложение, а не
+//                 склейка: каждый лишний элемент перематывает файл и кадр дёргается
+//   звук кадра  — либо живой звук из самого видео, либо выделенные звуки машины без голоса
+//                 (review.ambience). Одновременно никогда: это одна и та же запись
+//   озвучка     — одним слоем на весь ролик (narration.js → voicePlan), а не внутри
+//                 фрагментов: граница фрагмента не должна обрывать фразу
+//   музыка      — src/shared/music.tsx
+//   оформление  — src/reviews/Overlays.tsx: заставка, плашки, субтитры, финал
+//
+// Тайминги — src/shared/timeline.js; все времена оформления задаются в секундах (см. ниже).
 import React from 'react';
 import {AbsoluteFill, Audio, OffthreadVideo, Sequence, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
 import {defined, resolveAd, themeOf} from '../shared/model';
 import {BackgroundMusic} from '../shared/music';
-import {linesForSegment, voiceForSegment} from '../shared/subtitles.js';
+import {linesForSegment} from '../shared/subtitles.js';
 import {colourFilter, isNeutral, warmthChannels} from '../shared/colour.js';
 import {voicePlan} from '../shared/narration.js';
 import {REVIEW_BPM, buildTimeline, videoRuns} from '../shared/timeline.js';

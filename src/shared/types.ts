@@ -64,7 +64,8 @@ export type ReviewSource = {
   progress?: number;
   error?: string;
   name?: string;
-  // Рабочая копия H.264 1080×1920 30 fps: /data/reviews/<id>/proxy.mp4 (для рендера — полный http-адрес)
+  // Рабочая копия H.264 до 1080×1920, частота REVIEW_FPS: /data/reviews/<id>/proxy-<версия>.mp4
+  // (для рендера — полный http-адрес)
   proxy?: string;
   width?: number;
   height?: number;
