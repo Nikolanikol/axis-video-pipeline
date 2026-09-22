@@ -108,6 +108,9 @@ export const narrationSlots = (lines, voice, {gap = 0.15} = {}) => {
  * @param {number} fps
  * @returns {{id: string, from: number, frames: number, file: string, offset: number, line: import('./subtitles.js').Line}[]}
  */
+// Паузы короче этого модель не делала — значит фразы прочитаны слитно
+const GLUE_SEC = 0.12;
+
 export const voicePlan = (items, lines, voice, fps) => {
   if (!voice?.clips || !Array.isArray(items) || !items.length) return [];
   const all = Array.isArray(lines) ? lines : [];
@@ -132,7 +135,13 @@ export const voicePlan = (items, lines, voice, fps) => {
       used.add(line.id);
       // Время исходника → кадр ролика
       const want = seg.voiceLine ? segFrom : segFrom + Math.round(((line.start - seg.start) / seg.speed) * fps);
-      wanted.push({line, clip, want, frames: Math.round(clip.duration * fps)});
+      // Шла ли эта фраза в дорожке встык с предыдущей. Начитка синтезируется одним куском,
+      // и если модель не сделала паузу между двумя строками — она прочитала их как одно
+      // предложение. Разносить такие строки по местам пауз автора нельзя (см. ниже).
+      const before = wanted[wanted.length - 1];
+      const glued = Boolean(voice.track) && before
+        && Math.abs(clip.offset - (before.clip.offset + before.clip.duration)) < GLUE_SEC;
+      wanted.push({line, clip, want, glued, frames: Math.round(clip.duration * fps)});
     }
   }
   if (!wanted.length) return [];
@@ -142,11 +151,20 @@ export const voicePlan = (items, lines, voice, fps) => {
   // и на длинном тексте набегает секунда — без сжатия последняя фраза не влезает в ролик.
   // При k около 0,99 фраза на 90-й секунде уезжает на секунду вперёд: на слух не заметно,
   // а паузы между фразами остаются (речи 83 с при 94 с ролика).
-  const endsAt = (k) => {
+  // Строки, склеенные в дорожке, кладём вплотную к предыдущей, что бы ни говорил исходник:
+  // иначе в середину фразы попадёт тишина. На русском автор делает паузу там, где ему удобно
+  // («Пробег,» … «пробег здесь сто шестнадцать тысяч»), а в переводе это одно предложение —
+  // и разорванное по местам его пауз оно звучит так, будто озвучку проглотило.
+  const placeAll = (k, each) => {
     let next = 0;
-    for (const w of wanted) next = Math.max(next, Math.round(w.want * k)) + w.frames;
+    for (const w of wanted) {
+      const at = w.glued ? next : Math.max(next, Math.round(w.want * k));
+      if (each && each(w, at) === false) return next;
+      next = at + w.frames;
+    }
     return next;
   };
+  const endsAt = (k) => placeAll(k);
   let k = 1;
   if (endsAt(1) > rollEnd && endsAt(0) <= rollEnd) {
     // Речь короче ролика, значит нужное k есть: ищем самое большое, при котором всё влезает
@@ -164,7 +182,7 @@ export const voicePlan = (items, lines, voice, fps) => {
   // Раньше этого кадра ставить нельзя: предыдущая фраза ещё звучит
   let next = 0;
   for (const w of wanted) {
-    const at = Math.max(next, Math.round(w.want * k));
+    const at = w.glued ? next : Math.max(next, Math.round(w.want * k));
     if (at >= rollEnd) break;
     // Обрезаем только концом ролика — граница фрагмента фразе не указ
     const frames = Math.min(rollEnd - at, w.frames);

@@ -171,6 +171,37 @@ describe('укладка озвучки по всему ролику', () => {
     for (const c of plan) expect(c.from + c.frames).toBeLessThanOrEqual(rollEnd);
   });
 
+  it('фразы, прочитанные слитно, не разносятся по паузам автора', () => {
+    // Автор на своём языке сделал паузу посреди мысли: «Пробег,» … «пробег сто шестнадцать».
+    // В переводе это одно предложение, и модель прочитала его без паузы — в дорожке клипы
+    // идут встык. Разнести их по местам его пауз значит вставить тишину в середину фразы.
+    const split = [
+      {id: 'a', start: 0.5, end: 1, text: 'Пробег,'},
+      {id: 'b', start: 4.0, end: 6, text: 'пробег сто шестнадцать тысяч'},   // пауза 3 секунды
+    ];
+    const glued = {track: {file: '/v/t.mp3'}, clips: {
+      a: {from: 0, to: 0.8},
+      b: {from: 0.8, to: 3},     // встык: модель паузы не делала
+    }};
+    const plan = voicePlan(items, split, glued, fps);
+    expect(plan.map((c) => c.id)).toEqual(['a', 'b']);
+    // Вторая начинается ровно там, где кончилась первая, а не на 4-й секунде
+    expect(plan[1].from).toBe(plan[0].from + plan[0].frames);
+  });
+
+  it('там, где модель паузу сделала, место автора сохраняется', () => {
+    const split = [
+      {id: 'a', start: 0.5, end: 1, text: 'первая'},
+      {id: 'b', start: 4.0, end: 6, text: 'вторая'},
+    ];
+    const apart = {track: {file: '/v/t.mp3'}, clips: {
+      a: {from: 0, to: 0.8},
+      b: {from: 1.6, to: 3.8},   // в дорожке между ними 0,8 с тишины — это настоящая пауза
+    }};
+    const plan = voicePlan(items, split, apart, fps);
+    expect(plan[1].from).toBe(Math.round(4 * fps));
+  });
+
   it('каждая фраза звучит ровно один раз', () => {
     const plan = voicePlan(items, lines, voice, fps);
     expect(new Set(plan.map((c) => c.id)).size).toBe(plan.length);
