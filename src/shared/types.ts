@@ -183,6 +183,9 @@ export type CarouselCar = {
   history: {
     accidentsOwn: number; accidentsOther: number; accidentsTotal: number;
     accidentYears: number[]; maxPayoutKrw: number | null;
+    // Каждый случай отдельно: дата, выплата и на что ушла. own — своя вина (вывод
+    // по совпадению счётчиков Encar, у него это поле без расшифровки)
+    claims: {date: string; payoutKrw: number; partsKrw: number; laborKrw: number; paintKrw: number; own: boolean}[];
     ownerChanges: number; theft: number; flood: number; totalLoss: number;
   } | null;
   options: {comfort: string[]; safety: string[]; other: string[]; total: number};

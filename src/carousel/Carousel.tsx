@@ -10,7 +10,7 @@ import {AbsoluteFill, Img, staticFile, useCurrentFrame} from 'remotion';
 import {themeOf} from '../shared/model';
 import type {CarouselProps} from '../shared/types';
 import {BODY, CopperText, HEAD, ThemeProvider, useTheme} from '../shared/ui';
-import {Bullets, NumberCard, Photo, Row, Slide, TOTAL} from './Slides';
+import {Bullets, NumberCard, Photo, Row, Slide, Title, TOTAL} from './Slides';
 
 export const CAROUSEL_SLIDES = TOTAL;
 
@@ -84,29 +84,70 @@ const History: React.FC<CarouselProps & {brandName: string}> = ({car, brandName}
       </Slide>
     );
   }
-  const years = h.accidentYears.length ? ` (${h.accidentYears.join(', ')})` : '';
-  const payout = h.maxPayoutKrw ? `, largest payout ₩${h.maxPayoutKrw.toLocaleString('en-US')}` : '';
+  // Чистая история — сама по себе довод, и подавать её надо как довод, а не как пустой слайд
+  if (!h.accidentsTotal) {
+    return (
+      <Slide index={2} brandName={brandName}>
+        <Title kicker="Vehicle history">No accident record</Title>
+        <div style={{display: 'flex', gap: 22, marginTop: 64}}>
+          <NumberCard value="0" label="Insurance claims" />
+          <NumberCard value={String(h.ownerChanges)} label="Owner changes" />
+        </div>
+        <div style={{display: 'flex', gap: 22, marginTop: 22}}>
+          <NumberCard value={String(h.theft)} label="Theft records" />
+          <NumberCard value={String(h.flood)} label="Flood damage" />
+        </div>
+        <div style={{marginTop: 'auto', fontFamily: BODY, fontWeight: 500, fontSize: 30, lineHeight: 1.5,
+          color: C.grey, borderTop: `1px solid ${C.line}`, paddingTop: 32}}>
+          Nothing on record with the insurers. Full Encar report supplied before purchase.
+        </div>
+      </Slide>
+    );
+  }
+
+  // Случаев может быть много — показываем свежие, про остальные честно говорим числом
+  const SHOWN = 5;
+  const shown = h.claims.slice(0, SHOWN);
+  const rest = h.claims.length - shown.length;
   return (
     <Slide index={2} brandName={brandName}>
-      <div style={{marginTop: 52}}>
-        <CopperText style={{fontFamily: BODY, fontWeight: 700, fontSize: 32, letterSpacing: 9,
-          textTransform: 'uppercase'}}>Vehicle history</CopperText>
-        <div style={{fontFamily: HEAD, fontWeight: 600, fontSize: 84, lineHeight: 1.05, marginTop: 20,
-          color: C.white}}>Nothing hidden</div>
-      </div>
-      <div style={{display: 'flex', gap: 22, marginTop: 64}}>
-        <NumberCard value={String(h.accidentsTotal)} label="Insurance claims" alarm={h.accidentsTotal > 0} />
+      <Title kicker="Vehicle history">Nothing hidden</Title>
+      <div style={{display: 'flex', gap: 22, marginTop: 44}}>
+        <NumberCard value={String(h.accidentsTotal)} label="Insurance claims" alarm />
         <NumberCard value={String(h.ownerChanges)} label="Owner changes" />
       </div>
-      <div style={{display: 'flex', gap: 22, marginTop: 22}}>
-        <NumberCard value={String(h.theft)} label="Theft records" />
-        <NumberCard value={String(h.flood)} label="Flood damage" />
+      {/* Каждый случай с суммой: «4 ДТП» без цифр читается страшнее, чем есть на самом деле */}
+      <div style={{marginTop: 40}}>
+        <div style={{display: 'flex', fontFamily: BODY, fontWeight: 600, fontSize: 24, letterSpacing: 3,
+          textTransform: 'uppercase', color: C.grey, paddingBottom: 16}}>
+          <span style={{flex: 1}}>Date</span>
+          <span style={{width: 150, textAlign: 'right'}}>Fault</span>
+          <span style={{width: 250, textAlign: 'right'}}>Paid out</span>
+        </div>
+        {shown.map((c) => (
+          <div key={c.date} style={{borderTop: `1px solid ${C.line}`, padding: '22px 0'}}>
+            <div style={{display: 'flex', alignItems: 'baseline'}}>
+              <span style={{flex: 1, fontFamily: HEAD, fontWeight: 600, fontSize: 40, color: C.white}}>{c.date}</span>
+              <span style={{width: 150, textAlign: 'right', fontFamily: BODY, fontWeight: 500, fontSize: 28,
+                color: C.grey}}>{c.own ? 'own' : 'other'}</span>
+              <span style={{width: 250, textAlign: 'right', fontFamily: HEAD, fontWeight: 600, fontSize: 40,
+                color: C.white}}>₩{c.payoutKrw.toLocaleString('en-US')}</span>
+            </div>
+            {/* Покраска отдельно: по ней видно, трогали ли кузов */}
+            <div style={{fontFamily: BODY, fontWeight: 500, fontSize: 25, color: C.grey, marginTop: 8}}>
+              parts ₩{c.partsKrw.toLocaleString('en-US')} · labour ₩{c.laborKrw.toLocaleString('en-US')}
+              {c.paintKrw > 0 && <> · <span style={{color: C.copperLight}}>paint ₩{c.paintKrw.toLocaleString('en-US')}</span></>}
+            </div>
+          </div>
+        ))}
+        {rest > 0 && (
+          <div style={{borderTop: `1px solid ${C.line}`, paddingTop: 20, fontFamily: BODY,
+            fontWeight: 500, fontSize: 28, color: C.grey}}>and {rest} more in the full report</div>
+        )}
       </div>
-      <div style={{marginTop: 'auto', fontFamily: BODY, fontWeight: 500, fontSize: 30, lineHeight: 1.5,
-        color: C.grey, borderTop: `1px solid ${C.line}`, paddingTop: 32}}>
-        {h.accidentsTotal > 0
-          ? `${h.accidentsOwn} own and ${h.accidentsOther} third-party claims${years}${payout}. `
-          : 'No insurance claims on record. '}
+      <div style={{marginTop: 'auto', fontFamily: BODY, fontWeight: 500, fontSize: 28, lineHeight: 1.5,
+        color: C.grey, borderTop: `1px solid ${C.line}`, paddingTop: 26}}>
+        {h.accidentsOwn} at fault, {h.accidentsOther} third-party. Theft {h.theft} · Flood {h.flood}.
         Full Encar report supplied before purchase.
       </div>
     </Slide>
