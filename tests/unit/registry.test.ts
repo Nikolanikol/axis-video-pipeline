@@ -122,7 +122,7 @@ describe('бренд', () => {
   const COLORS = ['bg', 'panel', 'line', 'grey', 'white', 'copper', 'copperLight', 'copperDark'] as const;
 
   it('все цвета — #RRGGBB', () => {
-    for (const key of COLORS) expect((brand as Record<string, string>)[key], key).toMatch(/^#[0-9A-Fa-f]{6}$/);
+    for (const key of COLORS) expect((brand as unknown as Record<string, string>)[key], key).toMatch(/^#[0-9A-Fa-f]{6}$/);
   });
 
   it('имя бренда задано: оно печатается в шапке слайдов', () => {

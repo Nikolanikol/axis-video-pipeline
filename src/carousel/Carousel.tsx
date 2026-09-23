@@ -10,7 +10,7 @@ import {AbsoluteFill, Img, staticFile, useCurrentFrame} from 'remotion';
 import {themeOf} from '../shared/model';
 import type {CarouselProps} from '../shared/types';
 import {BODY, CopperText, HEAD, ThemeProvider, useAsset, useTheme} from '../shared/ui';
-import {Bullets, NumberCard, PAD, PhotoBand, Row, Slide, Title, NumberCard as Card, TOTAL} from './Slides';
+import {Bullets, NumberCard, PAD, PhotoBand, Row, SAFE, Slide, Title, TOTAL} from './Slides';
 
 export const CAROUSEL_SLIDES = TOTAL;
 
@@ -37,7 +37,8 @@ const Cover: React.FC<CarouselProps & {brandName: string}> = ({car, brandName}) 
       )}
       {/* Затемнение: сверху глушим остатки чужого логотипа, снизу — под белый текст */}
       <AbsoluteFill style={{background: `linear-gradient(to bottom, ${C.bg}f2 0%, ${C.bg}66 18%, ${C.bg}22 40%, ${C.bg}f2 72%)`}} />
-      <AbsoluteFill style={{padding: 96, display: 'flex', flexDirection: 'column'}}>
+      {/* Поля сверху и снизу — безопасная зона: Instagram обрезает 9:16 до 4:5 */}
+      <AbsoluteFill style={{padding: `${SAFE}px ${PAD}px`, display: 'flex', flexDirection: 'column'}}>
         <div style={{display: 'flex', justifyContent: 'space-between', fontFamily: BODY, fontWeight: 600,
           fontSize: 30, letterSpacing: 7, textTransform: 'uppercase', color: C.white}}>
           <span>{brandName}</span><span>01 / 0{TOTAL}</span>
@@ -169,7 +170,7 @@ const BandSlide: React.FC<{
       <PhotoBand src={photo ?? undefined} height={height} label={label}
         index={index} brandName={brandName} focus={focus} trimTop={trimTop} />
       {/* Наползаем на кадр: снизу он уже растворён в фоне, и шов не виден */}
-      <div style={{padding: `0 ${PAD}px ${PAD}px`, marginTop: -56, position: 'relative'}}>
+      <div style={{padding: `0 ${PAD}px ${SAFE}px`, marginTop: -56, position: 'relative'}}>
         <CopperText style={{fontFamily: BODY, fontWeight: 700, fontSize: 32, letterSpacing: 9,
           textTransform: 'uppercase'}}>{kicker}</CopperText>
         {children}
@@ -203,7 +204,7 @@ const Specs: React.FC<CarouselProps & {brandName: string}> = ({car, brandName}) 
   ];
   return (
     <BandSlide index={5} brandName={brandName} kicker="Specifications" photo={car.photos.rear}
-      label="фото сзади не пришло" height={860} trimTop={0.30}>
+      label="фото сзади не пришло" height={1000} trimTop={0.16}>
       <div style={{marginTop: 30}}>
         {rows.map(([k, v], i) => <Row key={k} k={k} v={v} first={i === 0} />)}
       </div>

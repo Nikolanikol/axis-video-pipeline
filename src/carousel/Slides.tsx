@@ -9,6 +9,19 @@ import {BODY, CopperText, HEAD, useTheme} from '../shared/ui';
 export const PAD = 96;
 export const TOTAL = 7;
 
+/**
+ * Безопасная зона сверху и снизу.
+ *
+ * Instagram НЕ поддерживает 9:16 в карусели: он обрезает такую картинку до 4:5, срезая
+ * верх и низ. Из 1920 остаётся 1350 — по 285 с каждой стороны. Подпись, стоявшая внизу,
+ * в ленту просто не попадала.
+ *
+ * TikTok показывает кадр целиком, но прячет низ под своей подписью и кнопками, так что
+ * зона нужна и там. Поэтому один комплект слайдов годится обеим площадкам: фото идёт
+ * во весь кадр, а текст живёт в середине.
+ */
+export const SAFE = Math.round((1920 - 1350) / 2);
+
 /** Шапка: слева имя бренда, справа номер слайда. Одинаковая на всех семи. */
 export const Header: React.FC<{index: number; brandName: string}> = ({index, brandName}) => {
   const C = useTheme();
@@ -69,9 +82,10 @@ export const PhotoBand: React.FC<{
       {/* Сверху глушим впечатанный логотип Encar — он сидит в верхней трети кадра и
           светлый, поэтому затемнение держим плотным дольше. Снизу уводим кадр в фон. */}
       <AbsoluteFill style={{background:
-        `linear-gradient(to bottom, ${C.bg}ee 0%, ${C.bg}b0 16%, ${C.bg}44 32%, transparent 58%, ${C.bg} 100%)`}} />
+        // Самый верх глухой: логотип Encar яркий, и сквозь 93% затемнения он ещё читался
+        `linear-gradient(to bottom, ${C.bg} 0%, ${C.bg} 9%, ${C.bg}cc 18%, ${C.bg}55 30%, transparent 58%, ${C.bg} 100%)`}} />
       <div style={{
-        position: 'absolute', top: PAD, left: PAD, right: PAD, display: 'flex',
+        position: 'absolute', top: SAFE, left: PAD, right: PAD, display: 'flex',
         justifyContent: 'space-between', fontFamily: BODY, fontWeight: 600, fontSize: 30,
         letterSpacing: 7, textTransform: 'uppercase', color: C.white,
       }}>
@@ -139,7 +153,9 @@ export const Row: React.FC<{k: string; v: string; first?: boolean}> = ({k, v, fi
 export const Slide: React.FC<{index: number; brandName: string; children: React.ReactNode}> = ({index, brandName, children}) => {
   const C = useTheme();
   return (
-    <AbsoluteFill style={{background: C.bg, padding: PAD, display: 'flex', flexDirection: 'column'}}>
+    <AbsoluteFill style={{
+      background: C.bg, padding: `${SAFE}px ${PAD}px`, display: 'flex', flexDirection: 'column',
+    }}>
       <Header index={index} brandName={brandName} />
       {children}
     </AbsoluteFill>
