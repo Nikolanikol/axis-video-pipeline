@@ -12,8 +12,15 @@ import '@fontsource/montserrat/latin-600.css';
 import {BRAND} from './model';
 import type {Theme} from './types';
 
-export const HEAD = 'Oswald, sans-serif';
-export const BODY = 'Montserrat, sans-serif';
+/**
+ * Шрифты подставляются переменными CSS, а не именами семейств.
+ *
+ * Так места вызова (их полсотни в пяти файлах) не знают, какой шрифт выбран, и смена
+ * шрифта в настройках не требует ни одной правки в вёрстке. Значения переменных задаёт
+ * ThemeProvider ниже — из темы, то есть из config/brand.json или из props.theme.
+ */
+export const HEAD = 'var(--axis-head)';
+export const BODY = 'var(--axis-body)';
 // Безопасная зона TikTok/Reels: снизу подпись и музыка, справа кнопки
 export const PAD = '0 150px 360px 80px';
 export const clamp = {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'} as const;
@@ -21,10 +28,69 @@ export const clamp = {extrapolateLeft: 'clamp', extrapolateRight: 'clamp'} as co
 export const lines = (s = '') => s.split('\n').map((l, i) => <React.Fragment key={i}>{i > 0 && <br />}{l}</React.Fragment>);
 const src = (s: string) => (s.startsWith('http') || s.startsWith('/') ? s : staticFile(s));
 
-// Цвета бренда: config/brand.json, можно переопределить через props.theme
+// Бренд: config/brand.json, можно переопределить через props.theme
 const ThemeCtx = createContext<Theme>(BRAND);
-export const ThemeProvider = ThemeCtx.Provider;
 export const useTheme = () => useContext(ThemeCtx);
+
+/**
+ * Раздаёт тему вниз по дереву и заодно кладёт шрифты в переменные CSS.
+ *
+ * display: contents — элемент не создаёт своего блока, поэтому вставка обёртки не меняет
+ * вёрстку ни на пиксель, а переменные всё равно наследуются детьми.
+ */
+export const ThemeProvider: React.FC<{value: Theme; children: React.ReactNode}> = ({value, children}) => {
+  const fonts = value.fonts ?? BRAND.fonts;
+  return (
+    <ThemeCtx.Provider value={value}>
+      <div style={{
+        display: 'contents',
+        ['--axis-head' as string]: fonts?.head ?? 'Oswald, sans-serif',
+        ['--axis-body' as string]: fonts?.body ?? 'Montserrat, sans-serif',
+      } as React.CSSProperties}>
+        <WebFont url={fonts?.url} />
+        {children}
+      </div>
+    </ThemeCtx.Provider>
+  );
+};
+
+/**
+ * Свой шрифт со стороны (таблица стилей Google Fonts).
+ *
+ * Встроенные Oswald и Montserrat приходят пакетами и уже готовы к первому кадру.
+ * Чужой шрифт грузится по сети, и без задержки рендера Remotion снял бы кадр раньше,
+ * чем шрифт применился — текст вышел бы системным. Пустой адрес — ничего не делаем.
+ */
+const WebFont: React.FC<{url?: string}> = ({url}) => {
+  const [handle] = useState(() => (url ? delayRender(`шрифт ${url}`) : null));
+  useEffect(() => {
+    if (!url || handle === null) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = url;
+    // Ждём не только таблицу стилей, но и сами начертания: готовая таблица ещё не значит
+    // готовый шрифт, а кадр снимается сразу после continueRender
+    link.onload = () => {
+      (document as Document & {fonts?: FontFaceSet}).fonts?.ready
+        .then(() => continueRender(handle))
+        .catch(() => continueRender(handle));
+    };
+    link.onerror = () => continueRender(handle);   // не грузится — рисуем встроенным
+    document.head.appendChild(link);
+    return () => link.remove();
+  }, [url, handle]);
+  return null;
+};
+
+/**
+ * Файл бренда по имени: логотип, подпись, текстура.
+ * Берём из темы, чтобы у каждого бренда были свои; нет такого — встроенный из public/brand.
+ * Значением годится и путь внутри public/, и полная ссылка — см. src() выше.
+ */
+export const useAsset = (key: keyof typeof BRAND.assets): string => {
+  const theme = useTheme();
+  return src(theme.assets?.[key] ?? BRAND.assets[key]);
+};
 
 const copper = (C: Theme) =>
   `linear-gradient(115deg, ${C.copperDark} 0%, ${C.copper} 30%, ${C.copperLight} 55%, ${C.copper} 80%, ${C.copperDark} 100%)`;
@@ -37,7 +103,7 @@ export const CopperText: React.FC<{style?: React.CSSProperties; children: React.
 
 // Медная плашка с текстурой шлифованного металла
 export const Metal: React.FC<{style?: React.CSSProperties; children?: React.ReactNode}> = ({style, children}) => (
-  <div style={{backgroundImage: `url(${staticFile('brand/brushed-copper.jpg')}), ${copper(useTheme())}`,
+  <div style={{backgroundImage: `url(${useAsset('texture')}), ${copper(useTheme())}`,
     backgroundSize: 'cover', backgroundBlendMode: 'overlay', ...style}}>{children}</div>
 );
 
@@ -104,7 +170,7 @@ export const TopLogo: React.FC<{scrim?: boolean}> = ({scrim = true}) => {
         }} />
       )}
       <AbsoluteFill style={{alignItems: 'center', paddingTop: 170}}>
-        <Img src={staticFile('brand/logo-horizontal.svg')}
+        <Img src={useAsset('logoHorizontal')}
           style={{height: 78, filter: scrim ? 'drop-shadow(0 3px 10px rgba(0,0,0,0.5))' : undefined}} />
       </AbsoluteFill>
     </>

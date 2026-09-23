@@ -11,7 +11,7 @@ import {CarTitle, Contacts, PriceTag} from '../shared/blocks';
 import {resolveAd} from '../shared/model';
 import {lineText} from '../shared/subtitles.js';
 import type {ReviewProps, ReviewSegment, SubtitleLine} from '../shared/types';
-import {BODY, HEAD, Metal, PAD, Shade, TopLogo, clamp, useTheme} from '../shared/ui';
+import {BODY, HEAD, Metal, PAD, Shade, TopLogo, clamp, useAsset, useTheme} from '../shared/ui';
 
 // Тайминги оформления — в секундах: в кадрах они зависели бы от частоты композиции,
 // и на 60 кадрах всё оформление шло вдвое быстрее (затемнение финала читалось как обрыв).
@@ -68,7 +68,7 @@ export const FinalCard: React.FC<{props: ReviewProps}> = ({props}) => {
     <AbsoluteFill>
       <AbsoluteFill style={{background: `${C.bg}c8`, opacity: dim}} />
       <AbsoluteFill style={{alignItems: 'center', paddingTop: 190}}>
-        <Img src={staticFile('brand/logo-stacked.svg')} style={{height: 200, opacity: logo, transform: `scale(${0.9 + 0.1 * logo})`}} />
+        <Img src={useAsset('logoStacked')} style={{height: 200, opacity: logo, transform: `scale(${0.9 + 0.1 * logo})`}} />
       </AbsoluteFill>
       {ad
         ? <PriceTag ad={ad} delay={atSec(0.13, fps)} padding="0 150px 720px 80px" />

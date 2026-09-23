@@ -118,13 +118,27 @@ describe('музыкальная библиотека', () => {
 });
 
 describe('бренд', () => {
+  // В теме кроме цветов есть имя, шрифты и файлы — проверяем цвета отдельно от остального
+  const COLORS = ['bg', 'panel', 'line', 'grey', 'white', 'copper', 'copperLight', 'copperDark'] as const;
+
   it('все цвета — #RRGGBB', () => {
-    for (const [key, value] of Object.entries(brand)) expect(value, key).toMatch(/^#[0-9A-Fa-f]{6}$/);
+    for (const key of COLORS) expect((brand as Record<string, string>)[key], key).toMatch(/^#[0-9A-Fa-f]{6}$/);
   });
 
-  it('ассеты бренда на месте', () => {
-    for (const f of ['sign.svg', 'logo-horizontal.svg', 'logo-stacked.svg', 'brushed-copper.jpg', 'icon-handshake.png', 'icon-phone.png']) {
-      expect(fs.existsSync(path.join(ROOT, 'public/brand', f)), f).toBe(true);
+  it('имя бренда задано: оно печатается в шапке слайдов', () => {
+    expect(brand.name).toBeTruthy();
+  });
+
+  it('шрифты заданы семействами, а не пустыми строками', () => {
+    expect(brand.fonts.head).toMatch(/\w/);
+    expect(brand.fonts.body).toMatch(/\w/);
+  });
+
+  it('каждый файл бренда из темы лежит на диске', () => {
+    // Путь может быть и полной ссылкой — такие пропускаем, проверять нечего
+    for (const [key, value] of Object.entries(brand.assets)) {
+      if (String(value).startsWith('http')) continue;
+      expect(fs.existsSync(path.join(ROOT, 'public', String(value))), `${key}: ${value}`).toBe(true);
     }
   });
 });

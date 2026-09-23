@@ -9,7 +9,7 @@ import React from 'react';
 import {AbsoluteFill, Img, staticFile, useCurrentFrame} from 'remotion';
 import {themeOf} from '../shared/model';
 import type {CarouselProps} from '../shared/types';
-import {BODY, CopperText, HEAD, ThemeProvider, useTheme} from '../shared/ui';
+import {BODY, CopperText, HEAD, ThemeProvider, useAsset, useTheme} from '../shared/ui';
 import {Bullets, NumberCard, PAD, PhotoBand, Row, Slide, Title, NumberCard as Card, TOTAL} from './Slides';
 
 export const CAROUSEL_SLIDES = TOTAL;
@@ -248,7 +248,7 @@ const Cta: React.FC<CarouselProps & {brandName: string}> = ({car, market, brandN
     <Slide index={7} brandName={brandName}>
       <AbsoluteFill style={{display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: 'center', padding: 96}}>
-        <Img src={staticFile('brand/logo-stacked.svg')} style={{height: 240}} />
+        <Img src={useAsset('logoStacked')} style={{height: 240}} />
         <div style={{fontFamily: HEAD, fontWeight: 600, fontSize: 72, color: C.white, marginTop: 64,
           textAlign: 'center', lineHeight: 1.2}}>Want this car?</div>
         <div style={{fontFamily: BODY, fontWeight: 500, fontSize: 36, color: C.grey, marginTop: 24,
@@ -274,7 +274,8 @@ const Cta: React.FC<CarouselProps & {brandName: string}> = ({car, market, brandN
 export const Carousel: React.FC<CarouselProps> = (props) => {
   const theme = themeOf(props.theme);
   const frame = useCurrentFrame();
-  const brandName = 'K-AXIS MOTORS';
+  // Имя из темы: у каждого бренда своё, править в настройках, а не в коде
+  const brandName = theme.name;
   const slides = [Cover, History, Interior, Technology, Specs, Price, Cta];
   const Current = slides[Math.min(slides.length - 1, Math.max(0, frame))];
   return (

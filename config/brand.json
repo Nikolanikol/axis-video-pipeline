@@ -1,4 +1,5 @@
 {
+  "name": "K-AXIS MOTORS",
   "bg": "#111111",
   "panel": "#1F1F1F",
   "line": "#2D2D2D",
@@ -6,5 +7,18 @@
   "white": "#F5F5F5",
   "copper": "#B8734A",
   "copperLight": "#E19A6B",
-  "copperDark": "#975B32"
+  "copperDark": "#975B32",
+  "fonts": {
+    "head": "Oswald, sans-serif",
+    "body": "Montserrat, sans-serif",
+    "url": ""
+  },
+  "assets": {
+    "logoStacked": "brand/logo-stacked.svg",
+    "logoHorizontal": "brand/logo-horizontal.svg",
+    "sign": "brand/sign.svg",
+    "texture": "brand/brushed-copper.jpg",
+    "iconPhone": "brand/icon-phone.png",
+    "iconHandshake": "brand/icon-handshake.png"
+  }
 }

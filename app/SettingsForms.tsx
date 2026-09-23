@@ -92,7 +92,11 @@ export const MarketForm: React.FC<MarketProps> = ({market, saved, markets, onCha
   );
 };
 
-const COLOR_FIELDS: [keyof Theme, string][] = [
+// Только цветовые поля темы: в ней теперь есть ещё имя, шрифты и файлы бренда,
+// и без сужения форма пыталась бы засунуть объект в поле ввода
+type ColorKey = {[K in keyof Theme]: Theme[K] extends string ? K : never}[keyof Theme];
+
+const COLOR_FIELDS: [ColorKey, string][] = [
   ['bg', 'Фон'], ['panel', 'Плашки'], ['line', 'Линии, пунктир'], ['grey', 'Второстепенный текст'],
   ['white', 'Основной текст'], ['copper', 'Медь'], ['copperLight', 'Медь светлая'], ['copperDark', 'Медь тёмная'],
 ];

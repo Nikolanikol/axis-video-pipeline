@@ -6,7 +6,7 @@ import {Contacts, CarTitle, PriceTag} from '../../shared/blocks';
 import {getFormat, resolveAd, themeOf} from '../../shared/model';
 import {BackgroundMusic} from '../../shared/music';
 import type {Ad, AdProps} from '../../shared/types';
-import {BODY, CopperText, HEAD, Metal, PAD, Photo, Shade, ThemeProvider, TopLogo, clamp, lines, useTheme} from '../../shared/ui';
+import {BODY, CopperText, HEAD, Metal, PAD, Photo, Shade, ThemeProvider, TopLogo, clamp, lines, useAsset, useTheme} from '../../shared/ui';
 
 const FORMAT = getFormat('price-ad');
 
@@ -66,7 +66,7 @@ const Route: React.FC<{ad: Ad}> = ({ad}) => {
   return (
     <AbsoluteFill style={{background: `radial-gradient(ellipse at 50% 30%, ${C.panel} 0%, ${C.bg} 65%)`}}>
       <AbsoluteFill style={{alignItems: 'center', top: 330, opacity: 0.06}}>
-        <Img src={staticFile('brand/sign.svg')} style={{width: 760}} />
+        <Img src={useAsset('sign')} style={{width: 760}} />
       </AbsoluteFill>
       <svg width={1080} height={700} style={{position: 'absolute', top: 270}}>
         <defs>
@@ -111,7 +111,7 @@ const Cta: React.FC<{ad: Ad}> = ({ad}) => {
   return (
     <AbsoluteFill style={{background: `radial-gradient(ellipse at 50% 18%, ${C.panel} 0%, ${C.bg} 60%)`,
       padding: '190px 150px 360px 80px', alignItems: 'center'}}>
-      <Img src={staticFile('brand/logo-stacked.svg')} style={{height: 260, opacity: logo, transform: `scale(${0.9 + 0.1 * logo})`}} />
+      <Img src={useAsset('logoStacked')} style={{height: 260, opacity: logo, transform: `scale(${0.9 + 0.1 * logo})`}} />
       <div style={{...rise(a), marginTop: 100, alignSelf: 'stretch'}}>
         <div style={{fontFamily: HEAD, fontWeight: 700, fontSize: 120, lineHeight: 1.04, color: C.white, textTransform: 'uppercase'}}>
           {lines(ad.texts.ctaTitle)}<br />
@@ -119,7 +119,7 @@ const Cta: React.FC<{ad: Ad}> = ({ad}) => {
         </div>
       </div>
       <div style={{...rise(b), ...row, marginTop: 70, alignSelf: 'stretch'}}>
-        <Img src={staticFile('brand/icon-handshake.png')} style={{width: 100}} />
+        <Img src={useAsset('iconHandshake')} style={{width: 100}} />
         <div style={{fontFamily: BODY, fontWeight: 600, fontSize: 46, color: C.white}}>{ad.texts.ctaBenefit}</div>
       </div>
       <div style={{...rise(c), marginTop: 'auto', alignSelf: 'stretch'}}>

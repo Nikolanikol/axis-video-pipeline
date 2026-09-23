@@ -3,7 +3,7 @@ import React from 'react';
 import {AbsoluteFill, Easing, Img, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
 import {fmt, totalUsd} from './model';
 import type {Ad} from './types';
-import {BODY, CopperText, HEAD, Metal, PAD, clamp, useTheme} from './ui';
+import {BODY, CopperText, HEAD, Metal, PAD, clamp, useAsset, useTheme} from './ui';
 
 export type CarTitleProps = {brand: string; model: string; year?: number | string; trim?: string; tagline?: string};
 
@@ -84,7 +84,7 @@ export const Contacts: React.FC<{whatsapp?: string | null; whatsappLabel?: strin
     <>
     {whatsapp && (
       <Metal style={{...row, padding: '24px 36px', marginBottom: 30}}>
-        <Img src={staticFile('brand/icon-phone.png')} style={{width: 76, filter: 'brightness(0.25) saturate(0)'}} />
+        <Img src={useAsset('iconPhone')} style={{width: 76, filter: 'brightness(0.25) saturate(0)'}} />
         <div>
           <div style={{fontFamily: BODY, fontWeight: 600, fontSize: 30, color: C.bg, opacity: 0.75}}>{whatsappLabel}</div>
           <div style={{fontFamily: HEAD, fontWeight: 700, fontSize: 64, color: C.bg, lineHeight: 1.1, whiteSpace: 'nowrap'}}>{whatsapp}</div>
