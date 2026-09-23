@@ -21,7 +21,7 @@ const carouselDefaults: CarouselProps = {
     transmission: '', fuel: '', body: '', color: '', seats: null, vin: null, plate: null,
     price: null, history: null,
     options: {comfort: [], safety: [], other: [], total: 0},
-    photos: {exterior: [], interior: [], other: []},
+    photos: {hero: null, rear: null, interiorShot: null, dashboard: null, exterior: [], interior: [], other: []},
   },
   market: mk as Market,
 };

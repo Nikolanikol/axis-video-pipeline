@@ -28,11 +28,15 @@ const Cover: React.FC<CarouselProps & {brandName: string}> = ({car, brandName}) 
   const sub = [car.year, car.fuel, car.transmission].filter(Boolean).join(' · ');
   return (
     <AbsoluteFill style={{background: C.bg}}>
-      {car.photos.exterior[0] && (
-        <Img src={car.photos.exterior[0]} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
+      {car.photos.hero && (
+        // Кадр горизонтальный, слайд вертикальный — обрезка неизбежна. Уводим её вниз и
+        // влево, к машине: сверху справа у Encar впечатан свой логотип, и центральная
+        // обрезка тащила бы его на обложку
+        <Img src={car.photos.hero}
+          style={{width: '100%', height: '100%', objectFit: 'cover', objectPosition: '38% 62%'}} />
       )}
-      {/* Затемнение снизу: белый текст на светлом кузове иначе не читается */}
-      <AbsoluteFill style={{background: `linear-gradient(to bottom, ${C.bg}cc 0%, ${C.bg}22 34%, ${C.bg}f2 72%)`}} />
+      {/* Затемнение: сверху глушим остатки чужого логотипа, снизу — под белый текст */}
+      <AbsoluteFill style={{background: `linear-gradient(to bottom, ${C.bg}f2 0%, ${C.bg}66 18%, ${C.bg}22 40%, ${C.bg}f2 72%)`}} />
       <AbsoluteFill style={{padding: 96, display: 'flex', flexDirection: 'column'}}>
         <div style={{display: 'flex', justifyContent: 'space-between', fontFamily: BODY, fontWeight: 600,
           fontSize: 30, letterSpacing: 7, textTransform: 'uppercase', color: C.white}}>
@@ -116,7 +120,7 @@ const Interior: React.FC<CarouselProps & {brandName: string}> = ({car, brandName
         textTransform: 'uppercase'}}>Interior</CopperText>
     </div>
     <div style={{marginTop: 28}}>
-      <Photo src={car.photos.interior[0]} height={620} label="фото салона не пришло" />
+      <Photo src={car.photos.interiorShot ?? undefined} height={620} label="фото салона не пришло" />
     </div>
     <Bullets items={car.options.comfort.slice(0, 4)} />
   </Slide>
@@ -129,7 +133,7 @@ const Technology: React.FC<CarouselProps & {brandName: string}> = ({car, brandNa
         textTransform: 'uppercase'}}>Technology &amp; safety</CopperText>
     </div>
     <div style={{marginTop: 28}}>
-      <Photo src={car.photos.interior[1] ?? car.photos.other[0]} height={560} label="фото приборки не пришло" />
+      <Photo src={car.photos.dashboard ?? undefined} height={560} label="фото приборки не пришло" />
     </div>
     <Bullets items={car.options.safety.slice(0, 5)} size={36} />
   </Slide>
@@ -151,7 +155,7 @@ const Specs: React.FC<CarouselProps & {brandName: string}> = ({car, brandName}) 
           textTransform: 'uppercase'}}>Specifications</CopperText>
       </div>
       <div style={{marginTop: 28}}>
-        <Photo src={car.photos.exterior[1] ?? car.photos.exterior[0]} height={520} />
+        <Photo src={car.photos.rear ?? undefined} height={520} label="фото сзади не пришло" />
       </div>
       <div style={{marginTop: 34}}>
         {rows.map(([k, v], i) => <Row key={k} k={k} v={v} first={i === 0} />)}

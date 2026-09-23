@@ -186,7 +186,13 @@ export type CarouselCar = {
     ownerChanges: number; theft: number; flood: number; totalLoss: number;
   } | null;
   options: {comfort: string[]; safety: string[]; other: string[]; total: number};
-  photos: {exterior: string[]; interior: string[]; other: string[]};
+  // Ракурсы подобраны шлюзом по кодам Encar: у него порядок выдачи случайный, и без
+  // разбора на обложку попадало колесо крупным планом (код 005 помечен как экстерьер)
+  photos: {
+    hero: string | null; rear: string | null;
+    interiorShot: string | null; dashboard: string | null;
+    exterior: string[]; interior: string[]; other: string[];
+  };
 };
 
 export type CarouselProps = {car: CarouselCar; market: Market; theme?: Partial<Theme>};
