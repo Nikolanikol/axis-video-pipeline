@@ -290,3 +290,37 @@ a.tab { text-decoration: none; }
 .colour-row { display: grid; gap: 4px; margin-bottom: 10px; }
 .colour-row label { font-size: 12px; color: var(--grey); }
 .colour-row input[type=range] { width: 100%; }
+
+/* Карусель: две панели — слева ссылка и сводка, справа слайды. Отдельная раскладка,
+   а не grid-review: тот рассчитан на три колонки монтажа обзора. */
+.grid-carousel { grid-template-columns: minmax(340px, 420px) minmax(400px, 1fr); }
+@media (max-width: 900px) { .grid-carousel { grid-template-columns: 1fr; } }
+
+/* Карусель: сетка слайдов 9:16. Две в ряд — так на экране помещается вся карусель
+   целиком, а слайд остаётся крупным настолько, чтобы читались подписи. */
+.slides {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 18px;
+  padding: 18px;
+  overflow: auto;
+}
+.slide { margin: 0; }
+.slide img {
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  display: block;
+}
+.slide figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--grey);
+}

@@ -4,7 +4,12 @@
     "title": "Реклама авто",
     "description": "Ролики по лотам: авто, характеристики и цена до порта",
     "tools": [
-      {"id": "lot", "title": "Ролик по лоту", "description": "Лот → превью → mp4 в выбранном формате", "status": "ready"}
+      {
+        "id": "lot",
+        "title": "Ролик по лоту",
+        "description": "Лот → превью → mp4 в выбранном формате",
+        "status": "ready"
+      }
     ]
   },
   {
@@ -12,7 +17,25 @@
     "title": "Обзоры авто",
     "description": "Шортсы 15–60 с из своих вертикальных съёмок",
     "tools": [
-      {"id": "edit", "title": "Монтаж обзора", "description": "Видео → фрагменты на таймлайне → оформление AXIS, цена, музыка → рендер 9:16", "status": "ready"}
+      {
+        "id": "edit",
+        "title": "Монтаж обзора",
+        "description": "Видео → фрагменты на таймлайне → оформление AXIS, цена, музыка → рендер 9:16",
+        "status": "ready"
+      }
+    ]
+  },
+  {
+    "id": "carousels",
+    "title": "Карусели авто",
+    "description": "Слайды по объявлению для Instagram и TikTok",
+    "tools": [
+      {
+        "id": "build",
+        "title": "Карусель по ссылке",
+        "description": "Ссылка Encar → семь слайдов 1080×1920 → скачать",
+        "status": "ready"
+      }
     ]
   },
   {
@@ -21,8 +44,18 @@
     "description": "Общее для всех пайплайнов",
     "kind": "settings",
     "tools": [
-      {"id": "markets", "title": "Рынки", "description": "Порт, фрахт, контакты, тексты роликов, музыка по умолчанию", "status": "ready"},
-      {"id": "brand", "title": "Бренд", "description": "Цвета AXIS", "status": "ready"}
+      {
+        "id": "markets",
+        "title": "Рынки",
+        "description": "Порт, фрахт, контакты, тексты роликов, музыка по умолчанию",
+        "status": "ready"
+      },
+      {
+        "id": "brand",
+        "title": "Бренд",
+        "description": "Цвета AXIS",
+        "status": "ready"
+      }
     ]
   }
 ]

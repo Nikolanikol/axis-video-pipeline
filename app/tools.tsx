@@ -4,6 +4,7 @@ import {lazy} from 'react';
 
 export const TOOLS = {
   'ads/lot': lazy(() => import('./ads/LotTool').then((m) => ({default: m.LotTool}))),
+  'carousels/build': lazy(() => import('./carousels/CarouselTool').then((m) => ({default: m.CarouselTool}))),
   'reviews/edit': lazy(() => import('./reviews/ReviewTool').then((m) => ({default: m.ReviewTool}))),
   'settings/markets': lazy(() => import('./settings/SettingsTool').then((m) => ({default: m.MarketsTool}))),
   'settings/brand': lazy(() => import('./settings/SettingsTool').then((m) => ({default: m.BrandTool}))),

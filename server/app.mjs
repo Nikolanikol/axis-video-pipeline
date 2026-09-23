@@ -18,6 +18,7 @@ import {
 import {apiSettings, resolveSpeaker, voiceConfig} from '../src/shared/voices.js';
 import {hasKey, hasVoice, synthesize} from './speech.mjs';
 import {hasSeparator} from './ambience.mjs';
+import {CAROUSELS_DIR, buildCarousel, listCarousels, slideFileName} from './carousel.mjs';
 
 // Медиа с путями /data/... браузер рендера берёт по полному адресу этого сервера
 const absolute = (origin, url) => (url && url.startsWith('/') ? `${origin}${url}` : url);
@@ -163,6 +164,21 @@ export const createApp = ({photoOrigin}) => {
       silentProps: req.body?.silent ? {...inputProps, review: {...inputProps.review, music: {track: null}}} : undefined,
     });
   }));
+
+  // Карусели: ссылка Encar → семь картинок. Сборка синхронная — семь кадров снимаются
+  // секунды, отдельная очередь как у видео тут была бы лишней сложностью.
+  api.post('/carousels', wrap((req) => buildCarousel(req.body?.link)));
+  api.get('/carousels', wrap(() => listCarousels()));
+  api.get('/carousels/:id/slide/:n/download', async (req, res, next) => {
+    try {
+      const id = checkId(req.params.id);
+      const n = Number(req.params.n);
+      if (!Number.isInteger(n) || n < 1 || n > 7) throw new HttpError(400, 'Нет такого слайда');
+      const meta = await readJson(path.join(CAROUSELS_DIR, id, 'carousel.json'))
+        .catch(() => { throw new HttpError(404, 'Карусель не собрана'); });
+      res.download(path.join(CAROUSELS_DIR, id, `slide-${n}.png`), slideFileName(meta.car, n));
+    } catch (e) { next(e); }
+  });
 
   api.get('/renders', wrap((req) => listJobs({
     lotId: req.query.lot ? checkId(req.query.lot) : undefined,

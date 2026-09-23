@@ -5,13 +5,26 @@ import {Composition} from 'remotion';
 import lot from '../lot.json';
 import mk from '../config/markets/mk.json';
 import {FORMAT_COMPONENTS} from './formats';
+import {CAROUSEL_SLIDES, Carousel} from './carousel/Carousel';
 import {ReviewShort} from './reviews/ReviewShort';
 import {FORMATS} from './shared/model';
 import {REVIEW_FPS, reviewFrames} from './shared/timeline.js';
-import type {AdProps, Lot, Market, ReviewProps} from './shared/types';
+import type {AdProps, CarouselProps, Lot, Market, ReviewProps} from './shared/types';
 
 // Каждый формат — отдельная композиция с id формата. В Studio — лот из lot.json на рынке Македонии.
 const defaultProps: AdProps = {lot: lot as Lot, market: mk as Market};
+// Заглушка для Studio: карусель всегда приходит с данными от шлюза
+const carouselDefaults: CarouselProps = {
+  car: {
+    id: '0', source: '', brand: 'Hyundai', model: 'Equus', grade: '', trim: '',
+    year: null, firstRegistered: null, mileageKm: null, displacementCc: null,
+    transmission: '', fuel: '', body: '', color: '', seats: null, vin: null, plate: null,
+    price: null, history: null,
+    options: {comfort: [], safety: [], other: [], total: 0},
+    photos: {exterior: [], interior: [], other: []},
+  },
+  market: mk as Market,
+};
 const reviewDefaults: ReviewProps = {review: {title: 'Обзор', segments: []}, lot: lot as Lot, market: mk as Market};
 
 export const Root: React.FC = () => (
@@ -28,6 +41,16 @@ export const Root: React.FC = () => (
         defaultProps={defaultProps}
       />
     ))}
+    {/* Карусель: кадр на слайд, на выходе не видео, а семь картинок через renderStill */}
+    <Composition
+      id="carousel"
+      component={Carousel}
+      durationInFrames={CAROUSEL_SLIDES}
+      fps={1}
+      width={1080}
+      height={1920}
+      defaultProps={carouselDefaults}
+    />
     {/* Обзоры: длительность считается по фрагментам */}
     <Composition
       id="review-short"

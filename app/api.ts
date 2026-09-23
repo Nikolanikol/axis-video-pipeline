@@ -1,5 +1,5 @@
 // Клиент API сервера: лоты, фото, обзоры, речь, озвучка, рендеры. Типы ответов — общие с сервером.
-import type {FormatMeta, Lot, Market, Review, Theme} from '../src/shared/types';
+import type {CarouselCar, FormatMeta, Lot, Market, Review, Theme} from '../src/shared/types';
 
 export type MarketEntry = Market & {id: string};
 // Размытие: [x, y, w, h] в долях кадра, по «стволу» имени файла фото
@@ -13,6 +13,8 @@ export type Config = {
   voices?: import('../src/shared/types').VoiceRegistry;
 };
 export type ReviewEntry = Review & {id: string};
+// Готовая карусель: карточка авто от шлюза и адреса семи картинок
+export type CarouselEntry = {id: string; car: CarouselCar; slides: string[]; updatedAt: string};
 export type JobQuery = {lot?: string; review?: string};
 export type Job = {
   id: string; lotId?: string; reviewId?: string; title: string; format: string; formatTitle: string;
@@ -58,6 +60,9 @@ export const api = {
   review: (id: string) => request<ReviewEntry>('GET', `/api/reviews/${id}`),
   createReview: (data: {lotId?: string | null; title?: string}) => request<ReviewEntry>('POST', '/api/reviews', data),
   saveReview: (r: ReviewEntry, baseUpdatedAt?: string) => request<ReviewEntry>('PUT', `/api/reviews/${r.id}`, {...r, baseUpdatedAt}),
+  // Карусели: ссылка Encar → семь слайдов
+  buildCarousel: (link: string) => request<CarouselEntry>('POST', '/api/carousels', {link}),
+  carousels: () => request<CarouselEntry[]>('GET', '/api/carousels'),
   renderReview: (id: string, silent: boolean) => request<Job>('POST', `/api/reviews/${id}/render`, {silent}),
   reprocessVideo: (id: string) => request<ReviewEntry>('POST', `/api/reviews/${id}/reprocess`),
   transcribe: (id: string) => request<ReviewEntry>('POST', `/api/reviews/${id}/transcribe`),

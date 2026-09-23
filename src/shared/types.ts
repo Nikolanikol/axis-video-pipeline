@@ -160,4 +160,35 @@ export type Review = {
   ambience?: ReviewAmbience | null;
   updatedAt?: string;
 };
+/**
+ * Карточка авто для карусели — то, что отдаёт шлюз kmotors (/api/vehicle/{id}).
+ * Поля уже нормализованы: английские названия, числа, абсолютные адреса фото.
+ * Пустая строка означает «источник не дал» — корейское слово на слайд не попадает.
+ */
+export type CarouselCar = {
+  id: string;
+  source: string;
+  brand: string; model: string; grade: string; trim: string;
+  year: number | null;
+  firstRegistered: string | null;
+  mileageKm: number | null;
+  displacementCc: number | null;
+  transmission: string; fuel: string; body: string; color: string;
+  seats: number | null;
+  vin: string | null; plate: string | null;
+  // Цена в Корее: воны, доллары и курс с отметкой времени — без неё цифры в постах
+  // расходятся между днями, и объяснить расхождение нечем
+  price: {krw: number; usd: number | null; krwToUsd: number; quotedAt: string; rateSource: string} | null;
+  // null — история недоступна. Это НЕ то же самое, что «происшествий не было»
+  history: {
+    accidentsOwn: number; accidentsOther: number; accidentsTotal: number;
+    accidentYears: number[]; maxPayoutKrw: number | null;
+    ownerChanges: number; theft: number; flood: number; totalLoss: number;
+  } | null;
+  options: {comfort: string[]; safety: string[]; other: string[]; total: number};
+  photos: {exterior: string[]; interior: string[]; other: string[]};
+};
+
+export type CarouselProps = {car: CarouselCar; market: Market; theme?: Partial<Theme>};
+
 export type ReviewProps = {review: Review; lot?: Lot | null; market: Market; theme?: Partial<Theme>};

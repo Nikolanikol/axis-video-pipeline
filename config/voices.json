@@ -16,12 +16,25 @@
       "voiceId": "JHEaCkr7pvpQMnZ1J7r4",
       "note": "клон владельца: в кадре он же, поэтому голос узнаваемый",
       "model": "eleven_v3",
-      "languages": ["mk", "en", "ru", "sr", "bg", "hr", "el", "de"],
+      "languages": [
+        "mk",
+        "en",
+        "ru",
+        "sr",
+        "bg",
+        "hr",
+        "el",
+        "de"
+      ],
       "perLanguage": {
         "en": {
           "model": "eleven_multilingual_v2",
-          "settings": {"stability": 0.4, "similarityBoost": 0.25, "style": 0},
-          "note": "подобрано на слух: речь чище и заметно быстрее, чем на eleven_v3"
+          "settings": {
+            "stability": 0.7,
+            "similarityBoost": 0.15,
+            "style": 0
+          },
+          "note": "подобрано на слух: высокая ровность + низкая похожесть. Клон копирует артикуляцию владельца, и на английском она слышна как чужой акцент; при similarityBoost 0.15 её меньше, а stability 0.7 не даёт голосу уходить в сторону — на 0.10 он терял узнаваемость. Модель английская multilingual_v2: чище и быстрее, чем eleven_v3"
         }
       }
     },
@@ -31,7 +44,12 @@
       "voiceId": "NG3DzyUGmLkog1AFB5iv",
       "note": "болгарская артикуляция ближе к македонской, чем англоязычные голоса",
       "model": "eleven_v3",
-      "languages": ["mk", "bg", "sr", "ru"]
+      "languages": [
+        "mk",
+        "bg",
+        "sr",
+        "ru"
+      ]
     },
     {
       "id": "georgi",
@@ -39,7 +57,12 @@
       "voiceId": "Ywe24jn5elUzaO9vm6vG",
       "note": "моложе и напористее Yakim",
       "model": "eleven_v3",
-      "languages": ["mk", "bg", "sr", "ru"]
+      "languages": [
+        "mk",
+        "bg",
+        "sr",
+        "ru"
+      ]
     },
     {
       "id": "eric",
@@ -47,7 +70,10 @@
       "voiceId": "cjVigY5qzO86Huf0OWal",
       "note": "самый быстрый из английских: меньше давит на хронометраж",
       "model": "eleven_multilingual_v2",
-      "languages": ["en", "de"]
+      "languages": [
+        "en",
+        "de"
+      ]
     },
     {
       "id": "george",
@@ -55,7 +81,9 @@
       "voiceId": "JBFqnCBsd6RMkjVDRZzb",
       "note": "солиднее, но медленнее — ролик выходит длиннее",
       "model": "eleven_multilingual_v2",
-      "languages": ["en"]
+      "languages": [
+        "en"
+      ]
     },
     {
       "id": "liam",
@@ -63,7 +91,9 @@
       "voiceId": "TX3LPaxmHKxFdv7VOQHJ",
       "note": "энергичный, менее солидный",
       "model": "eleven_multilingual_v2",
-      "languages": ["en"]
+      "languages": [
+        "en"
+      ]
     }
   ]
 }
