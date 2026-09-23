@@ -34,12 +34,47 @@ const CarSummary: React.FC<{entry: CarouselEntry}> = ({entry}) => {
   );
 };
 
+/**
+ * Слайд во весь экран. Нужен потому, что в сетке превью размером с ноготь, а решать
+ * про дизайн приходится по мелочам — читается ли подпись, не съехала ли цифра.
+ */
+const Lightbox: React.FC<{entry: CarouselEntry; at: number; onClose: () => void; onMove: (d: number) => void}> =
+  ({entry, at, onClose, onMove}) => {
+    useEffect(() => {
+      const onKey = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') onClose();
+        if (e.key === 'ArrowLeft') onMove(-1);
+        if (e.key === 'ArrowRight') onMove(1);
+      };
+      window.addEventListener('keydown', onKey);
+      return () => window.removeEventListener('keydown', onKey);
+    }, [onClose, onMove]);
+
+    return (
+      <div className="lightbox" onClick={onClose}>
+        {/* Клик по самой картинке не закрывает: по ней хочется возить курсором и разглядывать */}
+        <div className="lightbox-inner" onClick={(e) => e.stopPropagation()}>
+          <img src={`${entry.slides[at]}?v=${encodeURIComponent(entry.updatedAt)}`} alt={`Слайд ${at + 1}`} />
+          <div className="lightbox-bar">
+            <button className="btn ghost" onClick={() => onMove(-1)} disabled={at === 0}>← Назад</button>
+            <span className="muted">{at + 1} / {entry.slides.length}</span>
+            <button className="btn ghost" onClick={() => onMove(1)} disabled={at === entry.slides.length - 1}>Вперёд →</button>
+            <a className="btn primary" href={`/api/carousels/${entry.id}/slide/${at + 1}/download`}>Скачать</a>
+            <button className="btn ghost" onClick={onClose}>Закрыть</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
 export const CarouselTool: React.FC = () => {
   const {report} = useConfig();
   const [link, setLink] = useState('');
   const [busy, setBusy] = useState(false);
   const [entry, setEntry] = useState<CarouselEntry | null>(null);
   const [history, setHistory] = useState<CarouselEntry[]>([]);
+  // Какой слайд открыт во весь экран; null — сетка
+  const [open, setOpen] = useState<number | null>(null);
 
   const refresh = useCallback(() => {
     api.carousels().then((list) => {
@@ -127,7 +162,8 @@ export const CarouselTool: React.FC = () => {
             {entry.slides.map((src, i) => (
               <figure key={src} className="slide">
                 {/* Ключ по времени сборки: иначе браузер покажет прежнюю картинку из кэша */}
-                <img src={`${src}?v=${encodeURIComponent(entry.updatedAt)}`} alt={`Слайд ${i + 1}`} />
+                <img src={`${src}?v=${encodeURIComponent(entry.updatedAt)}`} alt={`Слайд ${i + 1}`}
+                  onClick={() => setOpen(i)} title="Открыть во весь экран" />
                 <figcaption>
                   <span>{i + 1} / {entry.slides.length}</span>
                   <a className="btn ghost" href={`/api/carousels/${entry.id}/slide/${i + 1}/download`}>Скачать</a>
@@ -137,6 +173,15 @@ export const CarouselTool: React.FC = () => {
           </div>
         )}
       </section>
+
+      {entry && open !== null && (
+        <Lightbox
+          entry={entry}
+          at={open}
+          onClose={() => setOpen(null)}
+          onMove={(d) => setOpen((n) => Math.min(entry.slides.length - 1, Math.max(0, (n ?? 0) + d)))}
+        />
+      )}
     </main>
   );
 };
