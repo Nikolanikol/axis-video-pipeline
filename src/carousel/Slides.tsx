@@ -37,20 +37,47 @@ export const Title: React.FC<{kicker: string; children: React.ReactNode}> = ({ki
 );
 
 /**
- * Фото с рамкой. Пустой адрес — вместо картинки серое поле с подписью:
- * дыра в вёрстке честнее, чем слайд, молча съехавший из-за отсутствующего фото.
+ * Фото в край: на всю ширину слайда, без рамки и полей.
+ *
+ * Рамка с бордюром и отступами читается как поле формы, а не как разворот журнала —
+ * это и делало слайды «некинематографичными». Снизу кадр растворяется в фоне, поэтому
+ * список под ним выглядит продолжением картинки, а не отдельным блоком.
+ *
+ * Шапка кладётся поверх фото: вынесенная над ним, она разрывает кадр.
+ * Пустой адрес — серое поле с подписью: дыра честнее, чем слайд, молча съехавший.
  */
-export const Photo: React.FC<{src?: string; height: number; label?: string}> = ({src, height, label}) => {
+export const PhotoBand: React.FC<{
+  src?: string; height: number; label?: string;
+  index: number; brandName: string; focus?: string; trimTop?: number;
+}> = ({src, height, label, index, brandName, focus = '50% 45%', trimTop = 0}) => {
   const C = useTheme();
+  // Срезаем верх кадра принудительно: снимок шире рамки, и object-fit режет его по бокам,
+  // а не сверху — вертикальное смещение на него не действует. А логотип Encar впечатан
+  // именно вверху. Растягиваем картинку и сдвигаем вверх на ту же долю.
+  const crop = trimTop > 0
+    ? {height: `${100 / (1 - trimTop)}%`, marginTop: `${-100 * trimTop / (1 - trimTop)}%`}
+    : {height: '100%'};
   return (
-    <div style={{
-      height, width: '100%', borderRadius: 18, overflow: 'hidden',
-      border: `2px solid ${C.line}`, background: C.panel,
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }}>
+    <div style={{height, width: '100%', overflow: 'hidden', position: 'relative', background: C.panel}}>
       {src
-        ? <Img src={src} style={{width: '100%', height: '100%', objectFit: 'cover'}} />
-        : <span style={{fontFamily: BODY, fontSize: 30, color: C.grey}}>{label ?? 'нет фото'}</span>}
+        ? <Img src={src} style={{width: '100%', ...crop, objectFit: 'cover', objectPosition: focus}} />
+        : (
+          <div style={{height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center'}}>
+            <span style={{fontFamily: BODY, fontSize: 30, color: C.grey}}>{label ?? 'нет фото'}</span>
+          </div>
+        )}
+      {/* Сверху глушим впечатанный логотип Encar — он сидит в верхней трети кадра и
+          светлый, поэтому затемнение держим плотным дольше. Снизу уводим кадр в фон. */}
+      <AbsoluteFill style={{background:
+        `linear-gradient(to bottom, ${C.bg}ee 0%, ${C.bg}b0 16%, ${C.bg}44 32%, transparent 58%, ${C.bg} 100%)`}} />
+      <div style={{
+        position: 'absolute', top: PAD, left: PAD, right: PAD, display: 'flex',
+        justifyContent: 'space-between', fontFamily: BODY, fontWeight: 600, fontSize: 30,
+        letterSpacing: 7, textTransform: 'uppercase', color: C.white,
+      }}>
+        <span>{brandName}</span>
+        <span>{String(index).padStart(2, '0')} / {String(TOTAL).padStart(2, '0')}</span>
+      </div>
     </div>
   );
 };

@@ -10,7 +10,7 @@ import {AbsoluteFill, Img, staticFile, useCurrentFrame} from 'remotion';
 import {themeOf} from '../shared/model';
 import type {CarouselProps} from '../shared/types';
 import {BODY, CopperText, HEAD, ThemeProvider, useTheme} from '../shared/ui';
-import {Bullets, NumberCard, Photo, Row, Slide, Title, TOTAL} from './Slides';
+import {Bullets, NumberCard, PAD, PhotoBand, Row, Slide, Title, NumberCard as Card, TOTAL} from './Slides';
 
 export const CAROUSEL_SLIDES = TOTAL;
 
@@ -154,30 +154,42 @@ const History: React.FC<CarouselProps & {brandName: string}> = ({car, brandName}
   );
 };
 
+/**
+ * Слайд с фото в край: кадр сверху, содержимое под ним.
+ * Единый каркас для салона, техники и характеристик — иначе три похожих слайда
+ * разъезжаются по вёрстке и карусель перестаёт выглядеть цельной.
+ */
+const BandSlide: React.FC<{
+  index: number; brandName: string; kicker: string; photo?: string | null;
+  label: string; focus?: string; height?: number; trimTop?: number; children: React.ReactNode;
+}> = ({index, brandName, kicker, photo, label, focus, height = 1080, trimTop, children}) => {
+  const C = useTheme();
+  return (
+    <AbsoluteFill style={{background: C.bg}}>
+      <PhotoBand src={photo ?? undefined} height={height} label={label}
+        index={index} brandName={brandName} focus={focus} trimTop={trimTop} />
+      {/* Наползаем на кадр: снизу он уже растворён в фоне, и шов не виден */}
+      <div style={{padding: `0 ${PAD}px ${PAD}px`, marginTop: -56, position: 'relative'}}>
+        <CopperText style={{fontFamily: BODY, fontWeight: 700, fontSize: 32, letterSpacing: 9,
+          textTransform: 'uppercase'}}>{kicker}</CopperText>
+        {children}
+      </div>
+    </AbsoluteFill>
+  );
+};
+
 const Interior: React.FC<CarouselProps & {brandName: string}> = ({car, brandName}) => (
-  <Slide index={3} brandName={brandName}>
-    <div style={{marginTop: 52}}>
-      <CopperText style={{fontFamily: BODY, fontWeight: 700, fontSize: 32, letterSpacing: 9,
-        textTransform: 'uppercase'}}>Interior</CopperText>
-    </div>
-    <div style={{marginTop: 28}}>
-      <Photo src={car.photos.interiorShot ?? undefined} height={620} label="фото салона не пришло" />
-    </div>
-    <Bullets items={car.options.comfort.slice(0, 4)} />
-  </Slide>
+  <BandSlide index={3} brandName={brandName} kicker="Interior" photo={car.photos.interiorShot}
+    label="фото салона не пришло">
+    <Bullets items={car.options.comfort.slice(0, 5)} size={44} />
+  </BandSlide>
 );
 
 const Technology: React.FC<CarouselProps & {brandName: string}> = ({car, brandName}) => (
-  <Slide index={4} brandName={brandName}>
-    <div style={{marginTop: 52}}>
-      <CopperText style={{fontFamily: BODY, fontWeight: 700, fontSize: 32, letterSpacing: 9,
-        textTransform: 'uppercase'}}>Technology &amp; safety</CopperText>
-    </div>
-    <div style={{marginTop: 28}}>
-      <Photo src={car.photos.dashboard ?? undefined} height={560} label="фото приборки не пришло" />
-    </div>
-    <Bullets items={car.options.safety.slice(0, 5)} size={36} />
-  </Slide>
+  <BandSlide index={4} brandName={brandName} kicker="Technology &amp; safety" photo={car.photos.dashboard}
+    label="фото приборки не пришло" focus="50% 50%">
+    <Bullets items={car.options.safety.slice(0, 5)} size={44} />
+  </BandSlide>
 );
 
 const Specs: React.FC<CarouselProps & {brandName: string}> = ({car, brandName}) => {
@@ -190,18 +202,12 @@ const Specs: React.FC<CarouselProps & {brandName: string}> = ({car, brandName}) 
     ['Seats', dash(car.seats)],
   ];
   return (
-    <Slide index={5} brandName={brandName}>
-      <div style={{marginTop: 52}}>
-        <CopperText style={{fontFamily: BODY, fontWeight: 700, fontSize: 32, letterSpacing: 9,
-          textTransform: 'uppercase'}}>Specifications</CopperText>
-      </div>
-      <div style={{marginTop: 28}}>
-        <Photo src={car.photos.rear ?? undefined} height={520} label="фото сзади не пришло" />
-      </div>
-      <div style={{marginTop: 34}}>
+    <BandSlide index={5} brandName={brandName} kicker="Specifications" photo={car.photos.rear}
+      label="фото сзади не пришло" height={860} trimTop={0.30}>
+      <div style={{marginTop: 30}}>
         {rows.map(([k, v], i) => <Row key={k} k={k} v={v} first={i === 0} />)}
       </div>
-    </Slide>
+    </BandSlide>
   );
 };
 
