@@ -4,6 +4,7 @@
   "description": "AXIS: рекламные вертикальные ролики авто из Кореи",
   "scripts": {
     "app": "node --env-file-if-exists=.env server/index.mjs",
+    "build": "vite build",
     "studio": "remotion studio src/index.ts",
     "render": "node render.mjs",
     "stills": "node stills.mjs",

@@ -4,3 +4,6 @@ data/
 .env
 .DS_Store
 .venv-demucs/
+
+# собранный интерфейс
+dist/

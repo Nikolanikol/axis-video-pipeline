@@ -53,7 +53,7 @@
       {
         "id": "brand",
         "title": "Бренд",
-        "description": "Цвета AXIS",
+        "description": "Имя, цвета, шрифты и логотип",
         "status": "ready"
       }
     ]
