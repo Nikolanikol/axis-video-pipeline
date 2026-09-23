@@ -5,6 +5,8 @@ import type {Market} from '../../src/shared/types';
 import {lotTitle} from '../ads/LotTool';
 import {api, LotEntry, MarketEntry} from '../api';
 import {useConfig} from '../config';
+import {Player} from '@remotion/player';
+import {BrandPreview} from '../../src/brand/BrandPreview';
 import {Preview} from '../Preview';
 import {href, lastLot} from '../router';
 import {BrandForm, MarketForm} from '../SettingsForms';
@@ -70,12 +72,44 @@ export const BrandTool: React.FC = () => {
   const {config, markets, brand, setBrand, brandSaved, report} = useConfig();
   const lot = usePreviewLot();
   const market = markets.find((m) => m.id === (lot?.market ?? config.defaultMarket)) ?? markets[0];
+  // Образец по умолчанию: на нём все настройки видны разом, а в ролике акцент мелькает
+  // на второй секунде, плашка на седьмой — подбирать цвета по нему мучительно
+  const [mode, setMode] = useState<'sampler' | 'ad'>('sampler');
   return (
     <main className="grid grid-settings">
       <section className="panel editor">
         <BrandForm theme={brand} saved={config.brand} onChange={setBrand} onSaved={brandSaved} onError={report} />
       </section>
-      <section className="panel preview"><PreviewPanel lot={lot} market={market} /></section>
+      <section className="panel preview">
+        <div className="format-bar">
+          <div className="btn-row">
+            <button className={`btn ${mode === 'sampler' ? 'primary' : 'ghost'}`} onClick={() => setMode('sampler')}>
+              Образец
+            </button>
+            <button className={`btn ${mode === 'ad' ? 'primary' : 'ghost'}`} onClick={() => setMode('ad')}>
+              Ролик
+            </button>
+          </div>
+        </div>
+        {mode === 'sampler'
+          ? (
+            <div className="player-wrap">
+              <div className="player-box">
+                {/* Один кадр без анимации: управление и повтор тут не нужны */}
+                <Player
+                  component={BrandPreview}
+                  inputProps={{theme: brand}}
+                  durationInFrames={1}
+                  fps={1}
+                  compositionWidth={1080}
+                  compositionHeight={1920}
+                  style={{width: '100%', height: '100%'}}
+                />
+              </div>
+            </div>
+          )
+          : <PreviewPanel lot={lot} market={market} />}
+      </section>
     </main>
   );
 };

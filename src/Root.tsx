@@ -5,6 +5,7 @@ import {Composition} from 'remotion';
 import lot from '../lot.json';
 import mk from '../config/markets/mk.json';
 import {FORMAT_COMPONENTS} from './formats';
+import {BrandPreview} from './brand/BrandPreview';
 import {CAROUSEL_SLIDES, Carousel} from './carousel/Carousel';
 import {ReviewShort} from './reviews/ReviewShort';
 import {FORMATS} from './shared/model';
@@ -41,6 +42,16 @@ export const Root: React.FC = () => (
         defaultProps={defaultProps}
       />
     ))}
+    {/* Образец бренда: один кадр со всеми настройками разом — для подбора цветов и шрифтов */}
+    <Composition
+      id="brand-preview"
+      component={BrandPreview}
+      durationInFrames={1}
+      fps={1}
+      width={1080}
+      height={1920}
+      defaultProps={{}}
+    />
     {/* Карусель: кадр на слайд, на выходе не видео, а семь картинок через renderStill */}
     <Composition
       id="carousel"
