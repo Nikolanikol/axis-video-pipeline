@@ -95,7 +95,14 @@ export const buildCarousel = async (link) => {
   try {
     const car = await fetchCar(id);
     const [market, theme] = await Promise.all([getMarket(DEFAULT_MARKET), getBrand()]);
-    const inputProps = {car, market, theme};
+    // Логотип из настроек лежит на нашем сервере, а рендер грузит сборку с адреса Remotion:
+    // путь /data/brand/… он искал бы у себя и не нашёл. Встроенные файлы уже в сборке.
+    const origin = process.env.SELF_ORIGIN || `http://127.0.0.1:${process.env.PORT || 3210}`;
+    const assets = theme.assets
+      ? Object.fromEntries(Object.entries(theme.assets)
+        .map(([k, v]) => [k, typeof v === 'string' && v.startsWith('/') ? origin + v : v]))
+      : theme.assets;
+    const inputProps = {car, market, theme: {...theme, assets}};
 
     const dir = path.join(CAROUSELS_DIR, id);
     await fs.mkdir(dir, {recursive: true});

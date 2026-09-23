@@ -19,9 +19,23 @@ import {apiSettings, resolveSpeaker, voiceConfig} from '../src/shared/voices.js'
 import {hasKey, hasVoice, synthesize} from './speech.mjs';
 import {hasSeparator} from './ambience.mjs';
 import {CAROUSELS_DIR, buildCarousel, listCarousels, slideFileName} from './carousel.mjs';
+import {LOGO_RULES, saveLogo} from './brand.mjs';
 
 // Медиа с путями /data/... браузер рендера берёт по полному адресу этого сервера
 const absolute = (origin, url) => (url && url.startsWith('/') ? `${origin}${url}` : url);
+
+/**
+ * Тема для рендера: пути к файлам бренда — в полные адреса.
+ *
+ * Рендер идёт в отдельном браузере, который грузит сборку с адреса Remotion, а не с нашего
+ * сервера. Путь вида /data/brand/logo.png он попробует найти у себя и получит 404 —
+ * логотип молча пропал бы со слайда. Встроенные файлы (brand/…) трогать не надо: они лежат
+ * в сборке.
+ */
+const themeForRender = (origin, theme) => (theme?.assets
+  ? {...theme, assets: Object.fromEntries(
+    Object.entries(theme.assets).map(([k, v]) => [k, absolute(origin, v)]))}
+  : theme);
 const withAbsolutePhotos = (lot, origin) => lot && {...lot, photos: lot.photos.map((p) => absolute(origin, p))};
 
 const wrap = (fn) => (req, res, next) => fn(req, res).then((data) => res.json(data)).catch(next);
@@ -43,6 +57,12 @@ export const createApp = ({photoOrigin}) => {
     features: {speech: hasKey(), voice: hasVoice(), ambience: await hasSeparator()},
   })));
   api.put('/brand', wrap(async (req) => { await saveBrand(req.body); return getBrand(); }));
+  // Логотип: свой приёмник с маленьким потолком — незачем принимать 30 МБ, чтобы потом отказать
+  const logoUpload = multer({storage: multer.memoryStorage(), limits: {fileSize: LOGO_RULES.maxBytes, files: 1}});
+  api.post('/brand/logo', logoUpload.single('logo'), wrap(async (req) => {
+    const saved = await saveLogo(req.file?.buffer, req.file?.originalname);
+    return {...saved, brand: await getBrand()};
+  }));
   api.put('/markets/:id', wrap(async (req) => {
     const {id: _ignored, ...market} = req.body;
     await saveMarket(req.params.id, market);
@@ -90,7 +110,7 @@ export const createApp = ({photoOrigin}) => {
     if (format.requires.includes('photos') && !lot.photos.length) throw new HttpError(400, 'Добавь хотя бы одно фото');
     const [market, theme] = await Promise.all([getMarket(lot.market || DEFAULT_MARKET), getBrand()]);
     const title = [lot.brand, lot.model, lot.year].filter(Boolean).join(' ') || lot.id;
-    const inputProps = {lot: withAbsolutePhotos(lot, photoOrigin), market, theme};
+    const inputProps = {lot: withAbsolutePhotos(lot, photoOrigin), market, theme: themeForRender(photoOrigin, theme)};
     return enqueue({
       owner: {lotId: lot.id}, composition: format.id, compositionTitle: format.title, title,
       frames: storyboardFrames(format), inputProps,
@@ -156,7 +176,7 @@ export const createApp = ({photoOrigin}) => {
             .map(([id, c]) => [id, c.file ? {...c, file: absolute(photoOrigin, c.file)} : c])),
         },
       },
-      lot: withAbsolutePhotos(lot, photoOrigin), market, theme,
+      lot: withAbsolutePhotos(lot, photoOrigin), market, theme: themeForRender(photoOrigin, theme),
     };
     return enqueue({
       owner: {reviewId: review.id}, composition: 'review-short', compositionTitle: 'Обзор', title: review.title || review.id,

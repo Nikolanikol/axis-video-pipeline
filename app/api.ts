@@ -61,6 +61,15 @@ export const api = {
   createReview: (data: {lotId?: string | null; title?: string}) => request<ReviewEntry>('POST', '/api/reviews', data),
   saveReview: (r: ReviewEntry, baseUpdatedAt?: string) => request<ReviewEntry>('PUT', `/api/reviews/${r.id}`, {...r, baseUpdatedAt}),
   // Карусели: ссылка Encar → семь слайдов
+  // Логотип: сервер проверяет формат, размер и прозрачность и возвращает обновлённый бренд
+  uploadLogo: async (file: File) => {
+    const form = new FormData();
+    form.append('logo', file);
+    const res = await fetch('/api/brand/logo', {method: 'POST', body: form});
+    const body = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(body?.error ?? 'Не удалось загрузить логотип');
+    return body as {url: string; width: number; height: number; bytes: number; brand: Theme};
+  },
   buildCarousel: (link: string) => request<CarouselEntry>('POST', '/api/carousels', {link}),
   carousels: () => request<CarouselEntry[]>('GET', '/api/carousels'),
   renderReview: (id: string, silent: boolean) => request<Job>('POST', `/api/reviews/${id}/render`, {silent}),

@@ -1,5 +1,5 @@
 // Формы настроек: рынок (порт, фрахт, контакты, тексты форматов) и цвета бренда.
-import React, {useState} from 'react';
+import React, {useRef, useState} from 'react';
 import {FORMATS} from '../src/shared/model';
 import type {Market, Theme} from '../src/shared/types';
 import {api, MarketEntry} from './api';
@@ -101,6 +101,53 @@ const COLOR_FIELDS: [ColorKey, string][] = [
   ['white', 'Основной текст'], ['copper', 'Медь'], ['copperLight', 'Медь светлая'], ['copperDark', 'Медь тёмная'],
 ];
 
+/**
+ * Загрузка логотипа. Условия написаны рядом с кнопкой намеренно: приёмник, который берёт
+ * что угодно, а потом отказывает, заставляет человека гадать. Числа берутся с сервера —
+ * так они не разойдутся с проверкой.
+ */
+const LogoField: React.FC<{theme: Theme; onSaved: (t: Theme) => void; onError: (e: unknown) => void}> =
+  ({theme, onSaved, onError}) => {
+    const [busy, setBusy] = useState(false);
+    const [info, setInfo] = useState('');
+    const ref = useRef<HTMLInputElement>(null);
+    const send = async (file?: File) => {
+      if (!file) return;
+      setBusy(true);
+      setInfo('');
+      try {
+        const res = await api.uploadLogo(file);
+        onSaved(res.brand);
+        setInfo(`Загружен: ${res.width}×${res.height}, ${Math.round(res.bytes / 1024)} КБ`);
+      } catch (e) { onError(e); } finally { setBusy(false); if (ref.current) ref.current.value = ''; }
+    };
+    const logo = theme.assets?.logoStacked ?? '';
+    // Путь внутри public/ в браузере доступен с корня, полный адрес оставляем как есть
+    const shown = logo.startsWith('http') || logo.startsWith('/') ? logo : `/${logo}`;
+    return (
+      <div className="logo-field">
+        <div className="logo-shot"><img src={shown} alt="Логотип" /></div>
+        <div>
+          <div className="btn-row">
+            <button className="btn" disabled={busy} onClick={() => ref.current?.click()}>
+              {busy ? 'Проверяю…' : 'Загрузить логотип'}
+            </button>
+          </div>
+          <input ref={ref} type="file" accept="image/png" hidden
+            onChange={(e) => send(e.target.files?.[0])} />
+          <ul className="rules">
+            <li>формат <b>PNG</b>, другие не принимаются</li>
+            <li><b>прозрачный фон</b> — иначе ляжет белым прямоугольником на тёмный слайд</li>
+            <li>от <b>400</b> до <b>2000</b> точек по длинной стороне</li>
+            <li>не больше <b>2 МБ</b></li>
+          </ul>
+          <p className="hint">Ставится везде, где виден логотип: крупно на финале и полосой вверху кадра.</p>
+          {info && <p className="hint">{info}</p>}
+        </div>
+      </div>
+    );
+  };
+
 type BrandProps = {theme: Theme; saved: Theme; onChange: (t: Theme) => void; onSaved: (t: Theme) => void; onError: (e: unknown) => void};
 
 export const BrandForm: React.FC<BrandProps> = ({theme, saved, onChange, onSaved, onError}) => {
@@ -112,8 +159,11 @@ export const BrandForm: React.FC<BrandProps> = ({theme, saved, onChange, onSaved
   };
   return (
     <div className="form">
+      <h2>Логотип</h2>
+      <LogoField theme={theme} onSaved={onSaved} onError={onError} />
+
       <h2>Цвета бренда</h2>
-      <p className="note">Из брендбука AXIS. Логотипы и иконки — в <code>public/brand</code> (пересборка: <code>tools/brand_assets.py</code>).</p>
+      <p className="note">Встроенные иконки — в <code>public/brand</code> (пересборка: <code>tools/brand_assets.py</code>).</p>
       {COLOR_FIELDS.map(([key, label]) => (
         <div className="color" key={key}>
           <input type="color" value={theme[key]} onChange={(e) => onChange({...theme, [key]: e.target.value.toUpperCase()})} />
