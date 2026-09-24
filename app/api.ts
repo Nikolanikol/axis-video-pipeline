@@ -6,8 +6,11 @@ export type MarketEntry = Market & {id: string};
 export type Region = [number, number, number, number];
 export type LotEntry = Lot & {id: string; updatedAt?: string; note?: string; blur?: Record<string, Region[]>};
 export type PhotoInfo = {path: string; source: string; regions: Region[]};
+// Пара шрифтов из config/fonts.json. url пустой — пара встроена в проект и не требует сети
+export type FontPair = {id: string; title: string; note: string; head: string; body: string; url: string};
 export type Config = {
   brand: Theme; markets: MarketEntry[]; defaultMarket: string; formats: FormatMeta[]; pipelines: unknown[];
+  fonts: FontPair[];
   // ambience — установлено ли локальное окружение для выделения звуков машины (проба)
   features: {speech: boolean; voice: boolean; ambience?: boolean};
   voices?: import('../src/shared/types').VoiceRegistry;

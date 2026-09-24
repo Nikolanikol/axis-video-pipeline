@@ -1,8 +1,8 @@
 // Формы настроек: рынок (порт, фрахт, контакты, тексты форматов) и цвета бренда.
-import React, {useRef, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {FORMATS} from '../src/shared/model';
 import type {Market, Theme} from '../src/shared/types';
-import {api, MarketEntry} from './api';
+import {api, FontPair, MarketEntry} from './api';
 import {Field} from './LotForm';
 import {MusicFields} from './MusicFields';
 
@@ -148,9 +148,68 @@ const LogoField: React.FC<{theme: Theme; onSaved: (t: Theme) => void; onError: (
     );
   };
 
-type BrandProps = {theme: Theme; saved: Theme; onChange: (t: Theme) => void; onSaved: (t: Theme) => void; onError: (e: unknown) => void};
+/**
+ * Таблицы стилей всех пар сразу.
+ *
+ * Иначе список нечем показать: пара, шрифт которой не загружен, нарисуется системным,
+ * и выбирать пришлось бы по названию вслепую. Встроенная пара своей таблицы не имеет —
+ * она приходит пакетами вместе со сборкой.
+ */
+const useFontSheets = (pairs: FontPair[]) => {
+  useEffect(() => {
+    const links = pairs.filter((p) => p.url).map((p) => {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = p.url;
+      document.head.appendChild(link);
+      return link;
+    });
+    return () => links.forEach((l) => l.remove());
+  }, [pairs]);
+};
 
-export const BrandForm: React.FC<BrandProps> = ({theme, saved, onChange, onSaved, onError}) => {
+/**
+ * Выбор пары шрифтов. Каждая нарисована своими шрифтами — по названию их не отличить.
+ *
+ * В образце намеренно есть кириллица: все пары реестра её умеют (проверено запросом
+ * к Google Fonts), и видеть это надо сразу, а не после первого ролика на македонском.
+ */
+const FontField: React.FC<{theme: Theme; pairs: FontPair[]; onChange: (t: Theme) => void}> = ({theme, pairs, onChange}) => {
+  useFontSheets(pairs);
+  // Выбранную пару узнаём по самим шрифтам, а не по отдельному полю id: лишнее поле
+  // разошлось бы с fonts, стоит один раз поправить brand.json руками
+  const current = pairs.find((p) => p.head === theme.fonts?.head && p.body === theme.fonts?.body);
+  return (
+    <>
+      <div className="pairs">
+        {pairs.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            className={`pair${p.id === current?.id ? ' on' : ''}`}
+            onClick={() => onChange({...theme, fonts: {head: p.head, body: p.body, url: p.url}})}
+          >
+            <span className="pair-head" style={{fontFamily: p.head}}>Hyundai Equus</span>
+            <span className="pair-body" style={{fontFamily: p.body}}>2015 · Бензин · Автомат · 239 601 км</span>
+            <span className="pair-note">{p.note}</span>
+          </button>
+        ))}
+      </div>
+      {!current && (
+        <p className="hint">
+          Сейчас стоит свой шрифт из <code>config/brand.json</code> — ни одна пара с ним не совпадает.
+        </p>
+      )}
+    </>
+  );
+};
+
+type BrandProps = {
+  theme: Theme; saved: Theme; pairs: FontPair[];
+  onChange: (t: Theme) => void; onSaved: (t: Theme) => void; onError: (e: unknown) => void;
+};
+
+export const BrandForm: React.FC<BrandProps> = ({theme, saved, pairs, onChange, onSaved, onError}) => {
   const [busy, setBusy] = useState(false);
   const dirty = theme !== saved;
   const persist = async () => {
@@ -161,6 +220,13 @@ export const BrandForm: React.FC<BrandProps> = ({theme, saved, onChange, onSaved
     <div className="form">
       <h2>Логотип</h2>
       <LogoField theme={theme} onSaved={onSaved} onError={onError} />
+
+      <h2>Шрифты</h2>
+      <p className="note">
+        Пары со стороны грузятся по сети при рендере. Не догрузился — кадр рисуется системным
+        шрифтом, а не ждёт: первая пара встроена в проект и работает всегда.
+      </p>
+      <FontField theme={theme} pairs={pairs} onChange={onChange} />
 
       <h2>Цвета бренда</h2>
       <p className="note">Встроенные иконки — в <code>public/brand</code> (пересборка: <code>tools/brand_assets.py</code>).</p>

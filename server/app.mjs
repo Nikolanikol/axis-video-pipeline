@@ -49,6 +49,9 @@ export const createApp = ({photoOrigin}) => {
   api.get('/config', wrap(async () => ({
     brand: await getBrand(), markets: await listMarkets(), defaultMarket: DEFAULT_MARKET, formats: await listFormats(),
     pipelines: await readJson(path.join(CONFIG_DIR, 'pipelines.json')),
+    // Пары шрифтов для настроек бренда. Все с кириллицей — проверено запросом к Google Fonts,
+    // и все отдают настоящие 500/600/700, а не синтезированный жирный
+    fonts: await readJson(path.join(CONFIG_DIR, 'fonts.json')),
     // Спикеры озвучки: интерфейс показывает только тех, кто умеет выбранный язык
     voices: await voiceRegistry(),
     // Что доступно: распознавание речи включается ключом ElevenLabs в .env

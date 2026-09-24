@@ -78,7 +78,8 @@ export const BrandTool: React.FC = () => {
   return (
     <main className="grid grid-settings">
       <section className="panel editor">
-        <BrandForm theme={brand} saved={config.brand} onChange={setBrand} onSaved={brandSaved} onError={report} />
+        <BrandForm theme={brand} saved={config.brand} pairs={config.fonts}
+          onChange={setBrand} onSaved={brandSaved} onError={report} />
       </section>
       <section className="panel preview">
         <div className="format-bar">

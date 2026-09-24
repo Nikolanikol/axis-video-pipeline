@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {describe, expect, it} from 'vitest';
 import brand from '../../config/brand.json';
+import fontPairs from '../../config/fonts.json';
 import {FORMAT_COMPONENTS} from '../../src/formats';
 import {tempoRate} from '../../src/shared/music';
 import {FORMATS, TRACKS} from '../../src/shared/model';
@@ -141,4 +142,53 @@ describe('бренд', () => {
       expect(fs.existsSync(path.join(ROOT, 'public', String(value))), `${key}: ${value}`).toBe(true);
     }
   });
+});
+
+describe('пары шрифтов', () => {
+  it('id уникальны', () => {
+    const ids = fontPairs.map((p) => p.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('первая пара встроена в проект и не требует сети', () => {
+    // Порядок важен: это запасной вариант, если своя пара не загрузится, и он
+    // приходит пакетами @fontsource вместе со сборкой
+    expect(fontPairs[0].url).toBe('');
+    expect(fontPairs[0].head).toContain('Oswald');
+    expect(fontPairs[0].body).toContain('Montserrat');
+  });
+
+  for (const pair of fontPairs) {
+    describe(pair.id, () => {
+      it('заголовок, подпись и оба семейства заданы', () => {
+        // \S, а не \w: подписи по-русски, и \w без флага u кириллицу не ловит
+        for (const [field, value] of Object.entries({title: pair.title, note: pair.note, head: pair.head, body: pair.body})) {
+          expect(value, field).toMatch(/\S/);
+        }
+      });
+
+      it('у семейства есть запасное: не загрузился шрифт — кадр рисуется системным', () => {
+        for (const stack of [pair.head, pair.body]) {
+          expect(stack, stack).toMatch(/,\s*(sans-serif|serif|monospace)$/);
+        }
+      });
+
+      it('адрес таблицы стилей перечисляет ровно те семейства, что заданы в паре', () => {
+        if (!pair.url) return;
+        expect(pair.url).toMatch(/^https:\/\/fonts\.googleapis\.com\/css2\?/);
+        // Имя семейства в адресе и в стеке должны совпадать: разойдутся — браузер
+        // загрузит один шрифт, а нарисует другим
+        const inUrl = [...pair.url.matchAll(/family=([^:&]+)/g)].map((m) => decodeURIComponent(m[1]).replace(/\+/g, ' '));
+        const wanted = [...new Set([pair.head, pair.body].map((s) => s.split(',')[0].replace(/"/g, '').trim()))];
+        expect(inUrl.sort()).toEqual(wanted.sort());
+      });
+
+      it('запрошены веса, которыми рисуют вёрстка и образец', () => {
+        if (!pair.url) return;
+        // Заголовки идут 700 и 600, основной текст 500 — синтезировать их браузером нельзя,
+        // иначе вместо настоящего начертания выйдет искусственно утолщённое
+        for (const weight of ['500', '600', '700']) expect(pair.url, weight).toContain(weight);
+      });
+    });
+  }
 });

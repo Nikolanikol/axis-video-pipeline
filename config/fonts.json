@@ -1,0 +1,74 @@
+[
+  {
+    "id": "oswald-montserrat",
+    "title": "Oswald + Montserrat",
+    "note": "Текущая. Встроена в проект — не требует сети",
+    "head": "Oswald, sans-serif",
+    "body": "Montserrat, sans-serif",
+    "url": ""
+  },
+  {
+    "id": "unbounded-onest",
+    "title": "Unbounded + Onest",
+    "note": "Широкая и современная: заголовок занимает всю ширину кадра",
+    "head": "\"Unbounded\", sans-serif",
+    "body": "\"Onest\", sans-serif",
+    "url": "https://fonts.googleapis.com/css2?family=Unbounded:wght@500;600;700&family=Onest:wght@500;600;700&display=swap"
+  },
+  {
+    "id": "exo-2-fira-sans",
+    "title": "Exo 2 + Fira Sans",
+    "note": "Техническая, с уклоном в скорость",
+    "head": "\"Exo 2\", sans-serif",
+    "body": "\"Fira Sans\", sans-serif",
+    "url": "https://fonts.googleapis.com/css2?family=Exo+2:wght@500;600;700&family=Fira+Sans:wght@500;600;700&display=swap"
+  },
+  {
+    "id": "roboto-condensed-roboto",
+    "title": "Roboto Condensed + Roboto",
+    "note": "Плотная и нейтральная: длинные названия влезают целиком",
+    "head": "\"Roboto Condensed\", sans-serif",
+    "body": "\"Roboto\", sans-serif",
+    "url": "https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@500;600;700&family=Roboto:wght@500;600;700&display=swap"
+  },
+  {
+    "id": "cormorant-jost",
+    "title": "Cormorant + Jost",
+    "note": "Журнальная: антиква в заголовке, гротеск в тексте",
+    "head": "\"Cormorant\", serif",
+    "body": "\"Jost\", sans-serif",
+    "url": "https://fonts.googleapis.com/css2?family=Cormorant:wght@500;600;700&family=Jost:wght@500;600;700&display=swap"
+  },
+  {
+    "id": "golos-text",
+    "title": "Golos Text",
+    "note": "Одна гарнитура на всё, разница только в весе",
+    "head": "\"Golos Text\", sans-serif",
+    "body": "\"Golos Text\", sans-serif",
+    "url": "https://fonts.googleapis.com/css2?family=Golos+Text:wght@500;600;700&display=swap"
+  },
+  {
+    "id": "ibm-plex-sans-inter",
+    "title": "IBM Plex Sans + Inter",
+    "note": "Инженерная: спокойная, без характера",
+    "head": "\"IBM Plex Sans\", sans-serif",
+    "body": "\"Inter\", sans-serif",
+    "url": "https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@500;600;700&family=Inter:wght@500;600;700&display=swap"
+  },
+  {
+    "id": "raleway-commissioner",
+    "title": "Raleway + Commissioner",
+    "note": "Мягкая, с тонкими заголовками",
+    "head": "\"Raleway\", sans-serif",
+    "body": "\"Commissioner\", sans-serif",
+    "url": "https://fonts.googleapis.com/css2?family=Raleway:wght@500;600;700&family=Commissioner:wght@500;600;700&display=swap"
+  },
+  {
+    "id": "rubik-manrope",
+    "title": "Rubik + Manrope",
+    "note": "Округлая, дружелюбная",
+    "head": "\"Rubik\", sans-serif",
+    "body": "\"Manrope\", sans-serif",
+    "url": "https://fonts.googleapis.com/css2?family=Rubik:wght@500;600;700&family=Manrope:wght@500;600;700&display=swap"
+  }
+]
