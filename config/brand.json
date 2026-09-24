@@ -13,6 +13,10 @@
     "body": "Montserrat, sans-serif",
     "url": ""
   },
+  "style": {
+    "gradient": true,
+    "radius": 1
+  },
   "assets": {
     "logoStacked": "brand/logo-stacked.svg",
     "logoHorizontal": "brand/logo-horizontal.svg",

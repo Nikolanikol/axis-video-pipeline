@@ -4,7 +4,7 @@
 // во времени, на выходе превратилось бы в случайный кадр этой анимации.
 import React from 'react';
 import {AbsoluteFill, Img} from 'remotion';
-import {BODY, CopperText, HEAD, useTheme} from '../shared/ui';
+import {BODY, CopperText, HEAD, radius, useTheme} from '../shared/ui';
 
 export const PAD = 96;
 export const TOTAL = 7;
@@ -106,7 +106,7 @@ export const Bullets: React.FC<{items: string[]; size?: number}> = ({items, size
           display: 'flex', alignItems: 'center', gap: 22,
           padding: '26px 0', borderTop: i ? `1px solid ${C.line}` : undefined,
         }}>
-          <span style={{width: 10, height: 10, borderRadius: 5, background: C.copper, flexShrink: 0}} />
+          <span style={{width: 10, height: 10, borderRadius: radius(C, 5), background: C.copper, flexShrink: 0}} />
           <span style={{fontFamily: BODY, fontWeight: 500, fontSize: size, color: C.white, lineHeight: 1.25}}>{t}</span>
         </div>
       ))}
@@ -119,7 +119,7 @@ export const NumberCard: React.FC<{value: string; label: string; alarm?: boolean
   const C = useTheme();
   return (
     <div style={{
-      flex: 1, background: C.panel, borderRadius: 18, border: `1px solid ${C.line}`,
+      flex: 1, background: C.panel, borderRadius: radius(C, 18), border: `1px solid ${C.line}`,
       padding: '34px 30px', minWidth: 0,
     }}>
       <div style={{

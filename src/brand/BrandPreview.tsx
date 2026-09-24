@@ -10,7 +10,7 @@ import React from 'react';
 import {AbsoluteFill} from 'remotion';
 import {themeOf} from '../shared/model';
 import type {Theme} from '../shared/types';
-import {BODY, CopperText, HEAD, ThemeProvider, useAsset, useTheme} from '../shared/ui';
+import {BODY, CopperText, HEAD, ThemeProvider, radius, useAsset, useTheme} from '../shared/ui';
 import {Img} from 'remotion';
 
 const PAD = 96;
@@ -64,7 +64,7 @@ const Sampler: React.FC = () => {
         <div style={{display: 'flex', gap: 22}}>
           {[['4', 'Insurance claims'], ['7', 'Owner changes']].map(([v, l]) => (
             <div key={l} style={{
-              flex: 1, background: C.panel, borderRadius: 18, border: `1px solid ${C.line}`, padding: '30px 28px',
+              flex: 1, background: C.panel, borderRadius: radius(C, 18), border: `1px solid ${C.line}`, padding: '30px 28px',
             }}>
               <div style={{fontFamily: HEAD, fontWeight: 700, fontSize: 80, lineHeight: 1, color: C.copperLight}}>{v}</div>
               <div style={{fontFamily: BODY, fontWeight: 600, fontSize: 24, letterSpacing: 3,
@@ -76,7 +76,7 @@ const Sampler: React.FC = () => {
           {['Head-up display', 'Adaptive cruise control'].map((t, i) => (
             <div key={t} style={{display: 'flex', alignItems: 'center', gap: 20, padding: '22px 0',
               borderTop: i ? `1px solid ${C.line}` : undefined}}>
-              <span style={{width: 10, height: 10, borderRadius: 5, background: C.copper}} />
+              <span style={{width: 10, height: 10, borderRadius: radius(C, 5), background: C.copper}} />
               <span style={{fontFamily: BODY, fontWeight: 500, fontSize: 36, color: C.white}}>{t}</span>
             </div>
           ))}
@@ -85,7 +85,7 @@ const Sampler: React.FC = () => {
 
       <div>
         <Label>рамка акцентом</Label>
-        <div style={{border: `3px solid ${C.copper}`, borderRadius: 22, padding: '38px 40px', textAlign: 'center'}}>
+        <div style={{border: `3px solid ${C.copper}`, borderRadius: radius(C, 22), padding: '38px 40px', textAlign: 'center'}}>
           <div style={{fontFamily: BODY, fontWeight: 600, fontSize: 26, letterSpacing: 6,
             textTransform: 'uppercase', color: C.grey}}>Price in Korea</div>
           <div style={{fontFamily: HEAD, fontWeight: 700, fontSize: 96, lineHeight: 1.1, color: C.white}}>$6,905</div>
@@ -101,7 +101,7 @@ const Sampler: React.FC = () => {
         <div style={{display: 'flex', gap: 12}}>
           {(['bg', 'panel', 'line', 'grey', 'white', 'copper'] as const).map((k) => (
             <div key={k} style={{textAlign: 'center'}}>
-              <div style={{width: 74, height: 74, borderRadius: 12, background: C[k], border: `1px solid ${C.line}`}} />
+              <div style={{width: 74, height: 74, borderRadius: radius(C, 12), background: C[k], border: `1px solid ${C.line}`}} />
               <div style={{fontFamily: BODY, fontSize: 18, color: C.grey, marginTop: 8}}>{k}</div>
             </div>
           ))}

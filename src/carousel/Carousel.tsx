@@ -9,7 +9,7 @@ import React from 'react';
 import {AbsoluteFill, Img, staticFile, useCurrentFrame} from 'remotion';
 import {themeOf} from '../shared/model';
 import type {CarouselProps} from '../shared/types';
-import {BODY, CopperText, HEAD, ThemeProvider, useAsset, useTheme} from '../shared/ui';
+import {BODY, CopperText, HEAD, ThemeProvider, radius, useAsset, useTheme} from '../shared/ui';
 import {Bullets, NumberCard, PAD, PhotoBand, Row, SAFE, Slide, Title, TOTAL} from './Slides';
 
 export const CAROUSEL_SLIDES = TOTAL;
@@ -57,7 +57,7 @@ const Cover: React.FC<CarouselProps & {brandName: string}> = ({car, brandName}) 
             {[km(car.mileageKm), car.history ? `${car.history.ownerChanges} owner changes` : null]
               .filter(Boolean).map((t) => (
                 <span key={t as string} style={{fontFamily: BODY, fontWeight: 600, fontSize: 32,
-                  color: C.white, border: `2px solid ${C.copper}`, borderRadius: 999, padding: '16px 34px'}}>{t}</span>
+                  color: C.white, border: `2px solid ${C.copper}`, borderRadius: radius(C, 999), padding: '16px 34px'}}>{t}</span>
               ))}
           </div>
           <div style={{fontFamily: BODY, fontWeight: 600, fontSize: 30, letterSpacing: 6, color: C.copperLight,
@@ -221,7 +221,7 @@ const Price: React.FC<CarouselProps & {brandName: string}> = ({car, brandName}) 
           textTransform: 'uppercase'}}>Price</CopperText>
       </div>
       <div style={{
-        marginTop: 64, border: `3px solid ${C.copper}`, borderRadius: 22, padding: '72px 56px',
+        marginTop: 64, border: `3px solid ${C.copper}`, borderRadius: radius(C, 22), padding: '72px 56px',
         textAlign: 'center',
       }}>
         <div style={{fontFamily: BODY, fontWeight: 600, fontSize: 30, letterSpacing: 6,

@@ -11,7 +11,7 @@ import {CarTitle, Contacts, PriceTag} from '../shared/blocks';
 import {resolveAd} from '../shared/model';
 import {lineText} from '../shared/subtitles.js';
 import type {ReviewProps, ReviewSegment, SubtitleLine} from '../shared/types';
-import {BODY, HEAD, Metal, PAD, Shade, TopLogo, clamp, useAsset, useTheme} from '../shared/ui';
+import {BODY, HEAD, Metal, PAD, Shade, TopLogo, clamp, radius, useAsset, useTheme} from '../shared/ui';
 
 // Тайминги оформления — в секундах: в кадрах они зависели бы от частоты композиции,
 // и на 60 кадрах всё оформление шло вдвое быстрее (затемнение финала читалось как обрыв).
@@ -47,7 +47,7 @@ export const Subtitle: React.FC<{text: string}> = ({text}) => {
   return (
     <AbsoluteFill style={{justifyContent: 'flex-end', alignItems: 'center', padding: '0 150px 500px 80px', opacity: a}}>
       <div style={{fontFamily: BODY, fontWeight: 600, fontSize: 46, lineHeight: 1.25, color: C.white, textAlign: 'center',
-        background: `${C.bg}cc`, borderRadius: 8, padding: '14px 24px', maxWidth: 850}}>
+        background: `${C.bg}cc`, borderRadius: radius(C, 8), padding: '14px 24px', maxWidth: 850}}>
         {text}
       </div>
     </AbsoluteFill>

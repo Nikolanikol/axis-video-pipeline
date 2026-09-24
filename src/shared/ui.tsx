@@ -92,8 +92,26 @@ export const useAsset = (key: keyof typeof BRAND.assets): string => {
   return src(theme.assets?.[key] ?? BRAND.assets[key]);
 };
 
-const copper = (C: Theme) =>
-  `linear-gradient(115deg, ${C.copperDark} 0%, ${C.copper} 30%, ${C.copperLight} 55%, ${C.copper} 80%, ${C.copperDark} 100%)`;
+/**
+ * Скругление угла с учётом настройки бренда.
+ *
+ * В теме лежит множитель, а не готовые радиусы: в вёрстке углов полтора десятка и они
+ * разного размера — плашка 18, рамка 22, «таблетка» 999, точка списка 5. Держать в бренде
+ * каждый из них значило бы заставлять человека подбирать полтора десятка чисел; множитель
+ * сохраняет их соотношение. Ноль — прямые углы, включая «таблетки» и точки списка.
+ */
+export const radius = (C: Theme, base: number) => Math.round(base * (C.style?.radius ?? 1));
+
+/**
+ * Медь: градиентом или плоским цветом — по настройке бренда.
+ *
+ * Плоский цвет тоже отдаём градиентом из двух одинаковых точек. Иначе в CopperText и Metal
+ * пришлось бы переключаться между backgroundImage и background в двух местах, и любое новое
+ * место с медью снова оказалось бы развилкой.
+ */
+const copper = (C: Theme) => (C.style?.gradient === false
+  ? `linear-gradient(${C.copper}, ${C.copper})`
+  : `linear-gradient(115deg, ${C.copperDark} 0%, ${C.copper} 30%, ${C.copperLight} 55%, ${C.copper} 80%, ${C.copperDark} 100%)`);
 
 // Текст с медным градиентом
 export const CopperText: React.FC<{style?: React.CSSProperties; children: React.ReactNode}> = ({style, children}) => (

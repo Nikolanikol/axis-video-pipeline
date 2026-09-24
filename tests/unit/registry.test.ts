@@ -135,6 +135,13 @@ describe('бренд', () => {
     expect(brand.fonts.body).toMatch(/\w/);
   });
 
+  it('оформление задано: медь и множитель углов', () => {
+    expect(typeof brand.style.gradient).toBe('boolean');
+    expect(typeof brand.style.radius).toBe('number');
+    // Ноль — прямые углы, это допустимо; отрицательный радиус браузер отбросит молча
+    expect(brand.style.radius).toBeGreaterThanOrEqual(0);
+  });
+
   it('каждый файл бренда из темы лежит на диске', () => {
     // Путь может быть и полной ссылкой — такие пропускаем, проверять нечего
     for (const [key, value] of Object.entries(brand.assets)) {

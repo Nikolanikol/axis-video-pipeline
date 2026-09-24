@@ -204,6 +204,45 @@ const FontField: React.FC<{theme: Theme; pairs: FontPair[]; onChange: (t: Theme)
   );
 };
 
+/**
+ * Оформление: медь и углы.
+ *
+ * Скругления заданы множителем, а не набором радиусов: в вёрстке углов полтора десятка
+ * и они разного размера — плашка, рамка, «таблетка», точка списка. Множитель сохраняет
+ * их соотношение, и подбирать полтора десятка чисел никому не приходится.
+ */
+const RADIUS: [number, string][] = [[0, 'Острые'], [1, 'Мягкие'], [1.8, 'Круглые']];
+
+const StyleField: React.FC<{theme: Theme; onChange: (t: Theme) => void}> = ({theme, onChange}) => {
+  // Значения по умолчанию те же, что в вёрстке: тема могла прийти без style
+  const style = {gradient: theme.style?.gradient ?? true, radius: theme.style?.radius ?? 1};
+  const set = (patch: Partial<typeof style>) => onChange({...theme, style: {...style, ...patch}});
+  return (
+    <>
+      <div className="switch-row">
+        <span className="switch-label">Медь</span>
+        <div className="btn-row">
+          <button type="button" className={`btn ${style.gradient ? 'primary' : 'ghost'}`}
+            onClick={() => set({gradient: true})}>Градиентом</button>
+          <button type="button" className={`btn ${style.gradient ? 'ghost' : 'primary'}`}
+            onClick={() => set({gradient: false})}>Плоским цветом</button>
+        </div>
+      </div>
+      <div className="switch-row">
+        <span className="switch-label">Углы</span>
+        <div className="btn-row">
+          {RADIUS.map(([value, label]) => (
+            <button key={label} type="button"
+              className={`btn ${style.radius === value ? 'primary' : 'ghost'}`}
+              onClick={() => set({radius: value})}>{label}</button>
+          ))}
+        </div>
+      </div>
+      <p className="hint">Углы задаются множителем: он меняет плашки, рамки, «таблетки» и точки списка разом, сохраняя их соотношение.</p>
+    </>
+  );
+};
+
 type BrandProps = {
   theme: Theme; saved: Theme; pairs: FontPair[];
   onChange: (t: Theme) => void; onSaved: (t: Theme) => void; onError: (e: unknown) => void;
@@ -227,6 +266,9 @@ export const BrandForm: React.FC<BrandProps> = ({theme, saved, pairs, onChange, 
         шрифтом, а не ждёт: первая пара встроена в проект и работает всегда.
       </p>
       <FontField theme={theme} pairs={pairs} onChange={onChange} />
+
+      <h2>Оформление</h2>
+      <StyleField theme={theme} onChange={onChange} />
 
       <h2>Цвета бренда</h2>
       <p className="note">Встроенные иконки — в <code>public/brand</code> (пересборка: <code>tools/brand_assets.py</code>).</p>
