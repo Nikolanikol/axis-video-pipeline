@@ -66,6 +66,24 @@ describe('настройки', () => {
     expect((await call('PUT', '/api/markets/..%2Fhack', {})).status).toBe(400);
     expect((await call('GET', '/api/lots/..%2F..%2Fetc')).status).toBe(400);
   });
+
+  it('отдаёт профили клиента и дефолты текстов', async () => {
+    const {body} = await call('GET', '/api/config');
+    expect(body.profiles.map((p) => p.id)).toContain('default');
+    expect(body.defaultProfile).toBe('default');
+    // copy — дефолты текстов по режиму: и export, и domestic
+    expect(body.copy.export).toBeTruthy();
+    expect(body.copy.domestic).toBeTruthy();
+  });
+
+  it('сохраняет профиль во временную папку настроек', async () => {
+    const {body: cfg} = await call('GET', '/api/config');
+    const {id, ...profile} = cfg.profiles.find((p) => p.id === 'default');
+    const {status} = await call('PUT', '/api/profiles/test', {...profile, company: 'Тестовая компания'});
+    expect(status).toBe(200);
+    const saved = JSON.parse(await fs.readFile(path.join(env.config, 'profiles', 'test.json'), 'utf8'));
+    expect(saved.company).toBe('Тестовая компания');
+  });
 });
 
 describe('лоты', () => {

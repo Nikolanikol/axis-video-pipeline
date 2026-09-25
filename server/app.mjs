@@ -5,8 +5,9 @@ import path from 'node:path';
 import express from 'express';
 import multer from 'multer';
 import {
-  CONFIG_DIR, DATA_DIR, DEFAULT_MARKET, HttpError, PRODUCTION, checkId, createLot, getBrand, getLot, getMarket,
-  listLots, listMarkets, readJson, saveBrand, saveLot, saveMarket, withLock,
+  CONFIG_DIR, DATA_DIR, DEFAULT_MARKET, DEFAULT_PROFILE, HttpError, PRODUCTION, checkId, createLot, getBrand, getCopy,
+  getLot, getMarket, getProfile, listLots, listMarkets, listProfiles, readJson, saveBrand, saveLot, saveMarket,
+  saveProfile, withLock,
 } from './store.mjs';
 import {reviewStoryboard} from '../src/shared/timeline.js';
 import {getFormat, listFormats, storyboardFrames} from './formats.mjs';
@@ -93,6 +94,10 @@ export const createApp = ({photoOrigin}) => {
 
   api.get('/config', wrap(async () => ({
     brand: await getBrand(), markets: await listMarkets(), defaultMarket: DEFAULT_MARKET, formats: await listFormats(),
+    // Профили клиента идут на смену рынкам (стадия перехода). Пока отдаём и то, и другое:
+    // интерфейс переключится на профиль отдельно, пайплайны — отдельно. copy — дефолты
+    // текстов платформы, из них профиль берёт готовые подписи.
+    profiles: await listProfiles(), defaultProfile: DEFAULT_PROFILE, copy: await getCopy(),
     pipelines: await readJson(path.join(CONFIG_DIR, 'pipelines.json')),
     // Признак боевого запуска. Интерфейс по нему прячет пайплайн обзоров: рендер обзора
     // занял бы полмашины на час рядом с боевым сайтом. Прячет именно клиент, а не сервер:
@@ -119,6 +124,11 @@ export const createApp = ({photoOrigin}) => {
     const {id: _ignored, ...market} = req.body;
     await saveMarket(req.params.id, market);
     return {id: req.params.id, ...(await getMarket(req.params.id))};
+  }));
+  api.put('/profiles/:id', wrap(async (req) => {
+    const {id: _ignored, ...profile} = req.body;
+    await saveProfile(req.params.id, profile);
+    return {id: req.params.id, ...(await getProfile(req.params.id))};
   }));
 
   // Запись лота — строго по очереди (автосохранение формы и операции с фото не должны перетирать друг друга)

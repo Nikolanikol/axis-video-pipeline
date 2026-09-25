@@ -81,6 +81,20 @@ export const listMarkets = async () => {
   return Promise.all(files.map(async (f) => ({id: f.slice(0, -5), ...(await readJson(path.join(MARKETS_DIR, f)))})));
 };
 
+// Профили клиента (идут на смену рынкам — см. src/shared/profile.js). Тексты постов клиент
+// не держит у себя: они приходят из дефолтов платформы (config/copy.json) при слиянии.
+export const COPY_FILE = path.join(CONFIG_DIR, 'copy.json');
+export const getCopy = () => readJson(COPY_FILE);
+
+export const PROFILES_DIR = path.join(CONFIG_DIR, 'profiles');
+export const DEFAULT_PROFILE = process.env.DEFAULT_PROFILE || 'default';
+export const getProfile = (id) => readJson(path.join(PROFILES_DIR, `${checkId(id)}.json`));
+export const saveProfile = (id, profile) => writeJson(path.join(PROFILES_DIR, `${checkId(id)}.json`), profile);
+export const listProfiles = async () => {
+  const files = (await fs.readdir(PROFILES_DIR)).filter((f) => f.endsWith('.json')).sort();
+  return Promise.all(files.map(async (f) => ({id: f.slice(0, -5), ...(await readJson(path.join(PROFILES_DIR, f)))})));
+};
+
 // Лоты: DATA_DIR/lots/<id>/lot.json + photos/
 export const lotDir = (id) => path.join(LOTS_DIR, checkId(id));
 export const lotPhotosDir = (id) => path.join(lotDir(id), 'photos');

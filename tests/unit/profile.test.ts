@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {describe, expect, it} from 'vitest';
-import {PRICING_MODES, priceView, resolveProfile, resolveTexts} from '../../src/shared/profile.js';
+import {PRICING_MODES, marketFromProfile, priceView, resolveProfile, resolveTexts} from '../../src/shared/profile.js';
 
 const ROOT = path.resolve(__dirname, '../..');
 const copy = JSON.parse(fs.readFileSync(path.join(ROOT, 'config/copy.json'), 'utf8'));
@@ -91,5 +91,43 @@ describe('priceView — модель цены', () => {
     const v = priceView(6000, {mode: 'weird' as never, currency: 'USD', export: {freight: 1000} as never});
     expect(v.mode).toBe('export');
     expect(v.total).toBe(7000);
+  });
+});
+
+describe('marketFromProfile — мост под старые пайплайны', () => {
+  const profile = () => JSON.parse(fs.readFileSync(path.join(ROOT, 'config/profiles/default.json'), 'utf8'));
+
+  it('экспорт: маршрут, фрахт и тексты на месте, имя = компания', () => {
+    const m = marketFromProfile(profile(), copy);
+    expect(m.name).toBe('K-AXIS MOTORS');
+    expect(m.origin).toBe('Инчон');
+    expect(m.port).toBe('Драч');
+    expect(m.freightUsd).toBe(1500);
+    expect(m.whatsapp).toBe('+82 10 5865 4344');
+    expect(m.site).toBe('kmotors.shop');
+    expect(m.texts.priceLabel).toBe('Цена до {port}');
+    // новые поля для стадии 4
+    expect(m.pricingMode).toBe('export');
+    expect(m.currency).toBe('USD');
+  });
+
+  it('внутренний рынок: ни маршрута, ни фрахта, тексты из domestic', () => {
+    const p = profile();
+    p.pricing = {mode: 'domestic', currency: 'EUR'};
+    p.language = 'ru';
+    const m = marketFromProfile(p, copy);
+    expect(m.origin).toBe('');
+    expect(m.port).toBe('');
+    expect(m.freightUsd).toBe(0);
+    expect(m.pricingMode).toBe('domestic');
+    expect(m.currency).toBe('EUR');
+    expect(m.texts.priceLabel).toBe('Цена');
+  });
+
+  it('форма совпадает с прежним Market: те же ключи, что читают пайплайны', () => {
+    const m = marketFromProfile(profile(), copy);
+    for (const k of ['name', 'origin', 'originCountry', 'port', 'portCountry', 'freightUsd', 'whatsapp', 'site', 'texts', 'music']) {
+      expect(m, `нет поля ${k}`).toHaveProperty(k);
+    }
   });
 });

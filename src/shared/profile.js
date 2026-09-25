@@ -53,3 +53,34 @@ export const priceView = (carPriceUsd, pricing) => {
   const total = carPriceUsd === null || carPriceUsd === undefined ? null : carPriceUsd + freight;
   return {mode, freight, total, showRoute: mode === 'export'};
 };
+
+/**
+ * Мост «профиль → рынок»: отдаёт объект в форме прежнего Market, чтобы пайплайны, которые
+ * пока читают рынок, работали без правок. На нём и держится незаметная замена: сервер
+ * подсовывает это вместо market, а вёрстка меняется отдельно, в свой черёд.
+ *
+ * Сверх полей Market везём и новые — pricingMode, currency, language: старые пайплайны их
+ * игнорируют, а обновлённые (стадия 4) читают, чтобы раздвоить ценовую сцену на export/domestic.
+ * На внутреннем рынке маршрут и фрахт обнуляются: порта и заграницы там нет.
+ */
+export const marketFromProfile = (profile, copy) => {
+  const p = profile || {};
+  const mode = isMode(p.pricing?.mode);
+  const ex = p.pricing?.export || {};
+  const isExport = mode === 'export';
+  return {
+    name: p.company ?? '',
+    origin: isExport ? (ex.origin ?? '') : '',
+    originCountry: isExport ? (ex.originCountry ?? '') : '',
+    port: isExport ? (ex.port ?? '') : '',
+    portCountry: isExport ? (ex.portCountry ?? '') : '',
+    freightUsd: isExport ? Number(ex.freight ?? 0) : 0,
+    whatsapp: p.contacts?.whatsapp ?? null,
+    site: p.contacts?.site ?? '',
+    texts: resolveTexts(copy, p.pricing?.mode, p.language, p.texts),
+    music: p.music,
+    pricingMode: mode,
+    currency: p.pricing?.currency ?? 'USD',
+    language: p.language,
+  };
+};
