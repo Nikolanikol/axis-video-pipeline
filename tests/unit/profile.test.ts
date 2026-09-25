@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {describe, expect, it} from 'vitest';
 import {PRICING_MODES, marketFromProfile, priceView, resolveProfile, resolveTexts} from '../../src/shared/profile.js';
+import type {Profile} from '../../src/shared/types';
 
 const ROOT = path.resolve(__dirname, '../..');
 const copy = JSON.parse(fs.readFileSync(path.join(ROOT, 'config/copy.json'), 'utf8'));
@@ -59,7 +60,7 @@ describe('resolveTexts', () => {
 
 // Явный профиль для тестов: default.json правит пользователь (режим, язык), и завязываться
 // на его текущее содержимое нельзя — тесты стали бы падать от смены настроек в интерфейсе.
-const exportProfile = () => ({
+const exportProfile = (): Profile => ({
   company: 'K-AXIS MOTORS', language: 'mk',
   contacts: {whatsapp: '+82 10 5865 4344', site: 'kmotors.shop'},
   pricing: {mode: 'export', currency: 'USD',

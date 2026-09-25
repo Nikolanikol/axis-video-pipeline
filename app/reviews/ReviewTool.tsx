@@ -378,7 +378,7 @@ export const ReviewTool: React.FC = () => {
               label="Рендер обзора"
               warnings={warnings}
               disabled={!source || !segments.length}
-              start={async (silent) => { if (save !== 'saved') await persist(); return api.renderReview(review.id, silent); }}
+              start={async () => { if (save !== 'saved') await persist(); return api.renderReview(review.id); }}
               onError={report}
             />
           </section>

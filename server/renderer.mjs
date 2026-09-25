@@ -41,14 +41,13 @@ const queue = [];
 const ACTIVE = new Set(['queued', 'running']);
 let running = false;
 
-const publicJob = ({input, silentInput, ...job}) => job;
+const publicJob = ({input, ...job}) => job;
 const metaFile = (id) => path.join(RENDERS_DIR, `${id}.json`);
 
 // Задание рендера:
 // owner — {lotId} или {reviewId}; composition — id композиции Remotion (формат или review-short);
-// inputProps — готовые props (адреса медиа уже полные); silentProps — props версии без музыки (если нужна);
-// frames — кадры раскадровки.
-export const enqueue = ({owner, composition, compositionTitle, title, frames, inputProps, silentProps}) => {
+// inputProps — готовые props (адреса медиа уже полные); frames — кадры раскадровки.
+export const enqueue = ({owner, composition, compositionTitle, title, frames, inputProps}) => {
   const now = new Date();
   const stamp = now.toISOString().replace(/\D/g, '').slice(0, 14);
   const ownerId = owner.lotId ?? owner.reviewId;
@@ -66,8 +65,7 @@ export const enqueue = ({owner, composition, compositionTitle, title, frames, in
     id, ...owner, title, format: composition, formatTitle: compositionTitle, frames,
     status: 'queued', stage: 'В очереди', progress: 0, createdAt: now.toISOString(),
     video: `/data/renders/${id}.mp4`, storyboard: `/data/renders/${id}.jpg`,
-    videoSilent: silentProps ? `/data/renders/${id}-silent.mp4` : undefined,
-    input: inputProps, silentInput: silentProps,
+    input: inputProps,
   };
   jobs.set(id, job);
   queue.push(job);
@@ -129,26 +127,14 @@ const run = async (job) => {
     browser = await openBrowser('chrome', {browserExecutable});
     const inputProps = job.input;
     const composition = await selectComposition({serveUrl, id: job.format, inputProps, puppeteerInstance: browser});
-    // enforceAudioTrack: без аудиодорожки мессенджеры и соцсети принимают mp4 за GIF — всегда пишем хотя бы тишину
+    // enforceAudioTrack: без аудиодорожки мессенджеры и соцсети принимают mp4 за GIF — всегда пишем хотя бы тишину.
+    // Музыки в роликах нет, звук добавляется уже в соцсети, поэтому ролик и так готов под трендовый звук.
     const media = {composition, serveUrl, codec: 'h264', crf, colorSpace: 'bt709', concurrency, puppeteerInstance: browser, enforceAudioTrack: true, cancelSignal};
-    const share = job.videoSilent ? 45 : 90;
     job.stage = 'Рендер видео';
     await renderMedia({
       ...media, inputProps, outputLocation: path.join(RENDERS_DIR, `${job.id}.mp4`),
-      onProgress: ({progress}) => { job.progress = Math.round(progress * share); },
+      onProgress: ({progress}) => { job.progress = Math.round(progress * 90); },
     });
-    if (job.videoSilent) {
-      job.stage = 'Версия без звука';
-      // Без музыки, но с беззвучной дорожкой — звук добавляется уже в соцсети.
-      // renderMedia рендерит props выбранной композиции, поэтому выбираем её заново с другими props.
-      const silentProps = job.silentInput;
-      const silentComposition = await selectComposition({serveUrl, id: job.format, inputProps: silentProps, puppeteerInstance: browser});
-      await renderMedia({
-        ...media, composition: silentComposition, inputProps: silentProps,
-        outputLocation: path.join(RENDERS_DIR, `${job.id}-silent.mp4`),
-        onProgress: ({progress}) => { job.progress = share + Math.round(progress * share); },
-      });
-    }
 
     job.stage = 'Раскадровка';
     const tiles = [];

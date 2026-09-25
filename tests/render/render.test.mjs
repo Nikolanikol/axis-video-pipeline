@@ -195,9 +195,11 @@ describe('обзор review-short', () => {
     }
   });
 
-  it('ролик с музыкой рынка: звук есть, доли попадают в склейки', async () => {
+  it('ролик с явной музыкой: звук есть, доли попадают в склейки', async () => {
     const {REVIEW_FPS, reviewFrames} = await import('../../src/shared/timeline.js');
-    const {out} = await renderReview('music', base);
+    // Музыку из настроек убрали (авторские права), но механизм оставлен дремать — задаём
+    // трек явно, чтобы проверить, что при появлении лицензии он по-прежнему играет
+    const {out} = await renderReview('music', {...base, review: {...base.review, music: {track: 'eleven-balkan-trap', volume: 0.8}}});
     const streams = await probe(out);
     expect(Number(streams.find((s) => s.codec_type === 'video').duration))
       // Частоту берём из настроек обзора: с числом вручную тест переставал ловить смысл

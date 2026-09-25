@@ -30,7 +30,7 @@ export type Job = {
   id: string; lotId?: string; reviewId?: string; title: string; format: string; formatTitle: string;
   status: 'queued' | 'running' | 'done' | 'error';
   stage: string; progress: number; createdAt: string; finishedAt?: string; error?: string;
-  video: string; storyboard: string; videoSilent?: string;
+  video: string; storyboard: string;
 };
 
 const request = async <T,>(method: string, url: string, body?: unknown): Promise<T> => {
@@ -64,8 +64,8 @@ export const api = {
     request<PhotoInfo>('GET', `/api/lots/${id}/photo?path=${encodeURIComponent(path)}`),
   blurPhoto: (id: string, path: string, regions: Region[]) =>
     request<LotEntry>('PUT', `/api/lots/${id}/photo`, {path, regions}),
-  render: (id: string, format: string, silent: boolean) =>
-    request<Job>('POST', `/api/lots/${id}/render`, {format, silent}),
+  render: (id: string, format: string) =>
+    request<Job>('POST', `/api/lots/${id}/render`, {format}),
   jobs: (q: JobQuery) => request<Job[]>('GET', `/api/renders?${new URLSearchParams(q as Record<string, string>)}`),
   reviews: () => request<ReviewEntry[]>('GET', '/api/reviews'),
   review: (id: string) => request<ReviewEntry>('GET', `/api/reviews/${id}`),
@@ -83,7 +83,7 @@ export const api = {
   },
   buildCarousel: (link: string) => request<CarouselEntry>('POST', '/api/carousels', {link}),
   carousels: () => request<CarouselEntry[]>('GET', '/api/carousels'),
-  renderReview: (id: string, silent: boolean) => request<Job>('POST', `/api/reviews/${id}/render`, {silent}),
+  renderReview: (id: string) => request<Job>('POST', `/api/reviews/${id}/render`, {}),
   reprocessVideo: (id: string) => request<ReviewEntry>('POST', `/api/reviews/${id}/reprocess`),
   transcribe: (id: string) => request<ReviewEntry>('POST', `/api/reviews/${id}/transcribe`),
   // Выделить звуки машины без голоса (проба; работает, если установлено окружение с моделью)

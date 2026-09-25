@@ -30,7 +30,7 @@ export const RenderPanel: React.FC<Props> = ({lot, format, unsavedSettings, befo
       label={`Рендер: ${format.title}`}
       warnings={warnings}
       disabled={!lot.photos.length}
-      start={async (silent) => { await beforeRender(); return api.render(lot.id, format.id, silent); }}
+      start={async () => { await beforeRender(); return api.render(lot.id, format.id); }}
       onError={onError}
     />
   );

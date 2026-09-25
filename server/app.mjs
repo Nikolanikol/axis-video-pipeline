@@ -177,7 +177,6 @@ export const createApp = ({photoOrigin}) => {
     return enqueue({
       owner: {lotId: lot.id}, composition: format.id, compositionTitle: format.title, title,
       frames: storyboardFrames(format), inputProps,
-      silentProps: req.body?.silent ? {...inputProps, lot: {...inputProps.lot, music: {track: null}}} : undefined,
     });
   }));
 
@@ -244,7 +243,6 @@ export const createApp = ({photoOrigin}) => {
     return enqueue({
       owner: {reviewId: review.id}, composition: 'review-short', compositionTitle: 'Обзор', title: review.title || review.id,
       frames: reviewStoryboard(review.segments), inputProps,
-      silentProps: req.body?.silent ? {...inputProps, review: {...inputProps.review, music: {track: null}}} : undefined,
     });
   }));
 
@@ -271,10 +269,8 @@ export const createApp = ({photoOrigin}) => {
   api.get('/renders/:id/download', async (req, res, next) => {
     try {
       const job = await getJob(checkId(req.params.id));
-      const silent = req.query.variant === 'silent';
-      const suffix = silent ? '-silent' : '';
-      const name = `${job.title.replace(/[^\p{L}\p{N}]+/gu, '-')}-${job.format ?? 'price-ad'}-${job.id.slice(-14)}${silent ? '-bez-zvuka' : ''}.mp4`;
-      res.download(path.join(DATA_DIR, 'renders', `${job.id}${suffix}.mp4`), name);
+      const name = `${job.title.replace(/[^\p{L}\p{N}]+/gu, '-')}-${job.format ?? 'price-ad'}-${job.id.slice(-14)}.mp4`;
+      res.download(path.join(DATA_DIR, 'renders', `${job.id}.mp4`), name);
     } catch (e) { next(e); }
   });
 

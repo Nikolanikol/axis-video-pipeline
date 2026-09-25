@@ -182,7 +182,6 @@ input:disabled { opacity: .5; }
 .track-info { font-size: 11px; color: var(--muted); margin: -4px 0 6px; }
 .track-info a, .link { color: var(--copper-light); }
 .link { background: none; border: none; padding: 0; font-size: 11px; cursor: pointer; text-decoration: underline; }
-.silent-check { margin-top: 10px; color: var(--muted); font-size: 12px; }
 .job-actions + .job-actions { margin-top: 6px; }
 
 .preview { flex-direction: column; gap: 10px; }
