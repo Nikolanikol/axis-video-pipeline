@@ -12,9 +12,15 @@ FROM node:22-bookworm-slim
 # без любой из них браузер не стартует. ca-certificates нужен для запросов к ElevenLabs
 # и Encar, fonts-liberation — чтобы на слайдах было чем рисовать латиницу, если свой
 # шрифт не подхватится.
+#
+# fonts-dejavu-core — из-за знака воны (₩) в цене «в Корее». Ни Oswald с Montserrat,
+# ни Liberation его не содержат: на Mac подставлялся системный шрифт, а в контейнере
+# подставить было нечего, и ₩ выходил квадратом-«тофу» на КАЖДОЙ карусели. DejaVu Sans
+# знак воны покрывает, и Chrome берёт из него один этот символ по цепочке подмены.
 RUN apt-get update && apt-get install -y --no-install-recommends \
       ca-certificates \
       fonts-liberation \
+      fonts-dejavu-core \
       libasound2 \
       libatk-bridge2.0-0 \
       libatk1.0-0 \
