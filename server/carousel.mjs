@@ -110,6 +110,12 @@ export const buildCarousel = async (link) => {
 
     const dir = path.join(CAROUSELS_DIR, id);
     await fs.mkdir(dir, {recursive: true});
+    // Старые кадры убираем перед сборкой: та же машина, пересобранная на проде, даёт шесть
+    // слайдов вместо прежних семи, и осиротевший slide-7.png остался бы на диске — со старой
+    // историей. Ответ ссылается только на новые шесть, но файл-призрак в томе ни к чему.
+    for (const f of await fs.readdir(dir)) {
+      if (/^slide-\d+\.png$/.test(f)) await fs.rm(path.join(dir, f), {force: true}).catch(() => {});
+    }
     const serveUrl = await getServeUrl();
     const browser = await openBrowser('chrome', {browserExecutable: process.env.CHROME_PATH || null});
     try {
