@@ -1,8 +1,8 @@
 // Оболочка: шапка с пайплайнами, вкладки инструментов, экран выбранного инструмента
 import React, {Suspense, useCallback, useState} from 'react';
-import {ConfigProvider} from './config';
+import {ConfigProvider, useConfig} from './config';
 import {Home, PipelinePage} from './Home';
-import {PIPELINES, Pipeline, ToolMeta, findPipeline, toolKey} from './pipelines';
+import {Pipeline, ToolMeta, findPipeline, toolKey, visiblePipelines} from './pipelines';
 import {href, useRoute} from './router';
 import {TOOLS, hasTool} from './tools';
 
@@ -20,10 +20,13 @@ export const Shell: React.FC = () => {
 
 const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearError}) => {
   const route = useRoute();
+  const {config} = useConfig();
   const pipeline = findPipeline(route.pipeline);
   const tool = pipeline?.tools.find((t) => t.id === route.tool);
-  const main = PIPELINES.filter((p) => p.kind !== 'settings');
-  const settings = PIPELINES.find((p) => p.kind === 'settings');
+  // На проде обзоры скрыты из вкладок; сам инструмент по прямой ссылке всё равно откроется
+  const pipelines = visiblePipelines(config.production);
+  const main = pipelines.filter((p) => p.kind !== 'settings');
+  const settings = pipelines.find((p) => p.kind === 'settings');
 
   return (
     <>

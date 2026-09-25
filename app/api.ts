@@ -10,6 +10,8 @@ export type PhotoInfo = {path: string; source: string; regions: Region[]};
 export type FontPair = {id: string; title: string; note: string; head: string; body: string; url: string};
 export type Config = {
   brand: Theme; markets: MarketEntry[]; defaultMarket: string; formats: FormatMeta[]; pipelines: unknown[];
+  // Боевой запуск (NODE_ENV=production). Интерфейс по нему прячет пайплайн обзоров
+  production: boolean;
   fonts: FontPair[];
   // ambience — установлено ли локальное окружение для выделения звуков машины (проба)
   features: {speech: boolean; voice: boolean; ambience?: boolean};

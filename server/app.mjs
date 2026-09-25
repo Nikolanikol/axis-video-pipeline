@@ -4,7 +4,7 @@ import path from 'node:path';
 import express from 'express';
 import multer from 'multer';
 import {
-  CONFIG_DIR, DATA_DIR, DEFAULT_MARKET, HttpError, checkId, createLot, getBrand, getLot, getMarket,
+  CONFIG_DIR, DATA_DIR, DEFAULT_MARKET, HttpError, PRODUCTION, checkId, createLot, getBrand, getLot, getMarket,
   listLots, listMarkets, readJson, saveBrand, saveLot, saveMarket, withLock,
 } from './store.mjs';
 import {reviewStoryboard} from '../src/shared/timeline.js';
@@ -49,6 +49,10 @@ export const createApp = ({photoOrigin}) => {
   api.get('/config', wrap(async () => ({
     brand: await getBrand(), markets: await listMarkets(), defaultMarket: DEFAULT_MARKET, formats: await listFormats(),
     pipelines: await readJson(path.join(CONFIG_DIR, 'pipelines.json')),
+    // Признак боевого запуска. Интерфейс по нему прячет пайплайн обзоров: рендер обзора
+    // занял бы полмашины на час рядом с боевым сайтом. Прячет именно клиент, а не сервер:
+    // реестр пайплайнов общий для прода и дева, и один флаг честнее двух списков.
+    production: PRODUCTION,
     // Пары шрифтов для настроек бренда. Все с кириллицей — проверено запросом к Google Fonts,
     // и все отдают настоящие 500/600/700, а не синтезированный жирный
     fonts: await readJson(path.join(CONFIG_DIR, 'fonts.json')),

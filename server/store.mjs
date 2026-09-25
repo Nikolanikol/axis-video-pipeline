@@ -11,6 +11,14 @@ export const LOTS_DIR = path.join(DATA_DIR, 'lots');
 export const RENDERS_DIR = path.join(DATA_DIR, 'renders');
 export const DEFAULT_MARKET = process.env.DEFAULT_MARKET || 'mk';
 
+// Прод (сервер) против дева (Mac). Один признак на весь сервер, чтобы прод и локальная
+// версия расходились в одном месте, а не в десяти. Сейчас от него зависят две вещи:
+// на проде из каруселей убран слайд истории (страховые случаи с датацентра не приходят,
+// Encar режет адрес — см. server/carousel.mjs), и в интерфейсе скрыт пайплайн обзоров
+// (рендер обзора занял бы полмашины на час рядом с боевым сайтом). Код обоих на месте —
+// закрыт только вход, вернётся снятием этого флага или починкой доступа к Encar.
+export const PRODUCTION = process.env.NODE_ENV === 'production';
+
 export class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }

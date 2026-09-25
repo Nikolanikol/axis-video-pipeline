@@ -198,6 +198,8 @@ export type CarouselCar = {
   };
 };
 
-export type CarouselProps = {car: CarouselCar; market: Market; theme?: Partial<Theme>};
+// includeHistory: показывать ли слайд истории. На проде сервер ставит false, пока
+// страховые случаи не приходят с датацентра (Encar режет адрес). По умолчанию — да.
+export type CarouselProps = {car: CarouselCar; market: Market; theme?: Partial<Theme>; includeHistory?: boolean};
 
 export type ReviewProps = {review: Review; lot?: Lot | null; market: Market; theme?: Partial<Theme>};

@@ -7,6 +7,9 @@ import {AbsoluteFill, Img} from 'remotion';
 import {BODY, CopperText, HEAD, radius, useTheme} from '../shared/ui';
 
 export const PAD = 96;
+// Максимум слайдов — им задаётся длительность композиции (см. Root.tsx). Сколько слайдов
+// в конкретной карусели, решает Carousel.tsx и передаёт числом: на проде истории нет,
+// и слайдов шесть, а не семь. Поэтому номер «NN / total» в шапках приходит пропом.
 export const TOTAL = 7;
 
 /**
@@ -22,8 +25,8 @@ export const TOTAL = 7;
  */
 export const SAFE = Math.round((1920 - 1350) / 2);
 
-/** Шапка: слева имя бренда, справа номер слайда. Одинаковая на всех семи. */
-export const Header: React.FC<{index: number; brandName: string}> = ({index, brandName}) => {
+/** Шапка: слева имя бренда, справа номер слайда. Одинаковая на всех слайдах. */
+export const Header: React.FC<{index: number; total: number; brandName: string}> = ({index, total, brandName}) => {
   const C = useTheme();
   return (
     <div style={{
@@ -32,7 +35,7 @@ export const Header: React.FC<{index: number; brandName: string}> = ({index, bra
       textTransform: 'uppercase', color: C.grey,
     }}>
       <span>{brandName}</span>
-      <span>{String(index).padStart(2, '0')} / {String(TOTAL).padStart(2, '0')}</span>
+      <span>{String(index).padStart(2, '0')} / {String(total).padStart(2, '0')}</span>
     </div>
   );
 };
@@ -61,8 +64,8 @@ export const Title: React.FC<{kicker: string; children: React.ReactNode}> = ({ki
  */
 export const PhotoBand: React.FC<{
   src?: string; height: number; label?: string;
-  index: number; brandName: string; focus?: string; trimTop?: number;
-}> = ({src, height, label, index, brandName, focus = '50% 45%', trimTop = 0}) => {
+  index: number; total: number; brandName: string; focus?: string; trimTop?: number;
+}> = ({src, height, label, index, total, brandName, focus = '50% 45%', trimTop = 0}) => {
   const C = useTheme();
   // Срезаем верх кадра принудительно: снимок шире рамки, и object-fit режет его по бокам,
   // а не сверху — вертикальное смещение на него не действует. А логотип Encar впечатан
@@ -90,7 +93,7 @@ export const PhotoBand: React.FC<{
         letterSpacing: 7, textTransform: 'uppercase', color: C.white,
       }}>
         <span>{brandName}</span>
-        <span>{String(index).padStart(2, '0')} / {String(TOTAL).padStart(2, '0')}</span>
+        <span>{String(index).padStart(2, '0')} / {String(total).padStart(2, '0')}</span>
       </div>
     </div>
   );
@@ -150,13 +153,13 @@ export const Row: React.FC<{k: string; v: string; first?: boolean}> = ({k, v, fi
 };
 
 /** Общая рамка слайда: фон, поля, шапка сверху */
-export const Slide: React.FC<{index: number; brandName: string; children: React.ReactNode}> = ({index, brandName, children}) => {
+export const Slide: React.FC<{index: number; total: number; brandName: string; children: React.ReactNode}> = ({index, total, brandName, children}) => {
   const C = useTheme();
   return (
     <AbsoluteFill style={{
       background: C.bg, padding: `${SAFE}px ${PAD}px`, display: 'flex', flexDirection: 'column',
     }}>
-      <Header index={index} brandName={brandName} />
+      <Header index={index} total={total} brandName={brandName} />
       {children}
     </AbsoluteFill>
   );

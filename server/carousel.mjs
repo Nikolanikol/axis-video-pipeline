@@ -12,10 +12,14 @@ import path from 'node:path';
 import {bundle} from '@remotion/bundler';
 import {openBrowser, renderStill, selectComposition} from '@remotion/renderer';
 import {parseCarLink} from '../src/shared/encarLink.js';
-import {DATA_DIR, DEFAULT_MARKET, HttpError, ROOT, getBrand, getMarket, readJson, writeJson} from './store.mjs';
+import {DATA_DIR, DEFAULT_MARKET, HttpError, PRODUCTION, ROOT, getBrand, getMarket, readJson, writeJson} from './store.mjs';
 
 export const CAROUSELS_DIR = path.join(DATA_DIR, 'carousels');
-const SLIDES = 7;
+// Слайд истории убираем на проде, пока страховые случаи не приходят с датацентра
+// (Encar режет адрес). Тогда слайдов шесть; на Mac — семь с настоящей историей.
+// Число решается здесь, а сам слайд отсекается в вёрстке по includeHistory.
+const INCLUDE_HISTORY = !PRODUCTION;
+const SLIDES = INCLUDE_HISTORY ? 7 : 6;
 // Шлюз ходит в Encar и ждёт ответа от него; у самого Encar таймаут 8 с плюс запасной прокси,
 // которому на холодную нужны десятки секунд
 const GATEWAY_TIMEOUT_MS = Number(process.env.CAROUSEL_TIMEOUT_MS || 60_000);
@@ -102,7 +106,7 @@ export const buildCarousel = async (link) => {
       ? Object.fromEntries(Object.entries(theme.assets)
         .map(([k, v]) => [k, typeof v === 'string' && v.startsWith('/') ? origin + v : v]))
       : theme.assets;
-    const inputProps = {car, market, theme: {...theme, assets}};
+    const inputProps = {car, market, theme: {...theme, assets}, includeHistory: INCLUDE_HISTORY};
 
     const dir = path.join(CAROUSELS_DIR, id);
     await fs.mkdir(dir, {recursive: true});

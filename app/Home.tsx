@@ -1,7 +1,8 @@
 // Главная: пайплайны и их инструменты
 import React from 'react';
-import {PIPELINES, Pipeline} from './pipelines';
+import {Pipeline, visiblePipelines} from './pipelines';
 import {href} from './router';
+import {useConfig} from './config';
 
 const ToolList: React.FC<{pipeline: Pipeline}> = ({pipeline}) => (
   <div className="tool-list">
@@ -15,8 +16,10 @@ const ToolList: React.FC<{pipeline: Pipeline}> = ({pipeline}) => (
 );
 
 export const Home: React.FC = () => {
-  const main = PIPELINES.filter((p) => p.kind !== 'settings');
-  const settings = PIPELINES.filter((p) => p.kind === 'settings');
+  const {config} = useConfig();
+  const pipelines = visiblePipelines(config.production);
+  const main = pipelines.filter((p) => p.kind !== 'settings');
+  const settings = pipelines.filter((p) => p.kind === 'settings');
   return (
     <div className="page">
       <h1 className="page-title">Пайплайны</h1>
