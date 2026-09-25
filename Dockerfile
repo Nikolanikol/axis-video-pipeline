@@ -79,8 +79,9 @@ ENV NODE_ENV=production \
 
 EXPOSE 3210
 
-# Проверка живости: сервер отвечает настройками, когда действительно готов
+# Проверка живости — на /healthz: он без пароля. Если бы стучались в /api/config, а на
+# сервере включён Basic Auth, health-check вечно получал бы 401 и контейнер считался бы мёртвым.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3210)+'/api/config').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:'+(process.env.PORT||3210)+'/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 
 CMD ["node", "server/index.mjs"]
