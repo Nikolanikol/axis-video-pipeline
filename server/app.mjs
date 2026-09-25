@@ -6,15 +6,15 @@ import express from 'express';
 import multer from 'multer';
 import {
   CONFIG_DIR, DATA_DIR, DEFAULT_MARKET, DEFAULT_PROFILE, HttpError, PRODUCTION, checkId, createLot, getBrand, getCopy,
-  getLot, getMarket, getProfile, listLots, listMarkets, listProfiles, readJson, saveBrand, saveLot, saveMarket,
-  saveProfile, withLock,
+  getLot, getMarket, getProfile, listLots, listMarkets, listProfiles, readJson, renderMarket, saveBrand, saveLot,
+  saveMarket, saveProfile, withLock,
 } from './store.mjs';
 import {reviewStoryboard} from '../src/shared/timeline.js';
 import {getFormat, listFormats, storyboardFrames} from './formats.mjs';
 import {addPhoto, applyBlur, photoInfo, removePhoto} from './photos.mjs';
 import {enqueue, getJob, listJobs} from './renderer.mjs';
 import {
-  UPLOAD_TMP, ambienceReview, createReview, defaultMarketFor, getReview, ingestSource, listReviews, rebuildLines, reprocessSource,
+  UPLOAD_TMP, ambienceReview, createReview, getReview, ingestSource, listReviews, rebuildLines, reprocessSource,
   transcribeReview, updateReview, voiceRegistry, voiceReview,
 } from './reviews.mjs';
 import {apiSettings, resolveSpeaker, voiceConfig} from '../src/shared/voices.js';
@@ -170,7 +170,8 @@ export const createApp = ({photoOrigin}) => {
     const lot = await getLot(req.params.id);
     const format = await getFormat(req.body?.format || lot.format);
     if (format.requires.includes('photos') && !lot.photos.length) throw new HttpError(400, 'Добавь хотя бы одно фото');
-    const [market, theme] = await Promise.all([getMarket(lot.market || DEFAULT_MARKET), getBrand()]);
+    const [market, brand] = await Promise.all([renderMarket(), getBrand()]);
+    const theme = {...brand, name: market.name};
     const title = [lot.brand, lot.model, lot.year].filter(Boolean).join(' ') || lot.id;
     const inputProps = {lot: withAbsolutePhotos(lot, photoOrigin), market, theme: themeForRender(photoOrigin, theme)};
     return enqueue({
@@ -214,8 +215,7 @@ export const createApp = ({photoOrigin}) => {
   })().catch(next));
   api.post('/reviews/:id/voice', wrap(async (req) => {
     const review = await getReview(checkId(req.params.id));
-    const lot = review.lotId ? await getLot(review.lotId).catch(() => null) : null;
-    const market = await getMarket(defaultMarketFor(review, lot));
+    const market = await renderMarket();
     return voiceReview(review.id, {language: typeof req.body?.language === 'string' ? req.body.language : undefined, market});
   }));
   api.post('/reviews/:id/ambience', wrap((req) => ambienceReview(checkId(req.params.id))));
@@ -224,7 +224,8 @@ export const createApp = ({photoOrigin}) => {
     if (review.source?.status !== 'ready') throw new HttpError(400, 'Видео ещё не готово');
     if (!review.segments.length) throw new HttpError(400, 'Добавь хотя бы один фрагмент');
     const lot = review.lotId ? await getLot(review.lotId).catch(() => null) : null;
-    const [market, theme] = await Promise.all([getMarket(defaultMarketFor(review, lot)), getBrand()]);
+    const [market, brand] = await Promise.all([renderMarket(), getBrand()]);
+    const theme = {...brand, name: market.name};
     const inputProps = {
       review: {
         ...review,

@@ -12,6 +12,12 @@ export type CarTitleProps = {brand: string; model: string; year?: number | strin
 // с разной скоростью. На 30 кадрах значения совпадают с прежними.
 const atSec = (sec: number, fps: number) => Math.round(sec * fps);
 
+// Символ валюты профиля: экспорт из Кореи считается в долларах, внутренний рынок может быть
+// в евро/фунтах. Значение цены как есть — конвертация валют вне MVP, дилер вводит своё число;
+// а вот символ обязан совпадать с валютой профиля, иначе «€ по цене $» выглядит обманом.
+const CURRENCY_SYMBOL: Record<string, string> = {USD: '$', EUR: '€', GBP: '£', JPY: '¥', KRW: '₩'};
+const currencySign = (code?: string) => CURRENCY_SYMBOL[code ?? 'USD'] ?? code ?? '$';
+
 // Марка, модель, год, версия и подзаголовок — выезжают снизу
 export const CarTitle: React.FC<CarTitleProps> = ({brand, model, year, trim, tagline}) => {
   const C = useTheme();
@@ -53,7 +59,8 @@ export const PriceTag: React.FC<{ad: Ad; delay?: number; padding?: string}> = ({
   const total = totalUsd(ad);
   const count = interpolate(f, [from, from + atSec(1.33, fps)], [0, 1], {...clamp, easing: Easing.out(Easing.cubic)});
   const num = total === null ? null : count >= 1 ? total : Math.round((total * count) / 10) * 10;
-  const label = num === null ? 'XX XXX $' : `${fmt(num)} $`;
+  const sign = currencySign(ad.currency);
+  const label = num === null ? `XX XXX ${sign}` : `${fmt(num)} ${sign}`;
   const priceIn = spring({frame: f - from, fps, config: {damping: 14, mass: 0.6}});
   const note = interpolate(f, [from + atSec(1.17, fps), from + atSec(1.67, fps)], [0, 1], clamp);
   return (

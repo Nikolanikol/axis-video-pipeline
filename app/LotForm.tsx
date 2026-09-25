@@ -2,16 +2,15 @@
 // Поле Field отсюда переиспользуют остальные формы.
 import React, {useCallback, useRef, useState} from 'react';
 import {fmt, priceUsd} from '../src/shared/model';
-import type {FormatMeta} from '../src/shared/types';
-import {api, LotEntry, MarketEntry} from './api';
+import type {FormatMeta, Market} from '../src/shared/types';
+import {api, LotEntry} from './api';
 import {BlurEditor} from './BlurEditor';
 import {MusicFields} from './MusicFields';
 
 type Props = {
   lot: LotEntry;
-  market: MarketEntry;
+  market: Market;
   format: FormatMeta;
-  markets: MarketEntry[];
   onChange: (patch: Partial<LotEntry>) => void;
   onPhotos: (lot: LotEntry) => void;
   onError: (e: unknown) => void;
@@ -29,7 +28,7 @@ export const Field: React.FC<{label: string; hint?: React.ReactNode; children: R
   </label>
 );
 
-export const LotForm: React.FC<Props> = ({lot, market, format, markets, onChange, onPhotos, onError}) => {
+export const LotForm: React.FC<Props> = ({lot, market, format, onChange, onPhotos, onError}) => {
   const car = priceUsd(lot);
   const freight = lot.freightUsd ?? market.freightUsd;
   const port = lot.port ?? market.port;
@@ -39,22 +38,15 @@ export const LotForm: React.FC<Props> = ({lot, market, format, markets, onChange
     <div className="form">
       <h2>Авто</h2>
       <div className="row">
-        <Field label="Рынок">
-          <select value={lot.market ?? ''} onChange={(e) => onChange({market: e.target.value})}>
-            {markets.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.id})</option>)}
-          </select>
-        </Field>
-        <Field label="Год">
-          <input type="number" value={lot.year ?? ''} onChange={(e) => onChange({year: Number(e.target.value)})} />
-        </Field>
-      </div>
-      <div className="row">
         <Field label="Марка"><input value={lot.brand} placeholder="Audi" onChange={(e) => onChange({brand: e.target.value})} /></Field>
         <Field label="Модель"><input value={lot.model} placeholder="A6" onChange={(e) => onChange({model: e.target.value})} /></Field>
+      </div>
+      <div className="row">
         <Field label="Версия"><input value={lot.trim ?? ''} placeholder="35 TDI" onChange={(e) => onChange({trim: e.target.value})} /></Field>
+        <Field label="Год"><input type="number" value={lot.year ?? ''} onChange={(e) => onChange({year: Number(e.target.value)})} /></Field>
       </div>
 
-      <h2>Характеристики <span className="muted">на языке рынка</span></h2>
+      <h2>Характеристики <span className="muted">на языке постов</span></h2>
       {lot.specs.map((s, i) => (
         <div className="spec" key={i}>
           <input value={s} placeholder={['78 498 км', 'Дизел · автоматик', 'Кожен ентериер', 'Шибер · навигација'][i] ?? ''}
@@ -98,13 +90,13 @@ export const LotForm: React.FC<Props> = ({lot, market, format, markets, onChange
       </Field>
 
       <details className="overrides">
-        <summary>Настройки рынка только для этого лота</summary>
+        <summary>Переопределить для этого лота</summary>
         <div className="row">
-          <Field label="Фрахт, $" hint={`по рынку: ${fmt(market.freightUsd)}`}>
+          <Field label="Фрахт, $" hint={`по профилю: ${fmt(market.freightUsd)}`}>
             <input inputMode="decimal" value={lot.freightUsd ?? ''} placeholder={String(market.freightUsd)}
               onChange={(e) => { const v = num(e.target.value); onChange({freightUsd: v === null || Number.isNaN(v) ? undefined : v}); }} />
           </Field>
-          <Field label="WhatsApp" hint={lot.whatsapp === null ? 'номер скрыт' : `по рынку: ${market.whatsapp ?? '—'}`}>
+          <Field label="WhatsApp" hint={lot.whatsapp === null ? 'номер скрыт' : `по профилю: ${market.whatsapp ?? '—'}`}>
             <input value={lot.whatsapp ?? ''} placeholder={market.whatsapp ?? ''} disabled={lot.whatsapp === null}
               onChange={(e) => onChange({whatsapp: e.target.value || undefined})} />
           </Field>

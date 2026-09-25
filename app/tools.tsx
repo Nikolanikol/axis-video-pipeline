@@ -8,7 +8,6 @@ export const TOOLS = {
   'reviews/edit': lazy(() => import('./reviews/ReviewTool').then((m) => ({default: m.ReviewTool}))),
   'settings/profile': lazy(() => import('./settings/SettingsTool').then((m) => ({default: m.ProfileTool}))),
   'settings/brand': lazy(() => import('./settings/SettingsTool').then((m) => ({default: m.BrandTool}))),
-  'settings/markets': lazy(() => import('./settings/SettingsTool').then((m) => ({default: m.MarketsTool}))),
 } as const;
 
 export type ToolKey = keyof typeof TOOLS;

@@ -67,6 +67,32 @@ describe.each(formats)('формат $id', (format) => {
     }
   });
 
+  // Модель цены: у рекламы ценовая сцена раздваивается на export (маршрут «до порта») и
+  // domestic (просто цена). Рендерим кадр сцены в обоих режимах и убеждаемся, что картинка
+  // реально разная — иначе раздвоение молча не сработало бы.
+  it('ценовая сцена отличается на экспортном и внутреннем рынке', async () => {
+    const priceScene = format.scenes.find((s) => s.id === 'price');
+    if (!priceScene) return; // раздвоение есть только у формата с ценовой сценой
+    const copy = JSON.parse(await fs.readFile(path.join(ROOT, 'config/copy.json'), 'utf8'));
+    const {marketFromProfile} = await import('../../src/shared/profile.js');
+    const domesticMarket = marketFromProfile(
+      {company: 'X', language: 'en', contacts: {whatsapp: '+1 000', site: 'x.com'}, pricing: {mode: 'domestic', currency: 'EUR'}},
+      copy,
+    );
+    const domesticProps = {...fixture, market: domesticMarket};
+    const frame = priceScene.preview;
+    // Разные props — композицию выбираем заново под каждую (см. комментарий у render)
+    const domComp = await selectComposition({serveUrl, id: format.id, inputProps: domesticProps, puppeteerInstance: browser});
+    const exportShot = (await renderStill({composition, serveUrl, frame, inputProps: fixture, puppeteerInstance: browser, imageFormat: 'png'})).buffer;
+    const domesticShot = (await renderStill({composition: domComp, serveUrl, frame, inputProps: domesticProps, puppeteerInstance: browser, imageFormat: 'png'})).buffer;
+    // Обе не пустые
+    expect((await sharp(exportShot).stats()).channels[0].stdev).toBeGreaterThan(10);
+    expect((await sharp(domesticShot).stats()).channels[0].stdev).toBeGreaterThan(10);
+    // И различаются по самим пикселям (у экспорта дуга маршрута, у внутреннего её нет)
+    const raw = (b) => sharp(b).resize(90, 160).raw().toBuffer();
+    expect(Buffer.compare(await raw(exportShot), await raw(domesticShot))).not.toBe(0);
+  });
+
   // Метроном — эталон: у него доля ровно там, где обещано. Проверяем на нём всю цепочку
   // подгонки темпа и компенсации задержки кодека. Если этот тест упал — сломалась механика,
   // а не выбор трека.

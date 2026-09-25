@@ -2,6 +2,7 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Player, PlayerRef} from '@remotion/player';
 import {ReviewShort} from '../../src/reviews/ReviewShort';
+import {marketFromProfile} from '../../src/shared/profile';
 import {
   MAX_REVIEW_SEC, REVIEW_FPS, buildTimeline, reviewFrames, sanitizeSegments, wholeReview,
 } from '../../src/shared/timeline.js';
@@ -28,7 +29,7 @@ const lastReview = {
 const newId = () => `s-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 5)}`;
 
 export const ReviewTool: React.FC = () => {
-  const {config, markets, brand, report} = useConfig();
+  const {config, profile, brand, report} = useConfig();
   const [reviews, setReviews] = useState<ReviewEntry[]>([]);
   const [review, setReview] = useState<ReviewEntry | null>(null);
   const [lots, setLots] = useState<LotEntry[]>([]);
@@ -142,8 +143,8 @@ export const ReviewTool: React.FC = () => {
   // Звуки машины играют вместо живого звука: это выделенная дорожка того же кадра, без голоса
   const ambienceOn = Boolean(review?.ambience?.enabled && review.ambience.file);
   const lot = lots.find((l) => l.id === review?.lotId) ?? null;
-  const marketId = lot?.market ?? review?.market ?? config.defaultMarket;
-  const market = markets.find((m) => m.id === marketId) ?? markets[0];
+  // Превью и озвучка берут данные из профиля клиента (тот же мост, что и рендер)
+  const market = marketFromProfile(profile, config.copy) as Market;
   const source = review?.source?.status === 'ready' ? review.source : null;
   // Видео из мессенджера приходит сильно меньше 1080p — никакой обработкой резкость не вернуть
   const smallSource = Boolean(source?.original?.width && Math.max(source.original.width, source.original.height ?? 0) < 1280);

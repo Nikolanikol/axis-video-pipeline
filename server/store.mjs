@@ -2,6 +2,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {marketFromProfile} from '../src/shared/profile.js';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const CONFIG_DIR = path.resolve(ROOT, process.env.CONFIG_DIR || 'config');
@@ -95,6 +96,14 @@ export const listProfiles = async () => {
   return Promise.all(files.map(async (f) => ({id: f.slice(0, -5), ...(await readJson(path.join(PROFILES_DIR, f)))})));
 };
 
+/**
+ * Данные для рендера из профиля в форме, которую ждут пайплайны (прежний Market).
+ * Единая точка входа: раньше каждый пайплайн звал getMarket по id из лота, теперь берёт
+ * один профиль клиента (MVP — он один). Тексты подставлены, режим цены и валюта уже внутри.
+ */
+export const renderMarket = async (id = DEFAULT_PROFILE) =>
+  marketFromProfile(await getProfile(id), await getCopy());
+
 // Лоты: DATA_DIR/lots/<id>/lot.json + photos/
 export const lotDir = (id) => path.join(LOTS_DIR, checkId(id));
 export const lotPhotosDir = (id) => path.join(lotDir(id), 'photos');
@@ -129,10 +138,12 @@ export const listLots = async () => {
   return lots.filter(Boolean).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
 };
 
-// Вход для ролика из файла лота (CLI): лот + его рынок + тема бренда
+// Вход для ролика из файла лота (CLI): лот + данные профиля + тема бренда.
+// Имя компании на постах берём из профиля (market.name), а не из brand.json: компания
+// переехала в профиль, бренд отвечает только за дизайн.
 export const loadInput = async (lotPath) => {
   const lot = await readJson(path.resolve(lotPath));
   if (!Array.isArray(lot.photos)) throw new Error(`${lotPath}: в лоте нет photos[]`);
-  const [market, theme] = await Promise.all([getMarket(lot.market || DEFAULT_MARKET), getBrand()]);
-  return {lot, market, theme};
+  const [market, brand] = await Promise.all([renderMarket(), getBrand()]);
+  return {lot, market, theme: {...brand, name: market.name}};
 };

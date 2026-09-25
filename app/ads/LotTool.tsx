@@ -1,6 +1,7 @@
 // Пайплайн «Реклама авто» → инструмент «Ролик по лоту»: лот, превью в выбранном формате, рендер
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {FORMATS, getFormat} from '../../src/shared/model';
+import {marketFromProfile} from '../../src/shared/profile';
 import type {Market} from '../../src/shared/types';
 import {api, LotEntry} from '../api';
 import {useConfig} from '../config';
@@ -15,7 +16,7 @@ const SAVE_LABEL: Record<SaveState, string> = {saved: 'Сохранено', dirt
 export const lotTitle = (l: LotEntry) => [l.brand, l.model, l.year].filter(Boolean).join(' ') || 'Новый лот';
 
 export const LotTool: React.FC = () => {
-  const {config, markets, brand, savedMarket, report} = useConfig();
+  const {config, profile, brand, report} = useConfig();
   const [lots, setLots] = useState<LotEntry[]>([]);
   const [lot, setLot] = useState<LotEntry | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -82,10 +83,12 @@ export const LotTool: React.FC = () => {
     } catch (e) { report(e); }
   };
 
-  const market = markets.find((m) => m.id === (lot?.market ?? config.defaultMarket)) ?? markets[0];
+  // Данные для превью — из профиля клиента (тот же мост, что и рендер), а не из рынка лота
+  const market = useMemo(() => marketFromProfile(profile, config.copy) as Market, [profile, config.copy]);
   const format = getFormat(lot?.format);
-  const input = useMemo(() => (lot && market ? {lot, market: market as Market, theme: brand} : null), [lot, market, brand]);
-  const unsavedSettings = Boolean(market && market !== savedMarket(market.id)) || brand !== config.brand;
+  const input = useMemo(() => (lot ? {lot, market, theme: brand} : null), [lot, market, brand]);
+  const savedProfile = config.profiles.find((p) => p.id === profile.id);
+  const unsavedSettings = profile !== savedProfile || brand !== config.brand;
 
   if (!loaded) return <div className="boot">Загрузка лотов…</div>;
 
@@ -102,8 +105,8 @@ export const LotTool: React.FC = () => {
 
       <main className="grid">
         <section className="panel editor">
-          {lot && market
-            ? <LotForm lot={lot} market={market} format={format} markets={markets} onChange={editLot} onPhotos={setPhotos} onError={report} />
+          {lot
+            ? <LotForm lot={lot} market={market} format={format} onChange={editLot} onPhotos={setPhotos} onError={report} />
             : <div className="empty">Создай первый лот кнопкой «+ Новый лот».</div>}
         </section>
 
@@ -121,10 +124,9 @@ export const LotTool: React.FC = () => {
         </section>
 
         <section className="panel renders">
-          {lot && market && (
+          {lot && (
             <RenderPanel
               lot={lot}
-              market={market}
               format={format}
               unsavedSettings={unsavedSettings}
               beforeRender={async () => { if (save !== 'saved') await saveLot(); }}

@@ -16,11 +16,15 @@ export type Track = {
   startSec: number; bpm: number; gain: number;
 };
 
-// Настройки рынка: config/markets/<id>.json
+// Настройки рынка: config/markets/<id>.json.
+// pricingMode/currency появляются, когда объект собран из профиля мостом marketFromProfile
+// (src/shared/profile.js): по ним ценовая сцена решает — рисовать маршрут «до порта» (export)
+// или просто цену (domestic). У старых рынков-файлов их нет, поэтому опциональные.
 export type Market = {
   name: string; origin: string; originCountry: string; port: string; portCountry: string;
   freightUsd: number; whatsapp: string | null; site: string; texts: Texts;
   music?: Music;
+  pricingMode?: PricingMode; currency?: string;
 };
 
 // Профиль клиента: config/profiles/<id>.json. Приходит на смену «рынку» — см. src/shared/profile.js.

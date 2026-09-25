@@ -12,7 +12,7 @@ import path from 'node:path';
 import {bundle} from '@remotion/bundler';
 import {openBrowser, renderStill, selectComposition} from '@remotion/renderer';
 import {parseCarLink} from '../src/shared/encarLink.js';
-import {DATA_DIR, DEFAULT_MARKET, HttpError, PRODUCTION, ROOT, getBrand, getMarket, readJson, writeJson} from './store.mjs';
+import {DATA_DIR, HttpError, PRODUCTION, ROOT, getBrand, readJson, renderMarket, writeJson} from './store.mjs';
 
 export const CAROUSELS_DIR = path.join(DATA_DIR, 'carousels');
 // Слайд истории убираем на проде, пока страховые случаи не приходят с датацентра
@@ -98,7 +98,11 @@ export const buildCarousel = async (link) => {
   running.add(id);
   try {
     const car = await fetchCar(id);
-    const [market, theme] = await Promise.all([getMarket(DEFAULT_MARKET), getBrand()]);
+    // Карусель — всегда про корейское объявление (источник Encar), но контакты и компанию
+    // берём из профиля клиента: бренд и подпись должны быть его.
+    const [profileMarket, brand] = await Promise.all([renderMarket(), getBrand()]);
+    const theme = {...brand, name: profileMarket.name};
+    const market = profileMarket;
     // Логотип из настроек лежит на нашем сервере, а рендер грузит сборку с адреса Remotion:
     // путь /data/brand/… он искал бы у себя и не нашёл. Встроенные файлы уже в сборке.
     const origin = process.env.SELF_ORIGIN || `http://127.0.0.1:${process.env.PORT || 3210}`;

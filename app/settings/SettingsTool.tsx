@@ -10,7 +10,7 @@ import {Player} from '@remotion/player';
 import {BrandPreview} from '../../src/brand/BrandPreview';
 import {Preview} from '../Preview';
 import {href, lastLot} from '../router';
-import {BrandForm, MarketForm, ProfileForm} from '../SettingsForms';
+import {BrandForm, ProfileForm} from '../SettingsForms';
 
 const usePreviewLot = () => {
   const {report} = useConfig();
@@ -53,43 +53,11 @@ export const ProfileTool: React.FC = () => {
   );
 };
 
-export const MarketsTool: React.FC = () => {
-  const {config, markets, setMarket, marketSaved, savedMarket, report} = useConfig();
-  const lot = usePreviewLot();
-  const [selected, setSelected] = useState<string | null>(null);
-  const id = selected ?? lot?.market ?? config.defaultMarket;
-  const market = markets.find((m) => m.id === id) ?? markets[0];
-
-  return (
-    <>
-      <div className="toolbar">
-        <span className="label">Рынок</span>
-        <select value={market.id} onChange={(e) => setSelected(e.target.value)}>
-          {markets.map((m) => <option key={m.id} value={m.id}>{m.name} ({m.id}){m !== savedMarket(m.id) ? ' — есть правки' : ''}</option>)}
-        </select>
-      </div>
-      <main className="grid grid-settings">
-        <section className="panel editor">
-          <MarketForm
-            market={market}
-            saved={savedMarket(market.id)}
-            markets={markets}
-            onChange={setMarket}
-            onSaved={marketSaved}
-            onCreated={setSelected}
-            onError={report}
-          />
-        </section>
-        <section className="panel preview"><PreviewPanel lot={lot} market={market} /></section>
-      </main>
-    </>
-  );
-};
-
 export const BrandTool: React.FC = () => {
-  const {config, markets, brand, setBrand, brandSaved, report} = useConfig();
+  const {config, profile, brand, setBrand, brandSaved, report} = useConfig();
   const lot = usePreviewLot();
-  const market = markets.find((m) => m.id === (lot?.market ?? config.defaultMarket)) ?? markets[0];
+  // Превью рекламы берёт данные из профиля — через тот же мост, что и рендер
+  const market = {...(marketFromProfile(profile, config.copy) as Market), id: profile.id};
   // Образец по умолчанию: на нём все настройки видны разом, а в ролике акцент мелькает
   // на второй секунде, плашка на седьмой — подбирать цвета по нему мучительно
   const [mode, setMode] = useState<'sampler' | 'ad'>('sampler');

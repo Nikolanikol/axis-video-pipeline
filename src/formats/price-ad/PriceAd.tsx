@@ -129,7 +129,29 @@ const Cta: React.FC<{ad: Ad}> = ({ad}) => {
   );
 };
 
-const SCENES: Record<string, React.FC<{ad: Ad}>> = {hook: Hook, specs: Specs, price: Route, cta: Cta};
+// Сцена цены для внутреннего рынка: без маршрута и порта — просто цена.
+// Маршрут «до порта» имеет смысл только при экспорте; на своём рынке машина уже на месте,
+// и дуга Инчон→порт была бы ложью. Фон и водяной знак те же, что у Route, чтобы монтаж
+// не дёргался при смене режима.
+const PriceOnly: React.FC<{ad: Ad}> = ({ad}) => {
+  const C = useTheme();
+  return (
+    <AbsoluteFill style={{background: `radial-gradient(ellipse at 50% 30%, ${C.panel} 0%, ${C.bg} 65%)`}}>
+      <AbsoluteFill style={{alignItems: 'center', top: 330, opacity: 0.06}}>
+        <Img src={useAsset('sign')} style={{width: 760}} />
+      </AbsoluteFill>
+      {/* Цена раньше, чем в Route: там её ждала анимация дуги, здесь дуги нет */}
+      <PriceTag ad={ad} delay={10} />
+      <TopLogo scrim={false} />
+    </AbsoluteFill>
+  );
+};
+
+// Ценовая сцена выбирается по модели профиля: экспорт — маршрут «до порта», внутренний — просто цена.
+const PriceScene: React.FC<{ad: Ad}> = (props) =>
+  props.ad.pricingMode === 'domestic' ? <PriceOnly {...props} /> : <Route {...props} />;
+
+const SCENES: Record<string, React.FC<{ad: Ad}>> = {hook: Hook, specs: Specs, price: PriceScene, cta: Cta};
 
 export const PriceAd: React.FC<AdProps> = (props) => {
   const ad = resolveAd(props);
