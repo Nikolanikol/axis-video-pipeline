@@ -4,7 +4,7 @@ import path from 'node:path';
 import {bundle} from '@remotion/bundler';
 import {makeCancelSignal, openBrowser, renderMedia, renderStill, selectComposition} from '@remotion/renderer';
 import sharp from 'sharp';
-import {HttpError, RENDERS_DIR, ROOT, readJson, writeJson} from './store.mjs';
+import {HttpError, RENDERS_DIR, ROOT, checkId, readJson, writeJson} from './store.mjs';
 const browserExecutable = process.env.CHROME_PATH || null;
 const concurrency = process.env.RENDER_CONCURRENCY ? Number(process.env.RENDER_CONCURRENCY) : null;
 const crf = Number(process.env.RENDER_CRF || 20);
@@ -41,7 +41,8 @@ const queue = [];
 const ACTIVE = new Set(['queued', 'running']);
 let running = false;
 
-const publicJob = ({input, ...job}) => job;
+// input — сырые props, _cancel — функция отмены живого рендера: наружу их не отдаём
+const publicJob = ({input, _cancel, ...job}) => job;
 const metaFile = (id) => path.join(RENDERS_DIR, `${id}.json`);
 
 // Задание рендера:
@@ -82,10 +83,16 @@ const pump = async () => {
     job.status = 'done';
     job.stage = 'Готово';
   } catch (e) {
-    job.status = 'error';
-    job.stage = 'Ошибка';
-    job.error = String(e?.message || e);
-    console.error(`Рендер ${job.id}:`, e);
+    if (job.cancelled) {
+      // Отменён пользователем — это не ошибка, и пугать «Ошибкой» в истории не надо
+      job.status = 'cancelled';
+      job.stage = 'Отменён';
+    } else {
+      job.status = 'error';
+      job.stage = 'Ошибка';
+      job.error = String(e?.message || e);
+      console.error(`Рендер ${job.id}:`, e);
+    }
   } finally {
     job.finishedAt = new Date().toISOString();
     await writeJson(metaFile(job.id), publicJob(job)).catch((e) => console.error(e));
@@ -102,6 +109,8 @@ const STALL_MS = Number(process.env.RENDER_STALL_MS || 10 * 60 * 1000);
 const run = async (job) => {
   let browser = null;
   const {cancelSignal, cancel} = makeCancelSignal();
+  // Отмена снаружи (кнопка «Отменить») дёргает ту же ручку, что и сторож по застою
+  job._cancel = cancel;
   let stop;
   const stalled = new Promise((_, reject) => { stop = reject; });
   let mark = {progress: -1, stage: '', at: Date.now()};
@@ -165,6 +174,52 @@ const run = async (job) => {
 export const getJob = async (id) => {
   const job = jobs.get(id);
   return job ? publicJob(job) : readJson(metaFile(id));
+};
+
+// Отмена задания в очереди или в работе. Готовые/ошибочные отменять нечего.
+export const cancelJob = async (id) => {
+  const job = jobs.get(id);
+  if (!job || !ACTIVE.has(job.status)) throw new HttpError(409, 'Этот ролик уже не в очереди и не в работе');
+  job.cancelled = true;
+  if (job.status === 'queued') {
+    // Из очереди просто вынимаем — до рендера дело не дойдёт
+    const i = queue.indexOf(job);
+    if (i >= 0) queue.splice(i, 1);
+    job.status = 'cancelled';
+    job.stage = 'Отменён';
+    job.finishedAt = new Date().toISOString();
+    await writeJson(metaFile(job.id), publicJob(job)).catch(() => {});
+  } else {
+    // Живой рендер: дёргаем cancelSignal, дальше run() упадёт, а pump() пометит «Отменён»
+    job._cancel?.();
+  }
+  return publicJob(job);
+};
+
+// Пересобрать: то же задание заново, с теми же props. Работает, пока исходные данные ещё
+// в памяти; после перезапуска сервера их нет — тогда честно просим запустить из лота.
+export const retryJob = async (id) => {
+  const job = jobs.get(id);
+  if (!job?.input) throw new HttpError(409, 'Исходные данные этого ролика уже не в памяти — запусти рендер заново из лота или обзора');
+  return enqueue({
+    owner: job.lotId ? {lotId: job.lotId} : {reviewId: job.reviewId},
+    composition: job.format, compositionTitle: job.formatTitle, title: job.title,
+    frames: job.frames, inputProps: job.input,
+  });
+};
+
+// Удаление из истории вместе с файлами. Идущий рендер сначала отмени — так не бывает гонки
+// «удаляем файл, который прямо сейчас пишется».
+export const deleteJob = async (id) => {
+  checkId(id);
+  const job = jobs.get(id);
+  if (job && ACTIVE.has(job.status)) throw new HttpError(409, 'Сначала отмени рендер, потом удаляй');
+  jobs.delete(id);
+  // -silent.mp4 — от прежней «версии без звука»: могло остаться на диске у старых роликов
+  for (const suffix of ['.mp4', '.jpg', '.json', '-silent.mp4']) {
+    await fs.rm(path.join(RENDERS_DIR, `${id}${suffix}`), {force: true}).catch(() => {});
+  }
+  return {id, deleted: true};
 };
 
 // История: завершённые с диска + текущие из памяти, новые сверху. filter — {lotId} или {reviewId}.

@@ -38,6 +38,17 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
     } catch (e) { onError(e); } finally { setStarting(false); }
   };
 
+  // Управление роликом в истории: отменить идущий, пересобрать заново, удалить из списка
+  const cancel = async (id: string) => {
+    try { await api.cancelRender(id); refresh(); } catch (e) { onError(e); }
+  };
+  const retry = async (id: string) => {
+    try { const job = await api.retryRender(id); setJobs((js) => [job, ...js]); } catch (e) { onError(e); }
+  };
+  const remove = async (id: string) => {
+    try { await api.deleteRender(id); setJobs((js) => js.filter((j) => j.id !== id)); } catch (e) { onError(e); }
+  };
+
   return (
     <div className="render">
       {/* Пока задание в очереди или считается — кнопка закрыта: рендер обзора занимает четверть
@@ -62,14 +73,26 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
             : <div className="bar"><div style={{width: `${j.progress}%`}} /></div>)}
           {j.status === 'error' && <div className="job-message">{j.error}</div>}
           {j.status === 'done' && (
-            <>
-              <a href={j.storyboard} target="_blank" rel="noreferrer"><img className="storyboard" src={j.storyboard} alt="Раскадровка" /></a>
-              <div className="job-actions">
+            <a href={j.storyboard} target="_blank" rel="noreferrer"><img className="storyboard" src={j.storyboard} alt="Раскадровка" /></a>
+          )}
+          {/* Кнопки управления есть всегда, только разные по состоянию:
+              в очереди/работе — отменить; готовый — скачать/смотреть/пересобрать/удалить;
+              ошибка или отменён — пересобрать/удалить */}
+          <div className="job-actions">
+            {active(j) && <button className="btn ghost" onClick={() => cancel(j.id)}>Отменить</button>}
+            {j.status === 'done' && (
+              <>
                 <a className="btn primary" href={`/api/renders/${j.id}/download`}>Скачать mp4</a>
                 <a className="btn ghost" href={j.video} target="_blank" rel="noreferrer">Смотреть</a>
-              </div>
-            </>
-          )}
+              </>
+            )}
+            {(j.status === 'done' || j.status === 'error' || j.status === 'cancelled') && (
+              <>
+                <button className="btn" onClick={() => retry(j.id)}>Пересобрать</button>
+                <button className="btn ghost" onClick={() => remove(j.id)}>Удалить</button>
+              </>
+            )}
+          </div>
         </div>
       ))}
     </div>

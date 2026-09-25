@@ -12,7 +12,7 @@ import {
 import {reviewStoryboard} from '../src/shared/timeline.js';
 import {getFormat, listFormats, storyboardFrames} from './formats.mjs';
 import {addPhoto, applyBlur, photoInfo, removePhoto} from './photos.mjs';
-import {enqueue, getJob, listJobs} from './renderer.mjs';
+import {cancelJob, deleteJob, enqueue, getJob, listJobs, retryJob} from './renderer.mjs';
 import {
   UPLOAD_TMP, ambienceReview, createReview, getReview, ingestSource, listReviews, rebuildLines, reprocessSource,
   transcribeReview, updateReview, voiceRegistry, voiceReview,
@@ -266,6 +266,9 @@ export const createApp = ({photoOrigin}) => {
     reviewId: req.query.review ? checkId(req.query.review) : undefined,
   })));
   api.get('/renders/:id', wrap((req) => getJob(checkId(req.params.id))));
+  api.post('/renders/:id/cancel', wrap((req) => cancelJob(checkId(req.params.id))));
+  api.post('/renders/:id/retry', wrap((req) => retryJob(checkId(req.params.id))));
+  api.delete('/renders/:id', wrap((req) => deleteJob(checkId(req.params.id))));
   api.get('/renders/:id/download', async (req, res, next) => {
     try {
       const job = await getJob(checkId(req.params.id));

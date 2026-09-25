@@ -28,7 +28,7 @@ export type CarouselEntry = {id: string; car: CarouselCar; slides: string[]; upd
 export type JobQuery = {lot?: string; review?: string};
 export type Job = {
   id: string; lotId?: string; reviewId?: string; title: string; format: string; formatTitle: string;
-  status: 'queued' | 'running' | 'done' | 'error';
+  status: 'queued' | 'running' | 'done' | 'error' | 'cancelled';
   stage: string; progress: number; createdAt: string; finishedAt?: string; error?: string;
   video: string; storyboard: string;
 };
@@ -67,6 +67,9 @@ export const api = {
   render: (id: string, format: string) =>
     request<Job>('POST', `/api/lots/${id}/render`, {format}),
   jobs: (q: JobQuery) => request<Job[]>('GET', `/api/renders?${new URLSearchParams(q as Record<string, string>)}`),
+  cancelRender: (id: string) => request<Job>('POST', `/api/renders/${id}/cancel`),
+  retryRender: (id: string) => request<Job>('POST', `/api/renders/${id}/retry`),
+  deleteRender: (id: string) => request<{id: string; deleted: boolean}>('DELETE', `/api/renders/${id}`),
   reviews: () => request<ReviewEntry[]>('GET', '/api/reviews'),
   review: (id: string) => request<ReviewEntry>('GET', `/api/reviews/${id}`),
   createReview: (data: {lotId?: string | null; title?: string}) => request<ReviewEntry>('POST', '/api/reviews', data),
