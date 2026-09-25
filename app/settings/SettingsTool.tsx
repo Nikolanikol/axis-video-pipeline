@@ -1,6 +1,7 @@
-// Раздел «Настройки»: рынки и бренд. Справа — живое превью последнего открытого лота.
+// Раздел «Настройки»: профиль, бренд, рынки. Справа — живое превью последнего открытого лота.
 import React, {useEffect, useState} from 'react';
 import {getFormat} from '../../src/shared/model';
+import {marketFromProfile} from '../../src/shared/profile';
 import type {Market} from '../../src/shared/types';
 import {lotTitle} from '../ads/LotTool';
 import {api, LotEntry, MarketEntry} from '../api';
@@ -9,7 +10,7 @@ import {Player} from '@remotion/player';
 import {BrandPreview} from '../../src/brand/BrandPreview';
 import {Preview} from '../Preview';
 import {href, lastLot} from '../router';
-import {BrandForm, MarketForm} from '../SettingsForms';
+import {BrandForm, MarketForm, ProfileForm} from '../SettingsForms';
 
 const usePreviewLot = () => {
   const {report} = useConfig();
@@ -32,6 +33,23 @@ const PreviewPanel: React.FC<{lot: LotEntry | null | undefined; market: MarketEn
       </div>
       <Preview input={{lot: {...lot, market: market.id}, market: market as Market, theme: brand}} format={format} />
     </>
+  );
+};
+
+export const ProfileTool: React.FC = () => {
+  const {config, profile, setProfile, profileSaved, report} = useConfig();
+  const lot = usePreviewLot();
+  // Превью считается из профиля клиентски — через тот же мост, что стадия 4 включит в рендере.
+  // Так правки профиля видны сразу, ещё до того как их начнёт читать сам ролик.
+  const savedProfile = config.profiles.find((p) => p.id === profile.id);
+  const market = marketFromProfile(profile, config.copy) as Market;
+  return (
+    <main className="grid grid-settings">
+      <section className="panel editor">
+        <ProfileForm profile={profile} saved={savedProfile} onChange={setProfile} onSaved={profileSaved} onError={report} />
+      </section>
+      <section className="panel preview"><PreviewPanel lot={lot} market={{...market, id: profile.id}} /></section>
+    </main>
   );
 };
 

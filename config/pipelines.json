@@ -45,15 +45,21 @@
     "kind": "settings",
     "tools": [
       {
-        "id": "markets",
-        "title": "Рынки",
-        "description": "Порт, фрахт, контакты, тексты роликов, музыка по умолчанию",
+        "id": "profile",
+        "title": "Профиль",
+        "description": "Компания, язык, модель цены (экспорт/внутренний), контакты",
         "status": "ready"
       },
       {
         "id": "brand",
         "title": "Бренд",
         "description": "Имя, цвета, шрифты и логотип",
+        "status": "ready"
+      },
+      {
+        "id": "markets",
+        "title": "Рынки",
+        "description": "Устаревшее: заменяется профилем, пока читается пайплайнами",
         "status": "ready"
       }
     ]

@@ -1,8 +1,9 @@
-// Формы настроек: рынок (порт, фрахт, контакты, тексты форматов) и цвета бренда.
+// Формы настроек: профиль клиента (компания, язык, модель цены, контакты), рынок и бренд.
 import React, {useEffect, useRef, useState} from 'react';
 import {FORMATS} from '../src/shared/model';
-import type {Market, Theme} from '../src/shared/types';
-import {api, FontPair, MarketEntry} from './api';
+import {TARGET_LANGUAGES} from '../src/shared/languages';
+import type {Market, Profile, Theme} from '../src/shared/types';
+import {api, FontPair, MarketEntry, ProfileEntry} from './api';
 import {Field} from './LotForm';
 import {MusicFields} from './MusicFields';
 
@@ -282,6 +283,108 @@ export const BrandForm: React.FC<BrandProps> = ({theme, saved, pairs, onChange, 
       <div className="actions">
         <button className="btn primary" disabled={!dirty || busy} onClick={persist}>Сохранить</button>
         <button className="btn" disabled={!dirty || busy} onClick={() => onChange(saved)}>Отменить правки</button>
+      </div>
+    </div>
+  );
+};
+
+type ProfileProps = {
+  profile: ProfileEntry;
+  saved?: ProfileEntry;
+  onChange: (p: ProfileEntry) => void;
+  onSaved: (p: ProfileEntry) => void;
+  onError: (e: unknown) => void;
+};
+
+// Значения по умолчанию для блока экспорта: подставляем, когда клиент впервые переключается
+// на экспорт с пустого профиля, чтобы поля не были undefined
+const EXPORT_DEFAULTS = {origin: '', originCountry: '', port: '', portCountry: '', freight: 0};
+
+/**
+ * Профиль клиента — «пара кнопок»: кто он, на каком языке и по какой модели продаёт.
+ *
+ * Тексты постов здесь НЕ правятся: они приходят из дефолтов платформы под язык и режим
+ * (config/copy.json). Клиент задаёт только своё — в этом смысл «пришёл и работает».
+ * Переключатель модели цены прячет поля порта и фрахта на внутреннем рынке: там их нет.
+ */
+export const ProfileForm: React.FC<ProfileProps> = ({profile, saved, onChange, onSaved, onError}) => {
+  const [busy, setBusy] = useState(false);
+  const dirty = profile !== saved;
+  const set = (patch: Partial<Profile>) => onChange({...profile, ...patch});
+  const setPricing = (patch: Partial<Profile['pricing']>) => set({pricing: {...profile.pricing, ...patch}});
+  const setExport = (patch: Partial<NonNullable<Profile['pricing']['export']>>) =>
+    setPricing({export: {...EXPORT_DEFAULTS, ...profile.pricing.export, ...patch}});
+  const setContacts = (patch: Partial<Profile['contacts']>) => set({contacts: {...profile.contacts, ...patch}});
+  const isExport = profile.pricing.mode !== 'domestic';
+
+  const persist = async () => {
+    setBusy(true);
+    const {id, ...data} = profile;
+    try { onSaved(await api.saveProfile(id, data)); } catch (e) { onError(e); } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="form">
+      <h2>Профиль <span className="muted">кто вы и как продаёте</span></h2>
+      <p className="note">Тексты постов подставляются сами под язык и модель цены — их править не нужно. Дизайн — в разделе «Бренд».</p>
+
+      <div className="row">
+        <Field label="Компания" hint="печатается на постах"><input value={profile.company} onChange={(e) => set({company: e.target.value})} /></Field>
+        <Field label="Язык постов">
+          <select value={profile.language} onChange={(e) => set({language: e.target.value})}>
+            {TARGET_LANGUAGES.map((l) => <option key={l.code} value={l.code}>{l.name} ({l.code})</option>)}
+          </select>
+        </Field>
+      </div>
+
+      <h2>Модель цены</h2>
+      <div className="switch-row">
+        <span className="switch-label">Режим</span>
+        <div className="btn-row">
+          <button type="button" className={`btn ${isExport ? 'primary' : 'ghost'}`}
+            onClick={() => setPricing({mode: 'export', export: {...EXPORT_DEFAULTS, ...profile.pricing.export}})}>Экспорт</button>
+          <button type="button" className={`btn ${isExport ? 'ghost' : 'primary'}`}
+            onClick={() => setPricing({mode: 'domestic'})}>Внутренний рынок</button>
+        </div>
+      </div>
+      <p className="hint">
+        {isExport
+          ? 'Экспорт: цена = авто + фрахт, на постах маршрут и «цена до порта».'
+          : 'Внутренний рынок: цена как есть, без порта и фрахта.'}
+      </p>
+
+      <div className="row">
+        <Field label="Валюта"><input value={profile.pricing.currency} onChange={(e) => setPricing({currency: e.target.value.toUpperCase()})} /></Field>
+        {isExport && <Field label="Фрахт, $"><input inputMode="decimal" value={profile.pricing.export?.freight ?? 0}
+          onChange={(e) => setExport({freight: Number(e.target.value) || 0})} /></Field>}
+      </div>
+      {isExport && (
+        <>
+          <div className="row">
+            <Field label="Откуда"><input value={profile.pricing.export?.origin ?? ''} onChange={(e) => setExport({origin: e.target.value})} /></Field>
+            <Field label="Страна отправки"><input value={profile.pricing.export?.originCountry ?? ''} onChange={(e) => setExport({originCountry: e.target.value})} /></Field>
+          </div>
+          <div className="row">
+            <Field label="Порт назначения"><input value={profile.pricing.export?.port ?? ''} onChange={(e) => setExport({port: e.target.value})} /></Field>
+            <Field label="Страна порта"><input value={profile.pricing.export?.portCountry ?? ''} onChange={(e) => setExport({portCountry: e.target.value})} /></Field>
+          </div>
+        </>
+      )}
+
+      <h2>Контакты</h2>
+      <div className="row">
+        <Field label="WhatsApp" hint="пусто — не показывать">
+          <input value={profile.contacts.whatsapp ?? ''} onChange={(e) => setContacts({whatsapp: e.target.value || null})} />
+        </Field>
+        <Field label="Сайт"><input value={profile.contacts.site} onChange={(e) => setContacts({site: e.target.value})} /></Field>
+      </div>
+
+      <h2>Музыка по умолчанию</h2>
+      <MusicFields value={profile.music ?? {track: null}} onChange={(music) => set({music: music ?? {track: null}})} />
+
+      <div className="actions">
+        <button className="btn primary" disabled={!dirty || busy} onClick={persist}>Сохранить</button>
+        <button className="btn" disabled={!dirty || busy || !saved} onClick={() => saved && onChange(saved)}>Отменить правки</button>
       </div>
     </div>
   );

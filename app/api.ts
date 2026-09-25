@@ -1,7 +1,10 @@
 // Клиент API сервера: лоты, фото, обзоры, речь, озвучка, рендеры. Типы ответов — общие с сервером.
-import type {CarouselCar, FormatMeta, Lot, Market, Review, Theme} from '../src/shared/types';
+import type {CarouselCar, FormatMeta, Lot, Market, Profile, Review, Texts, Theme} from '../src/shared/types';
 
 export type MarketEntry = Market & {id: string};
+export type ProfileEntry = Profile & {id: string};
+// Дефолты текстов платформы: режим цены → язык → тексты. Клиент их не пишет, только читает
+export type Copy = Record<string, Record<string, Texts>>;
 // Размытие: [x, y, w, h] в долях кадра, по «стволу» имени файла фото
 export type Region = [number, number, number, number];
 export type LotEntry = Lot & {id: string; updatedAt?: string; note?: string; blur?: Record<string, Region[]>};
@@ -10,6 +13,8 @@ export type PhotoInfo = {path: string; source: string; regions: Region[]};
 export type FontPair = {id: string; title: string; note: string; head: string; body: string; url: string};
 export type Config = {
   brand: Theme; markets: MarketEntry[]; defaultMarket: string; formats: FormatMeta[]; pipelines: unknown[];
+  // Профили клиента идут на смену рынкам; copy — дефолты текстов платформы
+  profiles: ProfileEntry[]; defaultProfile: string; copy: Copy;
   // Боевой запуск (NODE_ENV=production). Интерфейс по нему прячет пайплайн обзоров
   production: boolean;
   fonts: FontPair[];
@@ -44,6 +49,7 @@ export const api = {
   config: () => request<Config>('GET', '/api/config'),
   saveBrand: (theme: Theme) => request<Theme>('PUT', '/api/brand', theme),
   saveMarket: (id: string, market: Market) => request<MarketEntry>('PUT', `/api/markets/${id}`, market),
+  saveProfile: (id: string, profile: Profile) => request<ProfileEntry>('PUT', `/api/profiles/${id}`, profile),
   lots: () => request<LotEntry[]>('GET', '/api/lots'),
   createLot: (data: Partial<Lot>) => request<LotEntry>('POST', '/api/lots', data),
   saveLot: (lot: LotEntry) => request<LotEntry>('PUT', `/api/lots/${lot.id}`, lot),
