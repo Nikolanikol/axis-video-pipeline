@@ -1,0 +1,24 @@
+{
+  "company": "K-AXIS MOTORS",
+  "language": "mk",
+  "contacts": {
+    "whatsapp": "+82 10 5865 4344",
+    "site": "kmotors.shop"
+  },
+  "pricing": {
+    "mode": "export",
+    "currency": "USD",
+    "export": {
+      "origin": "Инчон",
+      "originCountry": "Кореја",
+      "port": "Драч",
+      "portCountry": "Албанија",
+      "freight": 1500
+    }
+  },
+  "music": {
+    "track": "eleven-balkan-trap",
+    "volume": 0.8
+  },
+  "texts": {}
+}

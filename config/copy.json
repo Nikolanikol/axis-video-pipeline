@@ -1,0 +1,46 @@
+{
+  "export": {
+    "mk": {
+      "hookTagline": "From Korea",
+      "priceLabel": "Цена до {port}",
+      "priceNoteIncluded": "Поморскиот транспорт е вклучен.",
+      "priceNoteExcluded": "Царинските давачки не се вклучени.",
+      "ctaTitle": "Пресметка\nдо клуч",
+      "ctaAccent": "in 24 hours",
+      "ctaBenefit": "Работиме без провизија",
+      "whatsappLabel": "WhatsApp"
+    },
+    "en": {
+      "hookTagline": "From Korea",
+      "priceLabel": "Landed price to {port}",
+      "priceNoteIncluded": "Sea freight included.",
+      "priceNoteExcluded": "Customs duties not included.",
+      "ctaTitle": "Full quote\nin 24 hours",
+      "ctaAccent": "in 24 hours",
+      "ctaBenefit": "We work commission-free",
+      "whatsappLabel": "WhatsApp"
+    }
+  },
+  "domestic": {
+    "en": {
+      "hookTagline": "In stock now",
+      "priceLabel": "Price",
+      "priceNoteIncluded": "",
+      "priceNoteExcluded": "",
+      "ctaTitle": "Book a\ntest drive",
+      "ctaAccent": "today",
+      "ctaBenefit": "No pressure, just cars",
+      "whatsappLabel": "WhatsApp"
+    },
+    "ru": {
+      "hookTagline": "В наличии",
+      "priceLabel": "Цена",
+      "priceNoteIncluded": "",
+      "priceNoteExcluded": "",
+      "ctaTitle": "Запишись на\nтест-драйв",
+      "ctaAccent": "сегодня",
+      "ctaBenefit": "Без навязывания",
+      "whatsappLabel": "WhatsApp"
+    }
+  }
+}

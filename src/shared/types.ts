@@ -23,6 +23,26 @@ export type Market = {
   music?: Music;
 };
 
+// Профиль клиента: config/profiles/<id>.json. Приходит на смену «рынку» — см. src/shared/profile.js.
+// Две модели цены: export (авто из-за рубежа, цена = авто + фрахт, маршрут и «до порта»)
+// и domestic (продажа на своём рынке, цена как есть). Тексты пусты — берутся из дефолтов платформы.
+export type PricingMode = 'export' | 'domestic';
+export type Pricing = {
+  mode: PricingMode;
+  currency: string;
+  // Нужен только при mode === 'export'
+  export?: {origin: string; originCountry: string; port: string; portCountry: string; freight: number};
+};
+export type Profile = {
+  company: string;
+  language: string;
+  contacts: {whatsapp: string | null; site: string};
+  pricing: Pricing;
+  music?: Music;
+  // Правки текстов поверх дефолтов платформы; пусто — всё из дефолтов
+  texts?: Partial<Texts>;
+};
+
 // Лот — данные об авто. Любое поле рынка можно переопределить (например, whatsapp: null — скрыть номер).
 export type Lot = Partial<Omit<Market, 'texts'>> & {
   market?: string;
