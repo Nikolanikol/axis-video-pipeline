@@ -42,7 +42,6 @@ export type Profile = {
   language: string;
   contacts: {whatsapp: string | null; site: string};
   pricing: Pricing;
-  music?: Music;
   // Правки текстов поверх дефолтов платформы; пусто — всё из дефолтов
   texts?: Partial<Texts>;
 };

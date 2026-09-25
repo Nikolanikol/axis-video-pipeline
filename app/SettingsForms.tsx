@@ -4,7 +4,6 @@ import {TARGET_LANGUAGES} from '../src/shared/languages';
 import type {Profile, Theme} from '../src/shared/types';
 import {api, FontPair, ProfileEntry} from './api';
 import {Field} from './LotForm';
-import {MusicFields} from './MusicFields';
 
 
 // Только цветовые поля темы: в ней теперь есть ещё имя, шрифты и файлы бренда,
@@ -292,9 +291,6 @@ export const ProfileForm: React.FC<ProfileProps> = ({profile, saved, onChange, o
         </Field>
         <Field label="Сайт"><input value={profile.contacts.site} onChange={(e) => setContacts({site: e.target.value})} /></Field>
       </div>
-
-      <h2>Музыка по умолчанию</h2>
-      <MusicFields value={profile.music ?? {track: null}} onChange={(music) => set({music: music ?? {track: null}})} />
 
       <div className="actions">
         <button className="btn primary" disabled={!dirty || busy} onClick={persist}>Сохранить</button>

@@ -57,10 +57,19 @@ describe('resolveTexts', () => {
   });
 });
 
+// Явный профиль для тестов: default.json правит пользователь (режим, язык), и завязываться
+// на его текущее содержимое нельзя — тесты стали бы падать от смены настроек в интерфейсе.
+const exportProfile = () => ({
+  company: 'K-AXIS MOTORS', language: 'mk',
+  contacts: {whatsapp: '+82 10 5865 4344', site: 'kmotors.shop'},
+  pricing: {mode: 'export', currency: 'USD',
+    export: {origin: 'Инчон', originCountry: 'Кореја', port: 'Драч', portCountry: 'Албанија', freight: 1500}},
+  texts: {},
+});
+
 describe('resolveProfile', () => {
   it('возвращает профиль с уже полными текстами', () => {
-    const profile = JSON.parse(fs.readFileSync(path.join(ROOT, 'config/profiles/default.json'), 'utf8'));
-    const resolved = resolveProfile(profile, copy);
+    const resolved = resolveProfile(exportProfile(), copy);
     expect(resolved.company).toBe('K-AXIS MOTORS');
     expect(resolved.texts.priceLabel).toBe('Цена до {port}');
     expect(resolved.texts.whatsappLabel).toBe('WhatsApp');
@@ -95,7 +104,7 @@ describe('priceView — модель цены', () => {
 });
 
 describe('marketFromProfile — мост под старые пайплайны', () => {
-  const profile = () => JSON.parse(fs.readFileSync(path.join(ROOT, 'config/profiles/default.json'), 'utf8'));
+  const profile = exportProfile;
 
   it('экспорт: маршрут, фрахт и тексты на месте, имя = компания', () => {
     const m = marketFromProfile(profile(), copy);

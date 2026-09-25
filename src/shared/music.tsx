@@ -14,11 +14,15 @@ const FADE_OUT = 30;
 export const tempoRate = (trackBpm: number, formatBpm: number) => formatBpm / trackBpm;
 
 // Музыка на весь ролик: плавно входит и затухает к концу, темп подогнан под формат
-export const BackgroundMusic: React.FC<{music: Music; bpm: number}> = ({music, bpm}) => {
+export const BackgroundMusic: React.FC<{music?: Music; bpm: number}> = ({music, bpm}) => {
   const {fps, durationInFrames} = useVideoConfig();
-  const track = findTrack(music.track);
+  // Музыка убрана из настроек (авторские права), поэтому трека обычно нет — тогда просто
+  // ничего не рисуем. Беззвучную дорожку в mp4 добавляет сам рендер (enforceAudioTrack),
+  // так что ролик без музыки всё равно не превращается в GIF. Механизм оставлен на случай,
+  // если появится лицензионная музыка.
+  const track = findTrack(music?.track);
   if (!track) return null;
-  const v = Math.min(1, Math.max(0, music.volume ?? 0.8)) * track.gain;
+  const v = Math.min(1, Math.max(0, music?.volume ?? 0.8)) * track.gain;
   const rate = tempoRate(track.bpm, bpm);
   return (
     <Audio

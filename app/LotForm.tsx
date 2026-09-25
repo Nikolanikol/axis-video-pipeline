@@ -5,7 +5,6 @@ import {fmt, priceUsd} from '../src/shared/model';
 import type {FormatMeta, Market} from '../src/shared/types';
 import {api, LotEntry} from './api';
 import {BlurEditor} from './BlurEditor';
-import {MusicFields} from './MusicFields';
 
 type Props = {
   lot: LotEntry;
@@ -80,9 +79,6 @@ export const LotForm: React.FC<Props> = ({lot, market, format, onChange, onPhoto
 
       <h2>Фото <span className="muted">перетаскивай, чтобы поменять порядок</span></h2>
       <Photos lot={lot} roles={format.photoRoles} onChange={onChange} onPhotos={onPhotos} onError={onError} />
-
-      <h2>Музыка</h2>
-      <MusicFields value={lot.music} inherited={market.music ?? {track: null}} onChange={(music) => onChange({music})} />
 
       <Field label="Заметка" hint="в ролик не попадает" wide>
         <textarea rows={2} value={lot.note ?? ''} placeholder="источник, пометки: аукцион, номер лота, «демо»…"
