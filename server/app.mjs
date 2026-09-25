@@ -20,7 +20,7 @@ import {
 import {apiSettings, resolveSpeaker, voiceConfig} from '../src/shared/voices.js';
 import {hasKey, hasVoice, synthesize} from './speech.mjs';
 import {hasSeparator} from './ambience.mjs';
-import {CAROUSELS_DIR, buildCarousel, listCarousels, slideFileName} from './carousel.mjs';
+import {CAROUSELS_DIR, buildCarousel, deleteCarousel, listCarousels, slideFileName} from './carousel.mjs';
 import {LOGO_RULES, saveLogo} from './brand.mjs';
 
 // Медиа с путями /data/... браузер рендера берёт по полному адресу этого сервера
@@ -250,6 +250,7 @@ export const createApp = ({photoOrigin}) => {
   // секунды, отдельная очередь как у видео тут была бы лишней сложностью.
   api.post('/carousels', wrap((req) => buildCarousel(req.body?.link)));
   api.get('/carousels', wrap(() => listCarousels()));
+  api.delete('/carousels/:id', wrap((req) => deleteCarousel(checkId(req.params.id))));
   api.get('/carousels/:id/slide/:n/download', async (req, res, next) => {
     try {
       const id = checkId(req.params.id);

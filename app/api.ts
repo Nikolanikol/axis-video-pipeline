@@ -86,6 +86,7 @@ export const api = {
   },
   buildCarousel: (link: string) => request<CarouselEntry>('POST', '/api/carousels', {link}),
   carousels: () => request<CarouselEntry[]>('GET', '/api/carousels'),
+  deleteCarousel: (id: string) => request<{id: string; deleted: boolean}>('DELETE', `/api/carousels/${id}`),
   renderReview: (id: string) => request<Job>('POST', `/api/reviews/${id}/render`, {}),
   reprocessVideo: (id: string) => request<ReviewEntry>('POST', `/api/reviews/${id}/reprocess`),
   transcribe: (id: string) => request<ReviewEntry>('POST', `/api/reviews/${id}/transcribe`),

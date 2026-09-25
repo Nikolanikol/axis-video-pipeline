@@ -150,8 +150,9 @@ input:disabled { opacity: .5; }
 @keyframes bar-wait { from { margin-left: -35%; } to { margin-left: 100%; } }
 @media (prefers-reduced-motion: reduce) { .bar.wait div { animation: none; width: 100%; opacity: .5; } }
 .storyboard { width: 100%; border-radius: 4px; display: block; margin: 4px 0 8px; }
-.job-actions { display: flex; gap: 8px; }
-.job-actions .btn { flex: 1; }
+.job-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+/* min-width + перенос: на узкой панели четыре кнопки ложатся в два ряда, а не вылезают за край */
+.job-actions .btn { flex: 1 1 auto; min-width: 96px; text-align: center; white-space: nowrap; }
 
 .blur-btn {
   position: absolute; top: 4px; left: 4px; padding: 3px 7px; border-radius: 4px; border: none;
@@ -378,3 +379,7 @@ a.tab { text-decoration: none; }
 /* Переключатели оформления: подпись слева, кнопки справа */
 .switch-row { display: flex; align-items: center; gap: 14px; margin-bottom: 10px; }
 .switch-label { min-width: 52px; font-size: 13px; opacity: .7; }
+
+/* Список ранее собранных каруселей: широкая кнопка «открыть» + маленькая «удалить» */
+.hist-row { display: flex; gap: 6px; margin-top: 6px; }
+.hist-open { flex: 1; text-align: left; }

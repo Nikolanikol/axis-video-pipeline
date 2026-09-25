@@ -12,7 +12,7 @@ import path from 'node:path';
 import {bundle} from '@remotion/bundler';
 import {openBrowser, renderStill, selectComposition} from '@remotion/renderer';
 import {parseCarLink} from '../src/shared/encarLink.js';
-import {DATA_DIR, HttpError, PRODUCTION, ROOT, getBrand, readJson, renderMarket, writeJson} from './store.mjs';
+import {DATA_DIR, HttpError, PRODUCTION, ROOT, checkId, getBrand, readJson, renderMarket, writeJson} from './store.mjs';
 
 export const CAROUSELS_DIR = path.join(DATA_DIR, 'carousels');
 // Слайд истории убираем на проде, пока страховые случаи не приходят с датацентра
@@ -155,6 +155,14 @@ export const slideFileName = (car, n) => {
   const name = [car?.brand, car?.model].filter(Boolean).join('-').toLowerCase()
     .replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '') || 'car';
   return `${name}-${car?.id ?? '0'}-${n}.png`;
+};
+
+/** Удалить собранную карусель со всеми слайдами. Пересобирать её — тот же buildCarousel по номеру. */
+export const deleteCarousel = async (id) => {
+  checkId(id);
+  if (running.has(id)) throw new HttpError(409, 'Эта карусель сейчас собирается — дождись');
+  await fs.rm(path.join(CAROUSELS_DIR, id), {recursive: true, force: true});
+  return {id, deleted: true};
 };
 
 /** Ранее собранные карусели, новые сверху */

@@ -94,6 +94,28 @@ export const CarouselTool: React.FC = () => {
     } catch (e) { report(e); } finally { setBusy(false); }
   };
 
+  // Пересобрать существующую карусель — тот же сбор по её номеру: свежие данные, тот же брендбук
+  const rebuild = async () => {
+    if (!entry) return;
+    setBusy(true);
+    try {
+      const made = await api.buildCarousel(entry.id);
+      setEntry(made);
+      setHistory((h) => [made, ...h.filter((x) => x.id !== made.id)]);
+    } catch (e) { report(e); } finally { setBusy(false); }
+  };
+
+  const remove = async (id: string) => {
+    try {
+      await api.deleteCarousel(id);
+      setHistory((h) => h.filter((x) => x.id !== id));
+      setEntry((e) => (e?.id === id ? null : e));
+    } catch (e) { report(e); }
+  };
+
+  // Удалили открытую карусель — показываем следующую из истории, а не пустой экран
+  useEffect(() => { if (!entry && history.length) setEntry(history[0]); }, [entry, history]);
+
   // Скачиваем по одному файлу: в Instagram и TikTok слайды всё равно загружаются
   // по отдельности, и архив пришлось бы распаковывать. Пауза между файлами — чтобы
   // браузер не счёл это за лавину загрузок и не отменил половину.
@@ -134,9 +156,11 @@ export const CarouselTool: React.FC = () => {
             <>
               <h2>Машина</h2>
               <CarSummary entry={entry} />
-              <div className="btn-row">
-                <button className="btn primary" onClick={downloadAll}>Скачать все 7</button>
+              <div className="job-actions">
+                <button className="btn primary" onClick={downloadAll} disabled={busy}>Скачать все {entry.slides.length}</button>
                 <a className="btn ghost" href={entry.car.source} target="_blank" rel="noreferrer">Открыть в каталоге</a>
+                <button className="btn" onClick={rebuild} disabled={busy}>Пересобрать</button>
+                <button className="btn ghost" onClick={() => remove(entry.id)} disabled={busy}>Удалить</button>
               </div>
             </>
           )}
@@ -145,10 +169,12 @@ export const CarouselTool: React.FC = () => {
             <>
               <h2>Собранные раньше</h2>
               {history.filter((h) => h.id !== entry?.id).slice(0, 8).map((h) => (
-                <button key={h.id} className="btn ghost" style={{display: 'block', width: '100%', textAlign: 'left'}}
-                  onClick={() => setEntry(h)}>
-                  {[h.car.brand, h.car.model].filter(Boolean).join(' ') || h.id} · № {h.id}
-                </button>
+                <div key={h.id} className="hist-row">
+                  <button className="btn ghost hist-open" onClick={() => setEntry(h)}>
+                    {[h.car.brand, h.car.model].filter(Boolean).join(' ') || h.id} · № {h.id}
+                  </button>
+                  <button className="btn icon" title="Удалить" onClick={() => remove(h.id)}>×</button>
+                </div>
               ))}
             </>
           )}
