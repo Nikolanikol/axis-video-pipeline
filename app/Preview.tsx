@@ -16,6 +16,9 @@ export const Preview: React.FC<{input: AdProps; format: FormatMeta}> = ({input, 
           component={FORMAT_COMPONENTS[format.id]}
           // Превью звучит так же, как рендер: без музыки, что бы ни было сохранено в лоте
           inputProps={{...input, lot: withoutMusic(input.lot)}}
+          // Звуки эффектов накладываются: щелчки характеристик идут через 0,3 с. По умолчанию
+          // проигрыватель держит пять звуков разом и на шестом падает — даём запас
+          numberOfSharedAudioTags={12}
           durationInFrames={format.durationInFrames}
           fps={format.fps}
           compositionWidth={format.width}
