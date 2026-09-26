@@ -22,6 +22,8 @@ export type Config = {
   fonts: FontPair[];
   // ambience — установлено ли локальное окружение для выделения звуков машины (проба)
   features: {speech: boolean; voice: boolean; ambience?: boolean};
+  // Цены генераций в кредитах: {ads, carousels, reviews}
+  credits?: Record<string, number>;
   voices?: import('../src/shared/types').VoiceRegistry;
 };
 export type ReviewEntry = Review & {id: string};
@@ -50,6 +52,10 @@ export type ActivationCode = {
   code: string; plan_id: string; plan_title?: string; days: number; credits: number; note: string; created_at: string;
   activated_at?: string | null; activated_workspace_id?: string | null; workspace_name?: string | null;
 };
+export type LedgerRow = {
+  id: number; delta: number; kind: 'grant' | 'charge' | 'refund' | 'adjust'; pipeline: string | null;
+  job_id: string | null; note: string; created_at: string; period_start: string; period_end: string;
+};
 export type WorkspaceRow = {id: string; name: string; created_at: string; emails: string | null; access: Access};
 
 const request = async <T,>(method: string, url: string, body?: unknown): Promise<T> => {
@@ -73,6 +79,7 @@ export const api = {
     request<{ok: true}>('POST', '/api/auth/register', data),
   logout: () => request<{ok: true}>('POST', '/api/auth/logout'),
   redeem: (code: string) => request<Access>('POST', '/api/account/redeem', {code}),
+  ledger: () => request<LedgerRow[]>('GET', '/api/account/ledger'),
   admin: {
     plans: () => request<Plan[]>('GET', '/api/admin/plans'),
     savePlan: (plan: Plan) => request<Plan>('PUT', `/api/admin/plans/${plan.id}`, plan),

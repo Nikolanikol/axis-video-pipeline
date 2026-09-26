@@ -9,7 +9,7 @@ import React from 'react';
 import {AbsoluteFill, Img, staticFile, useCurrentFrame} from 'remotion';
 import {themeOf} from '../shared/model';
 import type {CarouselProps} from '../shared/types';
-import {BODY, CopperText, HEAD, ThemeProvider, radius, useAsset, useTheme} from '../shared/ui';
+import {BODY, CopperText, HEAD, Logo, ThemeProvider, radius, useAsset, useTheme} from '../shared/ui';
 import {Bullets, NumberCard, PAD, PhotoBand, Row, SAFE, Slide, Title, TOTAL} from './Slides';
 
 export const CAROUSEL_SLIDES = TOTAL;
@@ -253,7 +253,7 @@ const Cta: React.FC<SlideProps> = ({car, market, brandName, index, total}) => {
     <Slide index={index} total={total} brandName={brandName}>
       <AbsoluteFill style={{display: 'flex', flexDirection: 'column', alignItems: 'center',
         justifyContent: 'center', padding: 96}}>
-        <Img src={useAsset('logoStacked')} style={{height: 240}} />
+        <Logo asset="logoStacked" height={240} />
         <div style={{fontFamily: HEAD, fontWeight: 600, fontSize: 72, color: C.white, marginTop: 64,
           textAlign: 'center', lineHeight: 1.2}}>Want this car?</div>
         <div style={{fontFamily: BODY, fontWeight: 500, fontSize: 36, color: C.grey, marginTop: 24,

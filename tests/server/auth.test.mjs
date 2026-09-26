@@ -125,6 +125,8 @@ suite('вход и кабинеты SMMAKER', () => {
     const cfg = (await a.call('GET', '/api/config')).body;
     expect(cfg.profiles[0].contacts.whatsapp).toBe('');
     expect(cfg.brand.name).toBe('Дилер А');
+    // Вместо логотипа AXIS — название компании текстом: логотипы пустые
+    expect(cfg.brand.assets).toMatchObject({logoStacked: '', logoHorizontal: '', sign: ''});
   });
 
   it('код гасится один раз', async () => {
@@ -212,6 +214,74 @@ suite('вход и кабинеты SMMAKER', () => {
     expect(list.find((w) => w.id === wsA)).toMatchObject({name: 'Дилер А', emails: 'a@dealer.test'});
     const used = (await owner.call('GET', '/api/admin/codes')).body.filter((c) => c.activated_at);
     expect(used).toHaveLength(4);
+  });
+
+  describe('кредиты', () => {
+    let billing;
+    let wsB;
+    beforeAll(async () => {
+      billing = await import('../../server/billing.mjs');
+      wsB = (await b.call('GET', '/api/auth/me')).body.workspace.id;
+    });
+    const credits = async () => (await b.call('GET', '/api/auth/me')).body.access.credits;
+
+    it('цены приходят в настройках интерфейса', async () => {
+      expect((await b.call('GET', '/api/config')).body.credits).toEqual({carousels: 1, ads: 3, reviews: 10});
+    });
+
+    it('списание, возврат один раз, закрытие', async () => {
+      expect(await credits()).toBe(30);
+      const r = await billing.charge({workspaceId: wsB, pipeline: 'ads', jobId: 'job-1'});
+      expect(r).toEqual({jobId: 'job-1', cost: 3});
+      expect(await credits()).toBe(27);
+      await billing.refund(r, 'тест');
+      await billing.refund(r, 'тест ещё раз');
+      expect(await credits()).toBe(30);
+      await billing.settle(await billing.charge({workspaceId: wsB, pipeline: 'carousels', jobId: 'job-2'}));
+      expect(await credits()).toBe(29);
+    });
+
+    it('владелец платформы не платит', async () => {
+      expect(await billing.charge({workspaceId: 'k-axis', pipeline: 'ads', jobId: 'job-own', free: true})).toBeNull();
+    });
+
+    it('одновременные запуски не уводят в минус', async () => {
+      // 29 кредитов, ролик — 3: пройдёт ровно 9 из 12, остаток 2
+      const tries = await Promise.allSettled(Array.from({length: 12}, (_, i) =>
+        billing.charge({workspaceId: wsB, pipeline: 'ads', jobId: `race-${i}`})));
+      expect(tries.filter((t) => t.status === 'fulfilled')).toHaveLength(9);
+      expect(tries.filter((t) => t.status === 'rejected').every((t) => t.reason.status === 402)).toBe(true);
+      expect(await credits()).toBe(2);
+    });
+
+    it('не хватает кредитов — рендер не ставится, объяснение человеческое', async () => {
+      const lot = (await b.call('POST', '/api/lots', {})).body;
+      const form = new FormData();
+      const jpg = await sharp({create: {width: 1200, height: 800, channels: 3, background: '#224488'}}).jpeg().toBuffer();
+      form.append('photos', new Blob([jpg], {type: 'image/jpeg'}), 'car.jpg');
+      await b.call('POST', `/api/lots/${lot.id}/photos`, form);
+      const res = await b.call('POST', `/api/lots/${lot.id}/render`, {});
+      expect(res.status).toBe(402);
+      expect(res.body.error).toMatch(/ролик стоит 3 кредита, осталось 2/);
+      expect((await b.call('GET', `/api/renders?lot=${lot.id}`)).body).toEqual([]);
+    });
+
+    it('после перезапуска незакрытые списания возвращаются', async () => {
+      // race-0…8 списаны и не закрыты — как задания, пропавшие с очередью в памяти
+      const n = await billing.refundOrphans({log: () => {}});
+      expect(n).toBe(9);
+      expect(await credits()).toBe(29);
+      expect(await billing.refundOrphans({log: () => {}})).toBe(0);
+    });
+
+    it('журнал в кабинете — построчно, новые сверху', async () => {
+      const rows = (await b.call('GET', '/api/account/ledger')).body;
+      expect(rows[0].kind).toBe('refund');
+      expect(rows.at(-1)).toMatchObject({kind: 'grant', delta: 30});
+      expect(rows.reduce((sum, r) => sum + r.delta, 0)).toBe(29);
+      // Чужой журнал не виден: у дилера А своя компания
+      expect((await owner.call('GET', '/api/account/ledger')).body.some((r) => r.job_id === 'job-1')).toBe(false);
+    });
   });
 
   it('выход закрывает сессию и на сервере', async () => {

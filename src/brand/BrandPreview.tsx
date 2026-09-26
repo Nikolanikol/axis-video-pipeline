@@ -10,7 +10,7 @@ import React from 'react';
 import {AbsoluteFill} from 'remotion';
 import {themeOf} from '../shared/model';
 import type {Theme} from '../shared/types';
-import {BODY, CopperText, HEAD, ThemeProvider, radius, useAsset, useTheme} from '../shared/ui';
+import {BODY, CopperText, HEAD, Logo, ThemeProvider, radius, useAsset, useTheme} from '../shared/ui';
 import {Img} from 'remotion';
 
 const PAD = 96;
@@ -95,7 +95,7 @@ const Sampler: React.FC = () => {
       <div style={{marginTop: 'auto', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between'}}>
         <div>
           <Label>логотип</Label>
-          <Img src={useAsset('logoStacked')} style={{height: 150}} />
+          <Logo asset="logoStacked" height={150} />
         </div>
         {/* Сами цвета плитками: по ним видно, что задано, даже если на образце цвет нигде не виден */}
         <div style={{display: 'flex', gap: 12}}>

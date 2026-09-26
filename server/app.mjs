@@ -22,6 +22,8 @@ import {hasKey, hasVoice, synthesize} from './speech.mjs';
 import {hasSeparator} from './ambience.mjs';
 import {carouselsDir, buildCarousel, deleteCarousel, listCarousels, slideFileName} from './carousel.mjs';
 import {LOGO_RULES, saveLogo} from './brand.mjs';
+import {billed, creditCosts, ledgerOf} from './billing.mjs';
+import {parseCarLink} from '../src/shared/encarLink.js';
 import {
   accessOf, adjustCredits, createCodes, listCodes, listPlans, listWorkspaces, login, redeem, register, savePlan,
   dropSession,
@@ -56,6 +58,8 @@ const wrap = (fn) => (req, res, next) => Promise.resolve().then(() => withWorksp
 // Компания запроса. С входом — только из сессии; без неё — никакой (withWorkspace откажет),
 // а не компания владельца по умолчанию. Без базы вход выключен — компания по умолчанию
 const wsOf = (req) => req.ws ?? (authEnabled() ? null : DEFAULT_WORKSPACE);
+// С кого и за что списать кредиты. Владелец платформы не платит
+const billOf = (req, pipeline) => ({pipeline, userId: req.user?.id ?? null, free: Boolean(req.user?.isAdmin)});
 
 /**
  * Бренд от клиента проверяем: файлы бренда и таблица шрифтов открываются браузером рендера
@@ -67,7 +71,8 @@ const checkBrand = (theme) => {
   if (!theme || typeof theme !== 'object' || Array.isArray(theme)) throw new HttpError(400, 'Бренд — объект настроек');
   const own = `${workspaceUrl()}/brand/`;
   for (const [k, v] of Object.entries(theme.assets ?? {})) {
-    if (typeof v !== 'string' || !(v.startsWith('brand/') || v.startsWith(own))) {
+    // Пустая строка у логотипа — «нет логотипа, пишем название компании»
+    if (typeof v !== 'string' || !(v === '' || v.startsWith('brand/') || v.startsWith(own))) {
       throw new HttpError(400, `Файл бренда «${k}»: только встроенный или загруженный в настройках`);
     }
   }
@@ -154,6 +159,7 @@ export const createApp = ({photoOrigin}) => {
   api.use((req, _res, next) => { try { withWorkspace(wsOf(req), next); } catch (e) { next(e); } });
 
   // ——— Кабинет компании ———
+  api.get('/account/ledger', wrap((req) => (authEnabled() ? ledgerOf(req.ws) : [])));
   api.post('/account/redeem', loginLimiter, wrap(async (req) => {
     if (!authEnabled()) throw new HttpError(400, 'Кабинеты работают только с базой');
     await redeem({workspaceId: req.ws, userId: req.user.id, code: req.body?.code});
@@ -197,6 +203,8 @@ export const createApp = ({photoOrigin}) => {
     // Что доступно: речь и озвучка — по ключу ElevenLabs; выделение звуков машины — по
     // наличию локального окружения с моделью разделения (проба, ставится отдельно)
     features: {speech: hasKey(), voice: hasVoice(), ambience: await hasSeparator()},
+    // Цены генераций в кредитах — интерфейс пишет их на кнопках
+    credits: await creditCosts(),
   })));
   api.put('/brand', wrap(async (req) => { await saveBrand(checkBrand(req.body)); return getBrand(); }));
   // Логотип: свой приёмник с маленьким потолком — незачем принимать 30 МБ, чтобы потом отказать
@@ -262,7 +270,7 @@ export const createApp = ({photoOrigin}) => {
     const inputProps = {lot: withAbsolutePhotos(lot, photoOrigin), market, theme: themeForRender(photoOrigin, theme)};
     return enqueue({
       owner: {lotId: lot.id}, composition: format.id, compositionTitle: format.title, title,
-      frames: storyboardFrames(format), inputProps,
+      frames: storyboardFrames(format), inputProps, bill: billOf(req, 'ads'),
     });
   }));
 
@@ -328,13 +336,22 @@ export const createApp = ({photoOrigin}) => {
     };
     return enqueue({
       owner: {reviewId: review.id}, composition: 'review-short', compositionTitle: 'Обзор', title: review.title || review.id,
-      frames: reviewStoryboard(review.segments), inputProps,
+      frames: reviewStoryboard(review.segments), inputProps, bill: billOf(req, 'reviews'),
     });
   }));
 
   // Карусели: ссылка Encar → семь картинок. Сборка синхронная — семь кадров снимаются
   // секунды, отдельная очередь как у видео тут была бы лишней сложностью.
-  api.post('/carousels', requireActive('carousels'), wrap((req) => buildCarousel(req.body?.link)));
+  // Карусель собирается синхронно, секунды: списываем, собираем, при неудаче возвращаем тут же
+  api.post('/carousels', requireActive('carousels'), (req, _res, next) => {
+    // Ссылку проверяем до списания: опечатка в ссылке — не повод гонять кредит туда-обратно
+    // и засорять журнал клиента парой «списано / возврат»
+    try { parseCarLink(req.body?.link); next(); } catch (e) { next(new HttpError(400, e.message)); }
+  }, wrap((req) => billed(
+    {...billOf(req, 'carousels'), workspaceId: req.ws,
+      jobId: `carousel-${req.ws}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      note: String(req.body?.link ?? '').slice(0, 120)},
+    () => buildCarousel(req.body?.link))));
   api.get('/carousels', wrap(() => listCarousels()));
   api.delete('/carousels/:id', wrap((req) => deleteCarousel(checkId(req.params.id))));
   api.get('/carousels/:id/slide/:n/download', async (req, res, next) => {
@@ -354,7 +371,7 @@ export const createApp = ({photoOrigin}) => {
   })));
   api.get('/renders/:id', wrap((req) => getJob(checkId(req.params.id))));
   api.post('/renders/:id/cancel', wrap((req) => cancelJob(checkId(req.params.id))));
-  api.post('/renders/:id/retry', requireActive(), wrap((req) => retryJob(checkId(req.params.id))));
+  api.post('/renders/:id/retry', requireActive(), wrap((req) => retryJob(checkId(req.params.id), billOf(req))));
   api.delete('/renders/:id', wrap((req) => deleteJob(checkId(req.params.id))));
   api.get('/renders/:id/download', async (req, res, next) => {
     try {

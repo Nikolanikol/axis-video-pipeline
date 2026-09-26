@@ -5,6 +5,8 @@ import path from 'node:path';
 import {bundle} from '@remotion/bundler';
 import {makeCancelSignal, openBrowser, renderMedia, renderStill, selectComposition} from '@remotion/renderer';
 import sharp from 'sharp';
+import {charge, refund, settle} from './billing.mjs';
+import {authEnabled} from './session.mjs';
 import {HttpError, ROOT, checkId, currentWorkspace, readJson, rendersDir, withWorkspace, workspaceUrl, writeJson} from './store.mjs';
 const browserExecutable = process.env.CHROME_PATH || null;
 const concurrency = process.env.RENDER_CONCURRENCY ? Number(process.env.RENDER_CONCURRENCY) : null;
@@ -42,8 +44,9 @@ const queue = [];
 const ACTIVE = new Set(['queued', 'running']);
 let running = false;
 
-// input — сырые props, _cancel — функция отмены живого рендера, ws — компания: наружу их не отдаём
-const publicJob = ({input, _cancel, ws, ...job}) => job;
+// input — сырые props, _cancel — функция отмены живого рендера, ws — компания, receipt — квитанция
+// списания кредитов: наружу их не отдаём
+const publicJob = ({input, _cancel, ws, receipt, ...job}) => job;
 const metaFile = (id, ws) => path.join(rendersDir(ws), `${id}.json`);
 
 // Задание из памяти — только своей компании. Id заданий предсказуемы (лот + время), и без
@@ -53,10 +56,15 @@ const ownJob = (id) => {
   return job && job.ws === currentWorkspace() ? job : undefined;
 };
 
+// Сколько заданий одной компании может ждать и идти разом. Очередь общая, рендер один за раз:
+// без потолка клиент с сотней кредитов поставил бы полсотни роликов, и остальные ждали бы час
+const MAX_PER_WORKSPACE = Number(process.env.RENDER_MAX_PER_WORKSPACE || 5);
+
 // Задание рендера:
 // owner — {lotId} или {reviewId}; composition — id композиции Remotion (формат или review-short);
-// inputProps — готовые props (адреса медиа уже полные); frames — кадры раскадровки.
-export const enqueue = ({owner, composition, compositionTitle, title, frames, inputProps}) => {
+// inputProps — готовые props (адреса медиа уже полные); frames — кадры раскадровки;
+// bill — {pipeline, userId, free}: за что и с кого списать кредиты (см. billing.mjs).
+export const enqueue = async ({owner, composition, compositionTitle, title, frames, inputProps, bill = null}) => {
   const now = new Date();
   const stamp = now.toISOString().replace(/\D/g, '').slice(0, 14);
   const ownerId = owner.lotId ?? owner.reviewId;
@@ -70,6 +78,12 @@ export const enqueue = ({owner, composition, compositionTitle, title, frames, in
       ? `Рендер уже идёт (${busy.progress}%) — дождись или обнови страницу`
       : 'Этот ролик уже в очереди на рендер');
   }
+  if (authEnabled() && !bill?.free) {
+    const mine = [...jobs.values()].filter((j) => j.ws === ws && ACTIVE.has(j.status)).length;
+    if (mine >= MAX_PER_WORKSPACE) {
+      throw new HttpError(429, `У вас уже ${mine} роликов в очереди — дождитесь, пока часть соберётся`);
+    }
+  }
   const id = `${ownerId}-${composition}-${stamp}`;
   const job = {
     id, ws, ...owner, title, format: composition, formatTitle: compositionTitle, frames,
@@ -77,16 +91,40 @@ export const enqueue = ({owner, composition, compositionTitle, title, frames, in
     video: `${workspaceUrl(ws)}/renders/${id}.mp4`, storyboard: `${workspaceUrl(ws)}/renders/${id}.jpg`,
     input: inputProps,
   };
+  // Место занимаем до списания: списание ждёт базу, и второе нажатие за это время прошло бы
+  // проверку «уже в очереди». В очередь рендера задание попадает только после оплаты
   jobs.set(id, job);
+  try {
+    if (bill) job.receipt = await charge({workspaceId: ws, pipeline: bill.pipeline, jobId: id, note: title, userId: bill.userId, free: bill.free});
+  } catch (e) {
+    jobs.delete(id);
+    throw e;
+  }
   queue.push(job);
   pump();
   return publicJob(job);
 };
 
+// Когда какая компания последний раз получала рендер: следующее задание берём у той,
+// что ждёт дольше всех, а не просто первое в очереди. Иначе десять роликов одного клиента,
+// поставленные подряд, заняли бы машину, пока второй клиент ждёт со своим одним
+const lastServed = new Map();
+const nextJob = () => {
+  let best = 0;
+  for (let i = 1; i < queue.length; i++) {
+    const a = lastServed.get(queue[i].ws) ?? 0;
+    const b = lastServed.get(queue[best].ws) ?? 0;
+    if (a < b) best = i;   // при равенстве — кто раньше встал, порядок очереди и так по времени
+  }
+  const [job] = queue.splice(best, 1);
+  lastServed.set(job.ws, Date.now());
+  return job;
+};
+
 const pump = async () => {
   if (running || queue.length === 0) return;
   running = true;
-  const job = queue.shift();
+  const job = nextJob();
   try {
     // Следующее задание стартует из хвоста предыдущего — в контексте чужого запроса.
     // Поэтому компанию задаём явно, из самого задания
@@ -106,6 +144,11 @@ const pump = async () => {
     }
   } finally {
     job.finishedAt = new Date().toISOString();
+    // Кредиты: готово — списание окончательное; упало или отменено — возвращаем
+    const billing = job.status === 'done'
+      ? settle(job.receipt)
+      : refund(job.receipt, job.status === 'cancelled' ? 'отменён' : `ошибка: ${job.error?.slice(0, 150)}`);
+    await billing.catch((e) => console.error(`Кредиты за ${job.id}:`, e));
     await writeJson(metaFile(job.id, job.ws), publicJob(job)).catch((e) => console.error(e));
     running = false;
     pump();
@@ -200,6 +243,7 @@ export const cancelJob = async (id) => {
     job.status = 'cancelled';
     job.stage = 'Отменён';
     job.finishedAt = new Date().toISOString();
+    await refund(job.receipt, 'отменён в очереди').catch((e) => console.error(`Кредиты за ${job.id}:`, e));
     await writeJson(metaFile(job.id, job.ws), publicJob(job)).catch(() => {});
   } else {
     // Живой рендер: дёргаем cancelSignal, дальше run() упадёт, а pump() пометит «Отменён»
@@ -210,13 +254,16 @@ export const cancelJob = async (id) => {
 
 // Пересобрать: то же задание заново, с теми же props. Работает, пока исходные данные ещё
 // в памяти; после перезапуска сервера их нет — тогда честно просим запустить из лота.
-export const retryJob = async (id) => {
+// Кредиты — как за новый запуск: неудачный уже вернулся, так что за один ролик клиент платит
+// один раз; пересборка удачного — это новая генерация.
+export const retryJob = async (id, bill = null) => {
   const job = ownJob(id);
   if (!job?.input) throw new HttpError(409, 'Исходные данные этого ролика уже не в памяти — запусти рендер заново из лота или обзора');
   return enqueue({
     owner: job.lotId ? {lotId: job.lotId} : {reviewId: job.reviewId},
     composition: job.format, compositionTitle: job.formatTitle, title: job.title,
     frames: job.frames, inputProps: job.input,
+    bill: bill && {...bill, pipeline: job.reviewId ? 'reviews' : 'ads'},
   });
 };
 

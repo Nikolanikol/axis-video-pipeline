@@ -92,6 +92,43 @@ export const useAsset = (key: keyof typeof BRAND.assets): string => {
   return src(theme.assets?.[key] ?? BRAND.assets[key]);
 };
 
+/** Знаки бренда, которые у клиента может заменить название компании */
+export type LogoAsset = 'logoStacked' | 'logoHorizontal' | 'sign';
+
+/**
+ * Логотип бренда — или название компании текстом, если логотипа нет.
+ *
+ * «Нет логотипа» — это пустая строка в теме, а не отсутствие ключа: отсутствующий ключ
+ * у старых тем по-прежнему значит «встроенный файл». Пустую строку ставит регистрация
+ * нового клиента: стартовый бренд копируется с платформенного, и без неё на роликах
+ * клиента стоял бы логотип AXIS. Текст — фирменный шрифт заголовков в меди, по центру,
+ * и ужимается под длину названия, чтобы длинное имя не вылезало за место логотипа.
+ * height и width — место под знак, как у картинки: текст вписывается в него.
+ */
+export const Logo: React.FC<{asset: LogoAsset; height?: number; width?: number; style?: React.CSSProperties}> = ({asset, height, width, style}) => {
+  const theme = useTheme();
+  const value = theme.assets?.[asset];
+  const url = src(value ?? BRAND.assets[asset]);
+  if (value !== '') {
+    return <Img src={url} style={{...(height ? {height} : {}), ...(width ? {width} : {}), ...style}} />;
+  }
+  const name = (theme.name || '').trim();
+  // Размер от места под знак: горизонтальный логотип — одна строка во всю высоту,
+  // вертикальный (знак над подписью) — текст примерно в треть его высоты
+  const box = width ?? (asset === 'logoHorizontal' ? 720 : 900);
+  const byHeight = height ? height * (asset === 'logoHorizontal' ? 0.72 : 0.36) : 110;
+  // Oswald узкий: средняя буква заглавными — около 0,5 кегля
+  const byWidth = box / Math.max(1, name.length * 0.5);
+  const size = Math.round(Math.min(byHeight, byWidth));
+  return (
+    <div style={{maxWidth: box, textAlign: 'center', lineHeight: 1.05, ...style}}>
+      <CopperText style={{fontFamily: HEAD, fontWeight: 700, fontSize: size, letterSpacing: size * 0.04, textTransform: 'uppercase'}}>
+        {name}
+      </CopperText>
+    </div>
+  );
+};
+
 /**
  * Скругление угла с учётом настройки бренда.
  *
@@ -188,8 +225,8 @@ export const TopLogo: React.FC<{scrim?: boolean}> = ({scrim = true}) => {
         }} />
       )}
       <AbsoluteFill style={{alignItems: 'center', paddingTop: 170}}>
-        <Img src={useAsset('logoHorizontal')}
-          style={{height: 78, filter: scrim ? 'drop-shadow(0 3px 10px rgba(0,0,0,0.5))' : undefined}} />
+        <Logo asset="logoHorizontal" height={78}
+          style={{filter: scrim ? 'drop-shadow(0 3px 10px rgba(0,0,0,0.5))' : undefined}} />
       </AbsoluteFill>
     </>
   );

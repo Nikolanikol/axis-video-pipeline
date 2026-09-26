@@ -5,6 +5,7 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {api, CarouselEntry} from '../api';
 import {useConfig} from '../config';
+import {useCost, useSession} from '../auth';
 import {Field} from '../LotForm';
 
 const km = (v: number | null) => (v === null ? '—' : `${v.toLocaleString('ru-RU')} км`);
@@ -68,7 +69,9 @@ const Lightbox: React.FC<{entry: CarouselEntry; at: number; onClose: () => void;
   };
 
 export const CarouselTool: React.FC = () => {
-  const {report} = useConfig();
+  const {report, config} = useConfig();
+  const {refresh: refreshAccess} = useSession();
+  const cost = useCost('carousels', config.credits);
   const [link, setLink] = useState('');
   const [busy, setBusy] = useState(false);
   const [entry, setEntry] = useState<CarouselEntry | null>(null);
@@ -91,7 +94,7 @@ export const CarouselTool: React.FC = () => {
       setEntry(made);
       setHistory((h) => [made, ...h.filter((x) => x.id !== made.id)]);
       setLink('');
-    } catch (e) { report(e); } finally { setBusy(false); }
+    } catch (e) { report(e); } finally { setBusy(false); refreshAccess(); }
   };
 
   // Пересобрать существующую карусель — тот же сбор по её номеру: свежие данные, тот же брендбук
@@ -102,7 +105,7 @@ export const CarouselTool: React.FC = () => {
       const made = await api.buildCarousel(entry.id);
       setEntry(made);
       setHistory((h) => [made, ...h.filter((x) => x.id !== made.id)]);
-    } catch (e) { report(e); } finally { setBusy(false); }
+    } catch (e) { report(e); } finally { setBusy(false); refreshAccess(); }
   };
 
   const remove = async (id: string) => {
@@ -147,7 +150,7 @@ export const CarouselTool: React.FC = () => {
           </Field>
           <div className="btn-row">
             <button className="btn primary big" onClick={build} disabled={busy || !link.trim()}>
-              {busy ? 'Собираю…' : 'Собрать карусель'}
+              {busy ? 'Собираю…' : `Собрать карусель${cost}`}
             </button>
           </div>
           {busy && <div className="bar wait"><div /></div>}
@@ -159,7 +162,7 @@ export const CarouselTool: React.FC = () => {
               <div className="job-actions">
                 <button className="btn primary" onClick={downloadAll} disabled={busy}>Скачать все {entry.slides.length}</button>
                 <a className="btn ghost" href={entry.car.source} target="_blank" rel="noreferrer">Открыть в каталоге</a>
-                <button className="btn" onClick={rebuild} disabled={busy}>Пересобрать</button>
+                <button className="btn" onClick={rebuild} disabled={busy}>Пересобрать{cost}</button>
                 <button className="btn ghost" onClick={() => remove(entry.id)} disabled={busy}>Удалить</button>
               </div>
             </>

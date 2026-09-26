@@ -32,18 +32,25 @@ beforeAll(async () => {
 afterAll(() => env.cleanup());
 
 describe('очередь рендера', () => {
-  it('повторное нажатие не ставит второе такое же задание', () => {
-    const first = enqueue(task('rv-1'));
+  it('повторное нажатие не ставит второе такое же задание', async () => {
+    const first = await enqueue(task('rv-1'));
     expect(first.status).toBe('queued');
     // Десять нажатий подряд — это десять одинаковых роликов и часы очереди
     for (let i = 0; i < 5; i++) {
-      expect(() => enqueue(task('rv-1'))).toThrow(/уже/);
+      await expect(enqueue(task('rv-1'))).rejects.toThrow(/уже/);
     }
   });
 
-  it('ошибка говорит, что делать, и это 409, а не поломка', () => {
+  // Место в очереди занимается до списания кредитов (оно ждёт базу): два нажатия подряд,
+  // не дожидаясь друг друга, всё равно дают одно задание
+  it('два нажатия одновременно — одно задание', async () => {
+    const both = await Promise.allSettled([enqueue(task('rv-twin')), enqueue(task('rv-twin'))]);
+    expect(both.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
+  });
+
+  it('ошибка говорит, что делать, и это 409, а не поломка', async () => {
     try {
-      enqueue(task('rv-1'));
+      await enqueue(task('rv-1'));
       throw new Error('должно было отказать');
     } catch (e) {
       expect(e.status).toBe(409);
@@ -51,9 +58,9 @@ describe('очередь рендера', () => {
     }
   });
 
-  it('другой обзор рендерить не мешает', () => {
-    expect(enqueue(task('rv-2')).status).toBe('queued');
-    expect(() => enqueue(task('rv-2'))).toThrow(/уже/);
+  it('другой обзор рендерить не мешает', async () => {
+    expect((await enqueue(task('rv-2'))).status).toBe('queued');
+    await expect(enqueue(task('rv-2'))).rejects.toThrow(/уже/);
   });
 });
 
@@ -62,12 +69,12 @@ describe('управление роликом', () => {
   const runningId = async () => (await listJobs({reviewId: 'rv-1'})).find((j) => j.status === 'running').id;
 
   it('задание из очереди можно отменить, и оно освобождает очередь', async () => {
-    const job = enqueue(task('rv-cancel'));
+    const job = await enqueue(task('rv-cancel'));
     expect(job.status).toBe('queued');
     const cancelled = await cancelJob(job.id);
     expect(cancelled.status).toBe('cancelled');
     // Отменённое не держит очередь: тот же обзор снова ставится
-    expect(enqueue(task('rv-cancel')).status).toBe('queued');
+    expect((await enqueue(task('rv-cancel'))).status).toBe('queued');
   });
 
   it('идущий рендер удалять нельзя — сначала отмена', async () => {

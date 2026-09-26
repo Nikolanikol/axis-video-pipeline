@@ -6,6 +6,7 @@ import {spawn} from 'node:child_process';
 import {createApp} from './app.mjs';
 import {ROOT} from './store.mjs';
 import {hasDatabase, migrate} from './db/index.mjs';
+import {refundOrphans} from './billing.mjs';
 import {DEFAULT_WORKSPACE, ensureWorkspace, legacyDataDirs} from './store.mjs';
 
 const PORT = Number(process.env.PORT || 3210);
@@ -27,7 +28,7 @@ process.on('uncaughtException', (e) => {
 // пока не нужна — инструмент работает на файлах, как раньше. С ним падаем сразу и понятно:
 // кабинеты и кредиты без базы работать не могут, и лучше не стартовать, чем стартовать наполовину.
 if (hasDatabase()) {
-  await migrate().then(() => ensureWorkspace()).catch((e) => {
+  await migrate().then(() => ensureWorkspace()).then(() => refundOrphans()).catch((e) => {
     console.error(`База SMMAKER недоступна: ${e.message}`);
     process.exit(1);
   });

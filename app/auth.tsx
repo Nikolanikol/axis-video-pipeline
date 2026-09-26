@@ -14,6 +14,8 @@ type Session = {
   access: Access | null;
   // Обновить доступ после погашения кода или правки кредитов
   setAccess: (a: Access) => void;
+  // Перечитать доступ с сервера — после списания или возврата кредитов
+  refresh: () => void;
   logout: () => void;
 };
 
@@ -34,6 +36,10 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
       .catch((e) => setError(e.message));
   }, []);
 
+  const refresh = useCallback(() => {
+    api.me().then((m) => { if (m.authRequired && m.user) setAccess(m.access); }).catch(() => {});
+  }, []);
+
   const logout = useCallback(() => {
     api.logout().finally(() => window.location.reload());
   }, []);
@@ -43,8 +49,8 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
   if (me.authRequired && !me.user) return <LoginScreen />;
 
   const session: Session = me.authRequired && me.user
-    ? {enabled: true, email: me.user.email, isAdmin: me.user.isAdmin, workspace: me.workspace, access, setAccess, logout}
-    : {enabled: false, email: null, isAdmin: true, workspace: null, access: null, setAccess, logout};
+    ? {enabled: true, email: me.user.email, isAdmin: me.user.isAdmin, workspace: me.workspace, access, setAccess, refresh, logout}
+    : {enabled: false, email: null, isAdmin: true, workspace: null, access: null, setAccess, refresh, logout};
   return <SessionCtx.Provider value={session}>{children}</SessionCtx.Provider>;
 };
 
@@ -112,6 +118,16 @@ export const useAllowedPipelines = (): string[] | null => {
   const {enabled, isAdmin, access} = useSession();
   if (!enabled || isAdmin || !access?.active) return null;
   return access.plan?.pipelines ?? null;
+};
+
+/**
+ * Цена генерации для подписи на кнопке: « · 3 кр.». Пусто, если клиент не платит
+ * (владелец платформы, вход выключен) — тогда и писать нечего.
+ */
+export const useCost = (pipeline: string, costs?: Record<string, number>) => {
+  const {enabled, isAdmin} = useSession();
+  const cost = costs?.[pipeline];
+  return enabled && !isAdmin && cost ? ` · ${cost} кр.` : '';
 };
 
 /** Дата для людей: 26.10.2026 */

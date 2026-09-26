@@ -196,8 +196,11 @@ export const register = async ({email, password, company, code}) => {
   const name = String(company ?? '').trim().slice(0, 120);
   if (!name) throw new HttpError(400, 'Как называется компания?');
   const hash = await hashPassword(pass);
-  // Дизайн по умолчанию — палитра и шрифты платформы; имя на постах — компания клиента
-  const brand = {...(await readJson(path.join(CONFIG_DIR, 'brand.json'))), name};
+  // Дизайн по умолчанию — палитра и шрифты платформы; имя на постах — компания клиента.
+  // Логотипы пустые: вместо них вёрстка пишет название компании (Logo в src/shared/ui.tsx).
+  // Иначе стартовый бренд унёс бы на ролики клиента логотип AXIS — до загрузки своего
+  const template = await readJson(path.join(CONFIG_DIR, 'brand.json'));
+  const brand = {...template, name, assets: {...template.assets, logoStacked: '', logoHorizontal: '', sign: ''}};
   return inTransaction(async (client) => {
     const {rows: [taken]} = await client.query('SELECT 1 FROM smmaker_users WHERE lower(email) = $1', [mail]);
     if (taken) throw new HttpError(409, 'Эта почта уже зарегистрирована — войди');

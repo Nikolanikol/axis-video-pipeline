@@ -414,3 +414,5 @@ a.tab { text-decoration: none; }
   .account-chip { margin-left: 0; width: 100%; justify-content: space-between; }
   .form .row { flex-direction: column; gap: 0; }
 }
+.table td.plus { color: var(--ok); font-weight: 600; }
+.table td.minus { color: var(--copper-light); font-weight: 600; }

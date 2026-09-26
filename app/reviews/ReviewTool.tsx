@@ -380,6 +380,7 @@ export const ReviewTool: React.FC = () => {
               disabled={!source || !segments.length}
               start={async () => { if (save !== 'saved') await persist(); return api.renderReview(review.id); }}
               onError={report}
+              pipeline="reviews"
             />
           </section>
         </main>

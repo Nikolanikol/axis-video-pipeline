@@ -1,6 +1,6 @@
 // Кабинет компании и админка владельца платформы.
 import React, {useCallback, useEffect, useState} from 'react';
-import {ActivationCode, Plan, WorkspaceRow, api} from './api';
+import {ActivationCode, LedgerRow, Plan, WorkspaceRow, api} from './api';
 import {day, daysLeft, useSession} from './auth';
 import {Field} from './LotForm';
 
@@ -75,7 +75,40 @@ export const AccountPage: React.FC = () => {
           </form>
         </section>
       </div>
+      <Ledger credits={access?.credits} />
     </div>
+  );
+};
+
+const KIND: Record<LedgerRow['kind'], string> = {grant: 'Начислено', charge: 'Списано', refund: 'Возврат', adjust: 'Правка'};
+const WHAT: Record<string, string> = {ads: 'Ролик', carousels: 'Карусель', reviews: 'Обзор'};
+
+/**
+ * Журнал кредитов: каждое движение строкой. Остаток в шапке — сумма этих строк за текущий
+ * период; на вопрос «почему осталось 3» ответ здесь, построчно.
+ */
+const Ledger: React.FC<{credits?: number}> = ({credits}) => {
+  const [rows, setRows] = useState<LedgerRow[] | null>(null);
+  // credits в зависимостях: остаток изменился (списание, возврат, продление) — журнал тоже
+  useEffect(() => { api.ledger().then(setRows).catch(() => setRows([])); }, [credits]);
+  if (!rows?.length) return null;
+  return (
+    <section className="card wide">
+      <h2>История кредитов</h2>
+      <table className="table">
+        <thead><tr><th>Когда</th><th>Что</th><th>Кредиты</th><th>Подробности</th></tr></thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.id}>
+              <td>{new Date(r.created_at).toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'})}</td>
+              <td>{KIND[r.kind]}{r.pipeline ? ` · ${WHAT[r.pipeline] ?? r.pipeline}` : ''}</td>
+              <td className={r.delta > 0 ? 'plus' : 'minus'}>{r.delta > 0 ? `+${r.delta}` : r.delta}</td>
+              <td className="muted">{r.note || '—'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
   );
 };
 
