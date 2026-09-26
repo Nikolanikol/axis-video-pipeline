@@ -13,12 +13,12 @@ import {bundle} from '@remotion/bundler';
 import {openBrowser, renderStill, selectComposition} from '@remotion/renderer';
 import {parseCarLink} from '../src/shared/encarLink.js';
 import {
-  HttpError, PRODUCTION, ROOT, WORKSPACE_DIR, WORKSPACE_URL, checkId, getBrand, readJson, renderMarket, writeJson,
+  HttpError, PRODUCTION, ROOT, checkId, currentWorkspace, workspaceDir, workspaceUrl, getBrand, readJson, renderMarket, writeJson,
 } from './store.mjs';
 
 // Папка карусели названа номером объявления. Поэтому она обязана лежать внутри папки
 // компании: у двух клиентов одна и та же машина иначе делила бы одни слайды — в чужих цветах
-export const CAROUSELS_DIR = path.join(WORKSPACE_DIR, 'carousels');
+export const carouselsDir = () => path.join(workspaceDir(), 'carousels');
 // Слайд истории убираем на проде, пока страховые случаи не приходят с датацентра
 // (Encar режет адрес). Тогда слайдов шесть; на Mac — семь с настоящей историей.
 // Число решается здесь, а сам слайд отсекается в вёрстке по includeHistory.
@@ -89,7 +89,9 @@ const getServeUrl = async () => {
 
 // Одна карусель на машину за раз: рендер семи кадров занимает секунды, но повторное
 // нажатие запускало бы браузер второй раз поверх первого
+// Ключ — компания и номер: одну и ту же машину две компании собирают независимо
 const running = new Set();
+const runKey = (id) => `${currentWorkspace()}:${id}`;
 
 /**
  * Собрать карусель по ссылке или номеру.
@@ -98,8 +100,9 @@ const running = new Set();
  */
 export const buildCarousel = async (link) => {
   const {id} = parseCarLink(link);
-  if (running.has(id)) throw new HttpError(409, 'Эта карусель уже собирается');
-  running.add(id);
+  const key = runKey(id);
+  if (running.has(key)) throw new HttpError(409, 'Эта карусель уже собирается');
+  running.add(key);
   try {
     const car = await fetchCar(id);
     // Карусель — всегда про корейское объявление (источник Encar), но контакты и компанию
@@ -116,7 +119,7 @@ export const buildCarousel = async (link) => {
       : theme.assets;
     const inputProps = {car, market, theme: {...theme, assets}, includeHistory: INCLUDE_HISTORY};
 
-    const dir = path.join(CAROUSELS_DIR, id);
+    const dir = path.join(carouselsDir(), id);
     await fs.mkdir(dir, {recursive: true});
     // Старые кадры убираем перед сборкой: та же машина, пересобранная на проде, даёт шесть
     // слайдов вместо прежних семи, и осиротевший slide-7.png остался бы на диске — со старой
@@ -141,13 +144,13 @@ export const buildCarousel = async (link) => {
     const meta = {
       id,
       car,
-      slides: Array.from({length: SLIDES}, (_, i) => `${WORKSPACE_URL}/carousels/${id}/slide-${i + 1}.png`),
+      slides: Array.from({length: SLIDES}, (_, i) => `${workspaceUrl()}/carousels/${id}/slide-${i + 1}.png`),
       updatedAt: new Date().toISOString(),
     };
     await writeJson(path.join(dir, 'carousel.json'), meta);
     return meta;
   } finally {
-    running.delete(id);
+    running.delete(key);
   }
 };
 
@@ -164,16 +167,16 @@ export const slideFileName = (car, n) => {
 /** Удалить собранную карусель со всеми слайдами. Пересобирать её — тот же buildCarousel по номеру. */
 export const deleteCarousel = async (id) => {
   checkId(id);
-  if (running.has(id)) throw new HttpError(409, 'Эта карусель сейчас собирается — дождись');
-  await fs.rm(path.join(CAROUSELS_DIR, id), {recursive: true, force: true});
+  if (running.has(runKey(id))) throw new HttpError(409, 'Эта карусель сейчас собирается — дождись');
+  await fs.rm(path.join(carouselsDir(), id), {recursive: true, force: true});
   return {id, deleted: true};
 };
 
 /** Ранее собранные карусели, новые сверху */
 export const listCarousels = async () => {
-  await fs.mkdir(CAROUSELS_DIR, {recursive: true});
-  const dirs = (await fs.readdir(CAROUSELS_DIR, {withFileTypes: true})).filter((d) => d.isDirectory());
+  await fs.mkdir(carouselsDir(), {recursive: true});
+  const dirs = (await fs.readdir(carouselsDir(), {withFileTypes: true})).filter((d) => d.isDirectory());
   const all = await Promise.all(dirs.map((d) =>
-    readJson(path.join(CAROUSELS_DIR, d.name, 'carousel.json')).catch(() => null)));
+    readJson(path.join(carouselsDir(), d.name, 'carousel.json')).catch(() => null)));
   return all.filter(Boolean).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
 };

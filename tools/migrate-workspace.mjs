@@ -15,7 +15,11 @@
 // руками. Резервную копию data/ сделать ДО запуска (на Mac мгновенно: cp -cR data data.bak).
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {DATA_DIR, WORKSPACE_DIR, WORKSPACE_ID, WORKSPACE_KINDS, toWorkspaceUrl} from '../server/store.mjs';
+import {DATA_DIR, DEFAULT_WORKSPACE, WORKSPACE_KINDS, toWorkspaceUrl, workspaceDir, workspaceUrl} from '../server/store.mjs';
+
+// Старая раскладка — это данные компании по умолчанию (владельца): до кабинетов она была одна
+const WORKSPACE_ID = DEFAULT_WORKSPACE;
+const WORKSPACE_DIR = workspaceDir(WORKSPACE_ID);
 
 const apply = process.argv.includes('--apply');
 
@@ -75,7 +79,7 @@ for (const p of plan) {
   for (const f of await jsonFiles(p.from)) {
     const text = await fs.readFile(f, 'utf8');
     if (!/\/data\/(lots|reviews|renders|carousels|brand)\//.test(text)) continue;
-    const next = toWorkspaceUrl(JSON.parse(text));
+    const next = toWorkspaceUrl(JSON.parse(text), workspaceUrl(WORKSPACE_ID));
     await fs.writeFile(`${f}.tmp`, JSON.stringify(next, null, 2) + '\n');
     await fs.rename(`${f}.tmp`, f);
   }

@@ -1,6 +1,8 @@
 // Оболочка: шапка с пайплайнами, вкладки инструментов, экран выбранного инструмента
 import React, {Suspense, useCallback, useState} from 'react';
 import {ConfigProvider, useConfig} from './config';
+import {AuthGate, day, daysLeft, useAllowedPipelines, useSession} from './auth';
+import {AccountPage, AdminPage} from './Account';
 import {Home, PipelinePage} from './Home';
 import {Pipeline, ToolMeta, findPipeline, toolKey, visiblePipelines} from './pipelines';
 import {href, useRoute} from './router';
@@ -11,9 +13,11 @@ export const Shell: React.FC = () => {
   const report = useCallback((e: unknown) => setError(e instanceof Error ? e.message : String(e)), []);
   return (
     <div className="app">
-      <ConfigProvider report={report}>
-        <Frame error={error} clearError={() => setError('')} />
-      </ConfigProvider>
+      <AuthGate>
+        <ConfigProvider report={report}>
+          <Frame error={error} clearError={() => setError('')} />
+        </ConfigProvider>
+      </AuthGate>
     </div>
   );
 };
@@ -21,10 +25,11 @@ export const Shell: React.FC = () => {
 const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearError}) => {
   const route = useRoute();
   const {config} = useConfig();
+  const session = useSession();
   const pipeline = findPipeline(route.pipeline);
   const tool = pipeline?.tools.find((t) => t.id === route.tool);
   // На проде обзоры скрыты из вкладок; сам инструмент по прямой ссылке всё равно откроется
-  const pipelines = visiblePipelines(config.production);
+  const pipelines = visiblePipelines(config.production, useAllowedPipelines());
   const main = pipelines.filter((p) => p.kind !== 'settings');
   const settings = pipelines.find((p) => p.kind === 'settings');
 
@@ -48,7 +53,11 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
               {settings.title}
             </a>
           )}
+          {session.enabled && session.isAdmin && (
+            <a href={href('admin')} className={route.pipeline === 'admin' ? 'tab active' : 'tab'}>Админка</a>
+          )}
         </nav>
+        {session.enabled && <AccountChip />}
       </header>
 
       {pipeline && pipeline.tools.length > 1 && (
@@ -62,15 +71,40 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
       )}
 
       {error && <div className="error" onClick={clearError}>{error} <span className="muted">— нажми, чтобы скрыть</span></div>}
+      {session.enabled && !session.isAdmin && session.access && !session.access.active && (
+        <div className="readonly">
+          Доступ {session.access.paidUntil ? `закончился ${day(session.access.paidUntil)}` : 'не активирован'}: готовое можно
+          смотреть и скачивать, новое — после продления. <a href={href('account')}>Продлить кодом</a>
+        </div>
+      )}
 
       <div className="tool">
-        {!route.pipeline ? <Home />
+        {route.pipeline === 'account' ? <AccountPage />
+          : route.pipeline === 'admin' ? <AdminPage />
+          : !route.pipeline ? <Home />
           : !pipeline ? <NotFound />
             : !route.tool ? <PipelinePage pipeline={pipeline} />
               : !tool ? <NotFound />
                 : <ToolScreen pipeline={pipeline} tool={tool} />}
       </div>
     </>
+  );
+};
+
+// Компания, срок и кредиты в шапке: клиент видит, сколько осталось, не заходя в кабинет
+const AccountChip: React.FC = () => {
+  const {workspace, access, email, isAdmin, logout} = useSession();
+  return (
+    <div className="account-chip">
+      <a href={href('account')} title={email ?? ''}>
+        <b>{workspace?.name}</b>
+        <span className="muted">
+          {access?.active ? ` · ${access.credits} кр. · ещё ${daysLeft(access.paidUntil)} дн.`
+            : isAdmin ? ' · владелец платформы' : ' · доступ закончился'}
+        </span>
+      </a>
+      <button className="btn ghost" onClick={logout}>Выйти</button>
+    </div>
   );
 };
 

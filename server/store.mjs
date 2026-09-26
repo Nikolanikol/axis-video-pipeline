@@ -2,6 +2,7 @@
 // лоты, обзоры, ролики и карусели компании (DATA_DIR/workspaces/<компания>/).
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import {AsyncLocalStorage} from 'node:async_hooks';
 import {fileURLToPath} from 'node:url';
 import {marketFromProfile} from '../src/shared/profile.js';
 import {db, hasDatabase} from './db/index.mjs';
@@ -13,24 +14,48 @@ export const DATA_DIR = path.resolve(ROOT, process.env.DATA_DIR || 'data');
 export const DEFAULT_MARKET = process.env.DEFAULT_MARKET || 'mk';
 
 /**
- * Компания (кабинет SMMAKER), от имени которой работает сервер.
+ * Компания (кабинет SMMAKER), для которой выполняется запрос.
  *
  * Все файлы компании — в своей папке: data/workspaces/<id>/{lots,reviews,renders,carousels,brand}.
- * Пока входа нет, компания одна на инстанс и задаётся переменной; с входом она станет
- * свойством запроса. Раньше файлы лежали прямо в data/ без хозяина, и у этого было два
- * следствия, опасных при втором клиенте: новый логотип стирал все прочие логотипы в общей
- * папке, а карусель одной и той же машины (папка = номер объявления) у двух клиентов
- * перезаписывала слайды друг друга. Перенос старой раскладки — tools/migrate-workspace.mjs.
+ * Раньше файлы лежали прямо в data/ без хозяина, и при втором клиенте это ломалось: новый
+ * логотип стирал все прочие логотипы в общей папке, а карусель одной и той же машины
+ * (папка = номер объявления) у двух клиентов перезаписывала слайды друг друга.
+ *
+ * Компания берётся из сессии и живёт в контексте запроса (AsyncLocalStorage): так её видят
+ * и сам обработчик, и всё, что он запустил в фоне (подготовка видео, распознавание),
+ * без протаскивания параметра через каждую функцию. Очередь рендера — исключение: следующее
+ * задание стартует из хвоста предыдущего, то есть в чужом контексте, поэтому задание
+ * несёт компанию с собой (см. renderer.mjs).
+ *
+ * Без контекста: при включённом входе (есть база) — ошибка, а не тихий откат на компанию
+ * по умолчанию, иначе забытый контекст отдал бы клиенту файлы владельца. Без базы (тесты,
+ * прод до подключения) — компания по умолчанию, как было до входа.
  */
-export const WORKSPACE_ID = process.env.SMMAKER_WORKSPACE || 'k-axis';
-if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(WORKSPACE_ID)) {
-  throw new Error(`SMMAKER_WORKSPACE=«${WORKSPACE_ID}»: только латиница, цифры и дефис`);
+export const DEFAULT_WORKSPACE = process.env.SMMAKER_WORKSPACE || 'k-axis';
+const WS_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
+if (!WS_RE.test(DEFAULT_WORKSPACE)) {
+  throw new Error(`SMMAKER_WORKSPACE=«${DEFAULT_WORKSPACE}»: только латиница, цифры и дефис`);
 }
-export const WORKSPACE_DIR = path.join(DATA_DIR, 'workspaces', WORKSPACE_ID);
-// Адрес той же папки в браузере и для рендера: /data отдаётся статикой из DATA_DIR
-export const WORKSPACE_URL = `/data/workspaces/${WORKSPACE_ID}`;
-export const LOTS_DIR = path.join(WORKSPACE_DIR, 'lots');
-export const RENDERS_DIR = path.join(WORKSPACE_DIR, 'renders');
+const workspaceContext = new AsyncLocalStorage();
+
+/** Выполнить fn от имени компании: всё, что внутри (и запущено из него), видит её папки */
+export const withWorkspace = (id, fn) => {
+  if (!WS_RE.test(String(id))) throw new Error(`Некорректная компания «${id}»`);
+  return workspaceContext.run(id, fn);
+};
+
+export const currentWorkspace = () => {
+  const id = workspaceContext.getStore();
+  if (id) return id;
+  if (hasDatabase()) throw new Error('Нет компании в контексте запроса — код вызван мимо withWorkspace');
+  return DEFAULT_WORKSPACE;
+};
+
+export const workspaceDir = (id = currentWorkspace()) => path.join(DATA_DIR, 'workspaces', id);
+// Адрес той же папки в браузере и для рендера: /data отдаётся из DATA_DIR (с проверкой хозяина)
+export const workspaceUrl = (id = currentWorkspace()) => `/data/workspaces/${id}`;
+export const lotsDir = () => path.join(workspaceDir(), 'lots');
+export const rendersDir = (id) => path.join(workspaceDir(id), 'renders');
 
 /** Папки компании, которые раньше лежали прямо в data/. Их же переносит миграция. */
 export const WORKSPACE_KINDS = ['lots', 'reviews', 'renders', 'carousels', 'brand'];
@@ -43,7 +68,7 @@ export const WORKSPACE_KINDS = ['lots', 'reviews', 'renders', 'carousels', 'bran
  */
 const LEGACY_URL_RE = new RegExp(
   `(^|https?://(?:127\\.0\\.0\\.1|localhost|0\\.0\\.0\\.0)(?::\\d+)?)/data/(${WORKSPACE_KINDS.join('|')})/`, 'g');
-export const toWorkspaceUrl = (value, wsUrl = WORKSPACE_URL) => {
+export const toWorkspaceUrl = (value, wsUrl = workspaceUrl()) => {
   if (typeof value === 'string') return value.replace(LEGACY_URL_RE, (_m, origin, kind) => `${origin}${wsUrl}/${kind}/`);
   if (Array.isArray(value)) return value.map((v) => toWorkspaceUrl(v, wsUrl));
   if (value && typeof value === 'object') {
@@ -118,12 +143,12 @@ export const writeJson = async (file, data) => {
 const BRAND_FILE = path.join(CONFIG_DIR, 'brand.json');
 
 const workspaceRow = async () => {
-  const {rows} = await db().query('SELECT brand, profile FROM smmaker_workspaces WHERE id = $1', [WORKSPACE_ID]);
-  if (!rows.length) throw new HttpError(500, `Компания «${WORKSPACE_ID}» не заведена в базе: перезапусти сервер`);
+  const {rows} = await db().query('SELECT brand, profile FROM smmaker_workspaces WHERE id = $1', [currentWorkspace()]);
+  if (!rows.length) throw new HttpError(404, `Компания «${currentWorkspace()}» не найдена`);
   return rows[0];
 };
 const updateWorkspace = (field, value) => db().query(
-  `UPDATE smmaker_workspaces SET ${field} = $2, updated_at = now() WHERE id = $1`, [WORKSPACE_ID, value]);
+  `UPDATE smmaker_workspaces SET ${field} = $2, updated_at = now() WHERE id = $1`, [currentWorkspace(), value]);
 
 export const getBrand = async () => (hasDatabase() ? (await workspaceRow()).brand : readJson(BRAND_FILE));
 export const saveBrand = (theme) => (hasDatabase() ? updateWorkspace('brand', theme) : writeJson(BRAND_FILE, theme));
@@ -173,14 +198,15 @@ export const listProfiles = async () => {
  */
 export const ensureWorkspace = async ({log = console.log} = {}) => {
   if (!hasDatabase()) return false;
-  const {rowCount} = await db().query('SELECT 1 FROM smmaker_workspaces WHERE id = $1', [WORKSPACE_ID]);
+  const id = DEFAULT_WORKSPACE;
+  const {rowCount} = await db().query('SELECT 1 FROM smmaker_workspaces WHERE id = $1', [id]);
   if (rowCount) return false;
-  const brand = toWorkspaceUrl(await readJson(BRAND_FILE));
+  const brand = toWorkspaceUrl(await readJson(BRAND_FILE), workspaceUrl(id));
   const profile = await readJson(path.join(PROFILES_DIR, `${DEFAULT_PROFILE}.json`));
   await db().query(
     'INSERT INTO smmaker_workspaces (id, name, brand, profile) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING',
-    [WORKSPACE_ID, profile.company || brand.name || WORKSPACE_ID, brand, profile]);
-  log(`Компания ${WORKSPACE_ID} заведена в базе: бренд и профиль взяты из config/`);
+    [id, profile.company || brand.name || id, brand, profile]);
+  log(`Компания ${id} заведена в базе: бренд и профиль взяты из config/`);
   return true;
 };
 
@@ -207,10 +233,10 @@ export const renderMarket = async (id = DEFAULT_PROFILE) =>
   marketFromProfile(await getProfile(id), await getCopy());
 
 // Лоты: <папка компании>/lots/<id>/lot.json + photos/
-export const lotDir = (id) => path.join(LOTS_DIR, checkId(id));
+export const lotDir = (id) => path.join(lotsDir(), checkId(id));
 export const lotPhotosDir = (id) => path.join(lotDir(id), 'photos');
 // Фото лота в браузере и для рендера доступны по <адрес компании>/lots/<id>/photos/<файл>
-export const photoUrl = (id, file) => `${WORKSPACE_URL}/lots/${id}/photos/${file}`;
+export const photoUrl = (id, file) => `${workspaceUrl()}/lots/${id}/photos/${file}`;
 
 export const getLot = async (id) => ({...(await readJson(path.join(lotDir(id), 'lot.json'))), id});
 
@@ -234,8 +260,8 @@ export const createLot = async (data = {}) => {
 };
 
 export const listLots = async () => {
-  await fs.mkdir(LOTS_DIR, {recursive: true});
-  const dirs = (await fs.readdir(LOTS_DIR, {withFileTypes: true})).filter((d) => d.isDirectory());
+  await fs.mkdir(lotsDir(), {recursive: true});
+  const dirs = (await fs.readdir(lotsDir(), {withFileTypes: true})).filter((d) => d.isDirectory());
   const lots = await Promise.all(dirs.map((d) => getLot(d.name).catch(() => null)));
   return lots.filter(Boolean).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
 };

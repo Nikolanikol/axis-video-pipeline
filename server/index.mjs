@@ -6,7 +6,7 @@ import {spawn} from 'node:child_process';
 import {createApp} from './app.mjs';
 import {ROOT} from './store.mjs';
 import {hasDatabase, migrate} from './db/index.mjs';
-import {WORKSPACE_ID, ensureWorkspace, legacyDataDirs} from './store.mjs';
+import {DEFAULT_WORKSPACE, ensureWorkspace, legacyDataDirs} from './store.mjs';
 
 const PORT = Number(process.env.PORT || 3210);
 // Без авторизации — поэтому только локально
@@ -39,7 +39,7 @@ const legacy = await legacyDataDirs();
 if (legacy.length) {
   console.warn(`Внимание: в data/ лежат файлы без компании (${legacy.join(', ')}). Они не видны, пока не перенесены:\n`
     + `  node tools/migrate-workspace.mjs           — показать, что куда поедет\n`
-    + `  node tools/migrate-workspace.mjs --apply   — перенести в data/workspaces/${WORKSPACE_ID}/`);
+    + `  node tools/migrate-workspace.mjs --apply   — перенести в data/workspaces/${DEFAULT_WORKSPACE}/`);
 }
 
 const app = createApp({photoOrigin: `http://${HOST}:${PORT}`});

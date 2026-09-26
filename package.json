@@ -9,6 +9,7 @@
     "render": "node render.mjs",
     "stills": "node stills.mjs",
     "db:migrate": "node --env-file-if-exists=.env tools/db/migrate.mjs",
+    "admin": "node --env-file-if-exists=.env tools/create-admin.mjs",
     "typecheck": "tsc --noEmit -p .",
     "test": "vitest run --project unit",
     "test:render": "vitest run --project render",

@@ -5,9 +5,9 @@ import path from 'node:path';
 import express from 'express';
 import multer from 'multer';
 import {
-  CONFIG_DIR, DATA_DIR, DEFAULT_MARKET, DEFAULT_PROFILE, HttpError, PRODUCTION, checkId, createLot, getBrand, getCopy,
+  CONFIG_DIR, DATA_DIR, DEFAULT_MARKET, DEFAULT_PROFILE, DEFAULT_WORKSPACE, withWorkspace, HttpError, PRODUCTION, checkId, createLot, getBrand, getCopy,
   getLot, getMarket, getProfile, listLots, listMarkets, listProfiles, readJson, renderMarket, saveBrand, saveLot,
-  saveMarket, saveProfile, withLock, RENDERS_DIR, WORKSPACE_ID, WORKSPACE_URL,
+  saveMarket, saveProfile, withLock, currentWorkspace, rendersDir, workspaceUrl,
 } from './store.mjs';
 import {reviewStoryboard} from '../src/shared/timeline.js';
 import {getFormat, listFormats, storyboardFrames} from './formats.mjs';
@@ -20,8 +20,16 @@ import {
 import {apiSettings, resolveSpeaker, voiceConfig} from '../src/shared/voices.js';
 import {hasKey, hasVoice, synthesize} from './speech.mjs';
 import {hasSeparator} from './ambience.mjs';
-import {CAROUSELS_DIR, buildCarousel, deleteCarousel, listCarousels, slideFileName} from './carousel.mjs';
+import {carouselsDir, buildCarousel, deleteCarousel, listCarousels, slideFileName} from './carousel.mjs';
 import {LOGO_RULES, saveLogo} from './brand.mjs';
+import {
+  accessOf, adjustCredits, createCodes, listCodes, listPlans, listWorkspaces, login, redeem, register, savePlan,
+  dropSession,
+} from './accounts.mjs';
+import {
+  authEnabled, clearSessionCookie, guardData, loginLimiter, readSessionMw, requireActive, requireAdmin, requireUser,
+  sessionToken, setSessionCookie,
+} from './session.mjs';
 
 // Медиа с путями /data/... браузер рендера берёт по полному адресу этого сервера
 const absolute = (origin, url) => (url && url.startsWith('/') ? `${origin}${url}` : url);
@@ -40,7 +48,35 @@ const themeForRender = (origin, theme) => (theme?.assets
   : theme);
 const withAbsolutePhotos = (lot, origin) => lot && {...lot, photos: lot.photos.map((p) => absolute(origin, p))};
 
-const wrap = (fn) => (req, res, next) => fn(req, res).then((data) => res.json(data)).catch(next);
+// Обработчик выполняется от имени компании из сессии. Контекст ставим заново здесь, а не
+// полагаемся на общий: приёмник файлов (multer) зовёт следующий шаг из событий потока,
+// и контекст запроса туда не доезжает
+const wrap = (fn) => (req, res, next) => Promise.resolve().then(() => withWorkspace(wsOf(req), () => fn(req, res)))
+  .then((data) => res.json(data)).catch(next);
+// Компания запроса. С входом — только из сессии; без неё — никакой (withWorkspace откажет),
+// а не компания владельца по умолчанию. Без базы вход выключен — компания по умолчанию
+const wsOf = (req) => req.ws ?? (authEnabled() ? null : DEFAULT_WORKSPACE);
+
+/**
+ * Бренд от клиента проверяем: файлы бренда и таблица шрифтов открываются браузером рендера
+ * на нашем сервере. Адрес, подставленный вручную, заставил бы его ходить куда угодно —
+ * в том числе на внутренние адреса машины. Разрешены встроенные файлы (brand/…), файлы своей
+ * компании и таблицы стилей Google Fonts — ровно то, что умеет выбрать интерфейс.
+ */
+const checkBrand = (theme) => {
+  if (!theme || typeof theme !== 'object' || Array.isArray(theme)) throw new HttpError(400, 'Бренд — объект настроек');
+  const own = `${workspaceUrl()}/brand/`;
+  for (const [k, v] of Object.entries(theme.assets ?? {})) {
+    if (typeof v !== 'string' || !(v.startsWith('brand/') || v.startsWith(own))) {
+      throw new HttpError(400, `Файл бренда «${k}»: только встроенный или загруженный в настройках`);
+    }
+  }
+  const url = theme.fonts?.url ?? '';
+  if (url && !/^https:\/\/fonts\.googleapis\.com\//.test(url)) {
+    throw new HttpError(400, 'Шрифты — только из Google Fonts');
+  }
+  return theme;
+};
 
 // photoOrigin — адрес этого сервера: браузер рендера берёт по нему фото лотов (/data/...)
 /**
@@ -89,8 +125,54 @@ export const createApp = ({photoOrigin}) => {
   // Живость: без пароля и без разбора тела, отвечает раньше заслонки по пути выше
   app.get('/healthz', (_req, res) => res.json({ok: true}));
 
+  // За Traefik на сервере: верим его X-Forwarded-Proto (для Secure у cookie) и адресу клиента
+  // (для ограничения попыток входа) — но только от прокси из внутренней сети, не от кого угодно
+  app.set('trust proxy', 'loopback, uniquelocal');
   app.use(express.json({limit: '2mb'}));
+  app.use(readSessionMw);
   const api = express.Router();
+
+  // ——— Вход (открыто без сессии) ———
+  // Интерфейс начинает с этого запроса: нужен ли вход, кто вошёл, что с доступом
+  api.get('/auth/me', (req, res, next) => (async () => {
+    if (!authEnabled()) return res.json({authRequired: false});
+    if (!req.user) return res.json({authRequired: true, user: null});
+    res.json({
+      authRequired: true, user: req.user, workspace: req.workspace,
+      access: req.ws ? await accessOf(req.ws) : null,
+    });
+  })().catch(next));
+  api.post('/auth/login', loginLimiter, (req, res, next) => login(req.body ?? {})
+    .then(({token}) => { setSessionCookie(req, res, token); res.json({ok: true}); }).catch(next));
+  api.post('/auth/register', loginLimiter, (req, res, next) => register(req.body ?? {})
+    .then(({token}) => { setSessionCookie(req, res, token); res.json({ok: true}); }).catch(next));
+  api.post('/auth/logout', (req, res, next) => Promise.resolve(authEnabled() ? dropSession(sessionToken(req)) : null)
+    .then(() => { clearSessionCookie(res); res.json({ok: true}); }).catch(next));
+
+  // Всё ниже — только после входа и от имени своей компании
+  api.use(requireUser);
+  api.use((req, _res, next) => { try { withWorkspace(wsOf(req), next); } catch (e) { next(e); } });
+
+  // ——— Кабинет компании ———
+  api.post('/account/redeem', loginLimiter, wrap(async (req) => {
+    if (!authEnabled()) throw new HttpError(400, 'Кабинеты работают только с базой');
+    await redeem({workspaceId: req.ws, userId: req.user.id, code: req.body?.code});
+    return accessOf(req.ws);
+  }));
+
+  // ——— Админка владельца платформы ———
+  const admin = express.Router();
+  admin.use((req, _res, next) => next(authEnabled() ? undefined : new HttpError(400, 'Админка работает только с базой')));
+  admin.use(requireAdmin);
+  admin.get('/plans', wrap(() => listPlans()));
+  admin.put('/plans/:id', wrap((req) => savePlan({...req.body, id: req.params.id})));
+  admin.get('/codes', wrap(() => listCodes()));
+  admin.post('/codes', wrap((req) => createCodes({...req.body, createdBy: req.user.id})));
+  admin.get('/workspaces', wrap(() => listWorkspaces()));
+  admin.post('/workspaces/:id/credits', wrap((req) => adjustCredits({
+    workspaceId: checkId(req.params.id), delta: req.body?.delta, note: req.body?.note, createdBy: req.user.id,
+  })));
+  api.use('/admin', admin);
 
   api.get('/config', wrap(async () => ({
     brand: await getBrand(), markets: await listMarkets(), defaultMarket: DEFAULT_MARKET, formats: await listFormats(),
@@ -105,7 +187,7 @@ export const createApp = ({photoOrigin}) => {
     production: PRODUCTION,
     // Компания, от имени которой работает сервер, и адрес её файлов: интерфейс по нему
     // отличает свои фото лота от чужих ссылок
-    workspace: {id: WORKSPACE_ID, url: WORKSPACE_URL},
+    workspace: {id: currentWorkspace(), url: workspaceUrl()},
     // Пары шрифтов для настроек бренда. Все с кириллицей — проверено запросом к Google Fonts,
     // и все отдают настоящие 500/600/700, а не синтезированный жирный
     fonts: await readJson(path.join(CONFIG_DIR, 'fonts.json')),
@@ -116,14 +198,15 @@ export const createApp = ({photoOrigin}) => {
     // наличию локального окружения с моделью разделения (проба, ставится отдельно)
     features: {speech: hasKey(), voice: hasVoice(), ambience: await hasSeparator()},
   })));
-  api.put('/brand', wrap(async (req) => { await saveBrand(req.body); return getBrand(); }));
+  api.put('/brand', wrap(async (req) => { await saveBrand(checkBrand(req.body)); return getBrand(); }));
   // Логотип: свой приёмник с маленьким потолком — незачем принимать 30 МБ, чтобы потом отказать
   const logoUpload = multer({storage: multer.memoryStorage(), limits: {fileSize: LOGO_RULES.maxBytes, files: 1}});
   api.post('/brand/logo', logoUpload.single('logo'), wrap(async (req) => {
     const saved = await saveLogo(req.file?.buffer, req.file?.originalname);
     return {...saved, brand: await getBrand()};
   }));
-  api.put('/markets/:id', wrap(async (req) => {
+  // Рынки — платформенный реестр в config/, общий для всех: править может только владелец
+  api.put('/markets/:id', requireAdmin, wrap(async (req) => {
     const {id: _ignored, ...market} = req.body;
     await saveMarket(req.params.id, market);
     return {id: req.params.id, ...(await getMarket(req.params.id))};
@@ -169,7 +252,7 @@ export const createApp = ({photoOrigin}) => {
   })));
 
   // Рендер: сохранённый лот + текущие настройки рынка и бренда, формат — из запроса или лота
-  api.post('/lots/:id/render', wrap(async (req) => {
+  api.post('/lots/:id/render', requireActive('ads'), wrap(async (req) => {
     const lot = await getLot(req.params.id);
     const format = await getFormat(req.body?.format || lot.format);
     if (format.requires.includes('photos') && !lot.photos.length) throw new HttpError(400, 'Добавь хотя бы одно фото');
@@ -196,15 +279,15 @@ export const createApp = ({photoOrigin}) => {
     limits: {fileSize: 4 * 1024 ** 3, files: 1},
   });
   const validId = (req, res, next) => { try { checkId(req.params.id); next(); } catch (e) { next(e); } };
-  api.post('/reviews/:id/source', validId, videoUpload.single('video'), wrap(async (req) => {
+  api.post('/reviews/:id/source', validId, requireActive('reviews'), videoUpload.single('video'), wrap(async (req) => {
     if (!req.file) throw new HttpError(400, 'Нет файла видео');
     return ingestSource(req.params.id, req.file.path, req.file.originalname);
   }));
-  api.post('/reviews/:id/reprocess', wrap((req) => reprocessSource(checkId(req.params.id))));
-  api.post('/reviews/:id/transcribe', wrap((req) => transcribeReview(checkId(req.params.id))));
+  api.post('/reviews/:id/reprocess', requireActive('reviews'), wrap((req) => reprocessSource(checkId(req.params.id))));
+  api.post('/reviews/:id/transcribe', requireActive('reviews'), wrap((req) => transcribeReview(checkId(req.params.id))));
   api.post('/reviews/:id/relines', wrap((req) => rebuildLines(checkId(req.params.id))));
   // Прослушать спикера: одна фраза вместо озвучки всего обзора. Отдаёт mp3, а не JSON.
-  api.post('/voices/preview', (req, res, next) => (async () => {
+  api.post('/voices/preview', requireActive('reviews'), (req, res, next) => (async () => {
     const language = typeof req.body?.language === 'string' ? req.body.language : 'mk';
     const registry = await voiceRegistry();
     const speaker = resolveSpeaker(registry, language, req.body?.speaker);
@@ -215,13 +298,13 @@ export const createApp = ({photoOrigin}) => {
     const audio = await synthesize(text, {language, voice: config.voiceId, model: config.model, settings: apiSettings(config.settings)});
     res.set('Content-Type', 'audio/mpeg').set('Cache-Control', 'no-store').send(audio);
   })().catch(next));
-  api.post('/reviews/:id/voice', wrap(async (req) => {
+  api.post('/reviews/:id/voice', requireActive('reviews'), wrap(async (req) => {
     const review = await getReview(checkId(req.params.id));
     const market = await renderMarket();
     return voiceReview(review.id, {language: typeof req.body?.language === 'string' ? req.body.language : undefined, market});
   }));
-  api.post('/reviews/:id/ambience', wrap((req) => ambienceReview(checkId(req.params.id))));
-  api.post('/reviews/:id/render', wrap(async (req) => {
+  api.post('/reviews/:id/ambience', requireActive('reviews'), wrap((req) => ambienceReview(checkId(req.params.id))));
+  api.post('/reviews/:id/render', requireActive('reviews'), wrap(async (req) => {
     const review = await getReview(checkId(req.params.id));
     if (review.source?.status !== 'ready') throw new HttpError(400, 'Видео ещё не готово');
     if (!review.segments.length) throw new HttpError(400, 'Добавь хотя бы один фрагмент');
@@ -251,7 +334,7 @@ export const createApp = ({photoOrigin}) => {
 
   // Карусели: ссылка Encar → семь картинок. Сборка синхронная — семь кадров снимаются
   // секунды, отдельная очередь как у видео тут была бы лишней сложностью.
-  api.post('/carousels', wrap((req) => buildCarousel(req.body?.link)));
+  api.post('/carousels', requireActive('carousels'), wrap((req) => buildCarousel(req.body?.link)));
   api.get('/carousels', wrap(() => listCarousels()));
   api.delete('/carousels/:id', wrap((req) => deleteCarousel(checkId(req.params.id))));
   api.get('/carousels/:id/slide/:n/download', async (req, res, next) => {
@@ -259,9 +342,9 @@ export const createApp = ({photoOrigin}) => {
       const id = checkId(req.params.id);
       const n = Number(req.params.n);
       if (!Number.isInteger(n) || n < 1 || n > 7) throw new HttpError(400, 'Нет такого слайда');
-      const meta = await readJson(path.join(CAROUSELS_DIR, id, 'carousel.json'))
+      const meta = await readJson(path.join(carouselsDir(), id, 'carousel.json'))
         .catch(() => { throw new HttpError(404, 'Карусель не собрана'); });
-      res.download(path.join(CAROUSELS_DIR, id, `slide-${n}.png`), slideFileName(meta.car, n));
+      res.download(path.join(carouselsDir(), id, `slide-${n}.png`), slideFileName(meta.car, n));
     } catch (e) { next(e); }
   });
 
@@ -271,18 +354,18 @@ export const createApp = ({photoOrigin}) => {
   })));
   api.get('/renders/:id', wrap((req) => getJob(checkId(req.params.id))));
   api.post('/renders/:id/cancel', wrap((req) => cancelJob(checkId(req.params.id))));
-  api.post('/renders/:id/retry', wrap((req) => retryJob(checkId(req.params.id))));
+  api.post('/renders/:id/retry', requireActive(), wrap((req) => retryJob(checkId(req.params.id))));
   api.delete('/renders/:id', wrap((req) => deleteJob(checkId(req.params.id))));
   api.get('/renders/:id/download', async (req, res, next) => {
     try {
       const job = await getJob(checkId(req.params.id));
       const name = `${job.title.replace(/[^\p{L}\p{N}]+/gu, '-')}-${job.format ?? 'price-ad'}-${job.id.slice(-14)}.mp4`;
-      res.download(path.join(RENDERS_DIR, `${job.id}.mp4`), name);
+      res.download(path.join(rendersDir(), `${job.id}.mp4`), name);
     } catch (e) { next(e); }
   });
 
   app.use('/api', api);
-  app.use('/data', express.static(DATA_DIR, {fallthrough: false}));
+  app.use('/data', guardData, express.static(DATA_DIR, {fallthrough: false}));
   app.use('/api', (err, req, res, _next) => {
     const status = err.status || (err.code === 'LIMIT_FILE_SIZE' ? 413 : 500);
     if (status >= 500) console.error(err);

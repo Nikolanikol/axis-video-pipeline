@@ -1,10 +1,11 @@
 // Очередь рендера: один ролик за раз, прогресс в памяти, история — JSON рядом с mp4.
+// Очередь общая на все компании, но каждое задание знает свою (ws) и пишет только в её папку.
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {bundle} from '@remotion/bundler';
 import {makeCancelSignal, openBrowser, renderMedia, renderStill, selectComposition} from '@remotion/renderer';
 import sharp from 'sharp';
-import {HttpError, RENDERS_DIR, ROOT, WORKSPACE_URL, checkId, readJson, writeJson} from './store.mjs';
+import {HttpError, ROOT, checkId, currentWorkspace, readJson, rendersDir, withWorkspace, workspaceUrl, writeJson} from './store.mjs';
 const browserExecutable = process.env.CHROME_PATH || null;
 const concurrency = process.env.RENDER_CONCURRENCY ? Number(process.env.RENDER_CONCURRENCY) : null;
 const crf = Number(process.env.RENDER_CRF || 20);
@@ -41,9 +42,16 @@ const queue = [];
 const ACTIVE = new Set(['queued', 'running']);
 let running = false;
 
-// input — сырые props, _cancel — функция отмены живого рендера: наружу их не отдаём
-const publicJob = ({input, _cancel, ...job}) => job;
-const metaFile = (id) => path.join(RENDERS_DIR, `${id}.json`);
+// input — сырые props, _cancel — функция отмены живого рендера, ws — компания: наружу их не отдаём
+const publicJob = ({input, _cancel, ws, ...job}) => job;
+const metaFile = (id, ws) => path.join(rendersDir(ws), `${id}.json`);
+
+// Задание из памяти — только своей компании. Id заданий предсказуемы (лот + время), и без
+// этой проверки чужой клиент мог бы отменить, пересобрать или удалить ваш ролик
+const ownJob = (id) => {
+  const job = jobs.get(id);
+  return job && job.ws === currentWorkspace() ? job : undefined;
+};
 
 // Задание рендера:
 // owner — {lotId} или {reviewId}; composition — id композиции Remotion (формат или review-short);
@@ -55,7 +63,8 @@ export const enqueue = ({owner, composition, compositionTitle, title, frames, in
   // Одно задание на обзор (или лот) за раз. Рендер минутного обзора занимает четверть часа и
   // все ядра: десять нажатий подряд — это два с половиной часа очереди из одинаковых роликов.
   // Проверяем на сервере, а не только в кнопке: вкладку можно открыть дважды.
-  const busy = [...jobs.values()].find((j) => (j.lotId ?? j.reviewId) === ownerId && ACTIVE.has(j.status));
+  const ws = currentWorkspace();
+  const busy = [...jobs.values()].find((j) => j.ws === ws && (j.lotId ?? j.reviewId) === ownerId && ACTIVE.has(j.status));
   if (busy) {
     throw new HttpError(409, busy.status === 'running'
       ? `Рендер уже идёт (${busy.progress}%) — дождись или обнови страницу`
@@ -63,9 +72,9 @@ export const enqueue = ({owner, composition, compositionTitle, title, frames, in
   }
   const id = `${ownerId}-${composition}-${stamp}`;
   const job = {
-    id, ...owner, title, format: composition, formatTitle: compositionTitle, frames,
+    id, ws, ...owner, title, format: composition, formatTitle: compositionTitle, frames,
     status: 'queued', stage: 'В очереди', progress: 0, createdAt: now.toISOString(),
-    video: `${WORKSPACE_URL}/renders/${id}.mp4`, storyboard: `${WORKSPACE_URL}/renders/${id}.jpg`,
+    video: `${workspaceUrl(ws)}/renders/${id}.mp4`, storyboard: `${workspaceUrl(ws)}/renders/${id}.jpg`,
     input: inputProps,
   };
   jobs.set(id, job);
@@ -79,7 +88,9 @@ const pump = async () => {
   running = true;
   const job = queue.shift();
   try {
-    await run(job);
+    // Следующее задание стартует из хвоста предыдущего — в контексте чужого запроса.
+    // Поэтому компанию задаём явно, из самого задания
+    await withWorkspace(job.ws, () => run(job));
     job.status = 'done';
     job.stage = 'Готово';
   } catch (e) {
@@ -95,7 +106,7 @@ const pump = async () => {
     }
   } finally {
     job.finishedAt = new Date().toISOString();
-    await writeJson(metaFile(job.id), publicJob(job)).catch((e) => console.error(e));
+    await writeJson(metaFile(job.id, job.ws), publicJob(job)).catch((e) => console.error(e));
     running = false;
     pump();
   }
@@ -129,6 +140,7 @@ const run = async (job) => {
   // Гонка со сторожем: если работа застряла там, где отмена не помогает (например, на сборке
   // проекта), очередь всё равно поедет дальше, а браузер закроется в finally
   const body = (async () => {
+    const RENDERS_DIR = rendersDir(job.ws);
     await fs.mkdir(RENDERS_DIR, {recursive: true});
     job.status = 'running';
     job.stage = 'Сборка проекта';
@@ -172,13 +184,13 @@ const run = async (job) => {
 };
 
 export const getJob = async (id) => {
-  const job = jobs.get(id);
+  const job = ownJob(checkId(id));
   return job ? publicJob(job) : readJson(metaFile(id));
 };
 
 // Отмена задания в очереди или в работе. Готовые/ошибочные отменять нечего.
 export const cancelJob = async (id) => {
-  const job = jobs.get(id);
+  const job = ownJob(id);
   if (!job || !ACTIVE.has(job.status)) throw new HttpError(409, 'Этот ролик уже не в очереди и не в работе');
   job.cancelled = true;
   if (job.status === 'queued') {
@@ -188,7 +200,7 @@ export const cancelJob = async (id) => {
     job.status = 'cancelled';
     job.stage = 'Отменён';
     job.finishedAt = new Date().toISOString();
-    await writeJson(metaFile(job.id), publicJob(job)).catch(() => {});
+    await writeJson(metaFile(job.id, job.ws), publicJob(job)).catch(() => {});
   } else {
     // Живой рендер: дёргаем cancelSignal, дальше run() упадёт, а pump() пометит «Отменён»
     job._cancel?.();
@@ -199,7 +211,7 @@ export const cancelJob = async (id) => {
 // Пересобрать: то же задание заново, с теми же props. Работает, пока исходные данные ещё
 // в памяти; после перезапуска сервера их нет — тогда честно просим запустить из лота.
 export const retryJob = async (id) => {
-  const job = jobs.get(id);
+  const job = ownJob(id);
   if (!job?.input) throw new HttpError(409, 'Исходные данные этого ролика уже не в памяти — запусти рендер заново из лота или обзора');
   return enqueue({
     owner: job.lotId ? {lotId: job.lotId} : {reviewId: job.reviewId},
@@ -212,18 +224,19 @@ export const retryJob = async (id) => {
 // «удаляем файл, который прямо сейчас пишется».
 export const deleteJob = async (id) => {
   checkId(id);
-  const job = jobs.get(id);
+  const job = ownJob(id);
   if (job && ACTIVE.has(job.status)) throw new HttpError(409, 'Сначала отмени рендер, потом удаляй');
-  jobs.delete(id);
+  if (job) jobs.delete(id);
   // -silent.mp4 — от прежней «версии без звука»: могло остаться на диске у старых роликов
   for (const suffix of ['.mp4', '.jpg', '.json', '-silent.mp4']) {
-    await fs.rm(path.join(RENDERS_DIR, `${id}${suffix}`), {force: true}).catch(() => {});
+    await fs.rm(path.join(rendersDir(), `${id}${suffix}`), {force: true}).catch(() => {});
   }
   return {id, deleted: true};
 };
 
 // История: завершённые с диска + текущие из памяти, новые сверху. filter — {lotId} или {reviewId}.
 export const listJobs = async (filter = {}) => {
+  const RENDERS_DIR = rendersDir();
   await fs.mkdir(RENDERS_DIR, {recursive: true});
   const files = (await fs.readdir(RENDERS_DIR)).filter((f) => f.endsWith('.json'));
   const byId = new Map();
@@ -231,7 +244,8 @@ export const listJobs = async (filter = {}) => {
     const job = await readJson(path.join(RENDERS_DIR, f)).catch(() => null);
     if (job) byId.set(job.id, job);
   }
-  for (const job of jobs.values()) byId.set(job.id, publicJob(job));
+  const ws = currentWorkspace();
+  for (const job of jobs.values()) if (job.ws === ws) byId.set(job.id, publicJob(job));
   return [...byId.values()]
     .filter((j) => (!filter.lotId || j.lotId === filter.lotId) && (!filter.reviewId || j.reviewId === filter.reviewId))
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));

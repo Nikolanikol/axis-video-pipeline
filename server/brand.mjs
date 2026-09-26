@@ -6,11 +6,11 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
-import {HttpError, WORKSPACE_DIR, WORKSPACE_URL, getBrand, saveBrand} from './store.mjs';
+import {HttpError, getBrand, saveBrand, workspaceDir, workspaceUrl} from './store.mjs';
 
 // Своя папка у каждой компании: ниже прежние логотипы удаляются всей папкой, и в общей
 // папке новый логотип одного клиента стёр бы логотипы всех остальных
-export const BRAND_DIR = path.join(WORKSPACE_DIR, 'brand');
+export const brandDir = () => path.join(workspaceDir(), 'brand');
 
 /**
  * Требования к логотипу. Держим их одним объектом: интерфейс показывает эти же числа,
@@ -65,6 +65,7 @@ export const saveLogo = async (buffer, originalName = '') => {
     }
   }
 
+  const BRAND_DIR = brandDir();
   await fs.mkdir(BRAND_DIR, {recursive: true});
   // Имя со временем: браузер и рендер кэшируют картинки по адресу, и при том же имени
   // показывали бы прежний логотип
@@ -76,7 +77,7 @@ export const saveLogo = async (buffer, originalName = '') => {
     if (f.startsWith('logo-') && f !== name) await fs.rm(path.join(BRAND_DIR, f), {force: true}).catch(() => {});
   }
 
-  const url = `${WORKSPACE_URL}/brand/${name}`;
+  const url = `${workspaceUrl()}/brand/${name}`;
   const brand = await getBrand();
   // Один файл на все места: и крупно на финале, и полосой вверху кадра. Отдельный
   // горизонтальный вариант заведём, если одного окажется мало

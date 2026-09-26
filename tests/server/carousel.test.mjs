@@ -6,13 +6,13 @@ import {afterAll, beforeAll, describe, expect, it} from 'vitest';
 import {useTempEnv} from '../helpers.mjs';
 
 let env;
-let CAROUSELS_DIR;
+let carouselsDir;
 let deleteCarousel;
 let listCarousels;
 
 // Подкладываем готовую карусель на диск, как её оставил бы настоящий сбор
 const seed = async (id, brand = 'Hyundai') => {
-  const dir = path.join(CAROUSELS_DIR, id);
+  const dir = path.join(carouselsDir(), id);
   await fs.mkdir(dir, {recursive: true});
   await fs.writeFile(path.join(dir, 'slide-1.png'), 'png');
   await fs.writeFile(path.join(dir, 'carousel.json'), JSON.stringify({
@@ -22,7 +22,7 @@ const seed = async (id, brand = 'Hyundai') => {
 
 beforeAll(async () => {
   env = await useTempEnv();
-  ({CAROUSELS_DIR, deleteCarousel, listCarousels} = await import('../../server/carousel.mjs'));
+  ({carouselsDir, deleteCarousel, listCarousels} = await import('../../server/carousel.mjs'));
 });
 afterAll(() => env.cleanup());
 
@@ -35,7 +35,7 @@ describe('удаление карусели', () => {
     const res = await deleteCarousel('41630924');
     expect(res).toEqual({id: '41630924', deleted: true});
     // Папки нет
-    await expect(fs.access(path.join(CAROUSELS_DIR, '41630924'))).rejects.toBeTruthy();
+    await expect(fs.access(path.join(carouselsDir(), '41630924'))).rejects.toBeTruthy();
     // В списке осталась только вторая
     expect((await listCarousels()).map((c) => c.id)).toEqual(['42636674']);
   });

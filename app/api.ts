@@ -35,6 +35,23 @@ export type Job = {
   video: string; storyboard: string;
 };
 
+// Кабинет SMMAKER: кто вошёл и что с доступом компании
+export type Access = {
+  active: boolean; plan: {id: string; title: string; pipelines: string[]} | null;
+  periodStart: string | null; periodEnd: string | null; paidUntil: string | null; credits: number;
+};
+export type Me =
+  | {authRequired: false}
+  | {authRequired: true; user: null}
+  | {authRequired: true; user: {id: string; email: string; isAdmin: boolean};
+     workspace: {id: string; name: string; role: string} | null; access: Access | null};
+export type Plan = {id: string; title: string; credits: number; days: number; pipelines: string[]; active: boolean};
+export type ActivationCode = {
+  code: string; plan_id: string; plan_title?: string; days: number; credits: number; note: string; created_at: string;
+  activated_at?: string | null; activated_workspace_id?: string | null; workspace_name?: string | null;
+};
+export type WorkspaceRow = {id: string; name: string; created_at: string; emails: string | null; access: Access};
+
 const request = async <T,>(method: string, url: string, body?: unknown): Promise<T> => {
   const isForm = body instanceof FormData;
   const res = await fetch(url, {
@@ -43,11 +60,29 @@ const request = async <T,>(method: string, url: string, body?: unknown): Promise
     body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
+  // Сессия кончилась или вход сброшен на другом устройстве — перезагрузка покажет экран входа
+  if (res.status === 401 && !url.startsWith('/api/auth/')) window.location.reload();
   if (!res.ok) throw new Error(data.error || `${res.status} ${res.statusText}`);
   return data as T;
 };
 
 export const api = {
+  me: () => request<Me>('GET', '/api/auth/me'),
+  login: (email: string, password: string) => request<{ok: true}>('POST', '/api/auth/login', {email, password}),
+  register: (data: {email: string; password: string; company: string; code: string}) =>
+    request<{ok: true}>('POST', '/api/auth/register', data),
+  logout: () => request<{ok: true}>('POST', '/api/auth/logout'),
+  redeem: (code: string) => request<Access>('POST', '/api/account/redeem', {code}),
+  admin: {
+    plans: () => request<Plan[]>('GET', '/api/admin/plans'),
+    savePlan: (plan: Plan) => request<Plan>('PUT', `/api/admin/plans/${plan.id}`, plan),
+    codes: () => request<ActivationCode[]>('GET', '/api/admin/codes'),
+    createCodes: (planId: string, count: number, note: string) =>
+      request<ActivationCode[]>('POST', '/api/admin/codes', {planId, count, note}),
+    workspaces: () => request<WorkspaceRow[]>('GET', '/api/admin/workspaces'),
+    adjustCredits: (id: string, delta: number, note: string) =>
+      request<Access>('POST', `/api/admin/workspaces/${id}/credits`, {delta, note}),
+  },
   config: () => request<Config>('GET', '/api/config'),
   saveBrand: (theme: Theme) => request<Theme>('PUT', '/api/brand', theme),
   saveMarket: (id: string, market: Market) => request<MarketEntry>('PUT', `/api/markets/${id}`, market),

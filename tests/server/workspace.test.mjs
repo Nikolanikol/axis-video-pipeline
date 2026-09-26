@@ -38,7 +38,7 @@ describe('адреса файлов компании', () => {
 
   it('фото лота получают адрес внутри папки компании', () => {
     expect(store.photoUrl('lot-1', 'a.jpg')).toBe('/data/workspaces/k-axis/lots/lot-1/photos/a.jpg');
-    expect(store.LOTS_DIR).toBe(path.join(env.ws, 'lots'));
+    expect(store.lotsDir()).toBe(path.join(env.ws, 'lots'));
   });
 });
 
