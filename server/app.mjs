@@ -24,6 +24,7 @@ import {carouselsDir, buildCarousel, deleteCarousel, listCarousels, slideFileNam
 import {LOGO_RULES, saveLogo, setLogoVariant} from './brand.mjs';
 import {billed, creditCosts, ledgerOf} from './billing.mjs';
 import {parseCarLink} from '../src/shared/encarLink.js';
+import {PALETTE_KEYS, isHex} from '../src/shared/contrast.js';
 import {
   accessOf, adjustCredits, createCodes, listCodes, listPlans, listWorkspaces, login, redeem, register, savePlan,
   dropSession,
@@ -75,6 +76,10 @@ const checkBrand = (theme) => {
     if (typeof v !== 'string' || !(v === '' || v.startsWith('brand/') || v.startsWith(own))) {
       throw new HttpError(400, `Файл бренда «${k}»: только встроенный или загруженный в настройках`);
     }
+  }
+  // Цвет попадает прямо в стили вёрстки рендера — только #RRGGBB, никаких строк со стороны
+  for (const k of PALETTE_KEYS) {
+    if (theme[k] !== undefined && !isHex(theme[k])) throw new HttpError(400, `Цвет «${k}» — в виде #RRGGBB`);
   }
   const url = theme.fonts?.url ?? '';
   if (url && !/^https:\/\/fonts\.googleapis\.com\//.test(url)) {
@@ -197,6 +202,9 @@ export const createApp = ({photoOrigin}) => {
     // Пары шрифтов для настроек бренда. Все с кириллицей — проверено запросом к Google Fonts,
     // и все отдают настоящие 500/600/700, а не синтезированный жирный
     fonts: await readJson(path.join(CONFIG_DIR, 'fonts.json')),
+    // Палитры: восемь цветов темы согласованно, каждая прошла проверку контраста
+    // (tests/unit/palettes.test.ts). Клиент выбирает палитру, а не восемь цветов по одному
+    palettes: await readJson(path.join(CONFIG_DIR, 'palettes.json')),
     // Спикеры озвучки: интерфейс показывает только тех, кто умеет выбранный язык
     voices: await voiceRegistry(),
     // Что доступно: распознавание речи включается ключом ElevenLabs в .env

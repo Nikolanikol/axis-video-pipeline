@@ -417,3 +417,12 @@ a.tab { text-decoration: none; }
 .table td.plus { color: var(--ok); font-weight: 600; }
 .table td.minus { color: var(--copper-light); font-weight: 600; }
 .logo-text { font-weight: 700; font-size: 18px; text-transform: uppercase; text-align: center; line-height: 1.1; word-break: break-word; }
+/* Палитры: карточка нарисована самой палитрой — фон, текст, акцентная плашка, чип */
+.pair.palette { gap: 8px; }
+.palette-demo { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.palette-price { font: 700 17px Oswald, sans-serif; padding: 3px 10px; border-radius: 6px; }
+.palette-chip { font-size: 12px; padding: 3px 8px; border-radius: 6px; }
+.fine { margin: 6px 0 4px; }
+.fine summary { cursor: pointer; font-size: 13px; color: var(--muted); padding: 6px 0; }
+.fine summary:hover { color: var(--text); }
+.fine-warn { color: #ffb4b8; }
