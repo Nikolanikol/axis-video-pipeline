@@ -64,6 +64,8 @@ export type Lot = Partial<Omit<Market, 'texts'>> & {
   // Путь в public/, абсолютный путь сервера (/data/...) или http-ссылка
   photos: string[];
   texts?: Partial<Texts>;
+  // Звуковые эффекты на появление плашек (config/sfx.json): false — выключены, нет поля — включены
+  sfx?: boolean;
 };
 
 // Вход любого формата

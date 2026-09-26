@@ -1,0 +1,19 @@
+{
+  "_note": "Звуковые эффекты рекламы. Пакет — набор звуков на события ролика. peakSec — где у звука «удар» (меряет tools/prep-sfx.mjs): звук ставится так, чтобы пик пришёлся на появление плашки. volume — громкость в ролике, 0…1. Файлы — в public/sfx, исходники — в public/sfx/src.",
+  "default": "mixkit-test",
+  "packs": [
+    {
+      "id": "mixkit-test",
+      "title": "Mixkit (проба)",
+      "note": "Проба на библиотечных звуках, 27.09.2026. Лицензия Mixkit Sound Effects Free разрешает соцсети и рекламу, но запрещает распространение «в составе инструмента или шаблона» — для SaaS серо. После прослушивания заменить своими синтезированными похожими звуками (решение владельца).",
+      "license": "Mixkit Sound Effects Free License",
+      "licenseUrl": "https://mixkit.co/license/#sfxFree",
+      "sounds": {
+        "transition": {"file": "sfx/mixkit-1492.wav", "peakSec": 1.089, "volume": 0.35, "title": "Cinematic whoosh fast transition", "url": "https://mixkit.co/free-sound-effects/whoosh/"},
+        "tick": {"file": "sfx/mixkit-2568.wav", "peakSec": 0.001, "volume": 0.3, "title": "Cool interface click tone", "url": "https://mixkit.co/free-sound-effects/click/"},
+        "price": {"file": "sfx/mixkit-2903.wav", "peakSec": 0.65, "volume": 0.55, "title": "Movie whoosh impact presentation", "url": "https://mixkit.co/free-sound-effects/whoosh/"},
+        "cta": {"file": "sfx/mixkit-951.wav", "peakSec": 0.134, "volume": 0.4, "title": "Positive notification", "url": "https://mixkit.co/free-sound-effects/notification/"}
+      }
+    }
+  ]
+}
