@@ -25,6 +25,8 @@ export type Market = {
   freightUsd: number; whatsapp: string | null; site: string; texts: Texts;
   music?: Music;
   pricingMode?: PricingMode; currency?: string;
+  // Язык постов из профиля: по нему карусель выбирает язык слайдов (src/carousel/i18n)
+  language?: string;
 };
 
 // Профиль клиента: config/profiles/<id>.json. Приходит на смену «рынку» — см. src/shared/profile.js.

@@ -134,5 +134,6 @@ docker build -t axis-video .
 | Demucs | звуки машины без голоса (проба) | окружение `.venv-demucs`, необязательно |
 | Postgres (общий Supabase) | база SMMAKER: кабинеты, коды, кредиты | `DATABASE_URL`, `SMMAKER_DB_SCHEMA` |
 
-Шлюз живёт в соседнем проекте: `KMotors-1/src/app/api/vehicle/[id]/route.ts`. Encar режет
+Шлюз живёт в соседнем проекте `~/Desktop/recup/KMotors-1`: `src/app/api/vehicle/[id]/route.ts`.
+Оттуда же русский словарь карусели — `tools/sync-kmotors-dict.mjs`. Encar режет
 адреса дата-центров, поэтому ходим через него, а не напрямую.

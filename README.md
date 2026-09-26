@@ -213,6 +213,11 @@ npm run app          # откроется http://localhost:3210
 `src/shared/encarLink.js` — разбор ссылки, `app/carousels/CarouselTool.tsx` — экран.
 Готовое лежит в `data/workspaces/<компания>/carousels/<id>/`.
 
+**Язык слайдов** — из «Языка постов» в профиле: английский или русский (македонский и
+другие пока получают английский). Опции, топливо и коробка переводятся словарями kmotors —
+слово то же, что на kmotors.shop/ru. Новые опции в kmotors — пересобрать словарь:
+`node tools/sync-kmotors-dict.mjs ~/Desktop/recup/KMotors-1`.
+
 ## Пайплайны и инструменты
 
 ```

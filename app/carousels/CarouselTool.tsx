@@ -6,6 +6,7 @@ import React, {useCallback, useEffect, useState} from 'react';
 import {api, CarouselEntry} from '../api';
 import {useConfig} from '../config';
 import {useCost, useSession} from '../auth';
+import {carouselLang} from '../../src/carousel/i18n';
 import {Field} from '../LotForm';
 
 const km = (v: number | null) => (v === null ? '—' : `${v.toLocaleString('ru-RU')} км`);
@@ -69,7 +70,9 @@ const Lightbox: React.FC<{entry: CarouselEntry; at: number; onClose: () => void;
   };
 
 export const CarouselTool: React.FC = () => {
-  const {report, config} = useConfig();
+  const {report, config, profile} = useConfig();
+  // Язык слайдов — из профиля: виден здесь, чтобы не удивляться английской карусели
+  const slidesLang = carouselLang(profile.language) === 'ru' ? 'русском' : 'английском';
   const {refresh: refreshAccess} = useSession();
   const cost = useCost('carousels', config.credits);
   const [link, setLink] = useState('');
@@ -140,7 +143,7 @@ export const CarouselTool: React.FC = () => {
       <section className="panel editor">
         <div className="form">
           <h2>Объявление</h2>
-          <Field label="Ссылка на Encar" hint="можно вставить и просто номер объявления">
+          <Field label="Ссылка на Encar" hint={<>можно вставить и просто номер объявления · слайды на {slidesLang} — язык меняется в <a href="#/settings/profile">профиле</a></>}>
             <input
               value={link}
               placeholder="https://fem.encar.com/cars/detail/41630924"

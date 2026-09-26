@@ -41,16 +41,21 @@ export const Header: React.FC<{index: number; total: number; brandName: string}>
 };
 
 /** Рубрика медью и крупный заголовок под ней — общий вход в каждый слайд */
-export const Title: React.FC<{kicker: string; children: React.ReactNode}> = ({kicker, children}) => (
-  <div style={{marginTop: 52}}>
-    <CopperText style={{fontFamily: BODY, fontWeight: 700, fontSize: 32, letterSpacing: 9, textTransform: 'uppercase'}}>
-      {kicker}
-    </CopperText>
-    <div style={{fontFamily: HEAD, fontWeight: 600, fontSize: 92, lineHeight: 1.05, marginTop: 20}}>
-      {children}
+export const Title: React.FC<{kicker: string; children: React.ReactNode}> = ({kicker, children}) => {
+  const C = useTheme();
+  return (
+    <div style={{marginTop: 52}}>
+      <CopperText style={{fontFamily: BODY, fontWeight: 700, fontSize: 32, letterSpacing: 9, textTransform: 'uppercase'}}>
+        {kicker}
+      </CopperText>
+      {/* Цвет задан явно: без него заголовок наследовал чёрный по умолчанию и пропадал
+          на тёмном слайде — «Nothing hidden» так и выходил почти невидимым */}
+      <div style={{fontFamily: HEAD, fontWeight: 600, fontSize: 92, lineHeight: 1.05, marginTop: 20, color: C.white}}>
+        {children}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 /**
  * Фото в край: на всю ширину слайда, без рамки и полей.

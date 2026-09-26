@@ -333,7 +333,9 @@ export const ProfileForm: React.FC<ProfileProps> = ({profile, saved, onChange, o
 
       <div className="row">
         <Field label="Компания" hint="печатается на постах"><input value={profile.company} onChange={(e) => set({company: e.target.value})} /></Field>
-        <Field label="Язык постов">
+        <Field label="Язык постов" hint={['en', 'ru'].includes(profile.language)
+          ? 'на нём же и карусели'
+          : 'карусели пока на английском: умеют русский и английский'}>
           <select value={profile.language} onChange={(e) => set({language: e.target.value})}>
             {TARGET_LANGUAGES.map((l) => <option key={l.code} value={l.code}>{l.name} ({l.code})</option>)}
           </select>
