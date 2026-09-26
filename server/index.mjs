@@ -10,7 +10,9 @@ import {refundOrphans} from './billing.mjs';
 import {DEFAULT_WORKSPACE, ensureWorkspace, legacyDataDirs} from './store.mjs';
 
 const PORT = Number(process.env.PORT || 3210);
-// Без авторизации — поэтому только локально
+// По умолчанию только локально: без базы входа нет вовсе, а с базой на Mac защищённые файлы
+// отдаются своему браузеру без сессии (см. guardData в session.mjs). Наружу — только в
+// контейнере (HOST=0.0.0.0 в Dockerfile), где снаружи всё идёт через прокси
 const HOST = process.env.HOST || '127.0.0.1';
 
 // Последняя сетка безопасности. Без неё невыловленная ошибка в фоновой задаче роняет сервер

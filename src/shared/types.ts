@@ -1,4 +1,5 @@
-// Типы данных проекта: рынок, лот, формат, обзор. Общие для ролика, интерфейса и сервера.
+// Типы данных проекта: бренд, профиль и рынок (мост из профиля), лот, формат, обзор, карусель.
+// Общие для ролика, интерфейса и сервера.
 import type brandTheme from '../../config/brand.json';
 
 export type Theme = typeof brandTheme;
@@ -16,7 +17,8 @@ export type Track = {
   startSec: number; bpm: number; gain: number;
 };
 
-// Настройки рынка: config/markets/<id>.json.
+// «Рынок» — форма данных, которую читают пайплайны. Сейчас его собирает из профиля клиента
+// мост marketFromProfile (src/shared/profile.js); файлы config/markets/ остались для Studio и CLI.
 // pricingMode/currency появляются, когда объект собран из профиля мостом marketFromProfile
 // (src/shared/profile.js): по ним ценовая сцена решает — рисовать маршрут «до порта» (export)
 // или просто цену (domestic). У старых рынков-файлов их нет, поэтому опциональные.
@@ -92,7 +94,7 @@ export type ReviewSource = {
   progress?: number;
   error?: string;
   name?: string;
-  // Рабочая копия H.264 до 1080×1920, частота REVIEW_FPS: /data/reviews/<id>/proxy-<версия>.mp4
+  // Рабочая копия H.264 до 1080×1920, частота REVIEW_FPS: /data/workspaces/<компания>/reviews/<id>/proxy-<версия>.mp4
   // (для рендера — полный http-адрес)
   proxy?: string;
   width?: number;

@@ -1,4 +1,5 @@
-// Клиент API сервера: лоты, фото, обзоры, речь, озвучка, рендеры. Типы ответов — общие с сервером.
+// Клиент API сервера: вход и кабинет, админка, настройки, лоты и фото, обзоры, речь и озвучка,
+// рендеры, карусели. Типы ответов — общие с сервером.
 import type {CarouselCar, FormatMeta, Lot, Market, Profile, Review, Texts, Theme} from '../src/shared/types';
 
 export type MarketEntry = Market & {id: string};
@@ -124,8 +125,7 @@ export const api = {
   review: (id: string) => request<ReviewEntry>('GET', `/api/reviews/${id}`),
   createReview: (data: {lotId?: string | null; title?: string}) => request<ReviewEntry>('POST', '/api/reviews', data),
   saveReview: (r: ReviewEntry, baseUpdatedAt?: string) => request<ReviewEntry>('PUT', `/api/reviews/${r.id}`, {...r, baseUpdatedAt}),
-  // Карусели: ссылка Encar → семь слайдов
-  // Логотип: сервер проверяет формат, размер и прозрачность и возвращает обновлённый бренд
+  // Логотип: сервер сам доводит файл (фон, поля, размер, SVG → PNG) и возвращает обновлённый бренд
   uploadLogo: async (file: File) => {
     const form = new FormData();
     form.append('logo', file);
@@ -138,6 +138,7 @@ export const api = {
   // clean — фон убран, raw — как загружен, none — без логотипа, название компании текстом
   logoVariant: (variant: 'clean' | 'raw' | 'none') =>
     request<{url: string; brand: Theme}>('PUT', '/api/brand/logo/variant', {variant}),
+  // Карусели: ссылка Encar → слайды формата; seed — зерно варианта (нет — случайное)
   buildCarousel: (link: string, format?: string, seed?: number) => request<CarouselEntry>('POST', '/api/carousels', {link, format, seed}),
   carousels: () => request<CarouselEntry[]>('GET', '/api/carousels'),
   deleteCarousel: (id: string) => request<{id: string; deleted: boolean}>('DELETE', `/api/carousels/${id}`),

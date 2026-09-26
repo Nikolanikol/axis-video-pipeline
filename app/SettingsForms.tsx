@@ -1,4 +1,5 @@
-// Формы настроек: профиль клиента (компания, язык, модель цены, контакты), рынок и бренд.
+// Формы настроек: профиль клиента (компания, язык постов, модель цены, контакты) и бренд
+// (логотип, шрифты, оформление, палитра).
 import React, {useEffect, useRef, useState} from 'react';
 import {POST_LANGUAGES} from '../src/shared/languages';
 import type {Profile, Theme} from '../src/shared/types';

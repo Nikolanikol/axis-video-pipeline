@@ -1,4 +1,5 @@
-// Языки перевода: на них делаем субтитры и озвучку. Общий модуль (интерфейс, сервер, тесты).
+// Языки: перевода обзоров (субтитры и озвучка, TARGET_LANGUAGES) и постов (POST_LANGUAGES —
+// реклама и карусели). Общий модуль (интерфейс, сервер, тесты).
 // voice — умеет ли этот язык голосовая модель (eleven_v3). Субтитры можно делать на любом.
 
 /** @typedef {{code: string, name: string, voice: boolean}} TargetLanguage */
@@ -40,7 +41,8 @@ export const languageName = (code) => findLanguage(code)?.name ?? String(code ||
 export const canSpeak = (code) => Boolean(findLanguage(code)?.voice);
 
 /**
- * Язык перевода обзора: свой, иначе язык рынка, иначе македонский.
+ * Язык перевода обзора: свой, иначе язык постов из профиля (приходит в market мостом),
+ * иначе македонский.
  * @param {{targetLanguage?: string}} review
  * @param {{language?: string} | null} [market]
  */

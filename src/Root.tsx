@@ -53,7 +53,8 @@ export const Root: React.FC = () => (
       height={1920}
       defaultProps={{}}
     />
-    {/* Карусель: кадр на слайд, на выходе не видео, а семь картинок через renderStill */}
+    {/* Карусель: кадр на слайд, на выходе не видео, а картинки через renderStill.
+        Размер и число слайдов — от формата (calculateMetadata ниже); 1080×1920 — «Классика» */}
     <Composition
       id="carousel"
       component={Carousel}
