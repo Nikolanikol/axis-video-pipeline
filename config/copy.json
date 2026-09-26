@@ -15,9 +15,19 @@
       "priceLabel": "Landed price to {port}",
       "priceNoteIncluded": "Sea freight included.",
       "priceNoteExcluded": "Customs duties not included.",
-      "ctaTitle": "Full quote\nin 24 hours",
+      "ctaTitle": "Full quote",
       "ctaAccent": "in 24 hours",
       "ctaBenefit": "We work commission-free",
+      "whatsappLabel": "WhatsApp"
+    },
+    "ru": {
+      "hookTagline": "Из Кореи",
+      "priceLabel": "Цена до {port}",
+      "priceNoteIncluded": "Морская доставка включена.",
+      "priceNoteExcluded": "Растаможка не включена.",
+      "ctaTitle": "Полный расчёт",
+      "ctaAccent": "за 24 часа",
+      "ctaBenefit": "Работаем без комиссии",
       "whatsappLabel": "WhatsApp"
     }
   },

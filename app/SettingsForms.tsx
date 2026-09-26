@@ -1,6 +1,6 @@
 // Формы настроек: профиль клиента (компания, язык, модель цены, контакты), рынок и бренд.
 import React, {useEffect, useRef, useState} from 'react';
-import {TARGET_LANGUAGES} from '../src/shared/languages';
+import {POST_LANGUAGES} from '../src/shared/languages';
 import type {Profile, Theme} from '../src/shared/types';
 import {api, FontPair, Palette, ProfileEntry} from './api';
 import {contrastIssues, matchPalette} from '../src/shared/contrast.js';
@@ -333,11 +333,14 @@ export const ProfileForm: React.FC<ProfileProps> = ({profile, saved, onChange, o
 
       <div className="row">
         <Field label="Компания" hint="печатается на постах"><input value={profile.company} onChange={(e) => set({company: e.target.value})} /></Field>
-        <Field label="Язык постов" hint={['en', 'ru'].includes(profile.language)
-          ? 'на нём же и карусели'
-          : 'карусели пока на английском: умеют русский и английский'}>
+        <Field label="Язык постов" hint="реклама и карусели">
           <select value={profile.language} onChange={(e) => set({language: e.target.value})}>
-            {TARGET_LANGUAGES.map((l) => <option key={l.code} value={l.code}>{l.name} ({l.code})</option>)}
+            {POST_LANGUAGES.map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
+            {/* Старый профиль мог остаться на языке, которого в списке больше нет: показываем
+                его как есть, иначе поле молча отображало бы первый пункт, а сохранялось другое */}
+            {!POST_LANGUAGES.some((l) => l.code === profile.language) && (
+              <option value={profile.language}>{profile.language} — больше не поддерживается, выберите другой</option>
+            )}
           </select>
         </Field>
       </div>
