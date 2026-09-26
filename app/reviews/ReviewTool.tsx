@@ -1,6 +1,7 @@
 // Пайплайн «Обзоры авто» → «Монтаж обзора»: видео → фрагменты → превью → рендер
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Player, PlayerRef} from '@remotion/player';
+import {withoutMusic} from '../../src/shared/nomusic.js';
 import {ReviewShort} from '../../src/reviews/ReviewShort';
 import {marketFromProfile} from '../../src/shared/profile';
 import {
@@ -11,7 +12,6 @@ import {api, LotEntry, ReviewEntry} from '../api';
 import {useConfig} from '../config';
 import {JobsPanel} from '../JobsPanel';
 import {Field} from '../LotForm';
-import {MusicFields} from '../MusicFields';
 import {Scrubber, Seek, sec} from './Scrubber';
 import {SegmentList} from './SegmentList';
 import {speechStale} from '../../src/shared/subtitles.js';
@@ -153,7 +153,8 @@ export const ReviewTool: React.FC = () => {
   const timeline = useMemo(() => buildTimeline(segments, REVIEW_FPS), [segments]);
   const totalSec = timeline.durationInFrames / REVIEW_FPS;
   const input: ReviewProps | null = useMemo(
-    () => (review && market ? {review, lot, market: market as Market, theme: brand} : null),
+    // Превью звучит так же, как рендер: без музыки, что бы ни было сохранено в обзоре
+    () => (review && market ? {review: withoutMusic(review), lot, market: market as Market, theme: brand} : null),
     [review, lot, market, brand],
   );
 
@@ -313,7 +314,6 @@ export const ReviewTool: React.FC = () => {
               )}
 
               <h2>Звук</h2>
-              <MusicFields value={review.music} inherited={market?.music ?? {track: null}} onChange={(music) => edit({music})} />
               {review.voice && voiceClips > 0 && (
                 <Field label={`Голос диктора: ${Math.round((review.voice.volume ?? 1) * 100)}%`}
                   hint={review.voice.enabled ? undefined : 'озвучка выключена — включается в разделе «Речь»'}>

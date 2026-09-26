@@ -25,6 +25,7 @@ import {LOGO_RULES, saveLogo, setLogoVariant} from './brand.mjs';
 import {billed, creditCosts, ledgerOf} from './billing.mjs';
 import {parseCarLink} from '../src/shared/encarLink.js';
 import {PALETTE_KEYS, isHex} from '../src/shared/contrast.js';
+import {withoutMusic} from '../src/shared/nomusic.js';
 import {
   accessOf, adjustCredits, createCodes, listCodes, listPlans, listWorkspaces, login, redeem, register, savePlan,
   dropSession,
@@ -287,7 +288,8 @@ export const createApp = ({photoOrigin}) => {
     const [market, brand] = await Promise.all([renderMarket(), getBrand()]);
     const theme = {...brand, name: market.name};
     const title = [lot.brand, lot.model, lot.year].filter(Boolean).join(' ') || lot.id;
-    const inputProps = {lot: withAbsolutePhotos(lot, photoOrigin), market, theme: themeForRender(photoOrigin, theme)};
+    // Музыка убрана из продукта: сохранённый в лоте трек в ролик не идёт (src/shared/nomusic.js)
+    const inputProps = {lot: withAbsolutePhotos(withoutMusic(lot), photoOrigin), market, theme: themeForRender(photoOrigin, theme)};
     return enqueue({
       owner: {lotId: lot.id}, composition: format.id, compositionTitle: format.title, title,
       frames: storyboardFrames(format), inputProps, bill: billOf(req, 'ads'),
@@ -341,7 +343,8 @@ export const createApp = ({photoOrigin}) => {
     const theme = {...brand, name: market.name};
     const inputProps = {
       review: {
-        ...review,
+        // Музыка убрана из продукта: сохранённый в обзоре трек в ролик не идёт (src/shared/nomusic.js)
+        ...withoutMusic(review),
         source: {...review.source, proxy: absolute(photoOrigin, review.source.proxy)},
         ambience: review.ambience?.file ? {...review.ambience, file: absolute(photoOrigin, review.ambience.file)} : review.ambience,
         voice: review.voice && {

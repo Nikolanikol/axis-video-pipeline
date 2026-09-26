@@ -3,6 +3,7 @@ import React, {useRef} from 'react';
 import {Player, PlayerRef} from '@remotion/player';
 import {FORMAT_COMPONENTS} from '../src/formats';
 import type {AdProps, FormatMeta} from '../src/shared/types';
+import {withoutMusic} from '../src/shared/nomusic.js';
 
 export const Preview: React.FC<{input: AdProps; format: FormatMeta}> = ({input, format}) => {
   const ref = useRef<PlayerRef>(null);
@@ -13,7 +14,8 @@ export const Preview: React.FC<{input: AdProps; format: FormatMeta}> = ({input, 
           ref={ref}
           key={format.id}
           component={FORMAT_COMPONENTS[format.id]}
-          inputProps={input}
+          // Превью звучит так же, как рендер: без музыки, что бы ни было сохранено в лоте
+          inputProps={{...input, lot: withoutMusic(input.lot)}}
           durationInFrames={format.durationInFrames}
           fps={format.fps}
           compositionWidth={format.width}
