@@ -20,7 +20,7 @@ import {
 import {apiSettings, resolveSpeaker, voiceConfig} from '../src/shared/voices.js';
 import {hasKey, hasVoice, synthesize} from './speech.mjs';
 import {hasSeparator} from './ambience.mjs';
-import {carouselsDir, buildCarousel, deleteCarousel, listCarousels, slideFileName} from './carousel.mjs';
+import {carouselFormats, carouselsDir, buildCarousel, deleteCarousel, listCarousels, slideFileName} from './carousel.mjs';
 import {LOGO_RULES, saveLogo, setLogoVariant} from './brand.mjs';
 import {billed, creditCosts, ledgerOf} from './billing.mjs';
 import {parseCarLink} from '../src/shared/encarLink.js';
@@ -205,6 +205,8 @@ export const createApp = ({photoOrigin}) => {
     // Палитры: восемь цветов темы согласованно, каждая прошла проверку контраста
     // (tests/unit/palettes.test.ts). Клиент выбирает палитру, а не восемь цветов по одному
     palettes: await readJson(path.join(CONFIG_DIR, 'palettes.json')),
+    // Форматы карусели: размер кадра и список слайдов
+    carouselFormats: await carouselFormats(),
     // Спикеры озвучки: интерфейс показывает только тех, кто умеет выбранный язык
     voices: await voiceRegistry(),
     // Что доступно: распознавание речи включается ключом ElevenLabs в .env
@@ -365,16 +367,17 @@ export const createApp = ({photoOrigin}) => {
     {...billOf(req, 'carousels'), workspaceId: req.ws,
       jobId: `carousel-${req.ws}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
       note: String(req.body?.link ?? '').slice(0, 120)},
-    () => buildCarousel(req.body?.link))));
+    () => buildCarousel(req.body?.link, {format: req.body?.format, seed: req.body?.seed}))));
   api.get('/carousels', wrap(() => listCarousels()));
   api.delete('/carousels/:id', wrap((req) => deleteCarousel(checkId(req.params.id))));
   api.get('/carousels/:id/slide/:n/download', async (req, res, next) => {
     try {
       const id = checkId(req.params.id);
       const n = Number(req.params.n);
-      if (!Number.isInteger(n) || n < 1 || n > 7) throw new HttpError(400, 'Нет такого слайда');
       const meta = await readJson(path.join(carouselsDir(), id, 'carousel.json'))
         .catch(() => { throw new HttpError(404, 'Карусель не собрана'); });
+      // Слайдов столько, сколько в собранной карусели: у форматов их от 6 до 12
+      if (!Number.isInteger(n) || n < 1 || n > meta.slides.length) throw new HttpError(400, 'Нет такого слайда');
       res.download(path.join(carouselsDir(), id, `slide-${n}.png`), slideFileName(meta.car, n));
     } catch (e) { next(e); }
   });

@@ -386,6 +386,18 @@ export const ProfileForm: React.FC<ProfileProps> = ({profile, saved, onChange, o
         </Field>
         <Field label="Сайт"><input value={profile.contacts.site} onChange={(e) => setContacts({site: e.target.value})} /></Field>
       </div>
+      <div className="row">
+        <Field label="Telegram" hint="@имя или ссылка t.me/…">
+          <input value={profile.contacts.telegram ?? ''} onChange={(e) => setContacts({telegram: e.target.value})} />
+        </Field>
+        <Field label="Кнопка на финале карусели" hint="если у выбранного нет контакта — возьмём другой">
+          <select value={profile.contacts.primary ?? 'whatsapp'}
+            onChange={(e) => setContacts({primary: e.target.value as 'whatsapp' | 'telegram'})}>
+            <option value="whatsapp">Написать в WhatsApp</option>
+            <option value="telegram">Написать в Telegram</option>
+          </select>
+        </Field>
+      </div>
 
       <div className="actions">
         <button className="btn primary" disabled={!dirty || busy} onClick={persist}>Сохранить</button>

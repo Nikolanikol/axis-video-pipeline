@@ -12,6 +12,8 @@ import type {CarouselProps} from '../shared/types';
 import {BODY, CopperText, HEAD, Logo, ThemeProvider, radius, useAsset, useTheme} from '../shared/ui';
 import {Bullets, NumberCard, PAD, PhotoBand, Row, SAFE, Slide, Title, TOTAL} from './Slides';
 import {CarouselText, carouselLang, carouselText} from './i18n';
+import {Deck} from './deck/Deck';
+import {carouselFormat, carouselSlides} from './formats';
 
 export const CAROUSEL_SLIDES = TOTAL;
 
@@ -284,6 +286,16 @@ export const Carousel: React.FC<CarouselProps> = (props) => {
   const withHistory = props.includeHistory !== false;
   // Язык слайдов — из профиля клиента; не английский и не русский → английский
   const tx = carouselText(carouselLang(props.market?.language));
+  // Новые форматы («Витрина», «Разворот», «Полная») собираются из библиотеки слайдов
+  // (./deck); «Классика» — прежняя вёрстка ниже, как была
+  if (carouselFormat(props.format).id !== 'classic') {
+    return (
+      <ThemeProvider value={theme}>
+        <Deck {...props} frame={frame} tx={tx} brandName={brandName} seed={props.seed ?? 1}
+          slides={carouselSlides(props.format, withHistory)} />
+      </ThemeProvider>
+    );
+  }
   const slides = [Cover, ...(withHistory ? [History] : []), Interior, Technology, Specs, Price, Cta];
   const total = slides.length;
   const i = Math.min(total - 1, Math.max(0, frame));

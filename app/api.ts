@@ -23,6 +23,7 @@ export type Config = {
   production: boolean;
   fonts: FontPair[];
   palettes?: Palette[];
+  carouselFormats?: CarouselFormat[];
   // ambience — установлено ли локальное окружение для выделения звуков машины (проба)
   features: {speech: boolean; voice: boolean; ambience?: boolean};
   // Цены генераций в кредитах: {ads, carousels, reviews}
@@ -31,7 +32,9 @@ export type Config = {
 };
 export type ReviewEntry = Review & {id: string};
 // Готовая карусель: карточка авто от шлюза и адреса семи картинок
-export type CarouselEntry = {id: string; car: CarouselCar; slides: string[]; updatedAt: string};
+// format и seed — чем собрана: формат из реестра и зерно варианта (у старых карусель их нет — «Классика»)
+export type CarouselEntry = {id: string; car: CarouselCar; slides: string[]; updatedAt: string; format?: string; seed?: number};
+export type CarouselFormat = {id: string; title: string; note: string; width: number; height: number; slides: string[]};
 export type JobQuery = {lot?: string; review?: string};
 export type Job = {
   id: string; lotId?: string; reviewId?: string; title: string; format: string; formatTitle: string;
@@ -135,7 +138,7 @@ export const api = {
   // clean — фон убран, raw — как загружен, none — без логотипа, название компании текстом
   logoVariant: (variant: 'clean' | 'raw' | 'none') =>
     request<{url: string; brand: Theme}>('PUT', '/api/brand/logo/variant', {variant}),
-  buildCarousel: (link: string) => request<CarouselEntry>('POST', '/api/carousels', {link}),
+  buildCarousel: (link: string, format?: string, seed?: number) => request<CarouselEntry>('POST', '/api/carousels', {link, format, seed}),
   carousels: () => request<CarouselEntry[]>('GET', '/api/carousels'),
   deleteCarousel: (id: string) => request<{id: string; deleted: boolean}>('DELETE', `/api/carousels/${id}`),
   renderReview: (id: string) => request<Job>('POST', `/api/reviews/${id}/render`, {}),

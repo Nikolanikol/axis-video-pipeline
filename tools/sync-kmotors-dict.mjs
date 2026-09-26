@@ -45,6 +45,37 @@ for (const [ko, enWord] of Object.entries(en)) {
   else values[enWord] = ruWord;
 }
 
+// Иконки опций — те же, что на сайте kmotors: соответствие «код → компонент» из OptionsRow.tsx
+// и из каких пакетов эти компоненты (lucide-react или react-icons/tb). Пишем отдельный модуль
+// с явными импортами: обращение к пакету целиком по имени затащило бы в сборку тысячи иконок
+const rowTsx = await fs.readFile(path.join(root, 'src/components/Catalog/CarDetail/OptionsRow/OptionsRow.tsx'), 'utf8');
+const lucide = new Set((/import\s*\{([^}]+)\}\s*from\s*"lucide-react"/.exec(rowTsx)?.[1] ?? '').split(',').map((x) => x.trim()).filter(Boolean));
+const iconByCode = {};
+for (const m of rowTsx.matchAll(/"(\d{3})"\s*:\s*<(\w+)/g)) iconByCode[m[1]] = m[2];
+const codeByEn = Object.fromEntries(Object.entries(enByCode).map(([code, name]) => [name, code]));
+const used = [...new Set(Object.values(iconByCode))].sort();
+const fromLucide = used.filter((n) => lucide.has(n));
+const fromTb = used.filter((n) => !lucide.has(n));
+const iconsTsx = `// Сгенерировано tools/sync-kmotors-dict.mjs из OptionsRow.tsx kmotors. Руками не править.
+// Иконка опции по её английскому названию (как отдаёт шлюз) — та же, что на сайте kmotors.
+import type {ComponentType} from 'react';
+${fromLucide.length ? `import {${fromLucide.join(', ')}} from 'lucide-react';` : ''}
+${fromTb.length ? `import {${fromTb.join(', ')}} from 'react-icons/tb';` : ''}
+
+type Icon = ComponentType<{size?: number | string; color?: string; strokeWidth?: number}>;
+
+/** Код опции Encar по английскому названию */
+export const OPTION_CODE: Record<string, string> = ${JSON.stringify(codeByEn, null, 2)};
+
+/** Иконка по коду опции */
+export const OPTION_ICON: Record<string, Icon> = {
+${Object.entries(iconByCode).map(([code, name]) => `  '${code}': ${name} as Icon,`).join('\n')}
+};
+`;
+const here = decodeURIComponent(path.dirname(new URL(import.meta.url).pathname));
+await fs.writeFile(path.join(here, '..', 'src/carousel/i18n/option-icons.generated.tsx'), iconsTsx);
+console.log(`иконок: ${Object.keys(iconByCode).length} (lucide ${fromLucide.length}, tabler ${fromTb.length})`);
+
 const out = path.join(path.dirname(new URL(import.meta.url).pathname), '..', 'src/carousel/i18n/ru-values.json');
 await fs.writeFile(decodeURIComponent(out), JSON.stringify({
   _note: 'Сгенерировано tools/sync-kmotors-dict.mjs из словарей kmotors. Руками не править — перегенерировать.',

@@ -7,6 +7,7 @@ import mk from '../config/markets/mk.json';
 import {FORMAT_COMPONENTS} from './formats';
 import {BrandPreview} from './brand/BrandPreview';
 import {CAROUSEL_SLIDES, Carousel} from './carousel/Carousel';
+import {carouselFormat, carouselSlides} from './carousel/formats';
 import {ReviewShort} from './reviews/ReviewShort';
 import {FORMATS} from './shared/model';
 import {REVIEW_FPS, reviewFrames} from './shared/timeline.js';
@@ -61,6 +62,12 @@ export const Root: React.FC = () => (
       width={1080}
       height={1920}
       defaultProps={carouselDefaults}
+      // Размер кадра и число слайдов — от формата: 9:16, 1:1 или 4:5
+      calculateMetadata={({props}) => {
+        const f = carouselFormat(props.format);
+        return {width: f.width, height: f.height,
+          durationInFrames: carouselSlides(props.format, props.includeHistory !== false).length};
+      }}
     />
     {/* Обзоры: длительность считается по фрагментам */}
     <Composition

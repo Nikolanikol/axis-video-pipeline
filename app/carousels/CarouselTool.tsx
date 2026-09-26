@@ -1,9 +1,9 @@
-// Пайплайн «Карусели авто»: ссылка на объявление → семь слайдов → скачать.
+// Пайплайн «Карусели авто»: ссылка на объявление → формат → слайды → скачать.
 //
 // Экран нарочно короткий: вставил ссылку, посмотрел, скачал. Всё остальное —
 // данные, слайды, брендбук — уже решено на сервере и в композиции.
 import React, {useCallback, useEffect, useState} from 'react';
-import {api, CarouselEntry} from '../api';
+import {api, CarouselEntry, CarouselFormat} from '../api';
 import {useConfig} from '../config';
 import {useCost, useSession} from '../auth';
 import {carouselLang} from '../../src/carousel/i18n';
@@ -69,12 +69,36 @@ const Lightbox: React.FC<{entry: CarouselEntry; at: number; onClose: () => void;
     );
   };
 
+/**
+ * Выбор формата: карточка с пропорцией кадра и числом слайдов. Пропорция нарисована —
+ * «1:1» и «4:5» словами различают не все, а прямоугольник видно сразу.
+ */
+const FormatPicker: React.FC<{formats: CarouselFormat[]; value: string; onChange: (id: string) => void}> =
+  ({formats, value, onChange}) => (
+    <div className="pairs formats">
+      {formats.map((f) => (
+        <button key={f.id} type="button" className={`pair${f.id === value ? ' on' : ''}`} onClick={() => onChange(f.id)}>
+          <span className="format-shape" style={{aspectRatio: `${f.width} / ${f.height}`}} />
+          <span className="pair-head">{f.title}</span>
+          <span className="pair-note">{f.note}</span>
+        </button>
+      ))}
+    </div>
+  );
+
+// Последний выбранный формат — удобство этого браузера, не настройка
+const FORMAT_KEY = 'axis-video:carousel-format';
+const savedFormat = () => { try { return localStorage.getItem(FORMAT_KEY); } catch { return null; } };
+
 export const CarouselTool: React.FC = () => {
   const {report, config, profile} = useConfig();
   // Язык слайдов — из профиля: виден здесь, чтобы не удивляться английской карусели
   const slidesLang = carouselLang(profile.language) === 'ru' ? 'русском' : 'английском';
   const {refresh: refreshAccess} = useSession();
   const cost = useCost('carousels', config.credits);
+  const formats = config.carouselFormats ?? [];
+  const [format, setFormatState] = useState<string>(() => savedFormat() ?? 'showcase');
+  const setFormat = (id: string) => { setFormatState(id); try { localStorage.setItem(FORMAT_KEY, id); } catch { /* приватный режим */ } };
   const [link, setLink] = useState('');
   const [busy, setBusy] = useState(false);
   const [entry, setEntry] = useState<CarouselEntry | null>(null);
@@ -93,19 +117,21 @@ export const CarouselTool: React.FC = () => {
   const build = async () => {
     setBusy(true);
     try {
-      const made = await api.buildCarousel(link);
+      const made = await api.buildCarousel(link, format);
       setEntry(made);
       setHistory((h) => [made, ...h.filter((x) => x.id !== made.id)]);
       setLink('');
     } catch (e) { report(e); } finally { setBusy(false); refreshAccess(); }
   };
 
-  // Пересобрать существующую карусель — тот же сбор по её номеру: свежие данные, тот же брендбук
-  const rebuild = async () => {
+  // Пересобрать существующую карусель: свежие данные и бренд. again — тот же вариант (зерно
+  // прежнее), иначе «Другой вариант»: новое зерно — другие компоновка и фразы.
+  // Формат — выбранный сейчас: так карусель переводится из одного формата в другой
+  const rebuild = async (again: boolean) => {
     if (!entry) return;
     setBusy(true);
     try {
-      const made = await api.buildCarousel(entry.id);
+      const made = await api.buildCarousel(entry.id, format, again && entry.format === format ? entry.seed : undefined);
       setEntry(made);
       setHistory((h) => [made, ...h.filter((x) => x.id !== made.id)]);
     } catch (e) { report(e); } finally { setBusy(false); refreshAccess(); }
@@ -151,6 +177,11 @@ export const CarouselTool: React.FC = () => {
               onKeyDown={(e) => { if (e.key === 'Enter' && link.trim() && !busy) build(); }}
             />
           </Field>
+          {formats.length > 0 && (
+            <Field label="Формат">
+              <FormatPicker formats={formats} value={format} onChange={setFormat} />
+            </Field>
+          )}
           <div className="btn-row">
             <button className="btn primary big" onClick={build} disabled={busy || !link.trim()}>
               {busy ? 'Собираю…' : `Собрать карусель${cost}`}
@@ -165,7 +196,12 @@ export const CarouselTool: React.FC = () => {
               <div className="job-actions">
                 <button className="btn primary" onClick={downloadAll} disabled={busy}>Скачать все {entry.slides.length}</button>
                 <a className="btn ghost" href={entry.car.source} target="_blank" rel="noreferrer">Открыть в каталоге</a>
-                <button className="btn" onClick={rebuild} disabled={busy}>Пересобрать{cost}</button>
+                <button className="btn" onClick={() => rebuild(true)} disabled={busy}
+                  title="Те же компоновка и фразы, свежие данные и текущий бренд">Пересобрать{cost}</button>
+                {format !== 'classic' && (
+                  <button className="btn" onClick={() => rebuild(false)} disabled={busy}
+                    title="Та же машина, другие компоновка и фразы">Другой вариант{cost}</button>
+                )}
                 <button className="btn ghost" onClick={() => remove(entry.id)} disabled={busy}>Удалить</button>
               </div>
             </>
@@ -190,7 +226,10 @@ export const CarouselTool: React.FC = () => {
       <section className="panel preview">
         {!entry && <div className="empty">Вставь ссылку на объявление</div>}
         {entry && (
-          <div className="slides">
+          <div className="slides" style={{['--slide-ratio' as string]: (() => {
+            const f = formats.find((x) => x.id === (entry.format ?? 'classic'));
+            return f ? `${f.width} / ${f.height}` : '9 / 16';
+          })()}}>
             {entry.slides.map((src, i) => (
               <figure key={src} className="slide">
                 {/* Ключ по времени сборки: иначе браузер покажет прежнюю картинку из кэша */}

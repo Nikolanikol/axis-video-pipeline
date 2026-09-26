@@ -308,7 +308,8 @@ a.tab { text-decoration: none; }
 .slide { margin: 0; }
 .slide img {
   width: 100%;
-  aspect-ratio: 9 / 16;
+  /* Пропорция — от формата собранной карусели: 9:16, 1:1 или 4:5 */
+  aspect-ratio: var(--slide-ratio, 9 / 16);
   object-fit: cover;
   border-radius: 10px;
   border: 1px solid var(--line);
@@ -426,3 +427,5 @@ a.tab { text-decoration: none; }
 .fine summary { cursor: pointer; font-size: 13px; color: var(--muted); padding: 6px 0; }
 .fine summary:hover { color: var(--text); }
 .fine-warn { color: #ffb4b8; }
+.formats .pair { align-items: flex-start; }
+.format-shape { display: block; height: 44px; border: 2px solid var(--copper); border-radius: 4px; margin-bottom: 4px; }

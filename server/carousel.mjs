@@ -23,7 +23,17 @@ export const carouselsDir = () => path.join(workspaceDir(), 'carousels');
 // (Encar режет адрес). Тогда слайдов шесть; на Mac — семь с настоящей историей.
 // Число решается здесь, а сам слайд отсекается в вёрстке по includeHistory.
 const INCLUDE_HISTORY = !PRODUCTION;
-const SLIDES = INCLUDE_HISTORY ? 7 : 6;
+// Сколько слайдов — решает формат (config/carousel-formats.json) вместе с историей:
+// число берётся из композиции (selectComposition), а не считается здесь второй раз
+
+/** Форматы карусели. Незнакомый id — отказ: иначе молча вышла бы «Классика» */
+export const carouselFormats = () => readJson(path.join(ROOT, 'config', 'carousel-formats.json'));
+const checkFormat = async (id) => {
+  const list = await carouselFormats();
+  const found = list.find((f) => f.id === (id || 'classic'));
+  if (!found) throw new HttpError(400, `Нет такого формата карусели: ${id}`);
+  return found.id;
+};
 // Шлюз ходит в Encar и ждёт ответа от него; у самого Encar таймаут 8 с плюс запасной прокси,
 // которому на холодную нужны десятки секунд
 const GATEWAY_TIMEOUT_MS = Number(process.env.CAROUSEL_TIMEOUT_MS || 60_000);
@@ -73,6 +83,8 @@ const getServeUrl = async () => {
   const signature = Math.max(
     await newestMtime(path.join(ROOT, 'src')),
     (await fs.stat(path.join(ROOT, 'config', 'brand.json'))).mtimeMs,
+    // Реестр форматов едет в сборку: правка размеров или списка слайдов должна пересобрать её
+    (await fs.stat(path.join(ROOT, 'config', 'carousel-formats.json'))).mtimeMs,
   );
   if (bundled?.signature !== signature) {
     bundled = {
@@ -96,10 +108,14 @@ const runKey = (id) => `${currentWorkspace()}:${id}`;
 /**
  * Собрать карусель по ссылке или номеру.
  * @param {string} link — ссылка Encar или голый номер
- * @returns {Promise<{id: string, car: object, slides: string[], updatedAt: string}>}
+ * @param {{format?: string, seed?: number}} [opts] — формат из реестра и зерно варианта:
+ *   то же зерно — те же компоновка и фразы; нет зерна — случайное («Другой вариант»)
+ * @returns {Promise<{id: string, car: object, slides: string[], updatedAt: string, format: string, seed: number}>}
  */
-export const buildCarousel = async (link) => {
+export const buildCarousel = async (link, opts = {}) => {
   const {id} = parseCarLink(link);
+  const format = await checkFormat(opts.format);
+  const seed = Number.isInteger(opts.seed) && opts.seed > 0 ? opts.seed : 1 + Math.floor(Math.random() * 2 ** 30);
   const key = runKey(id);
   if (running.has(key)) throw new HttpError(409, 'Эта карусель уже собирается');
   running.add(key);
@@ -117,7 +133,7 @@ export const buildCarousel = async (link) => {
       ? Object.fromEntries(Object.entries(theme.assets)
         .map(([k, v]) => [k, typeof v === 'string' && v.startsWith('/') ? origin + v : v]))
       : theme.assets;
-    const inputProps = {car, market, theme: {...theme, assets}, includeHistory: INCLUDE_HISTORY};
+    const inputProps = {car, market, theme: {...theme, assets}, includeHistory: INCLUDE_HISTORY, format, seed};
 
     const dir = path.join(carouselsDir(), id);
     await fs.mkdir(dir, {recursive: true});
@@ -129,9 +145,11 @@ export const buildCarousel = async (link) => {
     }
     const serveUrl = await getServeUrl();
     const browser = await openBrowser('chrome', {browserExecutable: process.env.CHROME_PATH || null});
+    let count = 0;
     try {
       const composition = await selectComposition({serveUrl, id: 'carousel', inputProps, puppeteerInstance: browser});
-      for (let frame = 0; frame < SLIDES; frame++) {
+      count = composition.durationInFrames;
+      for (let frame = 0; frame < count; frame++) {
         await renderStill({
           composition, serveUrl, frame, inputProps, puppeteerInstance: browser,
           imageFormat: 'png', output: path.join(dir, `slide-${frame + 1}.png`),
@@ -144,8 +162,9 @@ export const buildCarousel = async (link) => {
     const meta = {
       id,
       car,
-      slides: Array.from({length: SLIDES}, (_, i) => `${workspaceUrl()}/carousels/${id}/slide-${i + 1}.png`),
+      slides: Array.from({length: count}, (_, i) => `${workspaceUrl()}/carousels/${id}/slide-${i + 1}.png`),
       updatedAt: new Date().toISOString(),
+      format, seed,
     };
     await writeJson(path.join(dir, 'carousel.json'), meta);
     return meta;

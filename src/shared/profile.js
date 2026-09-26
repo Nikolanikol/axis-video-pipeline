@@ -77,6 +77,8 @@ export const marketFromProfile = (profile, copy) => {
     freightUsd: isExport ? Number(ex.freight ?? 0) : 0,
     whatsapp: p.contacts?.whatsapp ?? null,
     site: p.contacts?.site ?? '',
+    telegram: p.contacts?.telegram ?? '',
+    contactPrimary: p.contacts?.primary === 'telegram' ? 'telegram' : 'whatsapp',
     texts: resolveTexts(copy, p.pricing?.mode, p.language, p.texts),
     music: p.music,
     pricingMode: mode,

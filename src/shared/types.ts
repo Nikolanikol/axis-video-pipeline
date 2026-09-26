@@ -27,6 +27,8 @@ export type Market = {
   pricingMode?: PricingMode; currency?: string;
   // Язык постов из профиля: по нему карусель выбирает язык слайдов (src/carousel/i18n)
   language?: string;
+  // Telegram и главный канал связи — кнопка на финале карусели
+  telegram?: string; contactPrimary?: 'whatsapp' | 'telegram';
 };
 
 // Профиль клиента: config/profiles/<id>.json. Приходит на смену «рынку» — см. src/shared/profile.js.
@@ -42,7 +44,8 @@ export type Pricing = {
 export type Profile = {
   company: string;
   language: string;
-  contacts: {whatsapp: string | null; site: string};
+  // telegram — @имя или ссылка; primary — чем подписана кнопка связи на финале карусели
+  contacts: {whatsapp: string | null; site: string; telegram?: string; primary?: 'whatsapp' | 'telegram'};
   pricing: Pricing;
   // Правки текстов поверх дефолтов платформы; пусто — всё из дефолтов
   texts?: Partial<Texts>;
@@ -225,6 +228,8 @@ export type CarouselCar = {
 
 // includeHistory: показывать ли слайд истории. На проде сервер ставит false, пока
 // страховые случаи не приходят с датацентра (Encar режет адрес). По умолчанию — да.
-export type CarouselProps = {car: CarouselCar; market: Market; theme?: Partial<Theme>; includeHistory?: boolean};
+// format — id из config/carousel-formats.json (нет — «Классика»); seed — зерно варианта:
+// то же зерно даёт те же компоновку и фразы, «Другой вариант» — новое зерно
+export type CarouselProps = {car: CarouselCar; market: Market; theme?: Partial<Theme>; includeHistory?: boolean; format?: string; seed?: number};
 
 export type ReviewProps = {review: Review; lot?: Lot | null; market: Market; theme?: Partial<Theme>};
