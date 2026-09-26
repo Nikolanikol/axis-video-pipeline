@@ -126,8 +126,12 @@ export const api = {
     const res = await fetch('/api/brand/logo', {method: 'POST', body: form});
     const body = await res.json().catch(() => null);
     if (!res.ok) throw new Error(body?.error ?? 'Не удалось загрузить логотип');
-    return body as {url: string; width: number; height: number; bytes: number; brand: Theme};
+    return body as {url: string; width: number; height: number; bytes: number; brand: Theme;
+      notes: string[]; warnings: string[]; hasRaw: boolean};
   },
+  // clean — фон убран, raw — как загружен, none — без логотипа, название компании текстом
+  logoVariant: (variant: 'clean' | 'raw' | 'none') =>
+    request<{url: string; brand: Theme}>('PUT', '/api/brand/logo/variant', {variant}),
   buildCarousel: (link: string) => request<CarouselEntry>('POST', '/api/carousels', {link}),
   carousels: () => request<CarouselEntry[]>('GET', '/api/carousels'),
   deleteCarousel: (id: string) => request<{id: string; deleted: boolean}>('DELETE', `/api/carousels/${id}`),

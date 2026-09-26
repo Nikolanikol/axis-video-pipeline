@@ -416,3 +416,4 @@ a.tab { text-decoration: none; }
 }
 .table td.plus { color: var(--ok); font-weight: 600; }
 .table td.minus { color: var(--copper-light); font-weight: 600; }
+.logo-text { font-weight: 700; font-size: 18px; text-transform: uppercase; text-align: center; line-height: 1.1; word-break: break-word; }

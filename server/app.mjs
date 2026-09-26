@@ -21,7 +21,7 @@ import {apiSettings, resolveSpeaker, voiceConfig} from '../src/shared/voices.js'
 import {hasKey, hasVoice, synthesize} from './speech.mjs';
 import {hasSeparator} from './ambience.mjs';
 import {carouselsDir, buildCarousel, deleteCarousel, listCarousels, slideFileName} from './carousel.mjs';
-import {LOGO_RULES, saveLogo} from './brand.mjs';
+import {LOGO_RULES, saveLogo, setLogoVariant} from './brand.mjs';
 import {billed, creditCosts, ledgerOf} from './billing.mjs';
 import {parseCarLink} from '../src/shared/encarLink.js';
 import {
@@ -210,8 +210,14 @@ export const createApp = ({photoOrigin}) => {
   // Логотип: свой приёмник с маленьким потолком — незачем принимать 30 МБ, чтобы потом отказать
   const logoUpload = multer({storage: multer.memoryStorage(), limits: {fileSize: LOGO_RULES.maxBytes, files: 1}});
   api.post('/brand/logo', logoUpload.single('logo'), wrap(async (req) => {
-    const saved = await saveLogo(req.file?.buffer, req.file?.originalname);
+    const saved = await saveLogo(req.file?.buffer);
     return {...saved, brand: await getBrand()};
+  }));
+  // Вариант логотипа: clean — фон убран, raw — как загружен, none — название компании текстом
+  api.put('/brand/logo/variant', wrap(async (req) => {
+    const variant = String(req.body?.variant ?? '');
+    if (!['clean', 'raw', 'none'].includes(variant)) throw new HttpError(400, 'Вариант — clean, raw или none');
+    return {...(await setLogoVariant(variant)), brand: await getBrand()};
   }));
   // Рынки — платформенный реестр в config/, общий для всех: править может только владелец
   api.put('/markets/:id', requireAdmin, wrap(async (req) => {
@@ -385,6 +391,8 @@ export const createApp = ({photoOrigin}) => {
   app.use('/data', guardData, express.static(DATA_DIR, {fallthrough: false}));
   app.use('/api', (err, req, res, _next) => {
     const status = err.status || (err.code === 'LIMIT_FILE_SIZE' ? 413 : 500);
+    // Приёмник файлов отвечает по-английски — человеку нужен ответ, что делать
+    if (err.code === 'LIMIT_FILE_SIZE') err.message = 'Файл слишком большой для загрузки';
     if (status >= 500) console.error(err);
     res.status(status).json({error: err.message || 'Ошибка сервера'});
   });

@@ -16,47 +16,77 @@ const COLOR_FIELDS: [ColorKey, string][] = [
 ];
 
 /**
- * Загрузка логотипа. Условия написаны рядом с кнопкой намеренно: приёмник, который берёт
- * что угодно, а потом отказывает, заставляет человека гадать. Числа берутся с сервера —
- * так они не разойдутся с проверкой.
+ * Логотип: загрузка и вариант. Сервер сам приводит файл к виду для тёмного слайда —
+ * убирает ровный фон, обрезает поля, уменьшает большое, SVG переводит в PNG. Здесь —
+ * показать результат на цвете фона слайда и дать откатить, если автоматика ошиблась.
+ * Нет логотипа — показываем то, что будет на роликах: название компании текстом.
  */
 const LogoField: React.FC<{theme: Theme; onSaved: (t: Theme) => void; onError: (e: unknown) => void}> =
   ({theme, onSaved, onError}) => {
     const [busy, setBusy] = useState(false);
-    const [info, setInfo] = useState('');
+    const [notes, setNotes] = useState<string[]>([]);
+    const [warnings, setWarnings] = useState<string[]>([]);
     const ref = useRef<HTMLInputElement>(null);
-    const send = async (file?: File) => {
-      if (!file) return;
-      setBusy(true);
-      setInfo('');
-      try {
-        const res = await api.uploadLogo(file);
-        onSaved(res.brand);
-        setInfo(`Загружен: ${res.width}×${res.height}, ${Math.round(res.bytes / 1024)} КБ`);
-      } catch (e) { onError(e); } finally { setBusy(false); if (ref.current) ref.current.value = ''; }
-    };
     const logo = theme.assets?.logoStacked ?? '';
+    const isRaw = /-raw\.png$/.test(logo);
+    const isOwn = logo.includes('/brand/logo-');
+    // Вариант «как было» есть, только если фон убирался. Сервер кладёт его рядом с именем
+    // -raw.png; после перезагрузки страницы узнаём о нём, спросив сам файл
+    const [hasRaw, setHasRaw] = useState(isRaw);
+    useEffect(() => {
+      if (!isOwn || isRaw) return;
+      let alive = true;
+      fetch(logo.replace(/\.png$/, '-raw.png'), {method: 'HEAD'})
+        .then((r) => { if (alive) setHasRaw(r.ok); }).catch(() => {});
+      return () => { alive = false; };
+    }, [logo, isOwn, isRaw]);
+
+    const run = async (fn: () => Promise<{brand: Theme}>) => {
+      setBusy(true);
+      try { onSaved((await fn()).brand); } catch (e) { onError(e); } finally { setBusy(false); }
+    };
+    const send = (file?: File) => {
+      if (!file) return;
+      setNotes([]); setWarnings([]);
+      return run(async () => {
+        const res = await api.uploadLogo(file);
+        setNotes([`${res.width}×${res.height}, ${Math.round(res.bytes / 1024)} КБ`, ...res.notes]);
+        setWarnings(res.warnings);
+        setHasRaw(res.hasRaw);
+        return res;
+      }).finally(() => { if (ref.current) ref.current.value = ''; });
+    };
+    const variant = (v: 'clean' | 'raw' | 'none') => run(() => api.logoVariant(v));
+
     // Путь внутри public/ в браузере доступен с корня, полный адрес оставляем как есть
     const shown = logo.startsWith('http') || logo.startsWith('/') ? logo : `/${logo}`;
     return (
       <div className="logo-field">
-        <div className="logo-shot"><img src={shown} alt="Логотип" /></div>
+        <div className="logo-shot" style={{background: theme.bg}} title="Так логотип ляжет на тёмный слайд">
+          {logo
+            ? <img src={shown} alt="Логотип" />
+            : <span className="logo-text" style={{fontFamily: theme.fonts?.head, color: theme.copper}}>{theme.name || 'Компания'}</span>}
+        </div>
         <div>
           <div className="btn-row">
             <button className="btn" disabled={busy} onClick={() => ref.current?.click()}>
-              {busy ? 'Проверяю…' : 'Загрузить логотип'}
+              {busy ? 'Обрабатываю…' : 'Загрузить логотип'}
             </button>
+            {isOwn && hasRaw && !isRaw && <button className="btn ghost" disabled={busy} onClick={() => variant('raw')}>Оставить фон как был</button>}
+            {isOwn && isRaw && <button className="btn ghost" disabled={busy} onClick={() => variant('clean')}>Убрать фон</button>}
+            {logo && <button className="btn ghost" disabled={busy} onClick={() => variant('none')}>Без логотипа — название текстом</button>}
           </div>
-          <input ref={ref} type="file" accept="image/png" hidden
+          <input ref={ref} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg" hidden
             onChange={(e) => send(e.target.files?.[0])} />
+          {!logo && <p className="hint">Логотипа нет — на роликах вместо него название компании.</p>}
           <ul className="rules">
-            <li>формат <b>PNG</b>, другие не принимаются</li>
-            <li><b>прозрачный фон</b> — иначе ляжет белым прямоугольником на тёмный слайд</li>
-            <li>от <b>400</b> до <b>2000</b> точек по длинной стороне</li>
-            <li>не больше <b>2 МБ</b></li>
+            <li><b>PNG, JPG, WebP или SVG</b>, до 10 МБ</li>
+            <li>фон <b>прозрачный или однотонный</b> — однотонный уберём сами; фото и текстуры не подойдут</li>
+            <li>от <b>300</b> точек по длинной стороне; большое уменьшим, пустые поля обрежем</li>
           </ul>
+          {notes.length > 0 && <p className="hint">Загружен: {notes.join(' · ')}</p>}
+          {warnings.map((w) => <p key={w} className="auth-error">{w}</p>)}
           <p className="hint">Ставится везде, где виден логотип: крупно на финале и полосой вверху кадра.</p>
-          {info && <p className="hint">{info}</p>}
         </div>
       </div>
     );
