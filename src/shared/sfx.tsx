@@ -14,7 +14,7 @@ import {AUDIO_LATENCY_SEC} from './music';
 
 export type SfxSound = 'transition' | 'tick' | 'price' | 'cta';
 export type SfxCue = {sound: SfxSound; frame: number};
-type Sound = {file: string; peakSec: number; volume: number; durationSec: number};
+type Sound = {file: string; peakSec: number; volume: number};
 
 const PACKS = registry.packs as {id: string; sounds: Record<SfxSound, Sound>}[];
 export const sfxPack = (id?: string) => PACKS.find((p) => p.id === id) ?? PACKS.find((p) => p.id === registry.default) ?? PACKS[0];
@@ -33,11 +33,7 @@ export const SfxTrack: React.FC<{cues: SfxCue[]; pack?: string}> = ({cues, pack}
         const lead = Math.round((s.peakSec + AUDIO_LATENCY_SEC) * fps);
         const from = c.frame - lead;
         return (
-          // Длина последовательности — длина звука: отзвучал — отключился. Без неё все девять
-          // звуков висели подключёнными до конца ролика, а проигрыватель превью держит не больше
-          // пяти разом — на шестой секунде он падал, и превью становилось чёрным
-          <Sequence key={`${c.sound}-${i}`} from={Math.max(0, from)} name={`sfx ${c.sound}`} layout="none"
-            durationInFrames={Math.max(1, Math.ceil(s.durationSec * fps) - Math.max(0, -from))}>
+          <Sequence key={`${c.sound}-${i}`} from={Math.max(0, from)} name={`sfx ${c.sound}`} layout="none">
             <Audio src={staticFile(s.file)} volume={s.volume} trimBefore={from < 0 ? -from : undefined} />
           </Sequence>
         );
