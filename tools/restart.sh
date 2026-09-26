@@ -28,9 +28,12 @@ if pgrep -f 'server/index.mjs' >/dev/null 2>&1; then
 fi
 
 npm run app >"$LOG" 2>&1 &
-for _ in $(seq 1 40); do
+# Живость — по /healthz: /api/config с базой закрыт входом и отвечает 401, и скрипт
+# считал бы живой сервер мёртвым. Ждём до минуты: на старте сервер применяет миграции
+# и заводит компанию — через туннель к базе это секунды
+for _ in $(seq 1 120); do
   sleep 0.5
-  if curl -sf --max-time 1 "http://localhost:$PORT/api/config" >/dev/null 2>&1; then
+  if curl -sf --max-time 1 "http://localhost:$PORT/healthz" >/dev/null 2>&1; then
     echo "сервер поднят (pid $(pgrep -f 'server/index.mjs' | head -1)), журнал: $LOG"
     exit 0
   fi
