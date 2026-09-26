@@ -429,5 +429,3 @@ a.tab { text-decoration: none; }
 .fine-warn { color: #ffb4b8; }
 .formats .pair { align-items: flex-start; }
 .format-shape { display: block; height: 44px; border: 2px solid var(--copper); border-radius: 4px; margin-bottom: 4px; }
-.sfx-toggle { display: flex; align-items: center; gap: 6px; font-size: 13px; white-space: nowrap; cursor: pointer; }
-.sfx-toggle input { width: auto; }

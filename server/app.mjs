@@ -5,7 +5,7 @@ import path from 'node:path';
 import express from 'express';
 import multer from 'multer';
 import {
-  CONFIG_DIR, DATA_DIR, ROOT, DEFAULT_MARKET, DEFAULT_PROFILE, DEFAULT_WORKSPACE, withWorkspace, HttpError, PRODUCTION, checkId, createLot, getBrand, getCopy,
+  CONFIG_DIR, DATA_DIR, DEFAULT_MARKET, DEFAULT_PROFILE, DEFAULT_WORKSPACE, withWorkspace, HttpError, PRODUCTION, checkId, createLot, getBrand, getCopy,
   getLot, getMarket, getProfile, listLots, listMarkets, listProfiles, readJson, renderMarket, saveBrand, saveLot,
   saveMarket, saveProfile, withLock, currentWorkspace, rendersDir, workspaceUrl,
 } from './store.mjs';
@@ -55,19 +55,6 @@ const withAbsolutePhotos = (lot, origin) => lot && {...lot, photos: lot.photos.m
 // Обработчик выполняется от имени компании из сессии. Контекст ставим заново здесь, а не
 // полагаемся на общий: приёмник файлов (multer) зовёт следующий шаг из событий потока,
 // и контекст запроса туда не доезжает
-/**
- * Есть ли на диске звуки пакета эффектов. Звуки Mixkit в репозиторий не кладутся (лицензия
- * запрещает распространять их сами по себе, а репозиторий публичный), поэтому на свежей копии
- * и на проде их нет — тогда эффекты выключаются, а не роняют рендер на отсутствующем файле.
- */
-const sfxReady = async () => {
-  const registry = await readJson(path.join(CONFIG_DIR, 'sfx.json')).catch(() => null);
-  const pack = registry?.packs?.find((p) => p.id === registry.default);
-  if (!pack) return false;
-  const files = Object.values(pack.sounds).map((s) => path.join(ROOT, 'public', s.file));
-  return (await Promise.all(files.map((f) => fs.access(f).then(() => true, () => false)))).every(Boolean);
-};
-
 const wrap = (fn) => (req, res, next) => Promise.resolve().then(() => withWorkspace(wsOf(req), () => fn(req, res)))
   .then((data) => res.json(data)).catch(next);
 // Компания запроса. С входом — только из сессии; без неё — никакой (withWorkspace откажет),
@@ -230,7 +217,7 @@ export const createApp = ({photoOrigin}) => {
     // Что доступно: распознавание речи включается ключом ElevenLabs в .env
     // Что доступно: речь и озвучка — по ключу ElevenLabs; выделение звуков машины — по
     // наличию локального окружения с моделью разделения (проба, ставится отдельно)
-    features: {speech: hasKey(), voice: hasVoice(), ambience: await hasSeparator(), sfx: await sfxReady()},
+    features: {speech: hasKey(), voice: hasVoice(), ambience: await hasSeparator()},
     // Цены генераций в кредитах — интерфейс пишет их на кнопках
     credits: await creditCosts(),
   })));
@@ -302,8 +289,7 @@ export const createApp = ({photoOrigin}) => {
     const theme = {...brand, name: market.name};
     const title = [lot.brand, lot.model, lot.year].filter(Boolean).join(' ') || lot.id;
     // Музыка убрана из продукта: сохранённый в лоте трек в ролик не идёт (src/shared/nomusic.js)
-    const sound = await sfxReady() ? {} : {sfx: false};   // нет файлов звуков — без эффектов, а не падение
-    const inputProps = {lot: withAbsolutePhotos({...withoutMusic(lot), ...sound}, photoOrigin), market, theme: themeForRender(photoOrigin, theme)};
+    const inputProps = {lot: withAbsolutePhotos(withoutMusic(lot), photoOrigin), market, theme: themeForRender(photoOrigin, theme)};
     return enqueue({
       owner: {lotId: lot.id}, composition: format.id, compositionTitle: format.title, title,
       frames: storyboardFrames(format), inputProps, bill: billOf(req, 'ads'),

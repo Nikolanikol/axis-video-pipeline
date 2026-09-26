@@ -5,7 +5,6 @@ import {AbsoluteFill, Easing, Img, Sequence, interpolate, spring, staticFile, us
 import {Contacts, CarTitle, PriceTag} from '../../shared/blocks';
 import {getFormat, resolveAd, themeOf} from '../../shared/model';
 import {BackgroundMusic} from '../../shared/music';
-import {SfxCue, SfxTrack} from '../../shared/sfx';
 import type {Ad, AdProps} from '../../shared/types';
 import {BODY, CopperText, HEAD, Logo, Metal, PAD, Photo, Shade, ThemeProvider, TopLogo, clamp, lines, useAsset, useTheme} from '../../shared/ui';
 
@@ -148,32 +147,6 @@ const PriceOnly: React.FC<{ad: Ad}> = ({ad}) => {
   );
 };
 
-// Кадры появления внутри сцен — те же числа, что в анимациях выше: поменял анимацию —
-// поменяй здесь, иначе звук разойдётся с плашкой
-const SPEC_FIRST = 8;      // первая характеристика: spring(f - 8 - i * 9)
-const SPEC_STEP = 9;
-const PRICE_EXPORT = 45;   // <PriceTag delay={45}> в Route
-const PRICE_DOMESTIC = 10; // <PriceTag delay={10}> в PriceOnly
-const CTA_CONTACTS = 32;   // spring(f - 32) у контактов в Cta
-// spring стартует с нуля: к третьему кадру плашка уже заметна глазу — звук туда
-const VISIBLE = 2;
-
-/**
- * Звуковые события ролика: переход на каждой смене сцены, щелчок на каждую характеристику,
- * удар на появлении цены, звонок на контактах. Выключены — пусто.
- */
-const sfxCues = (ad: Ad): SfxCue[] => {
-  if (ad.sfx === false) return [];
-  const at = Object.fromEntries(FORMAT.scenes.map((s) => [s.id, s.from]));
-  const specs = ad.specs.filter(Boolean).length;
-  return [
-    ...FORMAT.scenes.slice(1).map((s) => ({sound: 'transition' as const, frame: s.from})),
-    ...Array.from({length: specs}, (_, i) => ({sound: 'tick' as const, frame: at.specs + SPEC_FIRST + i * SPEC_STEP + VISIBLE})),
-    {sound: 'price', frame: at.price + (ad.pricingMode === 'domestic' ? PRICE_DOMESTIC : PRICE_EXPORT) + VISIBLE},
-    {sound: 'cta', frame: at.cta + CTA_CONTACTS + VISIBLE},
-  ];
-};
-
 // Ценовая сцена выбирается по модели профиля: экспорт — маршрут «до порта», внутренний — просто цена.
 const PriceScene: React.FC<{ad: Ad}> = (props) =>
   props.ad.pricingMode === 'domestic' ? <PriceOnly {...props} /> : <Route {...props} />;
@@ -191,7 +164,6 @@ export const PriceAd: React.FC<AdProps> = (props) => {
           return <Sequence key={s.id} name={s.title} from={s.from} durationInFrames={s.frames}><Scene ad={ad} /></Sequence>;
         })}
         <BackgroundMusic music={ad.music} bpm={FORMAT.bpm} />
-        <SfxTrack cues={sfxCues(ad)} />
       </AbsoluteFill>
     </ThemeProvider>
   );

@@ -32,9 +32,7 @@ afterAll(async () => {
   await fs.rm(dir, {recursive: true, force: true});
 });
 
-// Эффекты выключены: музыкальные тесты меряют доли и тишину, а щелчки и удары им мешали бы.
-// Сами эффекты проверяет отдельный тест ниже
-const withMusic = (music) => ({...fixture, lot: {...fixture.lot, music, sfx: false}});
+const withMusic = (music) => ({...fixture, lot: {...fixture.lot, music}});
 
 describe.each(formats)('формат $id', (format) => {
   let composition;
@@ -130,58 +128,6 @@ describe.each(formats)('формат $id', (format) => {
     const streams = await probe(file);
     expect(streams.some((s) => s.codec_type === 'audio')).toBe(true);
     expect(peak(await decodeAudio(file))).toBe(0);
-  });
-});
-
-// Звуковые эффекты рекламы: всплеск на каждом событии, пиком на появлении плашки, с точностью
-// до кадра. «Рендер без ошибок ничего не доказывает» — проверяем по дорожке готового файла
-describe('звуковые эффекты рекламы', () => {
-  const peaksOf = ({samples, sampleRate}) => {
-    const win = Math.round(sampleRate / 100);
-    const env = [];
-    for (let i = 0; i < samples.length; i += win) {
-      let m = 0;
-      for (let k = i; k < Math.min(samples.length, i + win); k++) m = Math.max(m, Math.abs(samples[k]));
-      env.push(m);
-    }
-    const max = Math.max(...env);
-    return env.map((v, i) => ({t: i * win / sampleRate, v})).filter(({v}) => v > max * 0.15);
-  };
-
-  // Звуки Mixkit в репозиторий не кладутся (лицензия) — на свежей копии их нет, и проверять нечего
-  const sfxFiles = await fs.access(path.join(ROOT, 'public/sfx/mixkit-1492.wav')).then(() => true, () => false);
-  it.skipIf(!sfxFiles)('переходы, щелчки, цена и контакты звучат на своих кадрах; выключены — тишина', async () => {
-    const format = formats.find((f) => f.id === 'price-ad');
-    const specs = ['A', 'B', 'C', 'D'];
-    const props = {...fixture, lot: {...fixture.lot, music: {track: null}, specs, carPriceUsd: 9000},
-      market: {...fixture.market, pricingMode: 'export'}};
-    const comp = await selectComposition({serveUrl, id: format.id, inputProps: props, puppeteerInstance: browser});
-    const file = path.join(dir, 'sfx.mp4');
-    await renderMedia({composition: comp, serveUrl, codec: 'h264', inputProps: props, outputLocation: file,
-      puppeteerInstance: browser, enforceAudioTrack: true});
-    const loud = peaksOf(await decodeAudio(file));
-    const at = Object.fromEntries(format.scenes.map((s) => [s.id, s.from / format.fps]));
-    const fps = format.fps;
-    // Кадры событий — как в PriceAd.tsx: характеристики с 8-го кадра через 9, цена на 45-м, контакты на 32-м, +2 до заметности
-    const expected = [
-      at.specs, at.price, at.cta,
-      ...specs.map((_, i) => at.specs + (8 + i * 9 + 2) / fps),
-      at.price + (45 + 2) / fps,
-      at.cta + (32 + 2) / fps,
-    ];
-    for (const t of expected) {
-      const near = loud.filter((p) => Math.abs(p.t - t) <= 0.05);
-      expect(near.length, `звук на ${t.toFixed(2)} с`).toBeGreaterThan(0);
-    }
-    // До первого перехода звуков нет: первая сцена — тихий хук
-    expect(loud.filter((p) => p.t < at.specs - 1.2)).toEqual([]);
-
-    const off = {...props, lot: {...props.lot, sfx: false}};
-    const comp2 = await selectComposition({serveUrl, id: format.id, inputProps: off, puppeteerInstance: browser});
-    const silent = path.join(dir, 'sfx-off.mp4');
-    await renderMedia({composition: comp2, serveUrl, codec: 'h264', inputProps: off, outputLocation: silent,
-      puppeteerInstance: browser, enforceAudioTrack: true});
-    expect(peak(await decodeAudio(silent))).toBe(0);
   });
 });
 

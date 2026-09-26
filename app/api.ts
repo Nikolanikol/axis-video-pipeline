@@ -26,7 +26,7 @@ export type Config = {
   palettes?: Palette[];
   carouselFormats?: CarouselFormat[];
   // ambience — установлено ли локальное окружение для выделения звуков машины (проба)
-  features: {speech: boolean; voice: boolean; ambience?: boolean; sfx?: boolean};
+  features: {speech: boolean; voice: boolean; ambience?: boolean};
   // Цены генераций в кредитах: {ads, carousels, reviews}
   credits?: Record<string, number>;
   voices?: import('../src/shared/types').VoiceRegistry;

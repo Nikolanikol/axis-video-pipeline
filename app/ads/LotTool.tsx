@@ -86,9 +86,7 @@ export const LotTool: React.FC = () => {
   // Данные для превью — из профиля клиента (тот же мост, что и рендер), а не из рынка лота
   const market = useMemo(() => marketFromProfile(profile, config.copy) as Market, [profile, config.copy]);
   const format = getFormat(lot?.format);
-  // Звуков нет на диске (свежая копия, прод) — превью без эффектов, как и рендер
-  const sfxReady = Boolean(config.features.sfx);
-  const input = useMemo(() => (lot ? {lot: sfxReady ? lot : {...lot, sfx: false}, market, theme: brand} : null), [lot, market, brand, sfxReady]);
+  const input = useMemo(() => (lot ? {lot, market, theme: brand} : null), [lot, market, brand]);
   const savedProfile = config.profiles.find((p) => p.id === profile.id);
   const unsavedSettings = profile !== savedProfile || brand !== config.brand;
 
@@ -120,12 +118,6 @@ export const LotTool: React.FC = () => {
                 {FORMATS.map((f) => <option key={f.id} value={f.id}>{f.title}</option>)}
               </select>
             </label>
-            {/* Звуки на плашках: по умолчанию включены; выключить — для чистой дорожки под трендовый звук */}
-            {sfxReady && <label className="sfx-toggle" title="Переход между сценами, щелчок на характеристиках, удар на цене, звонок на контактах">
-              <input type="checkbox" checked={lot?.sfx !== false} disabled={!lot}
-                onChange={(e) => editLot({sfx: e.target.checked ? undefined : false})} />
-              Звуковые эффекты
-            </label>}
             <span className="muted">{format.description}</span>
           </div>
           {input ? <Preview input={input} format={format} /> : <div className="empty">Здесь будет превью ролика</div>}
