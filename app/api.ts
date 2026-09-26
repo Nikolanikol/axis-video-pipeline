@@ -15,6 +15,8 @@ export type Config = {
   brand: Theme; markets: MarketEntry[]; defaultMarket: string; formats: FormatMeta[]; pipelines: unknown[];
   // Профили клиента идут на смену рынкам; copy — дефолты текстов платформы
   profiles: ProfileEntry[]; defaultProfile: string; copy: Copy;
+  // Компания и адрес её файлов (/data/workspaces/<id>)
+  workspace: {id: string; url: string};
   // Боевой запуск (NODE_ENV=production). Интерфейс по нему прячет пайплайн обзоров
   production: boolean;
   fonts: FontPair[];

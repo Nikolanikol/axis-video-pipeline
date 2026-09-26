@@ -1,16 +1,56 @@
-// Хранилище: настройки бренда и рынков (config/), лоты и ролики (DATA_DIR).
+// Хранилище: платформенные реестры (config/), настройки компании (база или config/),
+// лоты, обзоры, ролики и карусели компании (DATA_DIR/workspaces/<компания>/).
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {marketFromProfile} from '../src/shared/profile.js';
+import {db, hasDatabase} from './db/index.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const CONFIG_DIR = path.resolve(ROOT, process.env.CONFIG_DIR || 'config');
 export const MARKETS_DIR = path.join(CONFIG_DIR, 'markets');
 export const DATA_DIR = path.resolve(ROOT, process.env.DATA_DIR || 'data');
-export const LOTS_DIR = path.join(DATA_DIR, 'lots');
-export const RENDERS_DIR = path.join(DATA_DIR, 'renders');
 export const DEFAULT_MARKET = process.env.DEFAULT_MARKET || 'mk';
+
+/**
+ * Компания (кабинет SMMAKER), от имени которой работает сервер.
+ *
+ * Все файлы компании — в своей папке: data/workspaces/<id>/{lots,reviews,renders,carousels,brand}.
+ * Пока входа нет, компания одна на инстанс и задаётся переменной; с входом она станет
+ * свойством запроса. Раньше файлы лежали прямо в data/ без хозяина, и у этого было два
+ * следствия, опасных при втором клиенте: новый логотип стирал все прочие логотипы в общей
+ * папке, а карусель одной и той же машины (папка = номер объявления) у двух клиентов
+ * перезаписывала слайды друг друга. Перенос старой раскладки — tools/migrate-workspace.mjs.
+ */
+export const WORKSPACE_ID = process.env.SMMAKER_WORKSPACE || 'k-axis';
+if (!/^[a-z0-9][a-z0-9-]{0,63}$/.test(WORKSPACE_ID)) {
+  throw new Error(`SMMAKER_WORKSPACE=«${WORKSPACE_ID}»: только латиница, цифры и дефис`);
+}
+export const WORKSPACE_DIR = path.join(DATA_DIR, 'workspaces', WORKSPACE_ID);
+// Адрес той же папки в браузере и для рендера: /data отдаётся статикой из DATA_DIR
+export const WORKSPACE_URL = `/data/workspaces/${WORKSPACE_ID}`;
+export const LOTS_DIR = path.join(WORKSPACE_DIR, 'lots');
+export const RENDERS_DIR = path.join(WORKSPACE_DIR, 'renders');
+
+/** Папки компании, которые раньше лежали прямо в data/. Их же переносит миграция. */
+export const WORKSPACE_KINDS = ['lots', 'reviews', 'renders', 'carousels', 'brand'];
+
+/**
+ * Старый адрес файла → адрес в папке компании. Пути записаны внутри лотов, обзоров,
+ * заданий рендера и бренда, иногда с адресом этого сервера впереди (так их видит браузер
+ * рендера: 127.0.0.1 на Mac, 0.0.0.0 в контейнере) — поэтому меняется только сам кусок
+ * /data/<вид>/. Адреса чужих серверов не трогаем, даже если в них встретится /data/lots/.
+ */
+const LEGACY_URL_RE = new RegExp(
+  `(^|https?://(?:127\\.0\\.0\\.1|localhost|0\\.0\\.0\\.0)(?::\\d+)?)/data/(${WORKSPACE_KINDS.join('|')})/`, 'g');
+export const toWorkspaceUrl = (value, wsUrl = WORKSPACE_URL) => {
+  if (typeof value === 'string') return value.replace(LEGACY_URL_RE, (_m, origin, kind) => `${origin}${wsUrl}/${kind}/`);
+  if (Array.isArray(value)) return value.map((v) => toWorkspaceUrl(v, wsUrl));
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, toWorkspaceUrl(v, wsUrl)]));
+  }
+  return value;
+};
 
 // Прод (сервер) против дева (Mac). Один признак на весь сервер, чтобы прод и локальная
 // версия расходились в одном месте, а не в десяти. Сейчас от него зависят две вещи:
@@ -69,10 +109,24 @@ export const writeJson = async (file, data) => {
   await renameWithRetry(tmp, file);
 };
 
-// Бренд
+// Настройки компании: бренд (дизайн) и профиль (кто она и как продаёт).
+//
+// С базой они живут в smmaker_workspaces и переживают выкладку. Без базы — файлы в config/,
+// как было до SMMAKER: так работают тесты и так работает прод, пока DATABASE_URL не задан.
+// Файлы в config/ едут в образе, и правка через интерфейс на проде там смывается
+// передеплоем — это и было главной причиной переезда в базу.
 const BRAND_FILE = path.join(CONFIG_DIR, 'brand.json');
-export const getBrand = () => readJson(BRAND_FILE);
-export const saveBrand = (theme) => writeJson(BRAND_FILE, theme);
+
+const workspaceRow = async () => {
+  const {rows} = await db().query('SELECT brand, profile FROM smmaker_workspaces WHERE id = $1', [WORKSPACE_ID]);
+  if (!rows.length) throw new HttpError(500, `Компания «${WORKSPACE_ID}» не заведена в базе: перезапусти сервер`);
+  return rows[0];
+};
+const updateWorkspace = (field, value) => db().query(
+  `UPDATE smmaker_workspaces SET ${field} = $2, updated_at = now() WHERE id = $1`, [WORKSPACE_ID, value]);
+
+export const getBrand = async () => (hasDatabase() ? (await workspaceRow()).brand : readJson(BRAND_FILE));
+export const saveBrand = (theme) => (hasDatabase() ? updateWorkspace('brand', theme) : writeJson(BRAND_FILE, theme));
 
 // Рынки
 export const getMarket = (id) => readJson(path.join(MARKETS_DIR, `${checkId(id)}.json`));
@@ -89,11 +143,59 @@ export const getCopy = () => readJson(COPY_FILE);
 
 export const PROFILES_DIR = path.join(CONFIG_DIR, 'profiles');
 export const DEFAULT_PROFILE = process.env.DEFAULT_PROFILE || 'default';
-export const getProfile = (id) => readJson(path.join(PROFILES_DIR, `${checkId(id)}.json`));
-export const saveProfile = (id, profile) => writeJson(path.join(PROFILES_DIR, `${checkId(id)}.json`), profile);
+
+// В базе у компании ровно один профиль. Интерфейс и API по-прежнему знают его под id
+// DEFAULT_PROFILE — так форма настроек работает без переделки; чужой id — «не найдено».
+const ownProfile = (id) => {
+  if (checkId(id) !== DEFAULT_PROFILE) throw new HttpError(404, `Не найдено: профиль ${id}`);
+};
+export const getProfile = async (id) => {
+  if (!hasDatabase()) return readJson(path.join(PROFILES_DIR, `${checkId(id)}.json`));
+  ownProfile(id);
+  return (await workspaceRow()).profile;
+};
+export const saveProfile = async (id, profile) => {
+  if (!hasDatabase()) return writeJson(path.join(PROFILES_DIR, `${checkId(id)}.json`), profile);
+  ownProfile(id);
+  await updateWorkspace('profile', profile);
+};
 export const listProfiles = async () => {
+  if (hasDatabase()) return [{id: DEFAULT_PROFILE, ...(await getProfile(DEFAULT_PROFILE))}];
   const files = (await fs.readdir(PROFILES_DIR)).filter((f) => f.endsWith('.json')).sort();
   return Promise.all(files.map(async (f) => ({id: f.slice(0, -5), ...(await readJson(path.join(PROFILES_DIR, f)))})));
+};
+
+/**
+ * Завести компанию в базе, если её там ещё нет. Первые настройки берутся из config/ —
+ * то, чем инструмент работал до SMMAKER, — так переезд в базу не теряет ни бренд, ни
+ * профиль. Дальше config/ для этой компании не читается: правда живёт в базе.
+ * Пути к файлам бренда (/data/brand/…) сразу переводятся в папку компании.
+ */
+export const ensureWorkspace = async ({log = console.log} = {}) => {
+  if (!hasDatabase()) return false;
+  const {rowCount} = await db().query('SELECT 1 FROM smmaker_workspaces WHERE id = $1', [WORKSPACE_ID]);
+  if (rowCount) return false;
+  const brand = toWorkspaceUrl(await readJson(BRAND_FILE));
+  const profile = await readJson(path.join(PROFILES_DIR, `${DEFAULT_PROFILE}.json`));
+  await db().query(
+    'INSERT INTO smmaker_workspaces (id, name, brand, profile) VALUES ($1, $2, $3, $4) ON CONFLICT (id) DO NOTHING',
+    [WORKSPACE_ID, profile.company || brand.name || WORKSPACE_ID, brand, profile]);
+  log(`Компания ${WORKSPACE_ID} заведена в базе: бренд и профиль взяты из config/`);
+  return true;
+};
+
+/**
+ * Есть ли в data/ файлы старой раскладки — без папки компании. Сервер с ними работает,
+ * но их не видит: история и лоты выглядели бы пропавшими. Поэтому при старте об этом
+ * громко пишем, а переносит их tools/migrate-workspace.mjs — по команде, не сам.
+ */
+export const legacyDataDirs = async () => {
+  const found = [];
+  for (const kind of WORKSPACE_KINDS) {
+    const entries = await fs.readdir(path.join(DATA_DIR, kind)).catch(() => []);
+    if (entries.some((e) => !e.startsWith('.'))) found.push(kind);
+  }
+  return found;
 };
 
 /**
@@ -104,11 +206,11 @@ export const listProfiles = async () => {
 export const renderMarket = async (id = DEFAULT_PROFILE) =>
   marketFromProfile(await getProfile(id), await getCopy());
 
-// Лоты: DATA_DIR/lots/<id>/lot.json + photos/
+// Лоты: <папка компании>/lots/<id>/lot.json + photos/
 export const lotDir = (id) => path.join(LOTS_DIR, checkId(id));
 export const lotPhotosDir = (id) => path.join(lotDir(id), 'photos');
-// Фото лота в браузере и для рендера доступны по /data/lots/<id>/photos/<файл>
-export const photoUrl = (id, file) => `/data/lots/${id}/photos/${file}`;
+// Фото лота в браузере и для рендера доступны по <адрес компании>/lots/<id>/photos/<файл>
+export const photoUrl = (id, file) => `${WORKSPACE_URL}/lots/${id}/photos/${file}`;
 
 export const getLot = async (id) => ({...(await readJson(path.join(lotDir(id), 'lot.json'))), id});
 

@@ -5,6 +5,8 @@ import path from 'node:path';
 import {spawn} from 'node:child_process';
 import {createApp} from './app.mjs';
 import {ROOT} from './store.mjs';
+import {hasDatabase, migrate} from './db/index.mjs';
+import {WORKSPACE_ID, ensureWorkspace, legacyDataDirs} from './store.mjs';
 
 const PORT = Number(process.env.PORT || 3210);
 // Без авторизации — поэтому только локально
@@ -20,6 +22,25 @@ process.on('unhandledRejection', (reason) => {
 process.on('uncaughtException', (e) => {
   console.error(`[${stamp()}] Необработанная ошибка:`, e?.stack || e);
 });
+
+// База SMMAKER: миграции до того, как сервер начнёт отвечать. Без DATABASE_URL база
+// пока не нужна — инструмент работает на файлах, как раньше. С ним падаем сразу и понятно:
+// кабинеты и кредиты без базы работать не могут, и лучше не стартовать, чем стартовать наполовину.
+if (hasDatabase()) {
+  await migrate().then(() => ensureWorkspace()).catch((e) => {
+    console.error(`База SMMAKER недоступна: ${e.message}`);
+    process.exit(1);
+  });
+}
+
+// Файлы старой раскладки сервер не видит — история и лоты выглядели бы пропавшими.
+// Переносим не сами: 11 ГБ и пути внутри JSON — это решение владельца, а не побочный эффект запуска
+const legacy = await legacyDataDirs();
+if (legacy.length) {
+  console.warn(`Внимание: в data/ лежат файлы без компании (${legacy.join(', ')}). Они не видны, пока не перенесены:\n`
+    + `  node tools/migrate-workspace.mjs           — показать, что куда поедет\n`
+    + `  node tools/migrate-workspace.mjs --apply   — перенести в data/workspaces/${WORKSPACE_ID}/`);
+}
 
 const app = createApp({photoOrigin: `http://${HOST}:${PORT}`});
 const server = http.createServer(app);

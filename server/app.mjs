@@ -7,7 +7,7 @@ import multer from 'multer';
 import {
   CONFIG_DIR, DATA_DIR, DEFAULT_MARKET, DEFAULT_PROFILE, HttpError, PRODUCTION, checkId, createLot, getBrand, getCopy,
   getLot, getMarket, getProfile, listLots, listMarkets, listProfiles, readJson, renderMarket, saveBrand, saveLot,
-  saveMarket, saveProfile, withLock,
+  saveMarket, saveProfile, withLock, RENDERS_DIR, WORKSPACE_ID, WORKSPACE_URL,
 } from './store.mjs';
 import {reviewStoryboard} from '../src/shared/timeline.js';
 import {getFormat, listFormats, storyboardFrames} from './formats.mjs';
@@ -103,6 +103,9 @@ export const createApp = ({photoOrigin}) => {
     // занял бы полмашины на час рядом с боевым сайтом. Прячет именно клиент, а не сервер:
     // реестр пайплайнов общий для прода и дева, и один флаг честнее двух списков.
     production: PRODUCTION,
+    // Компания, от имени которой работает сервер, и адрес её файлов: интерфейс по нему
+    // отличает свои фото лота от чужих ссылок
+    workspace: {id: WORKSPACE_ID, url: WORKSPACE_URL},
     // Пары шрифтов для настроек бренда. Все с кириллицей — проверено запросом к Google Fonts,
     // и все отдают настоящие 500/600/700, а не синтезированный жирный
     fonts: await readJson(path.join(CONFIG_DIR, 'fonts.json')),
@@ -274,7 +277,7 @@ export const createApp = ({photoOrigin}) => {
     try {
       const job = await getJob(checkId(req.params.id));
       const name = `${job.title.replace(/[^\p{L}\p{N}]+/gu, '-')}-${job.format ?? 'price-ad'}-${job.id.slice(-14)}.mp4`;
-      res.download(path.join(DATA_DIR, 'renders', `${job.id}.mp4`), name);
+      res.download(path.join(RENDERS_DIR, `${job.id}.mp4`), name);
     } catch (e) { next(e); }
   });
 

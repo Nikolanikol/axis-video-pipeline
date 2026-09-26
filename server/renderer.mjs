@@ -4,7 +4,7 @@ import path from 'node:path';
 import {bundle} from '@remotion/bundler';
 import {makeCancelSignal, openBrowser, renderMedia, renderStill, selectComposition} from '@remotion/renderer';
 import sharp from 'sharp';
-import {HttpError, RENDERS_DIR, ROOT, checkId, readJson, writeJson} from './store.mjs';
+import {HttpError, RENDERS_DIR, ROOT, WORKSPACE_URL, checkId, readJson, writeJson} from './store.mjs';
 const browserExecutable = process.env.CHROME_PATH || null;
 const concurrency = process.env.RENDER_CONCURRENCY ? Number(process.env.RENDER_CONCURRENCY) : null;
 const crf = Number(process.env.RENDER_CRF || 20);
@@ -65,7 +65,7 @@ export const enqueue = ({owner, composition, compositionTitle, title, frames, in
   const job = {
     id, ...owner, title, format: composition, formatTitle: compositionTitle, frames,
     status: 'queued', stage: 'В очереди', progress: 0, createdAt: now.toISOString(),
-    video: `/data/renders/${id}.mp4`, storyboard: `/data/renders/${id}.jpg`,
+    video: `${WORKSPACE_URL}/renders/${id}.mp4`, storyboard: `${WORKSPACE_URL}/renders/${id}.jpg`,
     input: inputProps,
   };
   jobs.set(id, job);

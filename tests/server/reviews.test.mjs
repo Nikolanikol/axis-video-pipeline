@@ -149,7 +149,7 @@ describe('проекты обзоров', () => {
     expect(empty.ambience).toBeUndefined();
 
     // Дорожку создаёт только сервер; здесь подкладываем её в файл напрямую, как это сделал бы он
-    const file = path.join(env.data, 'reviews', r.id, 'review.json');
+    const file = path.join(env.ws, 'reviews', r.id, 'review.json');
     const stored = JSON.parse(await fs.readFile(file, 'utf8'));
     stored.ambience = {status: 'ready', file: '/data/reviews/x/ambience-1.m4a', enabled: false};
     await fs.writeFile(file, JSON.stringify(stored));
@@ -293,7 +293,7 @@ describe('видео', {timeout: 120_000}, () => {
     const done = await ready(review.id);
     expect(done.source.proxy).not.toBe(before.proxy);
     expect(done.source.duration).toBeCloseTo(2, 0);
-    const files = await fs.readdir(path.join(env.data, 'reviews', review.id));
+    const files = await fs.readdir(path.join(env.ws, 'reviews', review.id));
     expect(files.filter((f) => f.startsWith('proxy-'))).toHaveLength(1);
     expect(files.filter((f) => f.startsWith('thumbs-'))).toHaveLength(1);
     expect(files.filter((f) => f.startsWith('source.'))).toEqual(['source.mp4']);
@@ -465,7 +465,7 @@ describe('озвучка перевода', {timeout: 120_000}, () => {
     });
     // Один запрос на весь текст, а не по запросу на строку: иначе голос «прыгает» между фразами
     expect(eleven.state.tts).toBe(before + 1);
-    expect(done.voice.track.file).toMatch(/^\/data\/reviews\/.+\/voice\/track-.+\.mp3$/);
+    expect(done.voice.track.file).toMatch(/^\/data\/workspaces\/k-axis\/reviews\/.+\/voice\/track-.+\.mp3$/);
     await fs.access(onDisk(done.voice.track.file));
     expect(done.voice.track.duration).toBeGreaterThan(0);
 

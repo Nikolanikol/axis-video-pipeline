@@ -76,11 +76,11 @@ describe('размытие', () => {
 
 describe('имена файлов фото', () => {
   it('свои файлы лота узнаются, чужие — нет', () => {
-    expect(ownFile('lot-1', '/data/lots/lot-1/photos/123-ab.jpg')).toBe('123-ab.jpg');
-    expect(ownFile('lot-1', '/data/lots/lot-1/photos/123-ab~456.jpg')).toBe('123-ab~456.jpg');
-    expect(ownFile('lot-1', '/data/lots/lot-2/photos/123.jpg')).toBeNull();
-    expect(ownFile('lot-1', '/data/lots/lot-1/photos/../../x.jpg')).toBeNull();
-    expect(ownFile('lot-1', '/data/lots/lot-1/photos/src/123.jpg')).toBeNull();
+    expect(ownFile('lot-1', '/data/workspaces/k-axis/lots/lot-1/photos/123-ab.jpg')).toBe('123-ab.jpg');
+    expect(ownFile('lot-1', '/data/workspaces/k-axis/lots/lot-1/photos/123-ab~456.jpg')).toBe('123-ab~456.jpg');
+    expect(ownFile('lot-1', '/data/workspaces/k-axis/lots/lot-2/photos/123.jpg')).toBeNull();
+    expect(ownFile('lot-1', '/data/workspaces/k-axis/lots/lot-1/photos/../../x.jpg')).toBeNull();
+    expect(ownFile('lot-1', '/data/workspaces/k-axis/lots/lot-1/photos/src/123.jpg')).toBeNull();
     expect(ownFile('lot-1', 'lots/audi/front.jpg')).toBeNull();
   });
 

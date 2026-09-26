@@ -12,9 +12,13 @@ import path from 'node:path';
 import {bundle} from '@remotion/bundler';
 import {openBrowser, renderStill, selectComposition} from '@remotion/renderer';
 import {parseCarLink} from '../src/shared/encarLink.js';
-import {DATA_DIR, HttpError, PRODUCTION, ROOT, checkId, getBrand, readJson, renderMarket, writeJson} from './store.mjs';
+import {
+  HttpError, PRODUCTION, ROOT, WORKSPACE_DIR, WORKSPACE_URL, checkId, getBrand, readJson, renderMarket, writeJson,
+} from './store.mjs';
 
-export const CAROUSELS_DIR = path.join(DATA_DIR, 'carousels');
+// Папка карусели названа номером объявления. Поэтому она обязана лежать внутри папки
+// компании: у двух клиентов одна и та же машина иначе делила бы одни слайды — в чужих цветах
+export const CAROUSELS_DIR = path.join(WORKSPACE_DIR, 'carousels');
 // Слайд истории убираем на проде, пока страховые случаи не приходят с датацентра
 // (Encar режет адрес). Тогда слайдов шесть; на Mac — семь с настоящей историей.
 // Число решается здесь, а сам слайд отсекается в вёрстке по includeHistory.
@@ -137,7 +141,7 @@ export const buildCarousel = async (link) => {
     const meta = {
       id,
       car,
-      slides: Array.from({length: SLIDES}, (_, i) => `/data/carousels/${id}/slide-${i + 1}.png`),
+      slides: Array.from({length: SLIDES}, (_, i) => `${WORKSPACE_URL}/carousels/${id}/slide-${i + 1}.png`),
       updatedAt: new Date().toISOString(),
     };
     await writeJson(path.join(dir, 'carousel.json'), meta);

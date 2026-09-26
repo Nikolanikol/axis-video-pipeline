@@ -16,7 +16,7 @@ const seed = async (id, brand = 'Hyundai') => {
   await fs.mkdir(dir, {recursive: true});
   await fs.writeFile(path.join(dir, 'slide-1.png'), 'png');
   await fs.writeFile(path.join(dir, 'carousel.json'), JSON.stringify({
-    id, car: {id, brand, model: 'Equus'}, slides: [`/data/carousels/${id}/slide-1.png`], updatedAt: new Date().toISOString(),
+    id, car: {id, brand, model: 'Equus'}, slides: [`/data/workspaces/k-axis/carousels/${id}/slide-1.png`], updatedAt: new Date().toISOString(),
   }));
 };
 
