@@ -17,7 +17,15 @@ export const useTempEnv = async () => {
   await fs.cp(path.join(ROOT, 'config'), config, {recursive: true});
   process.env.CONFIG_DIR = config;
   process.env.DATA_DIR = path.join(dir, 'data');
-  return {dir, config, data: process.env.DATA_DIR, cleanup: () => fs.rm(dir, {recursive: true, force: true})};
+  // Тесты без базы: настройки из временного config/, как до SMMAKER
+  delete process.env.DATABASE_URL;
+  // Файлы компании — в её папке; ws и wsUrl — та же папка на диске и в браузере
+  const workspace = process.env.SMMAKER_WORKSPACE || 'k-axis';
+  return {
+    dir, config, data: process.env.DATA_DIR,
+    ws: path.join(process.env.DATA_DIR, 'workspaces', workspace), wsUrl: `/data/workspaces/${workspace}`,
+    cleanup: () => fs.rm(dir, {recursive: true, force: true}),
+  };
 };
 
 // ffmpeg/ffprobe из Remotion

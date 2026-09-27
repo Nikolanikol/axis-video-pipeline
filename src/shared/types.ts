@@ -1,4 +1,5 @@
-// Типы данных проекта: рынок, лот, формат, обзор. Общие для ролика, интерфейса и сервера.
+// Типы данных проекта: бренд, профиль и рынок (мост из профиля), лот, формат, обзор, карусель.
+// Общие для ролика, интерфейса и сервера.
 import type brandTheme from '../../config/brand.json';
 
 export type Theme = typeof brandTheme;
@@ -16,7 +17,8 @@ export type Track = {
   startSec: number; bpm: number; gain: number;
 };
 
-// Настройки рынка: config/markets/<id>.json.
+// «Рынок» — форма данных, которую читают пайплайны. Сейчас его собирает из профиля клиента
+// мост marketFromProfile (src/shared/profile.js); файлы config/markets/ остались для Studio и CLI.
 // pricingMode/currency появляются, когда объект собран из профиля мостом marketFromProfile
 // (src/shared/profile.js): по ним ценовая сцена решает — рисовать маршрут «до порта» (export)
 // или просто цену (domestic). У старых рынков-файлов их нет, поэтому опциональные.
@@ -25,6 +27,10 @@ export type Market = {
   freightUsd: number; whatsapp: string | null; site: string; texts: Texts;
   music?: Music;
   pricingMode?: PricingMode; currency?: string;
+  // Язык постов из профиля: по нему карусель выбирает язык слайдов (src/carousel/i18n)
+  language?: string;
+  // Telegram и главный канал связи — кнопка на финале карусели
+  telegram?: string; contactPrimary?: 'whatsapp' | 'telegram';
 };
 
 // Профиль клиента: config/profiles/<id>.json. Приходит на смену «рынку» — см. src/shared/profile.js.
@@ -40,7 +46,8 @@ export type Pricing = {
 export type Profile = {
   company: string;
   language: string;
-  contacts: {whatsapp: string | null; site: string};
+  // telegram — @имя или ссылка; primary — чем подписана кнопка связи на финале карусели
+  contacts: {whatsapp: string | null; site: string; telegram?: string; primary?: 'whatsapp' | 'telegram'};
   pricing: Pricing;
   // Правки текстов поверх дефолтов платформы; пусто — всё из дефолтов
   texts?: Partial<Texts>;
@@ -87,7 +94,7 @@ export type ReviewSource = {
   progress?: number;
   error?: string;
   name?: string;
-  // Рабочая копия H.264 до 1080×1920, частота REVIEW_FPS: /data/reviews/<id>/proxy-<версия>.mp4
+  // Рабочая копия H.264 до 1080×1920, частота REVIEW_FPS: /data/workspaces/<компания>/reviews/<id>/proxy-<версия>.mp4
   // (для рендера — полный http-адрес)
   proxy?: string;
   width?: number;
@@ -223,6 +230,8 @@ export type CarouselCar = {
 
 // includeHistory: показывать ли слайд истории. На проде сервер ставит false, пока
 // страховые случаи не приходят с датацентра (Encar режет адрес). По умолчанию — да.
-export type CarouselProps = {car: CarouselCar; market: Market; theme?: Partial<Theme>; includeHistory?: boolean};
+// format — id из config/carousel-formats.json (нет — «Классика»); seed — зерно варианта:
+// то же зерно даёт те же компоновку и фразы, «Другой вариант» — новое зерно
+export type CarouselProps = {car: CarouselCar; market: Market; theme?: Partial<Theme>; includeHistory?: boolean; format?: string; seed?: number};
 
 export type ReviewProps = {review: Review; lot?: Lot | null; market: Market; theme?: Partial<Theme>};

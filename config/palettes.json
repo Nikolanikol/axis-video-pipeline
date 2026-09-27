@@ -1,0 +1,122 @@
+[
+  {
+    "id": "copper",
+    "title": "Медь на графите",
+    "note": "Фирменная палитра AXIS — из брендбука",
+    "colors": {
+      "bg": "#111111",
+      "panel": "#1F1F1F",
+      "line": "#2D2D2D",
+      "grey": "#8A8A8A",
+      "white": "#F5F5F5",
+      "copper": "#B8734A",
+      "copperLight": "#E19A6B",
+      "copperDark": "#975B32"
+    }
+  },
+  {
+    "id": "gold",
+    "title": "Золото на чёрном",
+    "note": "Премиум, дорогие авто",
+    "colors": {
+      "bg": "#0F0F0F",
+      "panel": "#1D1D1D",
+      "line": "#2E2E2E",
+      "grey": "#908E8A",
+      "white": "#F5F2EA",
+      "copper": "#C9A24A",
+      "copperLight": "#D8BC7D",
+      "copperDark": "#9D7E3A"
+    }
+  },
+  {
+    "id": "steel",
+    "title": "Сталь на тёмно-синем",
+    "note": "Сдержанно, корпоративно",
+    "colors": {
+      "bg": "#0E1520",
+      "panel": "#1C232D",
+      "line": "#2D333D",
+      "grey": "#8E929A",
+      "white": "#F2F5F9",
+      "copper": "#9AAABB",
+      "copperLight": "#B6C2CE",
+      "copperDark": "#788592"
+    }
+  },
+  {
+    "id": "blue",
+    "title": "Синий на ночном",
+    "note": "Технологично, электромобили",
+    "colors": {
+      "bg": "#0B1120",
+      "panel": "#1A1F2D",
+      "line": "#2B303D",
+      "grey": "#8C919A",
+      "white": "#F2F5FA",
+      "copper": "#3F7FFF",
+      "copperLight": "#75A3FF",
+      "copperDark": "#3163C7"
+    }
+  },
+  {
+    "id": "red",
+    "title": "Красный спорт",
+    "note": "Спорткары, энергично",
+    "colors": {
+      "bg": "#121212",
+      "panel": "#202020",
+      "line": "#313131",
+      "grey": "#919191",
+      "white": "#F5F5F5",
+      "copper": "#E8484D",
+      "copperLight": "#EE7B7F",
+      "copperDark": "#BE3B3F"
+    }
+  },
+  {
+    "id": "emerald",
+    "title": "Изумруд",
+    "note": "Спокойно, экологичные авто",
+    "colors": {
+      "bg": "#0D1411",
+      "panel": "#1C221F",
+      "line": "#2C3330",
+      "grey": "#8D9390",
+      "white": "#F2F7F4",
+      "copper": "#2DB47A",
+      "copperLight": "#68C99F",
+      "copperDark": "#238C5F"
+    }
+  },
+  {
+    "id": "orange",
+    "title": "Оранжевый",
+    "note": "Ярко, массовый сегмент",
+    "colors": {
+      "bg": "#141210",
+      "panel": "#22201E",
+      "line": "#33312F",
+      "grey": "#93918D",
+      "white": "#F7F4F0",
+      "copper": "#F08A24",
+      "copperLight": "#F4AB61",
+      "copperDark": "#BB6C1C"
+    }
+  },
+  {
+    "id": "mono",
+    "title": "Белый минимализм",
+    "note": "Без цвета — всё внимание на авто",
+    "colors": {
+      "bg": "#141414",
+      "panel": "#222222",
+      "line": "#333333",
+      "grey": "#989898",
+      "white": "#FFFFFF",
+      "copper": "#E6E6E6",
+      "copperLight": "#EDEDED",
+      "copperDark": "#B3B3B3"
+    }
+  }
+]

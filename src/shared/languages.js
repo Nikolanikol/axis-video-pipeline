@@ -1,4 +1,5 @@
-// Языки перевода: на них делаем субтитры и озвучку. Общий модуль (интерфейс, сервер, тесты).
+// Языки: перевода обзоров (субтитры и озвучка, TARGET_LANGUAGES) и постов (POST_LANGUAGES —
+// реклама и карусели). Общий модуль (интерфейс, сервер, тесты).
 // voice — умеет ли этот язык голосовая модель (eleven_v3). Субтитры можно делать на любом.
 
 /** @typedef {{code: string, name: string, voice: boolean}} TargetLanguage */
@@ -18,6 +19,18 @@ export const TARGET_LANGUAGES = [
 
 export const DEFAULT_TARGET = 'mk';
 
+/**
+ * Языки постов (профиль клиента): на них есть тексты рекламы (config/copy.json под обе
+ * модели цены) и карусели (src/carousel/i18n). Список уже, чем TARGET_LANGUAGES выше:
+ * тот — языки субтитров и озвучки обзоров, там македонский нужен. А язык поста, для
+ * которого нет своих текстов, молча давал бы английский — решение владельца 27 сентября:
+ * в выборе только английский и русский.
+ */
+export const POST_LANGUAGES = [
+  {code: 'en', name: 'английский'},
+  {code: 'ru', name: 'русский'},
+];
+
 /** @param {string} code @returns {TargetLanguage | null} */
 export const findLanguage = (code) => TARGET_LANGUAGES.find((l) => l.code === code) ?? null;
 
@@ -28,7 +41,8 @@ export const languageName = (code) => findLanguage(code)?.name ?? String(code ||
 export const canSpeak = (code) => Boolean(findLanguage(code)?.voice);
 
 /**
- * Язык перевода обзора: свой, иначе язык рынка, иначе македонский.
+ * Язык перевода обзора: свой, иначе язык постов из профиля (приходит в market мостом),
+ * иначе македонский.
  * @param {{targetLanguage?: string}} review
  * @param {{language?: string} | null} [market]
  */

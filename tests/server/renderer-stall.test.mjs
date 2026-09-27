@@ -42,7 +42,7 @@ afterAll(() => env.cleanup());
 
 describe('зависший рендер', () => {
   it('снимается сам и объясняет, на каком шаге встал', async () => {
-    const job = enqueue(task('rv-stall'));
+    const job = await enqueue(task('rv-stall'));
     const done = await waitFor(async () => {
       const j = await getJob(job.id);
       return j?.status === 'error' ? j : null;
@@ -54,7 +54,7 @@ describe('зависший рендер', () => {
   });
 
   it('очередь едет дальше: после снятого задания можно запускать снова', async () => {
-    const again = enqueue(task('rv-stall'));
+    const again = await enqueue(task('rv-stall'));
     expect(again.status).toBe('queued');
   });
 });

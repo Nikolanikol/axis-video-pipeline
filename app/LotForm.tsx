@@ -5,6 +5,7 @@ import {fmt, priceUsd} from '../src/shared/model';
 import type {FormatMeta, Market} from '../src/shared/types';
 import {api, LotEntry} from './api';
 import {BlurEditor} from './BlurEditor';
+import {useConfig} from './config';
 
 type Props = {
   lot: LotEntry;
@@ -113,7 +114,8 @@ const Photos: React.FC<Pick<Props, 'lot' | 'onChange' | 'onPhotos' | 'onError'> 
   const [editing, setEditing] = useState<string | null>(null);
   const closeEditor = useCallback(() => setEditing(null), []);
   const fileRef = useRef<HTMLInputElement>(null);
-  const own = `/data/lots/${lot.id}/photos/`;
+  const {config} = useConfig();
+  const own = `${config.workspace.url}/lots/${lot.id}/photos/`;
   const blurCount = (p: string) => lot.blur?.[p.slice(own.length).replace(/(~\d+)?\.jpg$/, '')]?.length ?? 0;
 
   const upload = async (files: File[]) => {

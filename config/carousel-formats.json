@@ -1,0 +1,34 @@
+[
+  {
+    "id": "classic",
+    "title": "Классика",
+    "note": "7 слайдов 9:16 — один комплект на Instagram и TikTok, текст в безопасной зоне",
+    "width": 1080,
+    "height": 1920,
+    "slides": ["cover", "history", "interior", "technology", "specs", "price", "cta"]
+  },
+  {
+    "id": "showcase",
+    "title": "Витрина",
+    "note": "9 квадратов 1:1 — не режется ни в ленте, ни в сетке профиля",
+    "width": 1080,
+    "height": 1080,
+    "slides": ["cover", "exterior", "interior", "engine", "safety", "history", "gallery", "price", "cta"]
+  },
+  {
+    "id": "spread",
+    "title": "Разворот",
+    "note": "6 слайдов 4:5 — родной размер карусели Instagram",
+    "width": 1080,
+    "height": 1350,
+    "slides": ["cover", "exterior", "interior", "engine", "history", "cta"]
+  },
+  {
+    "id": "full",
+    "title": "Полная",
+    "note": "12 квадратов 1:1 — с деталями, галереей и «почему мы»",
+    "width": 1080,
+    "height": 1080,
+    "slides": ["cover", "exterior", "interior", "details", "engine", "safety", "history", "rear", "gallery", "price", "why", "cta"]
+  }
+]

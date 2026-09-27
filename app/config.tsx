@@ -1,4 +1,4 @@
-// Общие настройки для всех инструментов: сохранённые (config) и черновики рынков и бренда.
+// Общие настройки для всех инструментов: сохранённые (config) и черновики профиля и бренда.
 // Черновики сразу видны в превью; на диск — по кнопке «Сохранить».
 import React, {createContext, useCallback, useContext, useEffect, useMemo, useState} from 'react';
 import type {Theme} from '../src/shared/types';

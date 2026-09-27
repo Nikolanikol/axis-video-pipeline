@@ -1,4 +1,5 @@
-// Кирпичики карусели: шапка, рубрика, заголовок, списки, карточки-цифры.
+// Кирпичики «Классики» (7 слайдов 9:16): шапка, рубрика, заголовок, списки, карточки-цифры.
+// У новых форматов свой набор — ./deck/Kit.tsx.
 //
 // Слайд — статичная картинка, поэтому здесь нет ни одной анимации: всё, что двигалось бы
 // во времени, на выходе превратилось бы в случайный кадр этой анимации.
@@ -7,9 +8,9 @@ import {AbsoluteFill, Img} from 'remotion';
 import {BODY, CopperText, HEAD, radius, useTheme} from '../shared/ui';
 
 export const PAD = 96;
-// Максимум слайдов — им задаётся длительность композиции (см. Root.tsx). Сколько слайдов
-// в конкретной карусели, решает Carousel.tsx и передаёт числом: на проде истории нет,
-// и слайдов шесть, а не семь. Поэтому номер «NN / total» в шапках приходит пропом.
+// Слайдов в «Классике» с историей. Это лишь значение по умолчанию для Studio: настоящее
+// число кадров композиция берёт из формата (calculateMetadata в Root.tsx), а на проде истории
+// нет и слайдов шесть. Поэтому номер «NN / total» в шапках приходит пропом.
 export const TOTAL = 7;
 
 /**
@@ -41,16 +42,21 @@ export const Header: React.FC<{index: number; total: number; brandName: string}>
 };
 
 /** Рубрика медью и крупный заголовок под ней — общий вход в каждый слайд */
-export const Title: React.FC<{kicker: string; children: React.ReactNode}> = ({kicker, children}) => (
-  <div style={{marginTop: 52}}>
-    <CopperText style={{fontFamily: BODY, fontWeight: 700, fontSize: 32, letterSpacing: 9, textTransform: 'uppercase'}}>
-      {kicker}
-    </CopperText>
-    <div style={{fontFamily: HEAD, fontWeight: 600, fontSize: 92, lineHeight: 1.05, marginTop: 20}}>
-      {children}
+export const Title: React.FC<{kicker: string; children: React.ReactNode}> = ({kicker, children}) => {
+  const C = useTheme();
+  return (
+    <div style={{marginTop: 52}}>
+      <CopperText style={{fontFamily: BODY, fontWeight: 700, fontSize: 32, letterSpacing: 9, textTransform: 'uppercase'}}>
+        {kicker}
+      </CopperText>
+      {/* Цвет задан явно: без него заголовок наследовал чёрный по умолчанию и пропадал
+          на тёмном слайде — «Nothing hidden» так и выходил почти невидимым */}
+      <div style={{fontFamily: HEAD, fontWeight: 600, fontSize: 92, lineHeight: 1.05, marginTop: 20, color: C.white}}>
+        {children}
+      </div>
     </div>
-  </div>
-);
+  );
+};
 
 /**
  * Фото в край: на всю ширину слайда, без рамки и полей.

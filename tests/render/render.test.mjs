@@ -218,3 +218,26 @@ describe('обзор review-short', () => {
     expect(peak(await decodeAudio(out))).toBe(0);
   });
 });
+
+// Карусель новых форматов на пустой машине: свежее объявление приходит без истории, опций,
+// цены и части фото — ни один слайд не должен от этого падать, а размер кадра и число
+// слайдов обязаны прийти от формата
+describe('карусель: форматы на пустых данных', () => {
+  const empty = {
+    id: '1', source: '', brand: 'Kia', model: 'K5', grade: '', trim: '', year: null, firstRegistered: null,
+    mileageKm: null, displacementCc: null, transmission: '', fuel: '', body: '', color: '', seats: null,
+    vin: null, plate: null, price: null, history: null, options: {comfort: [], safety: [], other: [], total: 0},
+    photos: {hero: null, rear: null, interiorShot: null, dashboard: null, exterior: [], interior: [], other: []},
+  };
+  it.each([['showcase', 1080, 1080, 9], ['spread', 1080, 1350, 6], ['full', 1080, 1080, 12]])(
+    '%s: %i×%i, %i слайдов, каждый рисуется', async (format, width, height, count) => {
+      const inputProps = {car: empty, market: {...fixture.market, language: 'ru'}, theme: fixture.theme, format, seed: 7};
+      const comp = await selectComposition({serveUrl, id: 'carousel', inputProps, puppeteerInstance: browser});
+      expect([comp.width, comp.height, comp.durationInFrames]).toEqual([width, height, count]);
+      for (let frame = 0; frame < count; frame++) {
+        const {buffer} = await renderStill({composition: comp, serveUrl, frame, inputProps, puppeteerInstance: browser, imageFormat: 'png', scale: 0.25});
+        const {width: w} = await sharp(buffer).metadata();
+        expect(w).toBe(width / 4);
+      }
+    });
+});

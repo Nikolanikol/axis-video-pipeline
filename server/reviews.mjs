@@ -1,4 +1,4 @@
-// Проекты обзоров: data/reviews/<id>/review.json + source.* (исходник) + proxy-<версия>.mp4 + thumbs-<версия>/
+// Проекты обзоров: <папка компании>/reviews/<id>/review.json + source.* (исходник) + proxy-<версия>.mp4 + thumbs-<версия>/
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {linesFromWords, sanitizeLines} from '../src/shared/subtitles.js';
@@ -10,9 +10,12 @@ import {apiSettings, resolveSpeaker, voiceConfig} from '../src/shared/voices.js'
 import {buildScript, lineTimes} from '../src/shared/narration.js';
 import {extractAudio, hasKey, hasVoice, synthesizeScript, transcribe, voiceHash} from './speech.mjs';
 import {hasSeparator, separateAmbience} from './ambience.mjs';
-import {CONFIG_DIR, DATA_DIR, DEFAULT_MARKET, HttpError, checkId, getLot, readJson, withLock, writeJson} from './store.mjs';
+import {
+  CONFIG_DIR, DATA_DIR, DEFAULT_MARKET, HttpError, checkId, workspaceDir, workspaceUrl, getLot, readJson, withLock, writeJson,
+} from './store.mjs';
 
-export const REVIEWS_DIR = path.join(DATA_DIR, 'reviews');
+export const reviewsDir = () => path.join(workspaceDir(), 'reviews');
+// Приёмник загрузок общий: файл лежит там секунды, пока его не заберёт обзор компании
 export const UPLOAD_TMP = path.join(DATA_DIR, 'tmp');
 export const MAX_SOURCE_SEC = 10 * 60;
 export const THUMBS_FPS = 2;
@@ -20,9 +23,9 @@ export const THUMBS_FPS = 2;
 // Реестр спикеров озвучки — общий на проект, читаем при каждой озвучке (правится редко, файл крошечный)
 export const voiceRegistry = () => readJson(path.join(CONFIG_DIR, 'voices.json')).catch(() => ({speakers: [], defaults: {}}));
 
-const reviewDir = (id) => path.join(REVIEWS_DIR, checkId(id));
+const reviewDir = (id) => path.join(reviewsDir(), checkId(id));
 const reviewFile = (id) => path.join(reviewDir(id), 'review.json');
-export const reviewUrl = (id, file) => `/data/reviews/${id}/${file}`;
+export const reviewUrl = (id, file) => `${workspaceUrl()}/reviews/${id}/${file}`;
 
 // Идёт обработка видео: id → доля 0…1; идёт приём загрузки — id в ingesting; идёт распознавание — в transcribing
 const progress = new Map();
@@ -61,8 +64,8 @@ const write = async (id, review) => {
 };
 
 export const listReviews = async () => {
-  await fs.mkdir(REVIEWS_DIR, {recursive: true});
-  const dirs = (await fs.readdir(REVIEWS_DIR, {withFileTypes: true})).filter((d) => d.isDirectory());
+  await fs.mkdir(reviewsDir(), {recursive: true});
+  const dirs = (await fs.readdir(reviewsDir(), {withFileTypes: true})).filter((d) => d.isDirectory());
   const all = await Promise.all(dirs.map((d) => getReview(d.name).catch(() => null)));
   return all.filter(Boolean).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
 };

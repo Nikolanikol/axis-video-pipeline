@@ -12,7 +12,7 @@ import {sec} from './Scrubber';
 type Props = {
   review: ReviewEntry;
   available: boolean;              // есть ключ ElevenLabs
-  market?: {language?: string} | null;  // язык рынка — значение по умолчанию для перевода
+  market?: {language?: string} | null;  // язык постов из профиля — значение по умолчанию для перевода
   voices?: import('../../src/shared/types').VoiceRegistry;  // реестр спикеров озвучки
   canVoice: boolean;               // есть голос для озвучки (ELEVENLABS_VOICE_ID)
   ready: boolean;                  // видео готово

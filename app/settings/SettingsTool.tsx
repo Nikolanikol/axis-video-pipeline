@@ -1,4 +1,4 @@
-// Раздел «Настройки»: профиль, бренд, рынки. Справа — живое превью последнего открытого лота.
+// Раздел «Настройки»: профиль и бренд. Справа — живое превью последнего открытого лота.
 import React, {useEffect, useState} from 'react';
 import {getFormat} from '../../src/shared/model';
 import {marketFromProfile} from '../../src/shared/profile';
@@ -29,7 +29,7 @@ const PreviewPanel: React.FC<{lot: LotEntry | null | undefined; market: MarketEn
   return (
     <>
       <div className="format-bar">
-        <span className="muted">Превью: <a href={href('ads', 'lot')}>{lotTitle(lot)}</a> · {format.title} · рынок «{market.id}»</span>
+        <span className="muted">Превью: <a href={href('ads', 'lot')}>{lotTitle(lot)}</a> · {format.title}</span>
       </div>
       <Preview input={{lot: {...lot, market: market.id}, market: market as Market, theme: brand}} format={format} />
     </>
@@ -64,7 +64,7 @@ export const BrandTool: React.FC = () => {
   return (
     <main className="grid grid-settings">
       <section className="panel editor">
-        <BrandForm theme={brand} saved={config.brand} pairs={config.fonts}
+        <BrandForm theme={brand} saved={config.brand} pairs={config.fonts} palettes={config.palettes ?? []}
           onChange={setBrand} onSaved={brandSaved} onError={report} />
       </section>
       <section className="panel preview">

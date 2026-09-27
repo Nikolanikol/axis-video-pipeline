@@ -40,7 +40,7 @@ const upload = async (lotId, files) => {
   return call('POST', `/api/lots/${lotId}/photos`, form);
 };
 
-const fileOf = (lotId, url) => path.join(env.data, 'lots', lotId, 'photos', url.split('/photos/')[1]);
+const fileOf = (lotId, url) => path.join(env.ws, 'lots', lotId, 'photos', url.split('/photos/')[1]);
 const exists = (f) => fs.access(f).then(() => true, () => false);
 
 describe('настройки', () => {
@@ -125,7 +125,7 @@ describe('фото', () => {
     }
     const [p] = body.photos;
     const stem = p.split('/').pop().replace('.jpg', '');
-    expect(await exists(path.join(env.data, 'lots', lot.id, 'photos', 'src', `${stem}.jpg`))).toBe(true);
+    expect(await exists(path.join(env.ws, 'lots', lot.id, 'photos', 'src', `${stem}.jpg`))).toBe(true);
     lot = body;
   });
 
@@ -172,7 +172,7 @@ describe('фото', () => {
   });
 
   it('чужие пути в запросах фото отклоняются', async () => {
-    expect((await call('PUT', `/api/lots/${lot.id}/photo`, {path: '/data/lots/other/photos/x.jpg', regions: []})).status).toBe(404);
+    expect((await call('PUT', `/api/lots/${lot.id}/photo`, {path: `${env.wsUrl}/lots/other/photos/x.jpg`, regions: []})).status).toBe(404);
     expect((await call('DELETE', `/api/lots/${lot.id}/photos?path=${encodeURIComponent('../../package.json')}`)).status).toBe(404);
   });
 
@@ -183,7 +183,7 @@ describe('фото', () => {
     expect(body.photos).not.toContain(url);
     expect(body.blur?.[stem]).toBeUndefined();
     expect(await exists(fileOf(lot.id, url))).toBe(false);
-    expect(await exists(path.join(env.data, 'lots', lot.id, 'photos', 'src', `${stem}.jpg`))).toBe(false);
+    expect(await exists(path.join(env.ws, 'lots', lot.id, 'photos', 'src', `${stem}.jpg`))).toBe(false);
   });
 });
 

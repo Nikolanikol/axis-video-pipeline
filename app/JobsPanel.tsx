@@ -1,6 +1,8 @@
 // Панель рендера: кнопка, предупреждения, история роликов с прогрессом и скачиванием
 import React, {useCallback, useEffect, useState} from 'react';
 import {api, Job, JobQuery} from './api';
+import {useCost, useSession} from './auth';
+import {useConfig} from './config';
 
 type Props = {
   query: JobQuery;
@@ -9,12 +11,17 @@ type Props = {
   disabled?: boolean;
   start: () => Promise<Job>;
   onError: (e: unknown) => void;
+  // За что списываются кредиты: ads | reviews — цена на кнопке
+  pipeline?: string;
 };
 
 const time = (iso: string) => new Date(iso).toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
 const active = (j: Job) => j.status === 'queued' || j.status === 'running';
 
-export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, start, onError}) => {
+export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, start, onError, pipeline}) => {
+  const {config} = useConfig();
+  const {refresh: refreshAccess} = useSession();
+  const cost = useCost(pipeline ?? '', config.credits);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [starting, setStarting] = useState(false);
   const key = JSON.stringify(query);
@@ -24,6 +31,8 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
 
   // Пока что-то рендерится — опрашиваем раз в секунду
   const running = jobs.some(active);
+  // Рендер закончился — остаток в шапке мог измениться: при неудаче кредит вернулся
+  useEffect(() => { if (!running) refreshAccess(); }, [running, refreshAccess]);
   useEffect(() => {
     if (!running) return;
     const t = setInterval(refresh, 1000);
@@ -35,15 +44,16 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
     try {
       const job = await start();
       setJobs((js) => [job, ...js]);
+      refreshAccess();
     } catch (e) { onError(e); } finally { setStarting(false); }
   };
 
   // Управление роликом в истории: отменить идущий, пересобрать заново, удалить из списка
   const cancel = async (id: string) => {
-    try { await api.cancelRender(id); refresh(); } catch (e) { onError(e); }
+    try { await api.cancelRender(id); refresh(); refreshAccess(); } catch (e) { onError(e); }
   };
   const retry = async (id: string) => {
-    try { const job = await api.retryRender(id); setJobs((js) => [job, ...js]); } catch (e) { onError(e); }
+    try { const job = await api.retryRender(id); setJobs((js) => [job, ...js]); refreshAccess(); } catch (e) { onError(e); }
   };
   const remove = async (id: string) => {
     try { await api.deleteRender(id); setJobs((js) => js.filter((j) => j.id !== id)); } catch (e) { onError(e); }
@@ -55,7 +65,7 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
           часа, и десять нажатий подряд встанут в очередь одинаковыми роликами. На сервере стоит
           такая же проверка — вкладку можно открыть дважды, и тогда эта кнопка ничего не знает. */}
       <button className="btn primary big" onClick={run} disabled={starting || running || disabled}>
-        {starting ? 'Запускаю…' : running ? 'Уже собирается…' : label}
+        {starting ? 'Запускаю…' : running ? 'Уже собирается…' : `${label}${cost}`}
       </button>
       {starting && <div className="bar wait"><div /></div>}
       {warnings.length > 0 && <ul className="warnings">{warnings.map((w) => <li key={w}>{w}</li>)}</ul>}

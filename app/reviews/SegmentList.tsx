@@ -66,7 +66,7 @@ export const SegmentList: React.FC<Props> = ({segments, source, selectedId, onSe
               </div>
             )}
             {s.kind === 'hook' && <div className="hint">Марка, модель и год — из привязанного лота</div>}
-            {s.kind === 'final' && <div className="hint">Цена до порта и контакты — из лота и настроек рынка</div>}
+            {s.kind === 'final' && <div className="hint">Цена до порта и контакты — из лота и профиля</div>}
           </div>
         );
       })}

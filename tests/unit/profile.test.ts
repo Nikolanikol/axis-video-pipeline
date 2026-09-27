@@ -39,6 +39,21 @@ describe('resolveTexts', () => {
     expect(t.priceNoteIncluded).toBe('');
   });
 
+  it('каждый язык постов есть в обеих моделях цены — иначе реклама молча выйдет на английском', async () => {
+    const {POST_LANGUAGES} = await import('../../src/shared/languages.js');
+    for (const mode of PRICING_MODES) {
+      for (const l of POST_LANGUAGES) expect(copy[mode][l.code], `${mode}.${l.code}`).toBeTruthy();
+    }
+  });
+
+  it('акцент финала не повторяется в заголовке', () => {
+    for (const byLang of Object.values(copy) as Record<string, {ctaTitle: string; ctaAccent: string}>[]) {
+      for (const [lang, t] of Object.entries(byLang)) {
+        if (t.ctaAccent) expect(t.ctaTitle.toLowerCase(), lang).not.toContain(t.ctaAccent.toLowerCase());
+      }
+    }
+  });
+
   it('незнакомый язык откатывается на английский, а не оставляет пусто', () => {
     const t = resolveTexts(copy, 'export', 'zz', {});
     expect(t).toEqual(copy.export.en);

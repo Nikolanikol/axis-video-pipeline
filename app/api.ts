@@ -1,4 +1,5 @@
-// Клиент API сервера: лоты, фото, обзоры, речь, озвучка, рендеры. Типы ответов — общие с сервером.
+// Клиент API сервера: вход и кабинет, админка, настройки, лоты и фото, обзоры, речь и озвучка,
+// рендеры, карусели. Типы ответов — общие с сервером.
 import type {CarouselCar, FormatMeta, Lot, Market, Profile, Review, Texts, Theme} from '../src/shared/types';
 
 export type MarketEntry = Market & {id: string};
@@ -11,20 +12,30 @@ export type LotEntry = Lot & {id: string; updatedAt?: string; note?: string; blu
 export type PhotoInfo = {path: string; source: string; regions: Region[]};
 // Пара шрифтов из config/fonts.json. url пустой — пара встроена в проект и не требует сети
 export type FontPair = {id: string; title: string; note: string; head: string; body: string; url: string};
+// Палитра из config/palettes.json: восемь цветов темы, прошедшие проверку контраста
+export type Palette = {id: string; title: string; note: string; colors: Record<string, string>};
 export type Config = {
   brand: Theme; markets: MarketEntry[]; defaultMarket: string; formats: FormatMeta[]; pipelines: unknown[];
   // Профили клиента идут на смену рынкам; copy — дефолты текстов платформы
   profiles: ProfileEntry[]; defaultProfile: string; copy: Copy;
+  // Компания и адрес её файлов (/data/workspaces/<id>)
+  workspace: {id: string; url: string};
   // Боевой запуск (NODE_ENV=production). Интерфейс по нему прячет пайплайн обзоров
   production: boolean;
   fonts: FontPair[];
+  palettes?: Palette[];
+  carouselFormats?: CarouselFormat[];
   // ambience — установлено ли локальное окружение для выделения звуков машины (проба)
   features: {speech: boolean; voice: boolean; ambience?: boolean};
+  // Цены генераций в кредитах: {ads, carousels, reviews}
+  credits?: Record<string, number>;
   voices?: import('../src/shared/types').VoiceRegistry;
 };
 export type ReviewEntry = Review & {id: string};
 // Готовая карусель: карточка авто от шлюза и адреса семи картинок
-export type CarouselEntry = {id: string; car: CarouselCar; slides: string[]; updatedAt: string};
+// format и seed — чем собрана: формат из реестра и зерно варианта (у старых карусель их нет — «Классика»)
+export type CarouselEntry = {id: string; car: CarouselCar; slides: string[]; updatedAt: string; format?: string; seed?: number};
+export type CarouselFormat = {id: string; title: string; note: string; width: number; height: number; slides: string[]};
 export type JobQuery = {lot?: string; review?: string};
 export type Job = {
   id: string; lotId?: string; reviewId?: string; title: string; format: string; formatTitle: string;
@@ -32,6 +43,27 @@ export type Job = {
   stage: string; progress: number; createdAt: string; finishedAt?: string; error?: string;
   video: string; storyboard: string;
 };
+
+// Кабинет SMMAKER: кто вошёл и что с доступом компании
+export type Access = {
+  active: boolean; plan: {id: string; title: string; pipelines: string[]} | null;
+  periodStart: string | null; periodEnd: string | null; paidUntil: string | null; credits: number;
+};
+export type Me =
+  | {authRequired: false}
+  | {authRequired: true; user: null}
+  | {authRequired: true; user: {id: string; email: string; isAdmin: boolean};
+     workspace: {id: string; name: string; role: string} | null; access: Access | null};
+export type Plan = {id: string; title: string; credits: number; days: number; pipelines: string[]; active: boolean};
+export type ActivationCode = {
+  code: string; plan_id: string; plan_title?: string; days: number; credits: number; note: string; created_at: string;
+  activated_at?: string | null; activated_workspace_id?: string | null; workspace_name?: string | null;
+};
+export type LedgerRow = {
+  id: number; delta: number; kind: 'grant' | 'charge' | 'refund' | 'adjust'; pipeline: string | null;
+  job_id: string | null; note: string; created_at: string; period_start: string; period_end: string;
+};
+export type WorkspaceRow = {id: string; name: string; created_at: string; emails: string | null; access: Access};
 
 const request = async <T,>(method: string, url: string, body?: unknown): Promise<T> => {
   const isForm = body instanceof FormData;
@@ -41,11 +73,30 @@ const request = async <T,>(method: string, url: string, body?: unknown): Promise
     body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
+  // Сессия кончилась или вход сброшен на другом устройстве — перезагрузка покажет экран входа
+  if (res.status === 401 && !url.startsWith('/api/auth/')) window.location.reload();
   if (!res.ok) throw new Error(data.error || `${res.status} ${res.statusText}`);
   return data as T;
 };
 
 export const api = {
+  me: () => request<Me>('GET', '/api/auth/me'),
+  login: (email: string, password: string) => request<{ok: true}>('POST', '/api/auth/login', {email, password}),
+  register: (data: {email: string; password: string; company: string; code: string}) =>
+    request<{ok: true}>('POST', '/api/auth/register', data),
+  logout: () => request<{ok: true}>('POST', '/api/auth/logout'),
+  redeem: (code: string) => request<Access>('POST', '/api/account/redeem', {code}),
+  ledger: () => request<LedgerRow[]>('GET', '/api/account/ledger'),
+  admin: {
+    plans: () => request<Plan[]>('GET', '/api/admin/plans'),
+    savePlan: (plan: Plan) => request<Plan>('PUT', `/api/admin/plans/${plan.id}`, plan),
+    codes: () => request<ActivationCode[]>('GET', '/api/admin/codes'),
+    createCodes: (planId: string, count: number, note: string) =>
+      request<ActivationCode[]>('POST', '/api/admin/codes', {planId, count, note}),
+    workspaces: () => request<WorkspaceRow[]>('GET', '/api/admin/workspaces'),
+    adjustCredits: (id: string, delta: number, note: string) =>
+      request<Access>('POST', `/api/admin/workspaces/${id}/credits`, {delta, note}),
+  },
   config: () => request<Config>('GET', '/api/config'),
   saveBrand: (theme: Theme) => request<Theme>('PUT', '/api/brand', theme),
   saveMarket: (id: string, market: Market) => request<MarketEntry>('PUT', `/api/markets/${id}`, market),
@@ -74,17 +125,21 @@ export const api = {
   review: (id: string) => request<ReviewEntry>('GET', `/api/reviews/${id}`),
   createReview: (data: {lotId?: string | null; title?: string}) => request<ReviewEntry>('POST', '/api/reviews', data),
   saveReview: (r: ReviewEntry, baseUpdatedAt?: string) => request<ReviewEntry>('PUT', `/api/reviews/${r.id}`, {...r, baseUpdatedAt}),
-  // Карусели: ссылка Encar → семь слайдов
-  // Логотип: сервер проверяет формат, размер и прозрачность и возвращает обновлённый бренд
+  // Логотип: сервер сам доводит файл (фон, поля, размер, SVG → PNG) и возвращает обновлённый бренд
   uploadLogo: async (file: File) => {
     const form = new FormData();
     form.append('logo', file);
     const res = await fetch('/api/brand/logo', {method: 'POST', body: form});
     const body = await res.json().catch(() => null);
     if (!res.ok) throw new Error(body?.error ?? 'Не удалось загрузить логотип');
-    return body as {url: string; width: number; height: number; bytes: number; brand: Theme};
+    return body as {url: string; width: number; height: number; bytes: number; brand: Theme;
+      notes: string[]; warnings: string[]; hasRaw: boolean};
   },
-  buildCarousel: (link: string) => request<CarouselEntry>('POST', '/api/carousels', {link}),
+  // clean — фон убран, raw — как загружен, none — без логотипа, название компании текстом
+  logoVariant: (variant: 'clean' | 'raw' | 'none') =>
+    request<{url: string; brand: Theme}>('PUT', '/api/brand/logo/variant', {variant}),
+  // Карусели: ссылка Encar → слайды формата; seed — зерно варианта (нет — случайное)
+  buildCarousel: (link: string, format?: string, seed?: number) => request<CarouselEntry>('POST', '/api/carousels', {link, format, seed}),
   carousels: () => request<CarouselEntry[]>('GET', '/api/carousels'),
   deleteCarousel: (id: string) => request<{id: string; deleted: boolean}>('DELETE', `/api/carousels/${id}`),
   renderReview: (id: string) => request<Job>('POST', `/api/reviews/${id}/render`, {}),
