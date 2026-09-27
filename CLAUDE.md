@@ -114,7 +114,13 @@ docker build -t axis-video .
 (без `--apply` — только показывает); сервер при старте предупреждает, если она осталась.
 
 **Без туннеля к базе сервер на Mac не стартует.** Mac уснул — туннель умер:
-`ssh -f -N -L 54329:10.0.2.6:5432 axis-vps` (запускает владелец), потом `tools/restart.sh`.
+`ssh -f -N -L 54329:<адрес>:5432 axis-vps` (запускает владелец), потом `tools/restart.sh`.
+Адрес контейнера базы меняется при перезапуске Supabase (27.09: 10.0.2.6 → 10.0.2.2) — узнать:
+`docker inspect -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}}={{$v.IPAddress}} {{end}}' supabase-db-o6sghkg5pktjad44oaigyy7h`.
+
+**Redeploy сервиса Supabase в Coolify нажимать нельзя** — он останавливает все контейнеры и падает
+на образе `minio/mc` (удалён из Docker Hub), kmotors остаётся без базы. Сеть `coolify` к базе
+подключена вручную (`docker network connect`) — слетит, если контейнеры Supabase пересоздадут.
 
 **Всё в базе, что наше, называется `smmaker`.** Supabase общий с kmotors и caranalizer.
 Схема `smmaker` (прод) или `smmaker_dev` (Mac), таблицы и индексы — `smmaker_…`, ходим под
