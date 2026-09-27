@@ -87,4 +87,4 @@ for (const p of plan) {
   await fs.rename(p.from, p.to);
   console.log(`Перенесено: data/${p.kind}/`);
 }
-console.log('Готово. Перезапусти сервер: ./tools/restart.sh');
+console.log('Готово. На Mac перезапусти сервер (./tools/restart.sh), на проде — Restart в Coolify: сервер видит файлы и так, перезапуск лишь убирает предупреждение из журнала');
