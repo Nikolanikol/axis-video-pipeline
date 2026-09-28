@@ -45,8 +45,9 @@ const onDark = async (svgRel, logoW, w, h) => {
   return sharp({create: {width: w, height: h, channels: 4, background: BG}})
     .composite([{input: logo, gravity: 'center'}]).png();
 };
-// Показывается шириной 160 px — рисуем вдвое крупнее для ретины
-await (await onDark('master/kok_wordmark_darkbg.svg', 240, 320, 120)).toFile(path.join(OUT, 'email-logo.png'));
+// Показывается 120×38 — рисуем в 2,5 раза крупнее для ретины. Впритык, без полей:
+// отступ задаёт письмо, иначе логотип съезжает относительно текста
+await (await onDark('master/kok_wordmark_darkbg.svg', 300, 300, 96)).toFile(path.join(OUT, 'email-logo.png'));
 // Превью ссылки: 1200×630 — размер, который WhatsApp, Telegram и Facebook не обрезают
 await (await onDark('master/kok_full_darkbg.svg', 720, 1200, 630)).toFile(path.join(OUT, 'og.png'));
 

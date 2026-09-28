@@ -21,7 +21,7 @@ export const AccountPage: React.FC = () => {
     return (
       <div className="page"><div className="card">
         <h1>Кабинет</h1>
-        <p className="muted">Кабинеты работают с базой SMMAKER. Здесь база не подключена — инструмент работает на одного владельца.</p>
+        <p className="muted">Кабинеты работают только с базой. Здесь база не подключена — инструмент работает на одного владельца.</p>
       </div></div>
     );
   }
@@ -156,7 +156,7 @@ export const AdminPage: React.FC = () => {
   useEffect(() => { if (enabled && isStaff) load(); }, [enabled, isStaff, load]);
 
   if (!enabled || !isStaff) {
-    return <div className="page"><div className="card"><h1>Админка</h1><p className="muted">Только для сотрудников платформы, и только с базой SMMAKER.</p></div></div>;
+    return <div className="page"><div className="card"><h1>Админка</h1><p className="muted">Только для сотрудников платформы, и только с подключённой базой.</p></div></div>;
   }
 
   return (

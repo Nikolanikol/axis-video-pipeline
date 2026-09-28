@@ -125,7 +125,7 @@ const basicAuth = (user, pass) => (req, res, next) => {
     const [u, p] = Buffer.from(encoded, 'base64').toString().split(':');
     if (sameSecret(u, user) && sameSecret(p ?? '', pass)) return next();
   }
-  res.set('WWW-Authenticate', 'Basic realm="AXIS", charset="UTF-8"').status(401).send('Нужен вход');
+  res.set('WWW-Authenticate', 'Basic realm="KOK", charset="UTF-8"').status(401).send('Нужен вход');
 };
 
 export const createApp = ({photoOrigin}) => {
