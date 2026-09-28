@@ -151,7 +151,7 @@ export const createApp = ({photoOrigin}) => {
   // Интерфейс начинает с этого запроса: нужен ли вход, кто вошёл, сколько кредитов
   api.get('/auth/me', (req, res, next) => (async () => {
     if (!authEnabled()) return res.json({authRequired: false});
-    // Незнакомцу — сколько дарим при регистрации: форма пишет это над кнопкой
+    // Незнакомцу — сколько дарим за регистрацию с подтверждённой почтой: форма пишет это над кнопкой
     if (!req.user) return res.json({authRequired: true, user: null, signup: await signupCredits()});
     res.json({
       authRequired: true, user: req.user, workspace: req.workspace,

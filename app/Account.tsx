@@ -10,7 +10,7 @@ import {Field} from './LotForm';
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const won = (n: number) => `₩${n.toLocaleString('ru-RU')}`;
 const when = (iso: string) => new Date(iso).toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
-const SOURCE: Record<CreditLot['source'], string> = {signup: 'подарок при регистрации', pack: 'пакет', bonus: 'бонус', legacy: 'перенесено'};
+const SOURCE: Record<CreditLot['source'], string> = {signup: 'подарок за регистрацию', pack: 'пакет', bonus: 'бонус', legacy: 'перенесено'};
 
 // ——— Мой кабинет ———
 
