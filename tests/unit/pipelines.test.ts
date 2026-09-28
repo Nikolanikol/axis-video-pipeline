@@ -1,6 +1,6 @@
 // Реестр пайплайнов и инструментов интерфейса
 import {describe, expect, it} from 'vitest';
-import {PIPELINES, toolKey, visiblePipelines} from '../../app/pipelines';
+import {PIPELINES, isClosed, toolKey, visiblePipelines} from '../../app/pipelines';
 import {TOOLS} from '../../app/tools';
 
 describe('реестр пайплайнов', () => {
@@ -44,6 +44,14 @@ describe('реестр пайплайнов', () => {
     it('скрытие не портит сам реестр: обзоры остаются в PIPELINES', () => {
       // Прячется только вход в навигации — код и роутинг инструмента на месте
       expect(PIPELINES.map((p) => p.id)).toContain('reviews');
+    });
+
+    it('на проде обзоры закрыты и по прямой ссылке, на деве открыты', () => {
+      // Shell по isClosed показывает «недоступно» вместо инструмента: ссылка из закладки
+      // или из старого письма не должна открывать неработающий монтаж и озвучку
+      expect(isClosed('reviews', true)).toBe(true);
+      expect(isClosed('reviews', false)).toBe(false);
+      for (const id of ['ads', 'carousels', 'settings']) expect(isClosed(id, true)).toBe(false);
     });
   });
 });

@@ -5,7 +5,7 @@ import {ConfigProvider, useConfig} from './config';
 import {AuthGate, VerifyBanner, day, useOutOfCredits, useSession} from './auth';
 import {AccountPage, AdminPage} from './Account';
 import {Home, PipelinePage} from './Home';
-import {Pipeline, ToolMeta, findPipeline, toolKey, visiblePipelines} from './pipelines';
+import {Pipeline, ToolMeta, findPipeline, isClosed, toolKey, visiblePipelines} from './pipelines';
 import {href, useRoute} from './router';
 import {TOOLS, hasTool} from './tools';
 
@@ -86,6 +86,7 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
           : route.pipeline === 'admin' ? <AdminPage />
           : !route.pipeline ? <Home />
           : !pipeline ? <NotFound />
+            : isClosed(pipeline.id, config.production) ? <Unavailable pipeline={pipeline} />
             : !route.tool ? <PipelinePage pipeline={pipeline} />
               : !tool ? <NotFound />
                 : <ToolScreen pipeline={pipeline} tool={tool} />}
@@ -158,6 +159,22 @@ const ComingSoon: React.FC<{pipeline: Pipeline; tool: ToolMeta}> = ({pipeline, t
       <div className="actions-row">
         <a className="btn" href={href(pipeline.id)}>{pipeline.title}</a>
         <a className="btn ghost" href={href()}>Все пайплайны</a>
+      </div>
+    </div>
+  </div>
+);
+
+// Пайплайн закрыт на проде (см. isClosed): показываем, что он есть, но пока недоступен,
+// вместо инструмента — экран инструмента даже не загружается
+const Unavailable: React.FC<{pipeline: Pipeline}> = ({pipeline}) => (
+  <div className="page">
+    <div className="card soon">
+      <span className="badge">скоро</span>
+      <h1>{pipeline.title}</h1>
+      <p>{pipeline.description}</p>
+      <p className="muted">Этот раздел пока недоступен — готовим его к запуску. Карусели и ролики по лотам работают.</p>
+      <div className="actions-row">
+        <a className="btn" href={href()}>Все пайплайны</a>
       </div>
     </div>
   </div>
