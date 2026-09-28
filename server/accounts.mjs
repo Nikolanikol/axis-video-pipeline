@@ -1,14 +1,16 @@
-// Аккаунты SMMAKER: вход, сессии, регистрация по коду активации, продление, тарифы и коды.
+// Аккаунты SMMAKER: вход, сессии, самостоятельная регистрация, роли, лиды и пакеты кредитов.
 //
-// Модель продаж (решение владельца, см. CONTEXT.md «База SMMAKER»): оплата вне системы,
-// владелец выдаёт код, клиент регистрируется по почте и паролю и вводит код. Код — это
-// активация, а не логин: вход по ключу раздали бы коллегам. Доступ принадлежит компании,
-// а не человеку. После конца периода — только просмотр.
+// Модель (решение владельца 28 сентября, см. CONTEXT.md «Кредиты»): человек регистрируется
+// сам — имя, почта, телефон, пароль — и сразу получает бесплатные кредиты на пробу. Когда они
+// кончаются, он пишет нам, платит вне системы, и менеджер начисляет пакет в админке.
+// Прежние коды активации и месячные периоды убраны: выдавать ключ каждому, кто хочет
+// попробовать, — лишняя работа для продаж. Доступ принадлежит компании, а не человеку.
 import crypto from 'node:crypto';
 import path from 'node:path';
 import {promisify} from 'node:util';
 import {db} from './db/index.mjs';
 import {CONFIG_DIR, HttpError, readJson} from './store.mjs';
+import {addLot, balanceOf, signupCredits} from './billing.mjs';
 
 const scrypt = promisify(crypto.scrypt);
 
@@ -49,20 +51,20 @@ const checkPassword = (password) => {
   return p;
 };
 
-// ——— Коды активации ———
-// Без похожих знаков (0/O, 1/I/L): код диктуют по телефону и перепечатывают из WhatsApp.
-// 12 знаков из 31 — около 10^18 вариантов: перебором не угадать.
-const CODE_ALPHABET = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
-export const newCode = () => {
-  const bytes = crypto.randomBytes(12);
-  const chars = [...bytes].map((b) => CODE_ALPHABET[b % CODE_ALPHABET.length]).join('');
-  return `SMM-${chars.slice(0, 4)}-${chars.slice(4, 8)}-${chars.slice(8, 12)}`;
+/**
+ * Телефон — чтобы с лидом можно было связаться. Храним одними цифрами с «+»: «+82 10-5865 4344»
+ * и «+821058654344» — один номер, и уникальность должна это видеть.
+ */
+export const normPhone = (phone) => {
+  const raw = String(phone ?? '').trim();
+  const digits = raw.replace(/\D/g, '');
+  if (digits.length < 8 || digits.length > 15) throw new HttpError(400, 'Проверь телефон: нужен номер с кодом страны, например +389 70 123 456');
+  return `+${digits}`;
 };
-/** Код, как его ввёл человек: пробелы, строчные, без дефисов — приводим к виду из базы */
-export const normCode = (code) => {
-  const raw = String(code ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^SMM/, '');
-  if (raw.length !== 12) throw new HttpError(400, 'Код не похож на код активации: SMM-XXXX-XXXX-XXXX');
-  return `SMM-${raw.slice(0, 4)}-${raw.slice(4, 8)}-${raw.slice(8, 12)}`;
+const checkName = (name) => {
+  const n = String(name ?? '').trim().slice(0, 120);
+  if (!n) throw new HttpError(400, 'Как вас зовут?');
+  return n;
 };
 
 // ——— Сессии ———
@@ -83,6 +85,9 @@ export const dropSession = (token) => (token
   ? db().query('DELETE FROM smmaker_sessions WHERE token_hash = $1', [tokenHash(token)])
   : null);
 
+/** Роль на платформе → права. admin — всё; manager — лиды и начисление пакетов */
+const rights = (role) => ({role: role ?? null, isAdmin: role === 'admin', isStaff: role === 'admin' || role === 'manager'});
+
 /**
  * Кто пришёл по токену: пользователь и его компания. Компания пока одна на человека
  * (участники — позже); берём самое раннее членство, чтобы выбор не прыгал.
@@ -90,7 +95,7 @@ export const dropSession = (token) => (token
 export const readSession = async (token) => {
   if (!token) return null;
   const {rows} = await db().query(
-    `SELECT u.id, u.email, u.is_platform_admin, m.workspace_id, m.role, w.name AS workspace_name
+    `SELECT u.id, u.email, u.name, u.platform_role, m.workspace_id, m.role, w.name AS workspace_name
        FROM smmaker_sessions s
        JOIN smmaker_users u ON u.id = s.user_id
        LEFT JOIN LATERAL (SELECT * FROM smmaker_memberships WHERE user_id = u.id ORDER BY created_at LIMIT 1) m ON true
@@ -100,68 +105,9 @@ export const readSession = async (token) => {
   const r = rows[0];
   if (!r) return null;
   return {
-    user: {id: r.id, email: r.email, isAdmin: r.is_platform_admin},
+    user: {id: r.id, email: r.email, name: r.name, ...rights(r.platform_role)},
     workspace: r.workspace_id ? {id: r.workspace_id, name: r.workspace_name, role: r.role} : null,
   };
-};
-
-// ——— Доступ компании ———
-
-/**
- * Состояние доступа: текущий период (или его отсутствие), до какого числа оплачено с учётом
- * продлений наперёд, остаток кредитов текущего периода. Кредиты прошлых периодов сгорели,
- * будущих — ещё не начались: считаем только текущий.
- */
-export const accessOf = async (workspaceId, client = db()) => {
-  const {rows} = await client.query(
-    `SELECT s.id, s.plan_id, p.title AS plan_title, p.pipelines, s.period_start, s.period_end,
-            (SELECT COALESCE(sum(delta), 0) FROM smmaker_credit_ledger l WHERE l.subscription_id = s.id)::int AS credits
-       FROM smmaker_subscriptions s JOIN smmaker_plans p ON p.id = s.plan_id
-      WHERE s.workspace_id = $1 AND s.period_start <= now() AND s.period_end > now()
-      ORDER BY s.period_start DESC LIMIT 1`,
-    [workspaceId]);
-  const {rows: [last]} = await client.query(
-    'SELECT max(period_end) AS paid_until FROM smmaker_subscriptions WHERE workspace_id = $1', [workspaceId]);
-  const cur = rows[0];
-  return {
-    active: Boolean(cur),
-    plan: cur ? {id: cur.plan_id, title: cur.plan_title, pipelines: cur.pipelines} : null,
-    periodStart: cur?.period_start ?? null,
-    periodEnd: cur?.period_end ?? null,
-    paidUntil: last?.paid_until ?? null,
-    credits: cur?.credits ?? 0,
-    subscriptionId: cur?.id ?? null,
-  };
-};
-
-/**
- * Погасить код за компанию: новый период начинается с конца уже оплаченного (или с сейчас,
- * если доступ закончился) — ранняя оплата не сжигает оплаченные дни. Кредиты начисляются
- * на этот новый период и становятся доступны с его началом.
- * Вызывать внутри транзакции: код блокируется строкой, два одновременных погашения одного
- * кода не пройдут.
- */
-const redeemIn = async (client, {workspaceId, userId, code}) => {
-  const {rows: [c]} = await client.query(
-    'SELECT * FROM smmaker_activation_codes WHERE code = $1 FOR UPDATE', [normCode(code)]);
-  if (!c) throw new HttpError(404, 'Такого кода нет — проверь, как он записан');
-  if (c.activated_at) throw new HttpError(409, 'Этот код уже использован');
-  const {rows: [s]} = await client.query(
-    `INSERT INTO smmaker_subscriptions (workspace_id, plan_id, code, period_start, period_end)
-     SELECT $1, $2, $3, start, start + $4 * interval '1 day'
-       FROM (SELECT GREATEST(now(), (SELECT max(period_end) FROM smmaker_subscriptions WHERE workspace_id = $1)) AS start) t
-     RETURNING id, period_start, period_end`,
-    [workspaceId, c.plan_id, c.code, c.days]);
-  if (c.credits > 0) {
-    await client.query(
-      `INSERT INTO smmaker_credit_ledger (workspace_id, subscription_id, delta, kind, note, created_by)
-       VALUES ($1, $2, $3, 'grant', $4, $5)`,
-      [workspaceId, s.id, c.credits, `код ${c.code}`, userId]);
-  }
-  await client.query(
-    'UPDATE smmaker_activation_codes SET activated_workspace_id = $2, activated_by = $3, activated_at = now() WHERE code = $1',
-    [c.code, workspaceId, userId]);
-  return s;
 };
 
 const inTransaction = async (fn) => {
@@ -173,8 +119,9 @@ const inTransaction = async (fn) => {
     return out;
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {});
-    // Гонка за один адрес почты: вторую регистрацию остановит уникальный индекс
-    if (e.code === '23505' && String(e.constraint).includes('email')) throw new HttpError(409, 'Эта почта уже зарегистрирована — войди');
+    // Гонка за одну почту или телефон: вторую регистрацию остановит уникальный индекс
+    if (e.code === '23505' && String(e.constraint).includes('email')) throw new HttpError(409, 'Эта почта уже зарегистрирована — войдите');
+    if (e.code === '23505' && String(e.constraint).includes('phone')) throw new HttpError(409, 'Этот телефон уже зарегистрирован — войдите по своей почте');
     throw e;
   } finally {
     client.release();
@@ -189,37 +136,42 @@ const starterProfile = (company) => ({
   texts: {},
 });
 
-/** Регистрация по коду: пользователь, компания, период и кредиты — одной транзакцией */
-export const register = async ({email, password, company, code}) => {
+/**
+ * Регистрация: пользователь, компания и бесплатные кредиты на пробу — одной транзакцией.
+ * Компания необязательна: не указана — берём имя человека (его можно поменять в профиле).
+ */
+export const register = async ({name, email, phone, password, company}) => {
+  const person = checkName(name);
   const mail = normEmail(email);
+  const tel = normPhone(phone);
   const pass = checkPassword(password);
-  const name = String(company ?? '').trim().slice(0, 120);
-  if (!name) throw new HttpError(400, 'Как называется компания?');
+  const title = String(company ?? '').trim().slice(0, 120) || person;
   const hash = await hashPassword(pass);
+  const trial = await signupCredits();
   // Дизайн по умолчанию — палитра и шрифты платформы; имя на постах — компания клиента.
   // Логотипы пустые: вместо них вёрстка пишет название компании (Logo в src/shared/ui.tsx).
   // Иначе стартовый бренд унёс бы на ролики клиента логотип AXIS — до загрузки своего
   const template = await readJson(path.join(CONFIG_DIR, 'brand.json'));
-  const brand = {...template, name, assets: {...template.assets, logoStacked: '', logoHorizontal: '', sign: ''}};
+  const brand = {...template, name: title, assets: {...template.assets, logoStacked: '', logoHorizontal: '', sign: ''}};
   return inTransaction(async (client) => {
     const {rows: [taken]} = await client.query('SELECT 1 FROM smmaker_users WHERE lower(email) = $1', [mail]);
-    if (taken) throw new HttpError(409, 'Эта почта уже зарегистрирована — войди');
+    if (taken) throw new HttpError(409, 'Эта почта уже зарегистрирована — войдите');
+    const {rows: [phoneTaken]} = await client.query('SELECT 1 FROM smmaker_users WHERE phone = $1', [tel]);
+    if (phoneTaken) throw new HttpError(409, 'Этот телефон уже зарегистрирован — войдите по своей почте');
     const workspaceId = `ws-${crypto.randomBytes(5).toString('hex')}`;
     const {rows: [user]} = await client.query(
-      'INSERT INTO smmaker_users (email, password_hash) VALUES ($1, $2) RETURNING id', [mail, hash]);
+      'INSERT INTO smmaker_users (email, password_hash, name, phone) VALUES ($1, $2, $3, $4) RETURNING id', [mail, hash, person, tel]);
     await client.query(
       'INSERT INTO smmaker_workspaces (id, name, brand, profile) VALUES ($1, $2, $3, $4)',
-      [workspaceId, name, brand, starterProfile(name)]);
+      [workspaceId, title, brand, starterProfile(title)]);
     await client.query(
       `INSERT INTO smmaker_memberships (workspace_id, user_id, role) VALUES ($1, $2, 'owner')`, [workspaceId, user.id]);
-    // Код гасится последним: если он негодный, откатится всё — ни пользователя, ни компании
-    await redeemIn(client, {workspaceId, userId: user.id, code});
+    if (trial.credits > 0) {
+      await addLot(client, {workspaceId, credits: trial.credits, days: trial.days, source: 'signup', note: 'бесплатные кредиты на пробу'});
+    }
     return {userId: user.id, token: await createSession(user.id, client)};
   });
 };
-
-export const redeem = ({workspaceId, userId, code}) =>
-  inTransaction((client) => redeemIn(client, {workspaceId, userId, code}));
 
 export const login = async ({email, password}) => {
   const mail = normEmail(email);
@@ -238,8 +190,8 @@ export const upsertAdmin = async ({email, password, workspaceId}) => {
   const hash = await hashPassword(checkPassword(password));
   return inTransaction(async (client) => {
     const {rows: [u]} = await client.query(
-      `INSERT INTO smmaker_users (email, password_hash, is_platform_admin) VALUES ($1, $2, true)
-       ON CONFLICT ((lower(email))) DO UPDATE SET password_hash = EXCLUDED.password_hash, is_platform_admin = true
+      `INSERT INTO smmaker_users (email, password_hash, platform_role, name) VALUES ($1, $2, 'admin', 'Владелец')
+       ON CONFLICT ((lower(email))) DO UPDATE SET password_hash = EXCLUDED.password_hash, platform_role = 'admin'
        RETURNING id`,
       [mail, hash]);
     await client.query(
@@ -249,76 +201,95 @@ export const upsertAdmin = async ({email, password, workspaceId}) => {
   });
 };
 
-// ——— Админка владельца ———
+// ——— Пакеты ———
 
-const PLAN_ID_RE = /^[a-z0-9][a-z0-9-]{0,31}$/;
-const PIPELINES = ['ads', 'reviews', 'carousels'];
+const PACK_ID_RE = /^[a-z0-9][a-z0-9-]{0,31}$/;
 
-export const listPlans = async () => (await db().query(
-  'SELECT id, title, credits, days, pipelines, active, created_at FROM smmaker_plans ORDER BY created_at')).rows;
+/** Пакеты: all — вместе со снятыми с продажи (для админки), иначе только действующие (прайс клиенту) */
+export const listPacks = async ({all = false} = {}) => (await db().query(
+  `SELECT id, title, credits, price_krw, valid_days, active, sort FROM smmaker_packs
+    ${all ? '' : 'WHERE active'} ORDER BY sort, credits`)).rows;
 
-export const savePlan = async ({id, title, credits, days, pipelines, active = true}) => {
-  if (!PLAN_ID_RE.test(String(id))) throw new HttpError(400, 'id тарифа — латиница, цифры и дефис (например, start)');
-  if (!String(title ?? '').trim()) throw new HttpError(400, 'Нужно название тарифа');
+export const savePack = async ({id, title, credits, price_krw: price, valid_days: days = 365, active = true, sort = 0}) => {
+  if (!PACK_ID_RE.test(String(id))) throw new HttpError(400, 'id пакета — латиница, цифры и дефис (например, base)');
+  if (!String(title ?? '').trim()) throw new HttpError(400, 'Нужно название пакета');
   const c = Number(credits);
+  const p = Number(price);
   const d = Number(days);
-  if (!Number.isInteger(c) || c < 0) throw new HttpError(400, 'Кредиты — целое число от 0');
+  if (!Number.isInteger(c) || c < 1) throw new HttpError(400, 'Кредиты — целое число от 1');
+  if (!Number.isInteger(p) || p < 0) throw new HttpError(400, 'Цена — целое число вон');
   if (!Number.isInteger(d) || d < 1 || d > 3660) throw new HttpError(400, 'Срок — целое число дней от 1');
-  const pl = (Array.isArray(pipelines) ? pipelines : []).filter((p) => PIPELINES.includes(p));
-  const {rows: [plan]} = await db().query(
-    `INSERT INTO smmaker_plans (id, title, credits, days, pipelines, active) VALUES ($1, $2, $3, $4, $5, $6)
-     ON CONFLICT (id) DO UPDATE SET title = $2, credits = $3, days = $4, pipelines = $5, active = $6
-     RETURNING id, title, credits, days, pipelines, active, created_at`,
-    [id, String(title).trim(), c, d, pl, Boolean(active)]);
-  return plan;
+  const {rows: [pack]} = await db().query(
+    `INSERT INTO smmaker_packs (id, title, credits, price_krw, valid_days, active, sort) VALUES ($1, $2, $3, $4, $5, $6, $7)
+     ON CONFLICT (id) DO UPDATE SET title = $2, credits = $3, price_krw = $4, valid_days = $5, active = $6, sort = $7
+     RETURNING id, title, credits, price_krw, valid_days, active, sort`,
+    [id, String(title).trim(), c, p, d, Boolean(active), Number(sort) || 0]);
+  return pack;
 };
 
 /**
- * Выдать коды. Срок и кредиты копируются из тарифа в момент выдачи: правка тарифа
- * потом не меняет уже проданное.
+ * Начислить пакет компании: партия с кредитами и сроком пакета, цена записана в партию —
+ * по журналу видно, кто сколько заплатил. Цена берётся из пакета в момент начисления:
+ * правка прайса потом не меняет уже проданное.
  */
-export const createCodes = async ({planId, count = 1, note = '', createdBy}) => {
-  const n = Number(count);
-  if (!Number.isInteger(n) || n < 1 || n > 50) throw new HttpError(400, 'Кодов за раз — от 1 до 50');
-  const {rows: [plan]} = await db().query('SELECT * FROM smmaker_plans WHERE id = $1 AND active', [planId]);
-  if (!plan) throw new HttpError(404, 'Нет такого действующего тарифа');
-  const out = [];
-  for (let i = 0; i < n; i++) {
-    const {rows: [c]} = await db().query(
-      `INSERT INTO smmaker_activation_codes (code, plan_id, days, credits, note, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING code, plan_id, days, credits, note, created_at`,
-      [newCode(), plan.id, plan.days, plan.credits, String(note).slice(0, 200), createdBy]);
-    out.push(c);
-  }
-  return out;
+export const grantPack = async ({workspaceId, packId, note = '', createdBy}) => {
+  const {rows: [pack]} = await db().query('SELECT * FROM smmaker_packs WHERE id = $1 AND active', [packId]);
+  if (!pack) throw new HttpError(404, 'Нет такого действующего пакета');
+  const {rowCount} = await db().query('SELECT 1 FROM smmaker_workspaces WHERE id = $1', [workspaceId]);
+  if (!rowCount) throw new HttpError(404, 'Нет такой компании');
+  await inTransaction((client) => addLot(client, {
+    workspaceId, credits: pack.credits, days: pack.valid_days, source: 'pack', packId: pack.id, priceKrw: pack.price_krw,
+    note: [`пакет «${pack.title}»`, String(note).trim()].filter(Boolean).join(' · '), createdBy,
+  }));
+  return balanceOf(workspaceId);
 };
 
-export const listCodes = async () => (await db().query(
-  `SELECT c.code, c.plan_id, p.title AS plan_title, c.days, c.credits, c.note, c.created_at, c.activated_at,
-          c.activated_workspace_id, w.name AS workspace_name
-     FROM smmaker_activation_codes c
-     JOIN smmaker_plans p ON p.id = c.plan_id
-     LEFT JOIN smmaker_workspaces w ON w.id = c.activated_workspace_id
-    ORDER BY c.created_at DESC LIMIT 500`)).rows;
+/** Бонус (компенсация, подарок): партия на заданный срок, по умолчанию год */
+export const grantBonus = async ({workspaceId, credits, days = 365, note = '', createdBy}) => {
+  const c = Number(credits);
+  if (!Number.isInteger(c) || c < 1 || c > 100000) throw new HttpError(400, 'Бонус — целое число кредитов от 1');
+  await inTransaction((client) => addLot(client, {
+    workspaceId, credits: c, days: Number(days) || 365, source: 'bonus', note: ['бонус', String(note).trim()].filter(Boolean).join(' · '), createdBy,
+  }));
+  return balanceOf(workspaceId);
+};
 
-export const listWorkspaces = async () => {
+// ——— Лиды и сотрудники ———
+
+/**
+ * Компании с контактами владельца: для продаж это список лидов. Новые сверху; видно остаток,
+ * сколько куплено и когда последний раз генерировали — «потестировал и выдохся» ищется глазами.
+ */
+export const listClients = async () => {
   const {rows} = await db().query(
     `SELECT w.id, w.name, w.created_at,
-            (SELECT string_agg(u.email, ', ') FROM smmaker_memberships m JOIN smmaker_users u ON u.id = m.user_id
-              WHERE m.workspace_id = w.id) AS emails
-       FROM smmaker_workspaces w ORDER BY w.created_at DESC`);
-  return Promise.all(rows.map(async (w) => ({...w, access: await accessOf(w.id)})));
+            u.name AS person, u.email, u.phone, u.platform_role,
+            COALESCE((SELECT sum(remaining) FROM smmaker_credit_lots t WHERE t.workspace_id = w.id AND t.expires_at > now()), 0)::int AS credits,
+            COALESCE((SELECT sum(price_krw) FROM smmaker_credit_lots t WHERE t.workspace_id = w.id AND t.source = 'pack'), 0)::int AS paid_krw,
+            (SELECT count(*) FROM smmaker_credit_ledger l WHERE l.workspace_id = w.id AND l.kind = 'charge')::int AS generations,
+            (SELECT max(created_at) FROM smmaker_credit_ledger l WHERE l.workspace_id = w.id AND l.kind = 'charge') AS last_generation
+       FROM smmaker_workspaces w
+       LEFT JOIN LATERAL (SELECT user_id FROM smmaker_memberships m WHERE m.workspace_id = w.id ORDER BY created_at LIMIT 1) m ON true
+       LEFT JOIN smmaker_users u ON u.id = m.user_id
+      ORDER BY w.created_at DESC`);
+  return rows;
 };
 
-/** Ручная правка кредитов (компенсация, бонус) — строкой журнала на текущий период */
-export const adjustCredits = async ({workspaceId, delta, note, createdBy}) => {
-  const d = Number(delta);
-  if (!Number.isInteger(d) || d === 0) throw new HttpError(400, 'Правка — целое число, не ноль');
-  const access = await accessOf(workspaceId);
-  if (!access.active) throw new HttpError(409, 'У компании нет действующего периода — сначала продлите доступ');
-  await db().query(
-    `INSERT INTO smmaker_credit_ledger (workspace_id, subscription_id, delta, kind, note, created_by)
-     VALUES ($1, $2, $3, 'adjust', $4, $5)`,
-    [workspaceId, access.subscriptionId, d, String(note ?? '').slice(0, 200), createdBy]);
-  return accessOf(workspaceId);
+/** Сотрудники платформы: у кого есть роль */
+export const listStaff = async () => (await db().query(
+  `SELECT id, email, name, platform_role FROM smmaker_users WHERE platform_role IS NOT NULL ORDER BY platform_role, email`)).rows;
+
+/**
+ * Дать или снять роль по почте. Человек сначала регистрируется сам, потом получает роль —
+ * так у менеджера есть свой пароль, который владелец не знает. Снять роль с себя нельзя:
+ * платформа осталась бы без админа.
+ */
+export const setRole = async ({email, role, by}) => {
+  const mail = normEmail(email);
+  const value = role === 'admin' || role === 'manager' ? role : null;
+  const {rows: [u]} = await db().query('SELECT id FROM smmaker_users WHERE lower(email) = $1', [mail]);
+  if (!u) throw new HttpError(404, 'Нет пользователя с такой почтой — пусть сначала зарегистрируется');
+  if (u.id === by && value !== 'admin') throw new HttpError(409, 'Снять роль администратора с себя нельзя');
+  await db().query('UPDATE smmaker_users SET platform_role = $2 WHERE id = $1', [u.id, value]);
+  return listStaff();
 };

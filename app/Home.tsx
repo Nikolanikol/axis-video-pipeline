@@ -3,7 +3,6 @@ import React from 'react';
 import {Pipeline, visiblePipelines} from './pipelines';
 import {href} from './router';
 import {useConfig} from './config';
-import {useAllowedPipelines} from './auth';
 
 const ToolList: React.FC<{pipeline: Pipeline}> = ({pipeline}) => (
   <div className="tool-list">
@@ -18,7 +17,7 @@ const ToolList: React.FC<{pipeline: Pipeline}> = ({pipeline}) => (
 
 export const Home: React.FC = () => {
   const {config} = useConfig();
-  const pipelines = visiblePipelines(config.production, useAllowedPipelines());
+  const pipelines = visiblePipelines(config.production);
   const main = pipelines.filter((p) => p.kind !== 'settings');
   const settings = pipelines.filter((p) => p.kind === 'settings');
   return (

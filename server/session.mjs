@@ -3,7 +3,8 @@
 // Вход включается вместе с базой (DATABASE_URL). Без базы — как было до кабинетов: один
 // владелец, компания по умолчанию, никаких проверок; так работают тесты и прод до переезда.
 import {hasDatabase} from './db/index.mjs';
-import {SESSION_COOKIE, SESSION_DAYS, accessOf, readSession} from './accounts.mjs';
+import {SESSION_COOKIE, SESSION_DAYS, readSession} from './accounts.mjs';
+import {balanceOf} from './billing.mjs';
 import {DEFAULT_WORKSPACE, HttpError} from './store.mjs';
 
 export const authEnabled = () => hasDatabase();
@@ -51,23 +52,25 @@ export const requireAdmin = (req, _res, next) => {
   next();
 };
 
+/** Сотрудники платформы — админ и менеджер: лиды и начисление пакетов */
+export const requireStaff = (req, _res, next) => {
+  if (!authEnabled()) return next();
+  if (!req.user?.isStaff) return next(new HttpError(403, 'Только для сотрудников платформы'));
+  next();
+};
+
 /**
- * Генерация — только при действующем доступе, и только в пайплайнах тарифа. Просмотр и
- * скачивание готового открыты и после конца срока (решение владельца: «только просмотр»).
- * Владелец платформы ограничений не имеет: это его инструмент.
- * pipeline — ads | reviews | carousels; без него — достаточно любого действующего периода.
+ * Генерация — только пока есть кредиты. Просмотр и скачивание готового открыты и с нулём.
+ * Точную цену проверяет само списание (charge) — здесь отсекаем пустой баланс заранее,
+ * чтобы шаги обзора, которые тратят внешние сервисы, но не списывают (распознавание,
+ * озвучка), не шли бесплатно у того, кто уже всё потратил.
+ * Сотрудники платформы не платят: это их инструмент.
  */
-export const requireActive = (pipeline) => async (req, _res, next) => {
-  if (!authEnabled() || req.user?.isAdmin) return next();
+export const requireCredits = async (req, _res, next) => {
+  if (!authEnabled() || req.user?.isStaff) return next();
   try {
-    const access = await accessOf(req.ws);
-    if (!access.active) {
-      const until = access.paidUntil ? ` ${new Date(access.paidUntil).toLocaleDateString('ru-RU')}` : '';
-      return next(new HttpError(403, `Доступ закончился${until}: смотреть и скачивать можно, создавать новое — после продления кодом`));
-    }
-    if (pipeline && !access.plan.pipelines.includes(pipeline)) {
-      return next(new HttpError(403, `Этот раздел не входит в тариф «${access.plan.title}»`));
-    }
+    const {credits} = await balanceOf(req.ws);
+    if (credits <= 0) return next(new HttpError(402, 'Кредиты закончились: смотреть и скачивать можно, создавать новое — после пополнения. Напишите нам — подберём пакет'));
     next();
   } catch (e) { next(e); }
 };
@@ -109,6 +112,31 @@ export const loginLimiter = (req, _res, next) => {
   attempts.set(key, a && a.until > now ? {...a, count: a.count + 1} : {count: 1, until: now + WINDOW_MS});
   if (attempts.size > 10_000) {
     for (const [k, v] of attempts) if (v.until <= now) attempts.delete(k);
+  }
+  next();
+};
+
+/**
+ * Регистрации: не больше 5 успешных в час с одного адреса. Каждая дарит бесплатные кредиты —
+ * без ограничения их можно было бы копить, заводя почту за почтой. Считаем только удачные:
+ * опечатка в телефоне или занятая почта не должны сжигать попытку.
+ */
+const signups = new Map();
+const SIGNUP_WINDOW_MS = 60 * 60 * 1000;
+const MAX_SIGNUPS = 5;
+export const registerLimiter = (req, res, next) => {
+  const now = Date.now();
+  const a = signups.get(req.ip);
+  if (a && a.until > now && a.count >= MAX_SIGNUPS) {
+    return next(new HttpError(429, 'Слишком много регистраций с этого адреса — попробуйте через час'));
+  }
+  res.on('finish', () => {
+    if (res.statusCode !== 200) return;
+    const cur = signups.get(req.ip);
+    signups.set(req.ip, cur && cur.until > Date.now() ? {...cur, count: cur.count + 1} : {count: 1, until: Date.now() + SIGNUP_WINDOW_MS});
+  });
+  if (signups.size > 10_000) {
+    for (const [k, v] of signups) if (v.until <= now) signups.delete(k);
   }
   next();
 };

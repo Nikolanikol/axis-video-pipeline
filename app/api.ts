@@ -44,26 +44,31 @@ export type Job = {
   video: string; storyboard: string;
 };
 
-// Кабинет SMMAKER: кто вошёл и что с доступом компании
-export type Access = {
-  active: boolean; plan: {id: string; title: string; pipelines: string[]} | null;
-  periodStart: string | null; periodEnd: string | null; paidUntil: string | null; credits: number;
+// Кабинет SMMAKER: кто вошёл и сколько у компании кредитов
+export type CreditLot = {
+  id: number; remaining: number; credits: number; expiresAt: string;
+  source: 'signup' | 'pack' | 'bonus' | 'legacy'; packId: string | null; createdAt: string;
 };
+export type Balance = {credits: number; nextExpiry: {at: string; credits: number} | null; lots: CreditLot[]};
+export type Role = 'admin' | 'manager' | null;
+export type User = {id: string; email: string; name: string | null; role: Role; isAdmin: boolean; isStaff: boolean};
 export type Me =
   | {authRequired: false}
-  | {authRequired: true; user: null}
-  | {authRequired: true; user: {id: string; email: string; isAdmin: boolean};
-     workspace: {id: string; name: string; role: string} | null; access: Access | null};
-export type Plan = {id: string; title: string; credits: number; days: number; pipelines: string[]; active: boolean};
-export type ActivationCode = {
-  code: string; plan_id: string; plan_title?: string; days: number; credits: number; note: string; created_at: string;
-  activated_at?: string | null; activated_workspace_id?: string | null; workspace_name?: string | null;
-};
+  | {authRequired: true; user: null; signup: {credits: number; days: number}}
+  | {authRequired: true; user: User; workspace: {id: string; name: string; role: string} | null; balance: Balance | null};
+export type Pack = {id: string; title: string; credits: number; price_krw: number; valid_days: number; active: boolean; sort: number};
+export type Offer = {contacts: {whatsapp?: string; telegram?: string; email?: string}; packs: Pack[]};
 export type LedgerRow = {
   id: number; delta: number; kind: 'grant' | 'charge' | 'refund' | 'adjust'; pipeline: string | null;
-  job_id: string | null; note: string; created_at: string; period_start: string; period_end: string;
+  job_id: string | null; note: string; created_at: string;
+  expires_at: string | null; source: CreditLot['source'] | null; price_krw: number | null;
 };
-export type WorkspaceRow = {id: string; name: string; created_at: string; emails: string | null; access: Access};
+export type ClientRow = {
+  id: string; name: string; created_at: string; person: string | null; email: string | null; phone: string | null;
+  platform_role: Role; credits: number; paid_krw: number; generations: number; last_generation: string | null;
+};
+export type StaffRow = {id: string; email: string; name: string | null; platform_role: Exclude<Role, null>};
+export type Registration = {name: string; email: string; phone: string; password: string; company: string};
 
 const request = async <T,>(method: string, url: string, body?: unknown): Promise<T> => {
   const isForm = body instanceof FormData;
@@ -82,20 +87,21 @@ const request = async <T,>(method: string, url: string, body?: unknown): Promise
 export const api = {
   me: () => request<Me>('GET', '/api/auth/me'),
   login: (email: string, password: string) => request<{ok: true}>('POST', '/api/auth/login', {email, password}),
-  register: (data: {email: string; password: string; company: string; code: string}) =>
-    request<{ok: true}>('POST', '/api/auth/register', data),
+  register: (data: Registration) => request<{ok: true}>('POST', '/api/auth/register', data),
   logout: () => request<{ok: true}>('POST', '/api/auth/logout'),
-  redeem: (code: string) => request<Access>('POST', '/api/account/redeem', {code}),
   ledger: () => request<LedgerRow[]>('GET', '/api/account/ledger'),
+  offer: () => request<Offer>('GET', '/api/account/offer'),
   admin: {
-    plans: () => request<Plan[]>('GET', '/api/admin/plans'),
-    savePlan: (plan: Plan) => request<Plan>('PUT', `/api/admin/plans/${plan.id}`, plan),
-    codes: () => request<ActivationCode[]>('GET', '/api/admin/codes'),
-    createCodes: (planId: string, count: number, note: string) =>
-      request<ActivationCode[]>('POST', '/api/admin/codes', {planId, count, note}),
-    workspaces: () => request<WorkspaceRow[]>('GET', '/api/admin/workspaces'),
-    adjustCredits: (id: string, delta: number, note: string) =>
-      request<Access>('POST', `/api/admin/workspaces/${id}/credits`, {delta, note}),
+    clients: () => request<ClientRow[]>('GET', '/api/admin/clients'),
+    clientLedger: (id: string) => request<LedgerRow[]>('GET', `/api/admin/clients/${id}/ledger`),
+    packs: () => request<Pack[]>('GET', '/api/admin/packs'),
+    savePack: (pack: Pack) => request<Pack>('PUT', `/api/admin/packs/${pack.id}`, pack),
+    grantPack: (id: string, packId: string, note: string) =>
+      request<Balance>('POST', `/api/admin/clients/${id}/packs`, {packId, note}),
+    grantBonus: (id: string, credits: number, note: string) =>
+      request<Balance>('POST', `/api/admin/clients/${id}/bonus`, {credits, note}),
+    staff: () => request<StaffRow[]>('GET', '/api/admin/staff'),
+    setRole: (email: string, role: Role) => request<StaffRow[]>('PUT', '/api/admin/staff', {email, role}),
   },
   config: () => request<Config>('GET', '/api/config'),
   saveBrand: (theme: Theme) => request<Theme>('PUT', '/api/brand', theme),

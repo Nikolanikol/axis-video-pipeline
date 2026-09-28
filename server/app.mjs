@@ -22,17 +22,16 @@ import {hasKey, hasVoice, synthesize} from './speech.mjs';
 import {hasSeparator} from './ambience.mjs';
 import {carouselFormats, carouselsDir, buildCarousel, deleteCarousel, listCarousels, slideFileName} from './carousel.mjs';
 import {LOGO_RULES, saveLogo, setLogoVariant} from './brand.mjs';
-import {billed, creditCosts, ledgerOf} from './billing.mjs';
+import {balanceOf, billed, creditCosts, ledgerOf, signupCredits} from './billing.mjs';
 import {parseCarLink} from '../src/shared/encarLink.js';
 import {PALETTE_KEYS, isHex} from '../src/shared/contrast.js';
 import {withoutMusic} from '../src/shared/nomusic.js';
 import {
-  accessOf, adjustCredits, createCodes, listCodes, listPlans, listWorkspaces, login, redeem, register, savePlan,
-  dropSession,
+  dropSession, grantBonus, grantPack, listClients, listPacks, listStaff, login, register, savePack, setRole,
 } from './accounts.mjs';
 import {
-  authEnabled, clearSessionCookie, guardData, loginLimiter, readSessionMw, requireActive, requireAdmin, requireUser,
-  sessionToken, setSessionCookie,
+  authEnabled, clearSessionCookie, guardData, loginLimiter, readSessionMw, registerLimiter, requireAdmin, requireCredits,
+  requireStaff, requireUser, sessionToken, setSessionCookie,
 } from './session.mjs';
 
 // Медиа с путями /data/... браузер рендера берёт по полному адресу этого сервера
@@ -60,8 +59,8 @@ const wrap = (fn) => (req, res, next) => Promise.resolve().then(() => withWorksp
 // Компания запроса. С входом — только из сессии; без неё — никакой (withWorkspace откажет),
 // а не компания владельца по умолчанию. Без базы вход выключен — компания по умолчанию
 const wsOf = (req) => req.ws ?? (authEnabled() ? null : DEFAULT_WORKSPACE);
-// С кого и за что списать кредиты. Владелец платформы не платит
-const billOf = (req, pipeline) => ({pipeline, userId: req.user?.id ?? null, free: Boolean(req.user?.isAdmin)});
+// С кого и за что списать кредиты. Сотрудники платформы не платят — как и в requireCredits
+const billOf = (req, pipeline) => ({pipeline, userId: req.user?.id ?? null, free: Boolean(req.user?.isStaff)});
 
 /**
  * Бренд от клиента проверяем: файлы бренда и таблица шрифтов открываются браузером рендера
@@ -148,18 +147,19 @@ export const createApp = ({photoOrigin}) => {
   const api = express.Router();
 
   // ——— Вход (открыто без сессии) ———
-  // Интерфейс начинает с этого запроса: нужен ли вход, кто вошёл, что с доступом
+  // Интерфейс начинает с этого запроса: нужен ли вход, кто вошёл, сколько кредитов
   api.get('/auth/me', (req, res, next) => (async () => {
     if (!authEnabled()) return res.json({authRequired: false});
-    if (!req.user) return res.json({authRequired: true, user: null});
+    // Незнакомцу — сколько дарим при регистрации: форма пишет это над кнопкой
+    if (!req.user) return res.json({authRequired: true, user: null, signup: await signupCredits()});
     res.json({
       authRequired: true, user: req.user, workspace: req.workspace,
-      access: req.ws ? await accessOf(req.ws) : null,
+      balance: req.ws ? await balanceOf(req.ws) : null,
     });
   })().catch(next));
   api.post('/auth/login', loginLimiter, (req, res, next) => login(req.body ?? {})
     .then(({token}) => { setSessionCookie(req, res, token); res.json({ok: true}); }).catch(next));
-  api.post('/auth/register', loginLimiter, (req, res, next) => register(req.body ?? {})
+  api.post('/auth/register', registerLimiter, (req, res, next) => register(req.body ?? {})
     .then(({token}) => { setSessionCookie(req, res, token); res.json({ok: true}); }).catch(next));
   api.post('/auth/logout', (req, res, next) => Promise.resolve(authEnabled() ? dropSession(sessionToken(req)) : null)
     .then(() => { clearSessionCookie(res); res.json({ok: true}); }).catch(next));
@@ -170,24 +170,28 @@ export const createApp = ({photoOrigin}) => {
 
   // ——— Кабинет компании ———
   api.get('/account/ledger', wrap((req) => (authEnabled() ? ledgerOf(req.ws) : [])));
-  api.post('/account/redeem', loginLimiter, wrap(async (req) => {
-    if (!authEnabled()) throw new HttpError(400, 'Кабинеты работают только с базой');
-    await redeem({workspaceId: req.ws, userId: req.user.id, code: req.body?.code});
-    return accessOf(req.ws);
-  }));
+  // Куда писать за пакетом и что в прайсе — на экран «кредиты закончились» и в кабинет
+  api.get('/account/offer', wrap(async () => ({
+    contacts: await readJson(path.join(CONFIG_DIR, 'platform.json')).then(({_note, ...c}) => c),
+    packs: authEnabled() ? await listPacks() : [],
+  })));
 
-  // ——— Админка владельца платформы ———
+  // ——— Админка: лиды и пакеты — сотрудникам, прайс и роли — только владельцу ———
   const admin = express.Router();
   admin.use((req, _res, next) => next(authEnabled() ? undefined : new HttpError(400, 'Админка работает только с базой')));
-  admin.use(requireAdmin);
-  admin.get('/plans', wrap(() => listPlans()));
-  admin.put('/plans/:id', wrap((req) => savePlan({...req.body, id: req.params.id})));
-  admin.get('/codes', wrap(() => listCodes()));
-  admin.post('/codes', wrap((req) => createCodes({...req.body, createdBy: req.user.id})));
-  admin.get('/workspaces', wrap(() => listWorkspaces()));
-  admin.post('/workspaces/:id/credits', wrap((req) => adjustCredits({
-    workspaceId: checkId(req.params.id), delta: req.body?.delta, note: req.body?.note, createdBy: req.user.id,
+  admin.use(requireStaff);
+  admin.get('/clients', wrap(() => listClients()));
+  admin.get('/clients/:id/ledger', wrap((req) => ledgerOf(checkId(req.params.id))));
+  admin.get('/packs', wrap(() => listPacks({all: true})));
+  admin.post('/clients/:id/packs', wrap((req) => grantPack({
+    workspaceId: checkId(req.params.id), packId: String(req.body?.packId ?? ''), note: req.body?.note, createdBy: req.user.id,
   })));
+  admin.post('/clients/:id/bonus', requireAdmin, wrap((req) => grantBonus({
+    workspaceId: checkId(req.params.id), credits: req.body?.credits, days: req.body?.days, note: req.body?.note, createdBy: req.user.id,
+  })));
+  admin.put('/packs/:id', requireAdmin, wrap((req) => savePack({...req.body, id: req.params.id})));
+  admin.get('/staff', requireAdmin, wrap(() => listStaff()));
+  admin.put('/staff', requireAdmin, wrap((req) => setRole({email: req.body?.email, role: req.body?.role, by: req.user.id})));
   api.use('/admin', admin);
 
   api.get('/config', wrap(async () => ({
@@ -281,7 +285,7 @@ export const createApp = ({photoOrigin}) => {
   })));
 
   // Рендер: сохранённый лот + текущие настройки рынка и бренда, формат — из запроса или лота
-  api.post('/lots/:id/render', requireActive('ads'), wrap(async (req) => {
+  api.post('/lots/:id/render', requireCredits, wrap(async (req) => {
     const lot = await getLot(req.params.id);
     const format = await getFormat(req.body?.format || lot.format);
     if (format.requires.includes('photos') && !lot.photos.length) throw new HttpError(400, 'Добавь хотя бы одно фото');
@@ -309,15 +313,15 @@ export const createApp = ({photoOrigin}) => {
     limits: {fileSize: 4 * 1024 ** 3, files: 1},
   });
   const validId = (req, res, next) => { try { checkId(req.params.id); next(); } catch (e) { next(e); } };
-  api.post('/reviews/:id/source', validId, requireActive('reviews'), videoUpload.single('video'), wrap(async (req) => {
+  api.post('/reviews/:id/source', validId, requireCredits, videoUpload.single('video'), wrap(async (req) => {
     if (!req.file) throw new HttpError(400, 'Нет файла видео');
     return ingestSource(req.params.id, req.file.path, req.file.originalname);
   }));
-  api.post('/reviews/:id/reprocess', requireActive('reviews'), wrap((req) => reprocessSource(checkId(req.params.id))));
-  api.post('/reviews/:id/transcribe', requireActive('reviews'), wrap((req) => transcribeReview(checkId(req.params.id))));
+  api.post('/reviews/:id/reprocess', requireCredits, wrap((req) => reprocessSource(checkId(req.params.id))));
+  api.post('/reviews/:id/transcribe', requireCredits, wrap((req) => transcribeReview(checkId(req.params.id))));
   api.post('/reviews/:id/relines', wrap((req) => rebuildLines(checkId(req.params.id))));
   // Прослушать спикера: одна фраза вместо озвучки всего обзора. Отдаёт mp3, а не JSON.
-  api.post('/voices/preview', requireActive('reviews'), (req, res, next) => (async () => {
+  api.post('/voices/preview', requireCredits, (req, res, next) => (async () => {
     const language = typeof req.body?.language === 'string' ? req.body.language : 'mk';
     const registry = await voiceRegistry();
     const speaker = resolveSpeaker(registry, language, req.body?.speaker);
@@ -328,13 +332,13 @@ export const createApp = ({photoOrigin}) => {
     const audio = await synthesize(text, {language, voice: config.voiceId, model: config.model, settings: apiSettings(config.settings)});
     res.set('Content-Type', 'audio/mpeg').set('Cache-Control', 'no-store').send(audio);
   })().catch(next));
-  api.post('/reviews/:id/voice', requireActive('reviews'), wrap(async (req) => {
+  api.post('/reviews/:id/voice', requireCredits, wrap(async (req) => {
     const review = await getReview(checkId(req.params.id));
     const market = await renderMarket();
     return voiceReview(review.id, {language: typeof req.body?.language === 'string' ? req.body.language : undefined, market});
   }));
-  api.post('/reviews/:id/ambience', requireActive('reviews'), wrap((req) => ambienceReview(checkId(req.params.id))));
-  api.post('/reviews/:id/render', requireActive('reviews'), wrap(async (req) => {
+  api.post('/reviews/:id/ambience', requireCredits, wrap((req) => ambienceReview(checkId(req.params.id))));
+  api.post('/reviews/:id/render', requireCredits, wrap(async (req) => {
     const review = await getReview(checkId(req.params.id));
     if (review.source?.status !== 'ready') throw new HttpError(400, 'Видео ещё не готово');
     if (!review.segments.length) throw new HttpError(400, 'Добавь хотя бы один фрагмент');
@@ -366,7 +370,7 @@ export const createApp = ({photoOrigin}) => {
   // Карусели: ссылка Encar → слайды выбранного формата. Сборка синхронная — кадры снимаются
   // за секунды, отдельная очередь как у видео тут была бы лишней сложностью. Поэтому и кредит
   // здесь же: списываем, собираем, при неудаче возвращаем
-  api.post('/carousels', requireActive('carousels'), (req, _res, next) => {
+  api.post('/carousels', requireCredits, (req, _res, next) => {
     // Ссылку проверяем до списания: опечатка в ссылке — не повод гонять кредит туда-обратно
     // и засорять журнал клиента парой «списано / возврат»
     try { parseCarLink(req.body?.link); next(); } catch (e) { next(new HttpError(400, e.message)); }
@@ -395,7 +399,7 @@ export const createApp = ({photoOrigin}) => {
   })));
   api.get('/renders/:id', wrap((req) => getJob(checkId(req.params.id))));
   api.post('/renders/:id/cancel', wrap((req) => cancelJob(checkId(req.params.id))));
-  api.post('/renders/:id/retry', requireActive(), wrap((req) => retryJob(checkId(req.params.id), billOf(req))));
+  api.post('/renders/:id/retry', requireCredits, wrap((req) => retryJob(checkId(req.params.id), billOf(req))));
   api.delete('/renders/:id', wrap((req) => deleteJob(checkId(req.params.id))));
   api.get('/renders/:id/download', async (req, res, next) => {
     try {

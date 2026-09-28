@@ -1,7 +1,7 @@
 // Оболочка: шапка с пайплайнами, вкладки инструментов, экран выбранного инструмента
 import React, {Suspense, useCallback, useState} from 'react';
 import {ConfigProvider, useConfig} from './config';
-import {AuthGate, day, daysLeft, useAllowedPipelines, useSession} from './auth';
+import {AuthGate, day, useOutOfCredits, useSession} from './auth';
 import {AccountPage, AdminPage} from './Account';
 import {Home, PipelinePage} from './Home';
 import {Pipeline, ToolMeta, findPipeline, toolKey, visiblePipelines} from './pipelines';
@@ -26,10 +26,11 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
   const route = useRoute();
   const {config} = useConfig();
   const session = useSession();
+  const outOfCredits = useOutOfCredits();
   const pipeline = findPipeline(route.pipeline);
   const tool = pipeline?.tools.find((t) => t.id === route.tool);
   // На проде обзоры скрыты из вкладок; сам инструмент по прямой ссылке всё равно откроется
-  const pipelines = visiblePipelines(config.production, useAllowedPipelines());
+  const pipelines = visiblePipelines(config.production);
   const main = pipelines.filter((p) => p.kind !== 'settings');
   const settings = pipelines.find((p) => p.kind === 'settings');
 
@@ -53,7 +54,7 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
               {settings.title}
             </a>
           )}
-          {session.enabled && session.isAdmin && (
+          {session.enabled && session.isStaff && (
             <a href={href('admin')} className={route.pipeline === 'admin' ? 'tab active' : 'tab'}>Админка</a>
           )}
         </nav>
@@ -71,10 +72,10 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
       )}
 
       {error && <div className="error" onClick={clearError}>{error} <span className="muted">— нажми, чтобы скрыть</span></div>}
-      {session.enabled && !session.isAdmin && session.access && !session.access.active && (
+      {outOfCredits && (
         <div className="readonly">
-          Доступ {session.access.paidUntil ? `закончился ${day(session.access.paidUntil)}` : 'не активирован'}: готовое можно
-          смотреть и скачивать, новое — после продления. <a href={href('account')}>Продлить кодом</a>
+          Кредиты закончились: готовое можно смотреть и скачивать, новое — после пополнения.{' '}
+          <a href={href('account')}>Пополнить пакетом</a>
         </div>
       )}
 
@@ -91,16 +92,16 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
   );
 };
 
-// Компания, срок и кредиты в шапке: клиент видит, сколько осталось, не заходя в кабинет
+// Компания и кредиты в шапке: клиент видит остаток, не заходя в кабинет
 const AccountChip: React.FC = () => {
-  const {workspace, access, email, isAdmin, logout} = useSession();
+  const {workspace, balance, email, isAdmin, isStaff, logout} = useSession();
+  const soon = balance?.nextExpiry;
   return (
     <div className="account-chip">
-      <a href={href('account')} title={email ?? ''}>
+      <a href={href('account')} title={soon ? `${soon.credits} кр. сгорят ${day(soon.at)}` : email ?? ''}>
         <b>{workspace?.name}</b>
         <span className="muted">
-          {access?.active ? ` · ${access.credits} кр. · ещё ${daysLeft(access.paidUntil)} дн.`
-            : isAdmin ? ' · владелец платформы' : ' · доступ закончился'}
+          {isStaff ? (isAdmin ? ' · владелец платформы' : ' · менеджер') : ` · ${balance?.credits ?? 0} кр.`}
         </span>
       </a>
       <button className="btn ghost" onClick={logout}>Выйти</button>
