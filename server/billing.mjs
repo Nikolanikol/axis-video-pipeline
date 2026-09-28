@@ -31,7 +31,7 @@ export const creditCosts = async () => {
 };
 
 /** Бесплатные кредиты новой компании — начисляются при подтверждении почты: {credits, days} */
-export const signupCredits = async () => ({credits: 10, days: 30, ...(await creditsConfig()).signup});
+export const signupCredits = async () => ({credits: 7, days: 30, ...(await creditsConfig()).signup});
 
 const plural = (n) => {
   const d = n % 10;

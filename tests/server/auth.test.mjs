@@ -87,7 +87,7 @@ suite('вход и кабинеты SMMAKER', () => {
 
   it('без входа: API закрыт, интерфейс узнаёт, что нужен вход и что дарим', async () => {
     const anon = client();
-    expect(await me(anon)).toEqual({authRequired: true, user: null, signup: {credits: 10, days: 30}});
+    expect(await me(anon)).toEqual({authRequired: true, user: null, signup: {credits: 7, days: 30}});
     expect((await anon.call('GET', '/api/config')).status).toBe(401);
     expect((await anon.call('GET', '/api/lots')).status).toBe(401);
   });
@@ -106,7 +106,7 @@ suite('вход и кабинеты SMMAKER', () => {
     expect(m0.user).toMatchObject({role: 'admin', isAdmin: true, isStaff: true});
     expect(m0.workspace.id).toBe('k-axis');
     const packs = (await owner.call('GET', '/api/admin/packs')).body;
-    expect(packs.map((p) => p.id)).toEqual(['start', 'base', 'pro', 'business']);
+    expect(packs.map((p) => p.id)).toEqual(['start', 'base', 'pro']);
   });
 
   it('без имени или с негодным телефоном — отказ, и ничего не остаётся', async () => {
@@ -150,9 +150,9 @@ suite('вход и кабинеты SMMAKER', () => {
     expect((await a.call('POST', '/api/auth/verify', {code: ` ${code.slice(0, 3)} ${code.slice(3)} `})).status).toBe(200);
     const ma = await me(a);
     expect(ma.user.emailVerified).toBe(true);
-    expect(ma.balance.credits).toBe(10);
+    expect(ma.balance.credits).toBe(7);
     expect(daysTo(ma.balance.nextExpiry.at)).toBeGreaterThan(29.9);
-    expect(ma.balance.lots).toMatchObject([{source: 'signup', credits: 10, remaining: 10}]);
+    expect(ma.balance.lots).toMatchObject([{source: 'signup', credits: 7, remaining: 7}]);
     // Код одноразовый, повторная отправка подтверждённому ничего не шлёт
     expect((await a.call('POST', '/api/auth/verify', {code})).status).toBe(410);
     expect((await a.call('POST', '/api/auth/verify/resend')).body).toEqual({sent: false, verified: true});
@@ -166,7 +166,7 @@ suite('вход и кабинеты SMMAKER', () => {
     const token = linkFrom(lastMail('b@dealer.test'));
     expect((await client().call('POST', '/api/auth/verify/link', {token})).status).toBe(200);
     expect((await client().call('POST', '/api/auth/verify/link', {token})).status).toBe(410);
-    expect((await me(b)).balance.credits).toBe(10);
+    expect((await me(b)).balance.credits).toBe(7);
   });
 
   it('пять неверных кодов — код сгорает', async () => {
@@ -230,7 +230,7 @@ suite('вход и кабинеты SMMAKER', () => {
     const offer = (await a.call('GET', '/api/account/offer')).body;
     expect(offer.contacts.whatsapp).toMatch(/\d/);
     expect(offer.contacts._note).toBeUndefined();
-    expect(offer.packs.map((p) => p.id)).toEqual(['start', 'base', 'pro', 'business']);
+    expect(offer.packs.map((p) => p.id)).toEqual(['start', 'base', 'pro']);
     // Номер продаж перекрывается переменной окружения
     process.env.SMMAKER_SALES_WHATSAPP = '+82 10 0000 1111';
     expect((await a.call('GET', '/api/account/offer')).body.contacts.whatsapp).toBe('+82 10 0000 1111');
@@ -256,33 +256,33 @@ suite('вход и кабинеты SMMAKER', () => {
 
     it('менеджер видит лидов с телефонами и начисляет пакет', async () => {
       const clients = (await m.call('GET', '/api/admin/clients')).body;
-      expect(clients.find((c) => c.id === wsA)).toMatchObject({person: 'Анна', phone: '+821011112222', credits: 10, paid_krw: 0});
+      expect(clients.find((c) => c.id === wsA)).toMatchObject({person: 'Анна', phone: '+821011112222', credits: 7, paid_krw: 0});
       const res = await m.call('POST', `/api/admin/clients/${wsA}/packs`, {packId: 'start', note: 'перевод 123'});
       expect(res.status).toBe(200);
-      expect(res.body.credits).toBe(40);
+      expect(res.body.credits).toBe(22);
       const pack = res.body.lots.find((l) => l.source === 'pack');
       expect(daysTo(pack.expiresAt)).toBeGreaterThan(364.9);
       // Ближайшее сгорание — бесплатные, а не купленные
-      expect(res.body.nextExpiry.credits).toBe(10);
-      expect((await me(a)).balance.credits).toBe(40);
+      expect(res.body.nextExpiry.credits).toBe(7);
+      expect((await me(a)).balance.credits).toBe(22);
     });
 
     it('менеджер не меняет цены, бонусы и сотрудников', async () => {
-      expect((await m.call('PUT', '/api/admin/packs/start', {title: 'Старт', credits: 30, price_krw: 1})).status).toBe(403);
+      expect((await m.call('PUT', '/api/admin/packs/start', {title: 'Старт', credits: 15, price_krw: 1})).status).toBe(403);
       expect((await m.call('POST', `/api/admin/clients/${wsA}/bonus`, {credits: 100})).status).toBe(403);
       expect((await m.call('GET', '/api/admin/staff')).status).toBe(403);
       expect((await m.call('PUT', '/api/admin/staff', {email: 'a@dealer.test', role: 'admin'})).status).toBe(403);
     });
 
     it('новая цена не меняет проданное; снятый с продажи пакет не начислить', async () => {
-      const saved = await owner.call('PUT', '/api/admin/packs/start', {title: 'Старт', credits: 30, price_krw: 45000, valid_days: 365, active: false});
+      const saved = await owner.call('PUT', '/api/admin/packs/start', {title: 'Старт', credits: 15, price_krw: 45000, valid_days: 365, active: false});
       expect(saved.body).toMatchObject({price_krw: 45000, active: false});
       expect((await a.call('GET', '/api/account/offer')).body.packs.map((p) => p.id)).not.toContain('start');
       expect((await owner.call('POST', `/api/admin/clients/${wsA}/packs`, {packId: 'start'})).status).toBe(404);
       const clients = (await owner.call('GET', '/api/admin/clients')).body;
-      expect(clients.find((c) => c.id === wsA).paid_krw).toBe(39000);
+      expect(clients.find((c) => c.id === wsA).paid_krw).toBe(100000);
       const rows = (await a.call('GET', '/api/account/ledger')).body;
-      expect(rows[0]).toMatchObject({kind: 'grant', delta: 30, source: 'pack', price_krw: 39000});
+      expect(rows[0]).toMatchObject({kind: 'grant', delta: 15, source: 'pack', price_krw: 100000});
       expect(rows[0].note).toMatch(/Старт.*перевод 123/);
     });
 
@@ -306,15 +306,15 @@ suite('вход и кабинеты SMMAKER', () => {
     });
 
     it('списание, возврат один раз, закрытие', async () => {
-      expect(await credits()).toBe(10);
+      expect(await credits()).toBe(7);
       const r = await billing.charge({workspaceId: wsB, pipeline: 'ads', jobId: 'job-1'});
       expect(r).toEqual({jobId: 'job-1', cost: 3});
-      expect(await credits()).toBe(7);
+      expect(await credits()).toBe(4);
       await billing.refund(r, 'тест');
       await billing.refund(r, 'тест ещё раз');
-      expect(await credits()).toBe(10);
+      expect(await credits()).toBe(7);
       await billing.settle(await billing.charge({workspaceId: wsB, pipeline: 'carousels', jobId: 'job-2'}));
-      expect(await credits()).toBe(9);
+      expect(await credits()).toBe(6);
     });
 
     it('сотрудники платформы не платят', async () => {
@@ -322,10 +322,10 @@ suite('вход и кабинеты SMMAKER', () => {
     });
 
     it('одновременные запуски не уводят в минус', async () => {
-      // 9 кредитов, ролик — 3: пройдёт ровно 3 из 8, остаток 0
+      // 6 кредитов, ролик — 3: пройдёт ровно 2 из 8, остаток 0
       const tries = await Promise.allSettled(Array.from({length: 8}, (_, i) =>
         billing.charge({workspaceId: wsB, pipeline: 'ads', jobId: `race-${i}`})));
-      expect(tries.filter((t) => t.status === 'fulfilled')).toHaveLength(3);
+      expect(tries.filter((t) => t.status === 'fulfilled')).toHaveLength(2);
       expect(tries.filter((t) => t.status === 'rejected').every((t) => t.reason.status === 402)).toBe(true);
       expect(await credits()).toBe(0);
     });
@@ -342,8 +342,8 @@ suite('вход и кабинеты SMMAKER', () => {
 
     it('после перезапуска незакрытые списания возвращаются', async () => {
       // race-* списаны и не закрыты — как задания, пропавшие с очередью в памяти
-      expect(await billing.refundOrphans({log: () => {}})).toBe(3);
-      expect(await credits()).toBe(9);
+      expect(await billing.refundOrphans({log: () => {}})).toBe(2);
+      expect(await credits()).toBe(6);
       expect(await billing.refundOrphans({log: () => {}})).toBe(0);
     });
 
@@ -379,7 +379,7 @@ suite('вход и кабинеты SMMAKER', () => {
     it('журнал в кабинете — построчно, новые сверху, у начислений срок', async () => {
       const rows = (await b.call('GET', '/api/account/ledger')).body;
       expect(rows[0].kind).toBe('refund');
-      expect(rows.at(-1)).toMatchObject({kind: 'grant', delta: 10, source: 'signup'});
+      expect(rows.at(-1)).toMatchObject({kind: 'grant', delta: 7, source: 'signup'});
       expect(rows.at(-1).expires_at).toBeTruthy();
       // Чужой журнал не виден: у владельца своя компания
       expect((await owner.call('GET', '/api/account/ledger')).body.some((r) => r.job_id === 'job-1')).toBe(false);

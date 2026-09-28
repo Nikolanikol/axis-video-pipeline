@@ -27,12 +27,16 @@ describe('миграции', () => {
   // В одном Supabase живут kmotors и caranalizer. Всё, что создаём мы, должно читаться
   // как наше и без схемы — в логах, дампах и списках Studio
   it('всё, что создаётся, называется smmaker_…', async () => {
+    let total = 0;
     for (const m of await listMigrations()) {
       const sql = (await fs.readFile(m.path, 'utf8')).replace(/--.*$/gm, '');
       const names = [...sql.matchAll(/CREATE\s+(?:UNIQUE\s+)?(?:TABLE|INDEX|VIEW|SEQUENCE|TYPE|FUNCTION)\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-z_][a-z0-9_.]*)/gi)]
         .map((x) => x[1]);
-      expect(names.length).toBeGreaterThan(0);
+      total += names.length;
       for (const name of names) expect(name, `${m.file}: ${name}`).toMatch(/^smmaker_/);
     }
+    // По всем сразу, а не в каждой: миграция может только менять данные (005 — прайс).
+    // Ноль на всех значит, что сломалось само выражение, и проверка молча ничего не ловит
+    expect(total).toBeGreaterThan(0);
   });
 });
