@@ -27,7 +27,8 @@ import {parseCarLink} from '../src/shared/encarLink.js';
 import {PALETTE_KEYS, isHex} from '../src/shared/contrast.js';
 import {withoutMusic} from '../src/shared/nomusic.js';
 import {
-  dropSession, grantBonus, grantPack, listClients, listPacks, listStaff, login, register, savePack, setRole,
+  dropSession, grantBonus, grantPack, listClients, listPacks, listStaff, login, register, requestReset, resetPassword,
+  savePack, sendVerification, setRole, verifyCode, verifyLink,
 } from './accounts.mjs';
 import {
   authEnabled, clearSessionCookie, guardData, loginLimiter, readSessionMw, registerLimiter, requireAdmin, requireCredits,
@@ -161,6 +162,24 @@ export const createApp = ({photoOrigin}) => {
     .then(({token}) => { setSessionCookie(req, res, token); res.json({ok: true}); }).catch(next));
   api.post('/auth/register', registerLimiter, (req, res, next) => register(req.body ?? {})
     .then(({token}) => { setSessionCookie(req, res, token); res.json({ok: true}); }).catch(next));
+  // Подтверждение почты: код — из кабинета (нужна сессия), ссылка — с любого устройства.
+  // Ссылка из письма открывает страницу приложения, а та шлёт POST: GET-ссылку почтовые
+  // сканеры (Outlook, антивирусы) открывают сами и сожгли бы её до человека
+  api.post('/auth/verify', loginLimiter, (req, res, next) => {
+    if (!req.user) return next(new HttpError(401, 'Нужно войти'));
+    verifyCode({userId: req.user.id, code: req.body?.code}).then((r) => res.json(r)).catch(next);
+  });
+  api.post('/auth/verify/resend', (req, res, next) => {
+    if (!req.user) return next(new HttpError(401, 'Нужно войти'));
+    sendVerification(req.user.id).then((r) => res.json(r)).catch(next);
+  });
+  api.post('/auth/verify/link', loginLimiter, (req, res, next) => verifyLink({token: req.body?.token})
+    .then((r) => res.json(r)).catch(next));
+  // Сброс пароля: письмо со ссылкой; по ссылке — новый пароль и сразу вход
+  api.post('/auth/forgot', loginLimiter, (req, res, next) => requestReset({email: req.body?.email})
+    .then((r) => res.json(r)).catch(next));
+  api.post('/auth/reset', loginLimiter, (req, res, next) => resetPassword({token: req.body?.token, password: req.body?.password})
+    .then(({token}) => { setSessionCookie(req, res, token); res.json({ok: true}); }).catch(next));
   api.post('/auth/logout', (req, res, next) => Promise.resolve(authEnabled() ? dropSession(sessionToken(req)) : null)
     .then(() => { clearSessionCookie(res); res.json({ok: true}); }).catch(next));
 
@@ -170,11 +189,17 @@ export const createApp = ({photoOrigin}) => {
 
   // ——— Кабинет компании ———
   api.get('/account/ledger', wrap((req) => (authEnabled() ? ledgerOf(req.ws) : [])));
-  // Куда писать за пакетом и что в прайсе — на экран «кредиты закончились» и в кабинет
-  api.get('/account/offer', wrap(async () => ({
-    contacts: await readJson(path.join(CONFIG_DIR, 'platform.json')).then(({_note, ...c}) => c),
-    packs: authEnabled() ? await listPacks() : [],
-  })));
+  // Куда писать за пакетом и что в прайсе — на экран «кредиты закончились» и в кабинет.
+  // WhatsApp продаж — из SMMAKER_SALES_WHATSAPP, если задан: номер менеджера меняется без
+  // пересборки образа. Не задан — номер из config/platform.json
+  api.get('/account/offer', wrap(async () => {
+    const {_note, ...contacts} = await readJson(path.join(CONFIG_DIR, 'platform.json'));
+    const whatsapp = process.env.SMMAKER_SALES_WHATSAPP?.trim();
+    return {
+      contacts: whatsapp ? {...contacts, whatsapp} : contacts,
+      packs: authEnabled() ? await listPacks() : [],
+    };
+  }));
 
   // ——— Админка: лиды и пакеты — сотрудникам, прайс и роли — только владельцу ———
   const admin = express.Router();

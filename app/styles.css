@@ -398,6 +398,9 @@ a.tab { text-decoration: none; }
 .account-chip a:hover b { color: var(--copper-light); }
 .readonly { padding: 8px 20px; background: #2a1f14; border-bottom: 1px solid var(--copper-dark); font-size: 13px; }
 .readonly a { color: var(--copper-light); }
+.readonly.verify { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.readonly.verify input { width: 110px; letter-spacing: 2px; }
+.auth-card .link { font-size: 13px; }
 .facts { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; margin: 14px 0 0; }
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; }

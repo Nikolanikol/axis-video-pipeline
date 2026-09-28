@@ -1,4 +1,4 @@
-// Вход, регистрация, кредиты партиями, пакеты, роли и изоляция компаний — на настоящем Postgres.
+// Вход, регистрация с подтверждением почты, сброс пароля, кредиты партиями, пакеты, роли и изоляция компаний — на настоящем Postgres.
 //
 // Нужна отдельная база: TEST_DATABASE_URL (пользователь с правом создавать схемы).
 // Каждый прогон — своя схема smmaker_test_<случайное>, после — удаляется. Без переменной
@@ -31,6 +31,8 @@ suite('вход и кабинеты SMMAKER', () => {
     db = dbm.db();
     const store = await import('../../server/store.mjs');
     await store.ensureWorkspace({log: () => {}});
+    // Письма не отправляем, а складываем в ящик теста: код и ссылки берём оттуда
+    (await import('../../server/mailer.mjs')).setMailTransport(async (mail) => { mails.push(mail); });
     accounts = await import('../../server/accounts.mjs');
     await accounts.upsertAdmin({email: 'owner@smmaker.test', password: 'owner-pass-1', workspaceId: store.DEFAULT_WORKSPACE});
     const {createApp} = await import('../../server/app.mjs');
@@ -40,6 +42,7 @@ suite('вход и кабинеты SMMAKER', () => {
   });
 
   afterAll(async () => {
+    (await import('../../server/mailer.mjs')).setMailTransport();
     await new Promise((r) => server?.close(r));
     await db?.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
     const dbm = await import('../../server/db/index.mjs');
@@ -76,6 +79,11 @@ suite('вход и кабинеты SMMAKER', () => {
   const register = (c, data) => c.call('POST', '/api/auth/register', {password: 'password-1', ...data});
   const me = async (c) => (await c.call('GET', '/api/auth/me')).body;
   const daysTo = (iso) => (new Date(iso) - Date.now()) / 864e5;
+  // Последнее письмо на адрес: код и ключ из ссылки
+  const mails = [];
+  const lastMail = (to) => mails.findLast((x) => x.to === to);
+  const codeFrom = (mail) => /код[^:]*: (\d{6})/i.exec(mail.text)[1];
+  const linkFrom = (mail) => /\?t=([\w-]+)/.exec(mail.text)[1];
 
   it('без входа: API закрыт, интерфейс узнаёт, что нужен вход и что дарим', async () => {
     const anon = client();
@@ -111,18 +119,20 @@ suite('вход и кабинеты SMMAKER', () => {
     expect(rowCount).toBe(0);
   });
 
-  it('клиент регистрируется сам: компания, 10 кредитов на 30 дней, контакты для лида', async () => {
+  it('клиент регистрируется сам: кредитов нет, пока почта не подтверждена', async () => {
     const res = await register(a, {name: 'Анна', email: 'a@dealer.test', phone: '+82 10-1111 2222', company: 'Дилер А', password: 'password-a'});
     expect(res.status).toBe(200);
     const ma = await me(a);
-    expect(ma.user).toMatchObject({name: 'Анна', role: null, isAdmin: false, isStaff: false});
+    expect(ma.user).toMatchObject({name: 'Анна', role: null, isAdmin: false, isStaff: false, emailVerified: false});
     expect(ma.workspace.name).toBe('Дилер А');
-    expect(ma.balance.credits).toBe(10);
-    expect(ma.balance.nextExpiry.credits).toBe(10);
-    expect(daysTo(ma.balance.nextExpiry.at)).toBeGreaterThan(29.9);
-    expect(ma.balance.lots).toMatchObject([{source: 'signup', credits: 10, remaining: 10}]);
+    expect(ma.balance.credits).toBe(0);
     const {rows: [u]} = await db.query(`SELECT phone FROM ${schema}.smmaker_users WHERE email = 'a@dealer.test'`);
     expect(u.phone).toBe('+821011112222');
+    // Генерация закрыта с понятной причиной
+    const lot = (await a.call('POST', '/api/lots', {})).body;
+    const render = await a.call('POST', `/api/lots/${lot.id}/render`, {});
+    expect(render.status).toBe(403);
+    expect(render.body.error).toMatch(/Подтвердите почту/);
     // Стартовый профиль — пустые контакты, а не номер владельца платформы
     const cfg = (await a.call('GET', '/api/config')).body;
     expect(cfg.profiles[0].contacts.whatsapp).toBe('');
@@ -131,19 +141,54 @@ suite('вход и кабинеты SMMAKER', () => {
     expect(cfg.brand.assets).toMatchObject({logoStacked: '', logoHorizontal: '', sign: ''});
   });
 
-  it('компания необязательна — тогда называется по имени человека', async () => {
-    expect((await register(b, {name: 'Борис', email: 'b@dealer.test', phone: '+7 900 000-00-01'})).status).toBe(200);
-    expect((await me(b)).workspace.name).toBe('Борис');
+  it('код из письма подтверждает почту и приносит 10 кредитов на 30 дней — один раз', async () => {
+    const mail = lastMail('a@dealer.test');
+    expect(mail.subject).toMatch(/\d{6}/);
+    const code = codeFrom(mail);
+    const wrong = code === '000000' ? '111111' : '000000';
+    expect((await a.call('POST', '/api/auth/verify', {code: wrong})).status).toBe(400);
+    expect((await a.call('POST', '/api/auth/verify', {code: ` ${code.slice(0, 3)} ${code.slice(3)} `})).status).toBe(200);
+    const ma = await me(a);
+    expect(ma.user.emailVerified).toBe(true);
+    expect(ma.balance.credits).toBe(10);
+    expect(daysTo(ma.balance.nextExpiry.at)).toBeGreaterThan(29.9);
+    expect(ma.balance.lots).toMatchObject([{source: 'signup', credits: 10, remaining: 10}]);
+    // Код одноразовый, повторная отправка подтверждённому ничего не шлёт
+    expect((await a.call('POST', '/api/auth/verify', {code})).status).toBe(410);
+    expect((await a.call('POST', '/api/auth/verify/resend')).body).toEqual({sent: false, verified: true});
   });
 
-  it('одна почта и один телефон — одна регистрация', async () => {
+  it('компания необязательна; почту можно подтвердить ссылкой без входа', async () => {
+    expect((await register(b, {name: 'Борис', email: 'b@dealer.test', phone: '+7 900 000-00-01'})).status).toBe(200);
+    expect((await me(b)).workspace.name).toBe('Борис');
+    // Повтор письма — не чаще раза в минуту
+    expect((await b.call('POST', '/api/auth/verify/resend')).status).toBe(429);
+    const token = linkFrom(lastMail('b@dealer.test'));
+    expect((await client().call('POST', '/api/auth/verify/link', {token})).status).toBe(200);
+    expect((await client().call('POST', '/api/auth/verify/link', {token})).status).toBe(410);
+    expect((await me(b)).balance.credits).toBe(10);
+  });
+
+  it('пять неверных кодов — код сгорает', async () => {
     const x = client();
-    const mail = await register(x, {name: 'X', email: 'A@Dealer.test', phone: '+82 10 9999 9999'});
-    expect(mail.status).toBe(409);
-    // Тот же номер, записанный иначе
-    const tel = await register(x, {name: 'X', email: 'x@dealer.test', phone: '+821011112222'});
-    expect(tel.status).toBe(409);
-    expect(tel.body.error).toMatch(/телефон/);
+    await register(x, {name: 'Перебор', email: 'brute@dealer.test', phone: '+82 10 8888 0001'});
+    const code = codeFrom(lastMail('brute@dealer.test'));
+    const wrong = code === '000000' ? '111111' : '000000';
+    for (let i = 0; i < 5; i++) expect((await x.call('POST', '/api/auth/verify', {code: wrong})).status).toBe(400);
+    expect((await x.call('POST', '/api/auth/verify', {code})).status).toBe(429);
+    expect((await me(x)).user.emailVerified).toBe(false);
+  });
+
+  it('варианты одного gmail и одноразовые почты не проходят', async () => {
+    const x = client();
+    expect((await register(x, {name: 'G', email: 'ivan.petrov@gmail.com', phone: '+82 10 8888 0002'})).status).toBe(200);
+    for (const alias of ['ivanpetrov+cars@gmail.com', 'I.VAN.PETROV@googlemail.com']) {
+      const res = await register(client(), {name: 'G', email: alias, phone: '+82 10 8888 0003'});
+      expect(res.status, alias).toBe(409);
+    }
+    const trash = await register(client(), {name: 'T', email: 'x@mail.yopmail.com', phone: '+82 10 8888 0004'});
+    expect(trash.status).toBe(400);
+    expect(trash.body.error).toMatch(/Одноразовая/);
   });
 
   it('компании не видят данных друг друга — ни через API, ни через файлы', async () => {
@@ -186,6 +231,10 @@ suite('вход и кабинеты SMMAKER', () => {
     expect(offer.contacts.whatsapp).toMatch(/\d/);
     expect(offer.contacts._note).toBeUndefined();
     expect(offer.packs.map((p) => p.id)).toEqual(['start', 'base', 'pro', 'business']);
+    // Номер продаж перекрывается переменной окружения
+    process.env.SMMAKER_SALES_WHATSAPP = '+82 10 0000 1111';
+    expect((await a.call('GET', '/api/account/offer')).body.contacts.whatsapp).toBe('+82 10 0000 1111');
+    delete process.env.SMMAKER_SALES_WHATSAPP;
   });
 
   describe('пакеты и роли', () => {
@@ -193,7 +242,9 @@ suite('вход и кабинеты SMMAKER', () => {
     beforeAll(async () => { wsA = (await me(a)).workspace.id; });
 
     it('менеджера назначает админ; менеджер — сотрудник, но не админ', async () => {
-      await register(m, {name: 'Мария', email: 'm@smmaker.test', phone: '+82 10 3333 4444'});
+      // С другого адреса: лимит — 5 удачных регистраций в час, с этого их уже четыре
+      await m.call('POST', '/api/auth/register', {name: 'Мария', email: 'm@smmaker.test', phone: '+82 10 3333 4444', password: 'password-1'},
+        {proxied: true, ip: '192.0.2.44'});
       expect((await owner.call('PUT', '/api/admin/staff', {email: 'M@smmaker.test', role: 'manager'})).status).toBe(200);
       expect((await me(m)).user).toMatchObject({role: 'manager', isAdmin: false, isStaff: true});
       // Роль по почте несуществующего — понятный отказ
@@ -348,6 +399,23 @@ suite('вход и кабинеты SMMAKER', () => {
     const sixth = await client().call('POST', '/api/auth/register',
       {name: 'L', email: 'l9@x.test', phone: '+82 10 5555 0009', password: 'password-1'}, {proxied: true, ip});
     expect(sixth.status).toBe(429);
+  });
+
+  it('сброс пароля: одинаковый ответ, новый пароль, старые сессии закрыты', async () => {
+    const before = mails.length;
+    expect((await client().call('POST', '/api/auth/forgot', {email: 'nobody@x.test'})).body).toEqual({ok: true});
+    expect(mails.length).toBe(before);
+    expect((await client().call('POST', '/api/auth/forgot', {email: 'A@dealer.test'})).body).toEqual({ok: true});
+    const token = linkFrom(lastMail('a@dealer.test'));
+    expect((await client().call('POST', '/api/auth/reset', {token, password: 'short'})).status).toBe(400);
+    const fresh = client();
+    expect((await fresh.call('POST', '/api/auth/reset', {token, password: 'new-password-a'})).status).toBe(200);
+    expect((await me(fresh)).user.email).toBe('a@dealer.test');
+    // Ссылка одноразовая, прежняя сессия вылетела, старый пароль не подходит
+    expect((await client().call('POST', '/api/auth/reset', {token, password: 'other-pass-1'})).status).toBe(410);
+    expect((await me(a)).user).toBeNull();
+    expect((await client().call('POST', '/api/auth/login', {email: 'a@dealer.test', password: 'password-a'})).status).toBe(401);
+    expect((await a.call('POST', '/api/auth/login', {email: 'a@dealer.test', password: 'new-password-a'})).status).toBe(200);
   });
 
   it('выход закрывает сессию и на сервере', async () => {

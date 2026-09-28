@@ -11,6 +11,7 @@ import {promisify} from 'node:util';
 import {db} from './db/index.mjs';
 import {CONFIG_DIR, HttpError, readJson} from './store.mjs';
 import {addLot, balanceOf, signupCredits} from './billing.mjs';
+import {appUrl, resetMail, verifyMail} from './mailer.mjs';
 
 const scrypt = promisify(crypto.scrypt);
 
@@ -44,6 +45,27 @@ export const normEmail = (email) => {
   if (!EMAIL_RE.test(e) || e.length > 200) throw new HttpError(400, 'Проверь почту: похоже, в адресе ошибка');
   return e;
 };
+/**
+ * Ключ почтового ящика: у всех адресов отбрасываем «+метку», у gmail ещё и точки —
+ * ivan+1@gmail.com и i.van@gmail.com приходят в один ящик. Уникален ключ, а не адрес:
+ * иначе бесплатные кредиты собирались бы вариантами одной почты.
+ * Та же формула — в миграции 004; меняешь одну — меняй и другую.
+ */
+export const emailKey = (mail) => {
+  const [local, domain] = mail.split('@');
+  const base = local.split('+')[0];
+  return domain === 'gmail.com' || domain === 'googlemail.com' ? `${base.replaceAll('.', '')}@gmail.com` : `${base}@${domain}`;
+};
+
+// Одноразовые почтовые сервисы — config/disposable-domains.json. Закрыт и поддомен
+let disposable = null;
+const isDisposable = async (mail) => {
+  disposable ??= readJson(path.join(CONFIG_DIR, 'disposable-domains.json')).then((c) => new Set(c.domains));
+  const set = await disposable;
+  const parts = mail.split('@')[1].split('.');
+  return parts.some((_, i) => set.has(parts.slice(i).join('.')));
+};
+
 const checkPassword = (password) => {
   const p = String(password ?? '');
   if (p.length < 8) throw new HttpError(400, 'Пароль — не короче 8 символов');
@@ -95,7 +117,7 @@ const rights = (role) => ({role: role ?? null, isAdmin: role === 'admin', isStaf
 export const readSession = async (token) => {
   if (!token) return null;
   const {rows} = await db().query(
-    `SELECT u.id, u.email, u.name, u.platform_role, m.workspace_id, m.role, w.name AS workspace_name
+    `SELECT u.id, u.email, u.name, u.platform_role, u.email_verified_at, m.workspace_id, m.role, w.name AS workspace_name
        FROM smmaker_sessions s
        JOIN smmaker_users u ON u.id = s.user_id
        LEFT JOIN LATERAL (SELECT * FROM smmaker_memberships WHERE user_id = u.id ORDER BY created_at LIMIT 1) m ON true
@@ -105,7 +127,7 @@ export const readSession = async (token) => {
   const r = rows[0];
   if (!r) return null;
   return {
-    user: {id: r.id, email: r.email, name: r.name, ...rights(r.platform_role)},
+    user: {id: r.id, email: r.email, name: r.name, emailVerified: Boolean(r.email_verified_at), ...rights(r.platform_role)},
     workspace: r.workspace_id ? {id: r.workspace_id, name: r.workspace_name, role: r.role} : null,
   };
 };
@@ -137,39 +159,175 @@ const starterProfile = (company) => ({
 });
 
 /**
- * Регистрация: пользователь, компания и бесплатные кредиты на пробу — одной транзакцией.
+ * Регистрация: пользователь, компания и членство — одной транзакцией. Бесплатные кредиты —
+ * не здесь, а при подтверждении почты (confirmEmail): иначе их собирали бы, придумывая
+ * адреса. Письмо с кодом уходит после записи; не ушло — человек запросит ещё раз из кабинета.
  * Компания необязательна: не указана — берём имя человека (его можно поменять в профиле).
  */
 export const register = async ({name, email, phone, password, company}) => {
   const person = checkName(name);
   const mail = normEmail(email);
+  const key = emailKey(mail);
   const tel = normPhone(phone);
   const pass = checkPassword(password);
+  if (await isDisposable(mail)) throw new HttpError(400, 'Одноразовая почта не подойдёт — укажите рабочую: на неё придёт код подтверждения');
   const title = String(company ?? '').trim().slice(0, 120) || person;
   const hash = await hashPassword(pass);
-  const trial = await signupCredits();
   // Дизайн по умолчанию — палитра и шрифты платформы; имя на постах — компания клиента.
   // Логотипы пустые: вместо них вёрстка пишет название компании (Logo в src/shared/ui.tsx).
   // Иначе стартовый бренд унёс бы на ролики клиента логотип AXIS — до загрузки своего
   const template = await readJson(path.join(CONFIG_DIR, 'brand.json'));
   const brand = {...template, name: title, assets: {...template.assets, logoStacked: '', logoHorizontal: '', sign: ''}};
-  return inTransaction(async (client) => {
-    const {rows: [taken]} = await client.query('SELECT 1 FROM smmaker_users WHERE lower(email) = $1', [mail]);
+  const out = await inTransaction(async (client) => {
+    const {rows: [taken]} = await client.query('SELECT 1 FROM smmaker_users WHERE lower(email) = $1 OR email_key = $2', [mail, key]);
     if (taken) throw new HttpError(409, 'Эта почта уже зарегистрирована — войдите');
     const {rows: [phoneTaken]} = await client.query('SELECT 1 FROM smmaker_users WHERE phone = $1', [tel]);
     if (phoneTaken) throw new HttpError(409, 'Этот телефон уже зарегистрирован — войдите по своей почте');
     const workspaceId = `ws-${crypto.randomBytes(5).toString('hex')}`;
     const {rows: [user]} = await client.query(
-      'INSERT INTO smmaker_users (email, password_hash, name, phone) VALUES ($1, $2, $3, $4) RETURNING id', [mail, hash, person, tel]);
+      'INSERT INTO smmaker_users (email, email_key, password_hash, name, phone) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+      [mail, key, hash, person, tel]);
     await client.query(
       'INSERT INTO smmaker_workspaces (id, name, brand, profile) VALUES ($1, $2, $3, $4)',
       [workspaceId, title, brand, starterProfile(title)]);
     await client.query(
       `INSERT INTO smmaker_memberships (workspace_id, user_id, role) VALUES ($1, $2, 'owner')`, [workspaceId, user.id]);
-    if (trial.credits > 0) {
-      await addLot(client, {workspaceId, credits: trial.credits, days: trial.days, source: 'signup', note: 'бесплатные кредиты на пробу'});
-    }
     return {userId: user.id, token: await createSession(user.id, client)};
+  });
+  await sendVerification(out.userId, {force: true}).catch((e) => console.error('Письмо с кодом не ушло:', e.message));
+  return out;
+};
+
+// ——— Письма: подтверждение почты и сброс пароля ———
+
+const VERIFY_HOURS = 24;
+const RESET_MINUTES = 60;
+const MAX_CODE_ATTEMPTS = 5;
+// Не чаще раза в минуту: кнопка «отправить ещё раз» не должна превращаться в рассылку
+const RESEND_PAUSE_SEC = 60;
+
+/**
+ * Новый ключ письма. Прежние неиспользованные того же вида гасим: в ходу всегда один код,
+ * и старое письмо, пришедшее с опозданием, не сработает
+ */
+const issueToken = async (client, userId, kind, minutes) => {
+  await client.query('UPDATE smmaker_email_tokens SET used_at = now() WHERE user_id = $1 AND kind = $2 AND used_at IS NULL', [userId, kind]);
+  const code = kind === 'verify' ? String(crypto.randomInt(0, 1_000_000)).padStart(6, '0') : null;
+  const link = crypto.randomBytes(32).toString('base64url');
+  await client.query(
+    `INSERT INTO smmaker_email_tokens (user_id, kind, code_hash, link_hash, expires_at)
+     VALUES ($1, $2, $3, $4, now() + $5 * interval '1 minute')`,
+    [userId, kind, code && tokenHash(`${userId}:${code}`), tokenHash(link), minutes]);
+  return {code, link};
+};
+
+/** Пауза перед повторным письмом: сколько секунд ещё ждать (0 — можно) */
+const pauseLeft = async (userId, kind) => {
+  const {rows: [t]} = await db().query(
+    `SELECT GREATEST(0, $3 - extract(epoch FROM now() - max(created_at)))::int AS left
+       FROM smmaker_email_tokens WHERE user_id = $1 AND kind = $2`, [userId, kind, RESEND_PAUSE_SEC]);
+  return t?.left ?? 0;
+};
+
+/** Отправить код подтверждения. force — без паузы (сразу после регистрации) */
+export const sendVerification = async (userId, {force = false} = {}) => {
+  const {rows: [u]} = await db().query('SELECT email, name, email_verified_at FROM smmaker_users WHERE id = $1', [userId]);
+  if (!u) throw new HttpError(404, 'Нет такого пользователя');
+  if (u.email_verified_at) return {sent: false, verified: true};
+  const left = force ? 0 : await pauseLeft(userId, 'verify');
+  if (left > 0) throw new HttpError(429, `Письмо уже отправлено — повторить можно через ${left} с`);
+  const {code, link} = await inTransaction((client) => issueToken(client, userId, 'verify', VERIFY_HOURS * 60));
+  const {credits} = await signupCredits();
+  await verifyMail({to: u.email, name: u.name, code, link: `${appUrl()}/#/verify?t=${link}`, credits});
+  return {sent: true};
+};
+
+/**
+ * Почта подтверждена: отметка и бесплатные кредиты компании, где человек владелец.
+ * Кредиты — один раз на компанию: повторное подтверждение (после сброса пароля, например)
+ * второй партии не даёт
+ */
+const confirmEmail = async (client, userId) => {
+  const {rowCount} = await client.query(
+    'UPDATE smmaker_users SET email_verified_at = now() WHERE id = $1 AND email_verified_at IS NULL', [userId]);
+  if (!rowCount) return false;
+  const {rows: [m]} = await client.query(
+    `SELECT workspace_id FROM smmaker_memberships WHERE user_id = $1 AND role = 'owner' ORDER BY created_at LIMIT 1`, [userId]);
+  const trial = await signupCredits();
+  if (m && trial.credits > 0) {
+    const {rowCount: had} = await client.query(
+      `SELECT 1 FROM smmaker_credit_lots WHERE workspace_id = $1 AND source = 'signup'`, [m.workspace_id]);
+    if (!had) await addLot(client, {workspaceId: m.workspace_id, credits: trial.credits, days: trial.days, source: 'signup', note: 'бесплатные кредиты на пробу'});
+  }
+  return true;
+};
+
+/** Код из письма, введённый в кабинете. Пять неверных — код сгорает */
+export const verifyCode = async ({userId, code}) => {
+  const c = String(code ?? '').replace(/\D/g, '');
+  return inTransaction(async (client) => {
+    const {rows: [t]} = await client.query(
+      `SELECT id, code_hash, attempts FROM smmaker_email_tokens
+        WHERE user_id = $1 AND kind = 'verify' AND used_at IS NULL AND expires_at > now()
+        ORDER BY created_at DESC LIMIT 1 FOR UPDATE`, [userId]);
+    if (!t) throw new HttpError(410, 'Код устарел — отправьте новый');
+    if (t.attempts >= MAX_CODE_ATTEMPTS) throw new HttpError(429, 'Слишком много неверных попыток — отправьте новый код');
+    if (c.length !== 6 || tokenHash(`${userId}:${c}`) !== t.code_hash) {
+      await client.query('UPDATE smmaker_email_tokens SET attempts = attempts + 1 WHERE id = $1', [t.id]);
+      // Ошибку отдаём после записи попытки: исключение внутри транзакции откатило бы счётчик
+      return {ok: false};
+    }
+    await client.query('UPDATE smmaker_email_tokens SET used_at = now() WHERE id = $1', [t.id]);
+    await confirmEmail(client, userId);
+    return {ok: true};
+  }).then((r) => {
+    if (!r.ok) throw new HttpError(400, 'Неверный код — проверьте письмо');
+    return r;
+  });
+};
+
+/** Ссылка из письма. Сессия не нужна: письмо могли открыть на другом устройстве */
+export const verifyLink = async ({token}) => inTransaction(async (client) => {
+  const {rows: [t]} = await client.query(
+    `UPDATE smmaker_email_tokens SET used_at = now()
+      WHERE link_hash = $1 AND kind = 'verify' AND used_at IS NULL AND expires_at > now() RETURNING user_id`,
+    [tokenHash(String(token ?? ''))]);
+  if (!t) throw new HttpError(410, 'Ссылка устарела или уже использована — войдите и запросите новый код');
+  await confirmEmail(client, t.user_id);
+  return {ok: true};
+});
+
+/**
+ * «Забыли пароль»: письмо со ссылкой, если такая почта есть. Ответ одинаковый в обоих
+ * случаях — по нему нельзя узнать, кто зарегистрирован
+ */
+export const requestReset = async ({email}) => {
+  let mail;
+  try { mail = normEmail(email); } catch { return {ok: true}; }
+  const {rows: [u]} = await db().query('SELECT id, email FROM smmaker_users WHERE lower(email) = $1 OR email_key = $2 LIMIT 1', [mail, emailKey(mail)]);
+  if (!u || await pauseLeft(u.id, 'reset') > 0) return {ok: true};
+  const {link} = await inTransaction((client) => issueToken(client, u.id, 'reset', RESET_MINUTES));
+  await resetMail({to: u.email, link: `${appUrl()}/#/reset?t=${link}`}).catch((e) => console.error('Письмо сброса не ушло:', e.message));
+  return {ok: true};
+};
+
+/**
+ * Новый пароль по ссылке. Все прежние сессии закрываются — если пароль меняют из-за утечки,
+ * тот, кто вошёл чужим паролем, должен вылететь. Ссылка пришла на почту — значит, почта
+ * заодно подтверждена
+ */
+export const resetPassword = async ({token, password}) => {
+  const hash = await hashPassword(checkPassword(password));
+  return inTransaction(async (client) => {
+    const {rows: [t]} = await client.query(
+      `UPDATE smmaker_email_tokens SET used_at = now()
+        WHERE link_hash = $1 AND kind = 'reset' AND used_at IS NULL AND expires_at > now() RETURNING user_id`,
+      [tokenHash(String(token ?? ''))]);
+    if (!t) throw new HttpError(410, 'Ссылка устарела или уже использована — запросите сброс ещё раз');
+    await client.query('UPDATE smmaker_users SET password_hash = $2 WHERE id = $1', [t.user_id, hash]);
+    await client.query('DELETE FROM smmaker_sessions WHERE user_id = $1', [t.user_id]);
+    await confirmEmail(client, t.user_id);
+    return {userId: t.user_id, token: await createSession(t.user_id, client)};
   });
 };
 
@@ -190,10 +348,12 @@ export const upsertAdmin = async ({email, password, workspaceId}) => {
   const hash = await hashPassword(checkPassword(password));
   return inTransaction(async (client) => {
     const {rows: [u]} = await client.query(
-      `INSERT INTO smmaker_users (email, password_hash, platform_role, name) VALUES ($1, $2, 'admin', 'Владелец')
-       ON CONFLICT ((lower(email))) DO UPDATE SET password_hash = EXCLUDED.password_hash, platform_role = 'admin'
+      `INSERT INTO smmaker_users (email, email_key, password_hash, platform_role, name, email_verified_at)
+       VALUES ($1, $2, $3, 'admin', 'Владелец', now())
+       ON CONFLICT ((lower(email))) DO UPDATE SET password_hash = EXCLUDED.password_hash, platform_role = 'admin',
+         email_verified_at = COALESCE(smmaker_users.email_verified_at, now())
        RETURNING id`,
-      [mail, hash]);
+      [mail, emailKey(mail), hash]);
     await client.query(
       `INSERT INTO smmaker_memberships (workspace_id, user_id, role) VALUES ($1, $2, 'owner') ON CONFLICT DO NOTHING`,
       [workspaceId, u.id]);

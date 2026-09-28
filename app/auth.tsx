@@ -13,6 +13,8 @@ type Session = {
   // Админ — прайс, роли, бонусы; сотрудник (админ или менеджер) — лиды и пакеты, не платит
   isAdmin: boolean;
   isStaff: boolean;
+  // Почта не подтверждена — бесплатных кредитов ещё нет, генерация закрыта
+  emailVerified: boolean;
   workspace: {id: string; name: string} | null;
   balance: Balance | null;
   // Перечитать баланс с сервера — после списания, возврата или начисления
@@ -35,34 +37,119 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
   const [error, setError] = useState('');
   const [balance, setBalance] = useState<Balance | null>(null);
 
-  useEffect(() => {
+  // Ссылка из письма: #/verify?t=… или #/reset?t=…. Читаем один раз при загрузке
+  const [link] = useState(readEmailLink);
+  const [notice, setNotice] = useState('');
+
+  // Перечитать, кто вошёл: после подтверждения почты меняются и признак, и баланс
+  const load = useCallback(() => {
     api.me().then((m) => { setMe(m); if (signedIn(m)) setBalance(m.balance); })
       .catch((e) => setError(e.message));
   }, []);
 
-  const refresh = useCallback(() => {
-    api.me().then((m) => { if (signedIn(m)) setBalance(m.balance); }).catch(() => {});
-  }, []);
+  useEffect(() => {
+    if (link?.kind !== 'verify') { load(); return; }
+    // Подтверждаем и убираем ключ из адреса: в истории браузера и при пересылке ссылки
+    // ему делать нечего
+    api.verifyLink(link.token)
+      .then(() => setNotice('Почта подтверждена — бесплатные кредиты на счёте'))
+      .catch((e) => setNotice(e.message))
+      .finally(() => { window.history.replaceState(null, '', '#/account'); load(); });
+  }, [link, load]);
 
   const logout = useCallback(() => {
     api.logout().finally(() => window.location.reload());
   }, []);
 
+  if (link?.kind === 'reset') return <ResetScreen token={link.token} />;
   if (error) return <div className="boot">Сервер не отвечает: {error}</div>;
   if (!me) return <div className="boot">Загрузка…</div>;
-  if (me.authRequired && !me.user) return <LoginScreen signup={me.signup} />;
+  if (me.authRequired && !me.user) return <LoginScreen signup={me.signup} notice={notice} />;
 
   const session: Session = signedIn(me)
     ? {enabled: true, email: me.user.email, name: me.user.name, isAdmin: me.user.isAdmin, isStaff: me.user.isStaff,
-      workspace: me.workspace, balance, refresh, logout}
-    : {enabled: false, email: null, name: null, isAdmin: true, isStaff: true, workspace: null, balance: null, refresh, logout};
-  return <SessionCtx.Provider value={session}>{children}</SessionCtx.Provider>;
+      emailVerified: me.user.emailVerified, workspace: me.workspace, balance, refresh: load, logout}
+    : {enabled: false, email: null, name: null, isAdmin: true, isStaff: true, emailVerified: true, workspace: null, balance: null,
+      refresh: load, logout};
+  return (
+    <SessionCtx.Provider value={session}>
+      {notice && <div className="readonly" onClick={() => setNotice('')}>{notice}</div>}
+      {children}
+    </SessionCtx.Provider>
+  );
+};
+
+type EmailLink = {kind: 'verify' | 'reset'; token: string};
+const readEmailLink = (): EmailLink | null => {
+  const m = /^#\/(verify|reset)\?t=([\w-]+)/.exec(window.location.hash);
+  return m ? {kind: m[1] as EmailLink['kind'], token: m[2]} : null;
+};
+
+// Новый пароль по ссылке из письма. Сессия не нужна: пароль и забывают, когда войти нельзя
+const ResetScreen: React.FC<{token: string}> = ({token}) => {
+  const [password, setPassword] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError('');
+    try {
+      await api.reset(token, password);
+      // Сервер уже впустил с новым паролем — на главную, ключ сброса из адреса убираем
+      window.location.replace(window.location.pathname);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="auth">
+      <form className="auth-card form" onSubmit={submit}>
+        <img src="/brand/logo-horizontal.svg" alt="" className="auth-logo" />
+        <h2>Новый пароль</h2>
+        <Field label="Пароль" hint="не короче 8 символов">
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" minLength={8} required />
+        </Field>
+        {error && <div className="auth-error">{error}</div>}
+        <button className="btn primary big" disabled={busy}>Сохранить и войти</button>
+        <p className="hint"><a href={window.location.pathname}>Вернуться ко входу</a></p>
+      </form>
+    </div>
+  );
+};
+
+/**
+ * Полоса «подтвердите почту»: ввести код из письма или запросить новый. До подтверждения
+ * бесплатных кредитов нет — без полосы человек не понял бы, почему генерация закрыта
+ */
+export const VerifyBanner: React.FC = () => {
+  const {enabled, isStaff, emailVerified, email, refresh} = useSession();
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState('');
+  if (!enabled || isStaff || emailVerified) return null;
+  const run = async (fn: () => Promise<unknown>, ok: string) => {
+    setBusy(true);
+    setNote('');
+    try { await fn(); setNote(ok); } catch (err) { setNote(err instanceof Error ? err.message : String(err)); } finally { setBusy(false); }
+  };
+  return (
+    <form className="readonly verify" onSubmit={(e) => { e.preventDefault(); run(async () => { await api.verify(code); refresh(); }, ''); }}>
+      <span>Подтвердите почту: код отправлен на <b>{email}</b>. После подтверждения придут бесплатные кредиты.</span>
+      <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="6 цифр" inputMode="numeric" autoComplete="one-time-code" maxLength={7} required />
+      <button className="btn primary" disabled={busy}>Подтвердить</button>
+      <button type="button" className="btn ghost" disabled={busy} onClick={() => run(() => api.resendVerify(), 'Отправили новый код')}>Отправить ещё раз</button>
+      {note && <span className="muted">{note}</span>}
+    </form>
+  );
 };
 
 const EMPTY: Registration = {name: '', email: '', phone: '', password: '', company: ''};
 
-const LoginScreen: React.FC<{signup: {credits: number; days: number}}> = ({signup}) => {
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+const LoginScreen: React.FC<{signup: {credits: number; days: number}; notice: string}> = ({signup, notice}) => {
+  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
+  const [sent, setSent] = useState(false);
   const [form, setForm] = useState<Registration>(EMPTY);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -73,6 +160,12 @@ const LoginScreen: React.FC<{signup: {credits: number; days: number}}> = ({signu
     setBusy(true);
     setError('');
     try {
+      if (mode === 'forgot') {
+        await api.forgot(form.email);
+        setSent(true);
+        setBusy(false);
+        return;
+      }
       if (mode === 'login') await api.login(form.email, form.password);
       else await api.register(form);
       // Перезагрузка, а не смена состояния: настройки, бренд и списки должны прийти уже
@@ -92,10 +185,16 @@ const LoginScreen: React.FC<{signup: {credits: number; days: number}}> = ({signu
           <button type="button" className={`btn ${mode === 'login' ? 'primary' : 'ghost'}`} onClick={() => setMode('login')}>Вход</button>
           <button type="button" className={`btn ${mode === 'register' ? 'primary' : 'ghost'}`} onClick={() => setMode('register')}>Регистрация</button>
         </div>
+        {notice && <p className="note">{notice}</p>}
+        {mode === 'forgot' && (
+          <p className="note">{sent
+            ? 'Если такая почта зарегистрирована, на неё ушло письмо со ссылкой. Ссылка действует час.'
+            : 'Пришлём ссылку, по которой можно задать новый пароль.'}</p>
+        )}
         {mode === 'register' && (
           <>
             {signup.credits > 0 && (
-              <p className="note">После регистрации — {signup.credits} кредитов бесплатно на {signup.days} дней: карусель стоит 1 кредит, рекламный ролик — 3.</p>
+              <p className="note">Подтвердите почту — и получите {signup.credits} кредитов бесплатно на {signup.days} дней: карусель стоит 1 кредит, рекламный ролик — 3.</p>
             )}
             <Field label="Имя"><input value={form.name} onChange={set('name')} autoComplete="name" required /></Field>
             <Field label="Телефон" hint="с кодом страны — свяжемся, если понадобится помощь">
@@ -107,12 +206,18 @@ const LoginScreen: React.FC<{signup: {credits: number; days: number}}> = ({signu
           </>
         )}
         <Field label="Почта"><input type="email" value={form.email} onChange={set('email')} autoComplete="email" required /></Field>
-        <Field label="Пароль" hint={mode === 'register' ? 'не короче 8 символов' : undefined}>
-          <input type="password" value={form.password} onChange={set('password')}
-            autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={mode === 'register' ? 8 : undefined} required />
-        </Field>
+        {mode !== 'forgot' && (
+          <Field label="Пароль" hint={mode === 'register' ? 'не короче 8 символов' : undefined}>
+            <input type="password" value={form.password} onChange={set('password')}
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={mode === 'register' ? 8 : undefined} required />
+          </Field>
+        )}
         {error && <div className="auth-error">{error}</div>}
-        <button className="btn primary big" disabled={busy}>{mode === 'login' ? 'Войти' : 'Создать кабинет'}</button>
+        <button className="btn primary big" disabled={busy || (mode === 'forgot' && sent)}>
+          {mode === 'login' ? 'Войти' : mode === 'register' ? 'Создать кабинет' : 'Прислать ссылку'}
+        </button>
+        {mode === 'login' && <p className="hint"><button type="button" className="link" onClick={() => { setMode('forgot'); setSent(false); }}>Забыли пароль?</button></p>}
+        {mode === 'forgot' && <p className="hint"><button type="button" className="link" onClick={() => setMode('login')}>Вернуться ко входу</button></p>}
       </form>
     </div>
   );
@@ -120,8 +225,9 @@ const LoginScreen: React.FC<{signup: {credits: number; days: number}}> = ({signu
 
 /** Баланс кончился — генерация закрыта (сотрудники платформы не платят) */
 export const useOutOfCredits = () => {
-  const {enabled, isStaff, balance} = useSession();
-  return enabled && !isStaff && balance !== null && balance.credits <= 0;
+  const {enabled, isStaff, emailVerified, balance} = useSession();
+  // Не подтвердил почту — про это своя полоса (VerifyBanner), «кончились» было бы неправдой
+  return enabled && !isStaff && emailVerified && balance !== null && balance.credits <= 0;
 };
 
 /**

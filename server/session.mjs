@@ -68,6 +68,10 @@ export const requireStaff = (req, _res, next) => {
  */
 export const requireCredits = async (req, _res, next) => {
   if (!authEnabled() || req.user?.isStaff) return next();
+  // Бесплатные кредиты приходят с подтверждением почты — говорим об этом, а не «кончились»
+  if (!req.user?.emailVerified) {
+    return next(new HttpError(403, 'Подтвердите почту — код в письме. После этого придут бесплатные кредиты'));
+  }
   try {
     const {credits} = await balanceOf(req.ws);
     if (credits <= 0) return next(new HttpError(402, 'Кредиты закончились: смотреть и скачивать можно, создавать новое — после пополнения. Напишите нам — подберём пакет'));
@@ -96,14 +100,17 @@ export const guardData = (req, res, next) => {
 };
 
 /**
- * Ограничение попыток входа: не больше 10 за 15 минут с одного адреса на одну почту.
+ * Ограничение попыток: не больше 10 за 15 минут на действие (вход, код, ссылка, сброс)
+ * с одного адреса на одну почту. Действия считаются раздельно: иначе опечатки в коде
+ * подтверждения съедали бы попытки сброса пароля. У кода к тому же свой предел — пять
+ * неверных вводов на код (server/accounts.mjs).
  * В памяти процесса — перезапуск сбрасывает, для перебора паролей этого достаточно.
  */
 const attempts = new Map();
 const WINDOW_MS = 15 * 60 * 1000;
 const MAX_ATTEMPTS = 10;
 export const loginLimiter = (req, _res, next) => {
-  const key = `${req.ip}|${String(req.body?.email ?? '').toLowerCase()}`;
+  const key = `${req.path}|${req.ip}|${String(req.body?.email ?? '').toLowerCase()}`;
   const now = Date.now();
   const a = attempts.get(key);
   if (a && a.until > now && a.count >= MAX_ATTEMPTS) {

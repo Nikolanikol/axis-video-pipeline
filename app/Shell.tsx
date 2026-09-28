@@ -1,7 +1,7 @@
 // Оболочка: шапка с пайплайнами, вкладки инструментов, экран выбранного инструмента
 import React, {Suspense, useCallback, useState} from 'react';
 import {ConfigProvider, useConfig} from './config';
-import {AuthGate, day, useOutOfCredits, useSession} from './auth';
+import {AuthGate, VerifyBanner, day, useOutOfCredits, useSession} from './auth';
 import {AccountPage, AdminPage} from './Account';
 import {Home, PipelinePage} from './Home';
 import {Pipeline, ToolMeta, findPipeline, toolKey, visiblePipelines} from './pipelines';
@@ -72,6 +72,7 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
       )}
 
       {error && <div className="error" onClick={clearError}>{error} <span className="muted">— нажми, чтобы скрыть</span></div>}
+      <VerifyBanner />
       {outOfCredits && (
         <div className="readonly">
           Кредиты закончились: готовое можно смотреть и скачивать, новое — после пополнения.{' '}

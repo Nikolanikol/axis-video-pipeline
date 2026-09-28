@@ -51,7 +51,7 @@ export type CreditLot = {
 };
 export type Balance = {credits: number; nextExpiry: {at: string; credits: number} | null; lots: CreditLot[]};
 export type Role = 'admin' | 'manager' | null;
-export type User = {id: string; email: string; name: string | null; role: Role; isAdmin: boolean; isStaff: boolean};
+export type User = {id: string; email: string; name: string | null; emailVerified: boolean; role: Role; isAdmin: boolean; isStaff: boolean};
 export type Me =
   | {authRequired: false}
   | {authRequired: true; user: null; signup: {credits: number; days: number}}
@@ -89,6 +89,11 @@ export const api = {
   login: (email: string, password: string) => request<{ok: true}>('POST', '/api/auth/login', {email, password}),
   register: (data: Registration) => request<{ok: true}>('POST', '/api/auth/register', data),
   logout: () => request<{ok: true}>('POST', '/api/auth/logout'),
+  verify: (code: string) => request<{ok: true}>('POST', '/api/auth/verify', {code}),
+  resendVerify: () => request<{sent: boolean}>('POST', '/api/auth/verify/resend'),
+  verifyLink: (token: string) => request<{ok: true}>('POST', '/api/auth/verify/link', {token}),
+  forgot: (email: string) => request<{ok: true}>('POST', '/api/auth/forgot', {email}),
+  reset: (token: string, password: string) => request<{ok: true}>('POST', '/api/auth/reset', {token, password}),
   ledger: () => request<LedgerRow[]>('GET', '/api/account/ledger'),
   offer: () => request<Offer>('GET', '/api/account/offer'),
   admin: {

@@ -151,6 +151,7 @@ docker build -t axis-video .
 | ElevenLabs | распознавание речи, озвучка | `ELEVENLABS_API_KEY` |
 | шлюз kmotors | данные Encar для каруселей | `KMOTORS_API_URL`, `KMOTORS_API_SECRET` |
 | Demucs | звуки машины без голоса (проба) | окружение `.venv-demucs`, необязательно |
+| Resend | письма: код подтверждения почты, сброс пароля | `RESEND_API_KEY`, `RESEND_FROM`, `SMMAKER_APP_URL` |
 | Postgres (общий Supabase) | база SMMAKER: кабинеты, пакеты, кредиты | `DATABASE_URL`, `SMMAKER_DB_SCHEMA` |
 
 Шлюз живёт в соседнем проекте `~/Desktop/recup/KMotors-1`: `src/app/api/vehicle/[id]/route.ts`.
