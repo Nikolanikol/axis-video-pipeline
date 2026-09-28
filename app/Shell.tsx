@@ -1,5 +1,6 @@
 // Оболочка: шапка с пайплайнами, вкладки инструментов, экран выбранного инструмента
 import React, {Suspense, useCallback, useState} from 'react';
+import {Loading} from './Loading';
 import {ConfigProvider, useConfig} from './config';
 import {AuthGate, VerifyBanner, day, useOutOfCredits, useSession} from './auth';
 import {AccountPage, AdminPage} from './Account';
@@ -38,7 +39,7 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
     <>
       <header className="top">
         <a href={href()} className="top-home" title="Все пайплайны">
-          <img src="/brand/logo-horizontal.svg" alt="AXIS" className="top-logo" />
+          <img src="/kok/wordmark.svg" alt="KOK" className="top-logo" />
         </a>
         <nav className="crumbs">
           <a href={href()}>Пайплайны</a>
@@ -118,7 +119,7 @@ const ToolScreen: React.FC<{pipeline: Pipeline; tool: ToolMeta}> = ({pipeline, t
   const Tool = TOOLS[key];
   return (
     <ToolBoundary key={key} title={tool.title}>
-      <Suspense fallback={<div className="boot">Загрузка…</div>}>
+      <Suspense fallback={<Loading />}>
         <Tool />
       </Suspense>
     </ToolBoundary>

@@ -1,0 +1,13 @@
+<svg viewBox="0 0 1000 320" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="KOK">
+
+<g fill="none" stroke="#F7F2EB" stroke-width="82" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M92 44 L92 276"/>
+  <path d="M99 160 L250 45"/>
+  <path d="M99 160 L250 275"/>
+  <path d="M908 44 L908 276"/>
+  <path d="M901 160 L750 45"/>
+  <path d="M901 160 L750 275"/>
+</g>
+<circle cx="500" cy="160" r="122" fill="none" stroke="#F7F2EB" stroke-width="70"/>
+<circle cx="500" cy="160" r="56" fill="#8E0D2C"/>
+</svg>

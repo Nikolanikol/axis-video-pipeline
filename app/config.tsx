@@ -1,6 +1,7 @@
 // Общие настройки для всех инструментов: сохранённые (config) и черновики профиля и бренда.
 // Черновики сразу видны в превью; на диск — по кнопке «Сохранить».
 import React, {createContext, useCallback, useContext, useEffect, useMemo, useState} from 'react';
+import {Loading} from './Loading';
 import type {Theme} from '../src/shared/types';
 import {api, Config, ProfileEntry} from './api';
 
@@ -53,6 +54,6 @@ export const ConfigProvider: React.FC<{report: (e: unknown) => void; children: R
       setBrand: setBrandDraft, brandSaved, unsaved, report};
   }, [config, brand, profile, profileSaved, report]);
 
-  if (!value) return <div className="boot">Загрузка…</div>;
+  if (!value) return <Loading />;
   return <ConfigCtx.Provider value={value}>{children}</ConfigCtx.Provider>;
 };

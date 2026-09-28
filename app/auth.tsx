@@ -3,6 +3,7 @@
 // Интерфейс начинает с /api/auth/me. Вход выключен (нет базы — Mac без DATABASE_URL,
 // тесты) — сразу пускаем внутрь, как было. Включён и никто не вошёл — экран входа.
 import React, {createContext, useCallback, useContext, useEffect, useState} from 'react';
+import {Loading} from './Loading';
 import {Balance, Me, Registration, User, api} from './api';
 import {Field} from './LotForm';
 
@@ -63,7 +64,7 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
 
   if (link?.kind === 'reset') return <ResetScreen token={link.token} />;
   if (error) return <div className="boot">Сервер не отвечает: {error}</div>;
-  if (!me) return <div className="boot">Загрузка…</div>;
+  if (!me) return <Loading />;
   if (me.authRequired && !me.user) return <LoginScreen signup={me.signup} notice={notice} />;
 
   const session: Session = signedIn(me)
@@ -105,8 +106,8 @@ const ResetScreen: React.FC<{token: string}> = ({token}) => {
   };
   return (
     <div className="auth">
+      <img src="/kok/full.svg" alt="KOK — контент одной кнопкой" className="auth-logo" />
       <form className="auth-card form" onSubmit={submit}>
-        <img src="/brand/logo-horizontal.svg" alt="" className="auth-logo" />
         <h2>Новый пароль</h2>
         <Field label="Пароль" hint="не короче 8 символов">
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" minLength={8} required />
@@ -179,8 +180,8 @@ const LoginScreen: React.FC<{signup: {credits: number; days: number}; notice: st
 
   return (
     <div className="auth">
+      <img src="/kok/full.svg" alt="KOK — контент одной кнопкой" className="auth-logo" />
       <form className="auth-card form" onSubmit={submit}>
-        <img src="/brand/logo-horizontal.svg" alt="" className="auth-logo" />
         <div className="btn-row auth-switch">
           <button type="button" className={`btn ${mode === 'login' ? 'primary' : 'ghost'}`} onClick={() => setMode('login')}>Вход</button>
           <button type="button" className={`btn ${mode === 'register' ? 'primary' : 'ghost'}`} onClick={() => setMode('register')}>Регистрация</button>

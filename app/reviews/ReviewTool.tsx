@@ -1,5 +1,6 @@
 // Пайплайн «Обзоры авто» → «Монтаж обзора»: видео → фрагменты → превью → рендер
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {Loading} from '../Loading';
 import {Player, PlayerRef} from '@remotion/player';
 import {withoutMusic} from '../../src/shared/nomusic.js';
 import {ReviewShort} from '../../src/reviews/ReviewShort';
@@ -196,7 +197,7 @@ export const ReviewTool: React.FC = () => {
     speechStale(review?.speech, source) && 'речь распознана по другому видео — субтитры и озвучка лягут мимо кадра',
   ].filter(Boolean) as string[];
 
-  if (!loaded) return <div className="boot">Загрузка обзоров…</div>;
+  if (!loaded) return <Loading text="Загрузка обзоров…" />;
 
   return (
     <>

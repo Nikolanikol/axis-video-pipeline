@@ -1,5 +1,6 @@
 // Пайплайн «Реклама авто» → инструмент «Ролик по лоту»: лот, превью в выбранном формате, рендер
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {Loading} from '../Loading';
 import {FORMATS, getFormat} from '../../src/shared/model';
 import {marketFromProfile} from '../../src/shared/profile';
 import type {Market} from '../../src/shared/types';
@@ -90,7 +91,7 @@ export const LotTool: React.FC = () => {
   const savedProfile = config.profiles.find((p) => p.id === profile.id);
   const unsavedSettings = profile !== savedProfile || brand !== config.brand;
 
-  if (!loaded) return <div className="boot">Загрузка лотов…</div>;
+  if (!loaded) return <Loading text="Загрузка лотов…" />;
 
   return (
     <>
