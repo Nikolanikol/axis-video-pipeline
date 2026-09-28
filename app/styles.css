@@ -17,11 +17,24 @@
   --accent-hover: #a3143a;
   /* рамки, фокус, выделение — не меньше 3:1 на любой панели (требование к элементам управления) */
   --accent-line: #c8304f;
-  /* текст, ссылки, цифры — 6,4–7,4:1; Николай просил контрастнее обычных 4,5 */
-  --accent-text: #f07a92;
-  /* Ошибка и успех — пока прежние; подберём отдельно, чтобы ошибка не путалась с винным */
-  --danger: #e5484d;
-  --ok: #46a758;
+  /* текст, ссылки, цифры — 6,7–7,7:1; Николай просил контрастнее обычных 4,5. Пыльная роза,
+     а не конфетный #f07a92: рядом с приглушёнными состояниями яркий розовый выглядел детским */
+  --accent-text: #e08a9a;
+  /* Состояния — тёплые и приглушённые, в тон тёплому белому (выбор владельца 29.09, образец
+     «A · приглушённый»). Ошибка — терракота, а не красный: красный спорил бы с винным бренда.
+     Правило: цвет состояния — в метке (полоса слева, точка, рамка поля, короткое слово),
+     а сам текст остаётся --text/--muted. Сплошь закрашенный текст и плашки читались
+     как детская раскраска. Контраст меток и *-text — 5,9–9:1 на всех фонах */
+  --danger: #d9825c;
+  --danger-text: #e3a283;
+  --danger-bg: #d9825c12;
+  --danger-line: #d9825c4d;
+  --warn: #c9a566;
+  --warn-bg: #c9a5660f;
+  --warn-line: #c9a56647;
+  --ok: #8fb996;
+  --ok-bg: #8fb9960f;
+  --ok-line: #8fb99647;
   --font: Manrope, system-ui, sans-serif;
 }
 
@@ -64,11 +77,11 @@ code { font-size: 12px; color: var(--accent-text); }
 
 .save { font-size: 12px; color: var(--muted); }
 .save-dirty, .save-saving { color: var(--accent-text); }
-.save-error { color: var(--danger); }
+.save-error { color: var(--danger-text); }
 
 .error {
   margin: 10px 20px 0; padding: 10px 14px; border-radius: 6px; cursor: pointer;
-  background: #3b1216; border: 1px solid #6b1f25; color: #ffb4b8;
+  background: var(--danger-bg); border: 1px solid var(--danger-line); border-left: 3px solid var(--danger); color: var(--text);
 }
 
 .grid {
@@ -107,11 +120,11 @@ input:disabled { opacity: .5; }
 
 .spec { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
 .spec .count { width: 24px; text-align: right; font-size: 11px; color: var(--muted); }
-.spec .count.over { color: var(--danger); font-weight: 600; }
+.spec .count.over { color: var(--danger-text); font-weight: 600; }
 
 .total { margin: 2px 0 4px; padding: 10px 12px; border-radius: 6px; background: var(--panel-2); border-left: 3px solid var(--accent-line); }
 .total b { color: var(--accent-text); font-size: 16px; }
-.total.warn { border-left-color: var(--danger); color: #ffb4b8; }
+.total.warn { border-left-color: var(--danger); background: var(--danger-bg); }
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 6px;
@@ -125,7 +138,7 @@ input:disabled { opacity: .5; }
 .btn.ghost { background: none; }
 .btn.big { width: 100%; padding: 14px; font: 700 16px var(--font); letter-spacing: .08em; text-transform: uppercase; }
 .icon { background: none; border: none; color: var(--muted); font-size: 18px; line-height: 1; cursor: pointer; padding: 2px 6px; }
-.icon:hover { color: var(--danger); }
+.icon:hover { color: var(--danger-text); }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; position: sticky; bottom: -16px; padding: 12px 0; background: var(--panel); }
 
 .photos { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 8px; margin: 0 -8px; border: 1px dashed transparent; border-radius: 8px; }
@@ -158,7 +171,8 @@ input:disabled { opacity: .5; }
 .job-head { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; margin-bottom: 6px; }
 .job-head span { color: var(--muted); }
 .job-done .job-head span { color: var(--ok); }
-.job-error .job-head span, .job-message { color: #ffb4b8; }
+.job-error .job-head span { color: var(--danger-text); }
+.job-message { color: var(--muted); }
 .job-message { font-size: 12px; word-break: break-word; }
 .bar { height: 6px; border-radius: 3px; background: var(--bg); overflow: hidden; }
 .bar div { height: 100%; background: var(--accent); transition: width .5s; }
@@ -193,7 +207,7 @@ input:disabled { opacity: .5; }
 }
 .blur-box.drawing { border-style: dashed; }
 .blur-box .icon { position: absolute; top: -12px; right: -12px; width: 24px; height: 24px; padding: 0; border-radius: 50%; background: var(--accent); color: var(--text); font-size: 16px; }
-.blur-box .icon:hover { background: var(--danger); color: #fff; }
+.blur-box .icon:hover { background: var(--danger); color: var(--bg); }
 
 .music .row { align-items: flex-start; }
 .music input[type="range"] { padding: 0; height: 34px; accent-color: var(--accent-line); }
@@ -276,8 +290,8 @@ a.tab { text-decoration: none; }
 .strip-seg.kind-hook { border-color: var(--accent-text); background: #f07a9244; }
 .strip-seg.kind-final { border-color: #f5f5f5; background: #f5f5f533; }
 .strip-seg.selected { border-width: 3px; box-shadow: 0 0 0 2px #fff inset; }
-.strip-mark { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px dashed #46a758; }
-.strip-mark.out { border-color: #e5484d; }
+.strip-mark { position: absolute; top: 0; bottom: 0; width: 0; border-left: 2px dashed var(--ok); }
+.strip-mark.out { border-color: var(--danger); }
 .strip-head { position: absolute; top: 0; bottom: 0; width: 2px; background: #fff; box-shadow: 0 0 4px #000; pointer-events: none; }
 
 .segments { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
@@ -292,7 +306,7 @@ a.tab { text-decoration: none; }
 .seg-times input { width: 72px; padding: 4px 6px; }
 .seg-times select { width: auto; padding: 4px 6px; }
 .seg-out { color: var(--text); }
-.seg-out.warn { color: #ffb4b8; }
+.seg-out.warn { color: var(--danger-text); }
 .seg-caption { display: flex; align-items: center; gap: 8px; padding-left: 26px; }
 .seg-caption .check { white-space: nowrap; }
 
@@ -302,7 +316,7 @@ a.tab { text-decoration: none; }
 .line input { padding: 6px 8px; }
 .line-translation { color: var(--accent-text); }
 /* Предупреждение прямо под элементом, к которому относится */
-.warn-inline { color: #ffcf8f; font-size: 12px; }
+.warn-inline { color: var(--warn); font-size: 12px; }
 /* Ползунки цвета: подпись со значением над дорожкой */
 .colour-row { display: grid; gap: 4px; margin-bottom: 10px; }
 .colour-row label { font-size: 12px; color: var(--muted); }
@@ -409,7 +423,7 @@ a.tab { text-decoration: none; }
 .auth-logo { width: 100%; max-width: 420px; display: block; }
 .auth-switch { display: flex; gap: 6px; margin-bottom: 16px; }
 .auth-switch .btn { flex: 1; }
-.auth-error { color: #ffb4b8; font-size: 13px; margin: 4px 0 12px; }
+.auth-error { color: var(--danger-text); font-size: 13px; margin: 4px 0 12px; }
 .auth-ok { color: var(--ok); font-size: 13px; margin: 4px 0 12px; }
 .account-chip { display: flex; align-items: center; gap: 8px; margin-left: auto; font-size: 13px; white-space: nowrap; }
 .account-chip a { color: inherit; text-decoration: none; }
@@ -437,7 +451,8 @@ a.tab { text-decoration: none; }
   .form .row { flex-direction: column; gap: 0; }
 }
 .table td.plus { color: var(--ok); font-weight: 600; }
-.table td.minus { color: var(--accent-text); font-weight: 600; }
+/* Списание — не ошибка: нейтрально, цветом отмечаем только начисление */
+.table td.minus { color: var(--muted); font-weight: 600; }
 .logo-text { font-weight: 700; font-size: 18px; text-transform: uppercase; text-align: center; line-height: 1.1; word-break: break-word; }
 /* Палитры: карточка нарисована самой палитрой — фон, текст, акцентная плашка, чип */
 .pair.palette { gap: 8px; }
@@ -448,6 +463,6 @@ a.tab { text-decoration: none; }
 .fine { margin: 6px 0 4px; }
 .fine summary { cursor: pointer; font-size: 13px; color: var(--muted); padding: 6px 0; }
 .fine summary:hover { color: var(--text); }
-.fine-warn { color: #ffb4b8; }
+.fine-warn { color: var(--danger-text); }
 .formats .pair { align-items: flex-start; }
 .format-shape { display: block; height: 44px; border: 2px solid var(--accent-line); border-radius: 4px; margin-bottom: 4px; }
