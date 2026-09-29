@@ -101,7 +101,7 @@ export const LotForm: React.FC<Props> = ({lot, market, format, onChange, onPhoto
       </div>
 
       <h2>Фото <span className="muted">перетаскивай, чтобы поменять порядок</span></h2>
-      <Photos lot={lot} roles={format.photoRoles} onChange={onChange} onPhotos={onPhotos} onError={onError} />
+      <Photos lot={lot} roles={format.photoRoles} rest={format.photoRest ?? 'запас'} onChange={onChange} onPhotos={onPhotos} onError={onError} />
 
       <Field label="Заметка" hint="в ролик не попадает" wide>
         <textarea rows={2} value={lot.note ?? ''} placeholder="источник, пометки: аукцион, номер лота, «демо»…"
@@ -129,7 +129,7 @@ export const LotForm: React.FC<Props> = ({lot, market, format, onChange, onPhoto
   );
 };
 
-const Photos: React.FC<Pick<Props, 'lot' | 'onChange' | 'onPhotos' | 'onError'> & {roles: string[]}> = ({lot, roles, onChange, onPhotos, onError}) => {
+const Photos: React.FC<Pick<Props, 'lot' | 'onChange' | 'onPhotos' | 'onError'> & {roles: string[]; rest: string}> = ({lot, roles, rest, onChange, onPhotos, onError}) => {
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState<number | null>(null);
   const [over, setOver] = useState(false);
@@ -174,7 +174,7 @@ const Photos: React.FC<Pick<Props, 'lot' | 'onChange' | 'onPhotos' | 'onError'> 
           {/* Тянется только фото: кнопки вне перетаскиваемого блока, иначе браузер съедает их клики */}
           <div className="drag" draggable onDragStart={() => setDrag(i)} onDragEnd={() => setDrag(null)}>
             <img src={p.startsWith('http') || p.startsWith('/') ? p : `/${p}`} alt="" />
-            <span className="role">{i + 1}. {roles[i] ?? 'запас'}</span>
+            <span className="role">{i + 1}. {roles[i] ?? rest}</span>
           </div>
           <button className="icon del" title="Удалить фото" onClick={() => remove(p)}>×</button>
           {p.startsWith(own) && (

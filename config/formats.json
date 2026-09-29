@@ -9,22 +9,189 @@
     "durationInFrames": 450,
     "bpm": 120,
     "scenes": [
-      {"id": "hook", "title": "Хук", "from": 0, "frames": 90, "preview": 75},
-      {"id": "specs", "title": "Характеристики", "from": 90, "frames": 120, "preview": 190},
-      {"id": "price", "title": "Цена", "from": 210, "frames": 135, "preview": 335},
-      {"id": "cta", "title": "CTA", "from": 345, "frames": 105, "preview": 440}
+      {
+        "id": "hook",
+        "title": "Хук",
+        "from": 0,
+        "frames": 90,
+        "preview": 75
+      },
+      {
+        "id": "specs",
+        "title": "Характеристики",
+        "from": 90,
+        "frames": 120,
+        "preview": 190
+      },
+      {
+        "id": "price",
+        "title": "Цена",
+        "from": 210,
+        "frames": 135,
+        "preview": 335
+      },
+      {
+        "id": "cta",
+        "title": "CTA",
+        "from": 345,
+        "frames": 105,
+        "preview": 440
+      }
     ],
-    "requires": ["photos", "specs", "price"],
-    "photoRoles": ["Хук", "Характеристики 1", "Характеристики 2"],
+    "requires": [
+      "photos",
+      "specs",
+      "price"
+    ],
+    "photoRoles": [
+      "Хук",
+      "Характеристики 1",
+      "Характеристики 2"
+    ],
     "texts": [
-      {"key": "hookTagline", "label": "Подзаголовок хука", "hint": "сцена 1, под годом"},
-      {"key": "priceLabel", "label": "Подпись над ценой", "hint": "{port} заменится на порт"},
-      {"key": "priceNoteIncluded", "label": "Под ценой: что включено", "hint": "сцена 3"},
-      {"key": "priceNoteExcluded", "label": "Под ценой: что не включено", "hint": "сцена 3, серым"},
-      {"key": "ctaTitle", "label": "Заголовок CTA", "hint": "Enter — перенос строки", "multiline": true},
-      {"key": "ctaAccent", "label": "Акцент CTA (медью)", "hint": "последняя строка заголовка"},
-      {"key": "ctaBenefit", "label": "Преимущество (с рукопожатием)", "hint": "сцена 4"},
-      {"key": "whatsappLabel", "label": "Подпись над номером", "hint": "сцена 4"}
+      {
+        "key": "hookTagline",
+        "label": "Подзаголовок хука",
+        "hint": "сцена 1, под годом"
+      },
+      {
+        "key": "priceLabel",
+        "label": "Подпись над ценой",
+        "hint": "{port} заменится на порт"
+      },
+      {
+        "key": "priceNoteIncluded",
+        "label": "Под ценой: что включено",
+        "hint": "сцена 3"
+      },
+      {
+        "key": "priceNoteExcluded",
+        "label": "Под ценой: что не включено",
+        "hint": "сцена 3, серым"
+      },
+      {
+        "key": "ctaTitle",
+        "label": "Заголовок CTA",
+        "hint": "Enter — перенос строки",
+        "multiline": true
+      },
+      {
+        "key": "ctaAccent",
+        "label": "Акцент CTA (медью)",
+        "hint": "последняя строка заголовка"
+      },
+      {
+        "key": "ctaBenefit",
+        "label": "Преимущество (с рукопожатием)",
+        "hint": "сцена 4"
+      },
+      {
+        "key": "whatsappLabel",
+        "label": "Подпись над номером",
+        "hint": "сцена 4"
+      }
+    ]
+  },
+  {
+    "id": "gallery-ad",
+    "title": "Галерея",
+    "description": "Хук → склейки под бит → стопка из трёх фото → цена → призыв. До 12 фото, 16,5 секунды — под объявления Encar.",
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "durationInFrames": 495,
+    "bpm": 120,
+    "scenes": [
+      {
+        "id": "hook",
+        "title": "Хук",
+        "from": 0,
+        "frames": 90,
+        "preview": 75
+      },
+      {
+        "id": "gallery",
+        "title": "Галерея",
+        "from": 90,
+        "frames": 120,
+        "preview": 150
+      },
+      {
+        "id": "stack",
+        "title": "Стопка",
+        "from": 210,
+        "frames": 90,
+        "preview": 285
+      },
+      {
+        "id": "price",
+        "title": "Цена",
+        "from": 300,
+        "frames": 105,
+        "preview": 395
+      },
+      {
+        "id": "cta",
+        "title": "CTA",
+        "from": 405,
+        "frames": 90,
+        "preview": 485
+      }
+    ],
+    "requires": [
+      "photos",
+      "specs",
+      "price"
+    ],
+    "photoRoles": [
+      "Хук",
+      "Стопка 1",
+      "Стопка 2",
+      "Стопка 3"
+    ],
+    "photoRest": "Галерея",
+    "texts": [
+      {
+        "key": "hookTagline",
+        "label": "Подзаголовок хука",
+        "hint": "сцена 1, под годом"
+      },
+      {
+        "key": "priceLabel",
+        "label": "Подпись над ценой",
+        "hint": "{port} заменится на порт"
+      },
+      {
+        "key": "priceNoteIncluded",
+        "label": "Под ценой: что включено",
+        "hint": "сцена 3"
+      },
+      {
+        "key": "priceNoteExcluded",
+        "label": "Под ценой: что не включено",
+        "hint": "сцена 3, серым"
+      },
+      {
+        "key": "ctaTitle",
+        "label": "Заголовок CTA",
+        "hint": "Enter — перенос строки",
+        "multiline": true
+      },
+      {
+        "key": "ctaAccent",
+        "label": "Акцент CTA (медью)",
+        "hint": "последняя строка заголовка"
+      },
+      {
+        "key": "ctaBenefit",
+        "label": "Преимущество (с рукопожатием)",
+        "hint": "сцена 4"
+      },
+      {
+        "key": "whatsappLabel",
+        "label": "Подпись над номером",
+        "hint": "сцена 4"
+      }
     ]
   }
 ]

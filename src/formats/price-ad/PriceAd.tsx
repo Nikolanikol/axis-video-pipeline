@@ -11,7 +11,7 @@ import {BODY, CopperText, HEAD, Logo, Metal, PAD, Photo, Shade, ThemeProvider, T
 const FORMAT = getFormat('price-ad');
 
 // Сцена 1: хук
-const Hook: React.FC<{ad: Ad}> = ({ad}) => (
+export const Hook: React.FC<{ad: Ad}> = ({ad}) => (
   <AbsoluteFill>
     <Photo src={ad.photos[0]} dur={useVideoConfig().durationInFrames} />
     <Shade />
@@ -26,10 +26,9 @@ const Specs: React.FC<{ad: Ad}> = ({ad}) => {
   const f = useCurrentFrame(); const {fps, durationInFrames} = useVideoConfig();
   const half = Math.round(durationInFrames / 2);
   const [p0, p1, p2] = ad.photos;
-  // Два фото сцены — камера навстречу: второй проход в ту же сторону читался бы как рывок
   return (
     <AbsoluteFill>
-      <Sequence durationInFrames={half}><Photo src={p1 ?? p0} dur={half} pan={-1} /></Sequence>
+      <Sequence durationInFrames={half}><Photo src={p1 ?? p0} dur={half} /></Sequence>
       <Sequence from={half}><Photo src={p2 ?? p1 ?? p0} dur={durationInFrames - half} /></Sequence>
       <Shade />
       <AbsoluteFill style={{justifyContent: 'flex-end', alignItems: 'flex-start', padding: PAD, gap: 20}}>
@@ -100,7 +99,7 @@ const Route: React.FC<{ad: Ad}> = ({ad}) => {
 };
 
 // Сцена 4: призыв
-const Cta: React.FC<{ad: Ad}> = ({ad}) => {
+export const Cta: React.FC<{ad: Ad}> = ({ad}) => {
   const C = useTheme();
   const f = useCurrentFrame(); const {fps} = useVideoConfig();
   const logo = spring({frame: f - 2, fps, config: {damping: 200}});
@@ -149,7 +148,7 @@ const PriceOnly: React.FC<{ad: Ad}> = ({ad}) => {
 };
 
 // Ценовая сцена выбирается по модели профиля: экспорт — маршрут «до порта», внутренний — просто цена.
-const PriceScene: React.FC<{ad: Ad}> = (props) =>
+export const PriceScene: React.FC<{ad: Ad}> = (props) =>
   props.ad.pricingMode === 'domestic' ? <PriceOnly {...props} /> : <Route {...props} />;
 
 const SCENES: Record<string, React.FC<{ad: Ad}>> = {hook: Hook, specs: Specs, price: PriceScene, cta: Cta};

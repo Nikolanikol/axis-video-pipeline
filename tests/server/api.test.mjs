@@ -111,18 +111,22 @@ describe('фото', () => {
     ({body: lot} = await call('POST', '/api/lots', {}));
   });
 
-  it('загрузка: рабочая копия 1080 по ширине + оригинал', async () => {
+  it('загрузка: рабочая копия 1080 по ширине (горизонтальное — до 2200) + оригинал', async () => {
     const {status, body} = await upload(lot.id, [
       ['portrait.jpg', await image(1536, 2048, 'jpeg'), 'image/jpeg'],
       ['landscape.png', await image(1600, 1200), 'image/png'],
     ]);
     expect(status).toBe(200);
     expect(body.photos).toHaveLength(2);
+    // Вертикальное — ровно ширина кадра; горизонтальное в ролике крупнее кадра (полоса
+    // 1150 px в высоту), поэтому не ужимается до 1080, а 1600 и не растягивается
+    const widths = [];
     for (const url of body.photos) {
       const meta = await sharp(fileOf(lot.id, url)).metadata();
-      expect(meta.width).toBe(1080);
+      widths.push(meta.width);
       expect(meta.format).toBe('jpeg');
     }
+    expect(widths).toEqual([1080, 1600]);
     const [p] = body.photos;
     const stem = p.split('/').pop().replace('.jpg', '');
     expect(await exists(path.join(env.ws, 'lots', lot.id, 'photos', 'src', `${stem}.jpg`))).toBe(true);

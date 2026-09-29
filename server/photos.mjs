@@ -5,7 +5,11 @@ import path from 'node:path';
 import sharp from 'sharp';
 import {HttpError, lotPhotosDir, photoUrl} from './store.mjs';
 
-const WIDTH = 1080;          // ширина рабочей копии
+const WIDTH = 1080;          // ширина рабочей копии вертикального фото — ровно ширина кадра
+// Горизонтальное фото в ролике — полоса 1150 px в высоту (LANDSCAPE_BAND в src/shared/ui.tsx),
+// то есть ~2000 px в ширину. Копия в 1080 растягивалась почти вдвое и мылилась (раскадровка
+// 30.09 на фото Encar 2200×1238). 2200 — ширина снимков Encar: больше взять неоткуда
+const LANDSCAPE_WIDTH = 2200;
 const SOURCE_MAX = 2560;     // оригинал ужимаем до разумного размера
 const srcDir = (lotId) => path.join(lotPhotosDir(lotId), 'src');
 const srcFile = (lotId, stem) => path.join(srcDir(lotId), `${stem}.jpg`);
@@ -47,9 +51,12 @@ const blurPatch = async (image, W, H, [x, y, w, h]) => {
   return {input, left, top};
 };
 
-// Рабочая копия: оригинал → 1080 по ширине → размытые области
+// Рабочая копия: оригинал → 1080 по ширине (горизонтальное — до 2200) → размытые области.
+// Области размытия — в долях кадра, поэтому ширина копии на них не влияет
 export const buildPhoto = async (source, regions, out) => {
-  const {data, info} = await sharp(source).resize({width: WIDTH, withoutEnlargement: true}).toBuffer({resolveWithObject: true});
+  const meta = await sharp(source).metadata();
+  const width = (meta.width ?? 0) > (meta.height ?? 0) ? LANDSCAPE_WIDTH : WIDTH;
+  const {data, info} = await sharp(source).resize({width, withoutEnlargement: true}).toBuffer({resolveWithObject: true});
   const patches = [];
   for (const region of regions) {
     const patch = await blurPatch(data, info.width, info.height, region);

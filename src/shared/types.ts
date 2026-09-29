@@ -84,6 +84,8 @@ export type FormatMeta = {
   scenes: Scene[];
   requires: Requirement[];
   photoRoles: string[];
+  // Подпись фото сверх photoRoles: «Галерея» у формата, который берёт их все; нет — «запас»
+  photoRest?: string;
   texts: TextField[];
 };
 
