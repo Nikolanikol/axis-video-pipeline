@@ -19,6 +19,13 @@ const FORMAT = getFormat('gallery-ad');
 // Доля темпа в кадрах: 120 ударов в минуту при 30 кадрах — полсекунды. Склейки галереи
 // и появление фото стопки — на доли, чтобы с музыкой всё шло в такт
 const BEAT = Math.round((60 / FORMAT.bpm) * FORMAT.fps);
+// Растворение вместо жёсткой склейки. Жёсткие склейки каждые полсекунды «били по глазам»
+// (владелец, 30.09): яркая фара сразу после тёмного салона, восемь раз подряд. Новое фото
+// проступает поверх прежнего; склейка по-прежнему начинается на долю темпа.
+// 8 кадров из 15 — больше половины доли: мягко, но кадр ещё успевает постоять чистым
+const XFADE = 8;
+// Между сценами — чуть длиннее: там меняется вся раскладка кадра (полоса → стопка → цена)
+const SCENE_XFADE = 12;
 
 /**
  * Фото для галереи: сначала пятое и дальше (их никто больше не показывает), потом 2–4-е из
@@ -37,10 +44,13 @@ export const galleryPhotos = (photos: string[], cuts: number): string[] => {
 const Cut: React.FC<{src: string}> = ({src}) => {
   const C = useTheme();
   const f = useCurrentFrame();
-  const zoom = interpolate(f, [0, BEAT], [1.03, 1], {...clamp, easing: Easing.out(Easing.quad)});
+  // Отдаление за всю жизнь кадра (доля + растворение следующего), а не за долю: иначе
+  // под растворением картинка замирала бы и движение шло рывками
+  const zoom = interpolate(f, [0, BEAT + XFADE], [1.03, 1], {...clamp, easing: Easing.out(Easing.quad)});
+  const opacity = interpolate(f, [0, XFADE], [0, 1], {...clamp, easing: Easing.inOut(Easing.quad)});
   const url = photoSrc(src);
   return (
-    <AbsoluteFill style={{background: C.bg}}>
+    <AbsoluteFill style={{background: C.bg, opacity}}>
       <Img src={url} style={{position: 'absolute', inset: -80, width: 'calc(100% + 160px)', height: 'calc(100% + 160px)',
         objectFit: 'cover', filter: 'blur(50px) brightness(0.35)'}} />
       <Landscape src={url} w={1080} h={LANDSCAPE_BAND} zoom={zoom} />
@@ -55,7 +65,9 @@ const Gallery: React.FC<{ad: Ad}> = ({ad}) => {
   return (
     <AbsoluteFill>
       {shots.map((src, i) => (
-        <Sequence key={i} from={i * BEAT} durationInFrames={BEAT}><Cut src={src} /></Sequence>
+        // Кадр живёт долю плюс растворение следующего поверх него. Первый не растворяется:
+        // появление галереи целиком растворяет переход между сценами
+        <Sequence key={i} from={i === 0 ? -XFADE : i * BEAT} durationInFrames={BEAT + XFADE * 2}><Cut src={src} /></Sequence>
       ))}
       <Shade />
       <TopLogo scrim={false} />
@@ -76,9 +88,10 @@ const Stack: React.FC<{ad: Ad}> = ({ad}) => {
   return (
     <AbsoluteFill style={{background: C.bg}}>
       {three.map((src, n) => {
-        const a = interpolate(f, [n * BEAT, n * BEAT + 8], [0, 1], {...clamp, easing: Easing.out(Easing.cubic)});
+        // Появление мягче, чем было (8 кадров и сдвиг 40 px — «по глазам»): 14 кадров, сдвиг 16
+        const a = interpolate(f, [n * BEAT, n * BEAT + 14], [0, 1], {...clamp, easing: Easing.inOut(Easing.quad)});
         return (
-          <div key={n} style={{position: 'absolute', left: 0, top: top0 + n * (H + GAP), opacity: a, transform: `translateY(${(1 - a) * 40}px)`}}>
+          <div key={n} style={{position: 'absolute', left: 0, top: top0 + n * (H + GAP), opacity: a, transform: `translateY(${(1 - a) * 16}px)`}}>
             <Landscape src={photoSrc(src)} w={1080} h={H} />
           </div>
         );
@@ -101,6 +114,13 @@ const Stack: React.FC<{ad: Ad}> = ({ad}) => {
   );
 };
 
+// Растворение сцены поверх предыдущей за SCENE_XFADE кадров; первая сцена — без него
+const SceneFade: React.FC<{first: boolean; children: React.ReactNode}> = ({first, children}) => {
+  const f = useCurrentFrame();
+  const opacity = first ? 1 : interpolate(f, [0, SCENE_XFADE], [0, 1], {...clamp, easing: Easing.inOut(Easing.quad)});
+  return <AbsoluteFill style={{opacity}}>{children}</AbsoluteFill>;
+};
+
 const SCENES: Record<string, React.FC<{ad: Ad}>> = {hook: Hook, gallery: Gallery, stack: Stack, price: PriceScene, cta: Cta};
 
 export const GalleryAd: React.FC<AdProps> = (props) => {
@@ -109,9 +129,16 @@ export const GalleryAd: React.FC<AdProps> = (props) => {
   return (
     <ThemeProvider value={theme}>
       <AbsoluteFill style={{background: theme.bg}}>
-        {FORMAT.scenes.map((s) => {
+        {FORMAT.scenes.map((s, i) => {
           const Scene = SCENES[s.id];
-          return <Sequence key={s.id} name={s.title} from={s.from} durationInFrames={s.frames}><Scene ad={ad} /></Sequence>;
+          // Сцена живёт на SCENE_XFADE дольше — под растворяющейся поверх следующей.
+          // Следующая начинается ровно на своём кадре (склейка на долю темпа не сдвигается)
+          const last = i === FORMAT.scenes.length - 1;
+          return (
+            <Sequence key={s.id} name={s.title} from={s.from} durationInFrames={s.frames + (last ? 0 : SCENE_XFADE)}>
+              <SceneFade first={i === 0}><Scene ad={ad} /></SceneFade>
+            </Sequence>
+          );
         })}
         <BackgroundMusic music={ad.music} bpm={FORMAT.bpm} />
       </AbsoluteFill>
