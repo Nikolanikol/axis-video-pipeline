@@ -95,11 +95,11 @@
   {
     "id": "gallery-ad",
     "title": "Галерея",
-    "description": "Хук → склейки под бит → стопка из трёх фото → цена → призыв. До 12 фото, 16,5 секунды — под объявления Encar.",
+    "description": "Хук → галерея (5 фото по секунде) → стопка из трёх фото → цена → призыв. До 9 фото, 17,5 секунды — под объявления Encar.",
     "width": 1080,
     "height": 1920,
     "fps": 30,
-    "durationInFrames": 495,
+    "durationInFrames": 525,
     "bpm": 120,
     "scenes": [
       {
@@ -113,29 +113,29 @@
         "id": "gallery",
         "title": "Галерея",
         "from": 90,
-        "frames": 120,
-        "preview": 150
+        "frames": 150,
+        "preview": 195
       },
       {
         "id": "stack",
         "title": "Стопка",
-        "from": 210,
+        "from": 240,
         "frames": 90,
-        "preview": 285
+        "preview": 315
       },
       {
         "id": "price",
         "title": "Цена",
-        "from": 300,
+        "from": 330,
         "frames": 105,
-        "preview": 395
+        "preview": 425
       },
       {
         "id": "cta",
         "title": "CTA",
-        "from": 405,
+        "from": 435,
         "frames": 90,
-        "preview": 485
+        "preview": 515
       }
     ],
     "requires": [

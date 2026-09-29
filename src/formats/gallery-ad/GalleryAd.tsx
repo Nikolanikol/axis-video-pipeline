@@ -21,29 +21,28 @@ const FORMAT = getFormat('gallery-ad');
 // Доля темпа в кадрах: 120 ударов в минуту при 30 кадрах — полсекунды. Склейки галереи
 // и появление фото стопки — на доли, чтобы с музыкой всё шло в такт
 const BEAT = Math.round((60 / FORMAT.bpm) * FORMAT.fps);
-// Растворение вместо жёсткой склейки. Жёсткие склейки каждые полсекунды «били по глазам»
-// (владелец, 30.09): яркая фара сразу после тёмного салона, восемь раз подряд. Новое фото
-// проступает поверх прежнего; склейка по-прежнему начинается на долю темпа.
-// 8 кадров из 15 — больше половины доли: мягко, но кадр ещё успевает постоять чистым
-const XFADE = 8;
-// Между сценами — чуть длиннее: там меняется вся раскладка кадра (полоса → стопка → цена)
+// Фото галереи стоит две доли (секунду) и растворяется в следующее за долю.
+// Было полсекунды и растворение 8 кадров — владелец: «очень сильно моргает». Замер яркости
+// по кадрам готового ролика (30.09): 27 → 59 → 43 → 27 → 59 дважды в секунду — тёмный салон,
+// яркая фара, снова салон. Это мигание 2 Гц, и растворение его лишь размазывало. Секунда
+// на кадр и растворение в полсекунды превращают смену в плавный переход, а не в мигание.
+const SHOT = 2 * BEAT;
+const XFADE = BEAT;
+// Между сценами — растворение 12 кадров: там меняется вся раскладка кадра
 const SCENE_XFADE = 12;
 
-// Кадр без движения камеры: фото стоит, внутри доли — едва заметное отдаление 3%,
-// чтобы склейка не казалась застывшей картинкой
+// Кадр галереи: фото стоит на месте. Прежнее отдаление 3% на каждом кадре давало «пульс»
+// дважды в секунду — движение здесь только в самой смене кадров
 const Cut: React.FC<{src: string}> = ({src}) => {
   const C = useTheme();
   const f = useCurrentFrame();
-  // Отдаление за всю жизнь кадра (доля + растворение следующего), а не за долю: иначе
-  // под растворением картинка замирала бы и движение шло рывками
-  const zoom = interpolate(f, [0, BEAT + XFADE], [1.03, 1], {...clamp, easing: Easing.out(Easing.quad)});
   const opacity = interpolate(f, [0, XFADE], [0, 1], {...clamp, easing: Easing.inOut(Easing.quad)});
   const url = photoSrc(src);
   return (
     <AbsoluteFill style={{background: C.bg, opacity}}>
       <Img src={url} style={{position: 'absolute', inset: -80, width: 'calc(100% + 160px)', height: 'calc(100% + 160px)',
         objectFit: 'cover', filter: 'blur(50px) brightness(0.35)'}} />
-      <Landscape src={url} w={1080} h={LANDSCAPE_BAND} zoom={zoom} />
+      <Landscape src={url} w={1080} h={LANDSCAPE_BAND} />
     </AbsoluteFill>
   );
 };
@@ -56,7 +55,10 @@ const Gallery: React.FC<{ad: Ad; layout: Layout}> = ({layout}) => {
       {shots.map((src, i) => (
         // Кадр живёт долю плюс растворение следующего поверх него. Первый не растворяется:
         // появление галереи целиком растворяет переход между сценами
-        <Sequence key={i} from={i === 0 ? -XFADE : i * BEAT} durationInFrames={BEAT + XFADE * 2}><Cut src={src} /></Sequence>
+        // premountFor — фото монтируется (и начинает грузиться) за кадр до появления. В превью
+        // интерфейса иначе картинка грузилась в момент появления, и кадр на миг проваливался
+        // в тёмный фон; в готовом ролике рендер сам ждёт загрузку, там этого не было
+        <Sequence key={i} from={i === 0 ? -XFADE : i * SHOT} durationInFrames={SHOT + XFADE * 2} premountFor={SHOT}><Cut src={src} /></Sequence>
       ))}
       <Shade />
       <TopLogo scrim={false} />
@@ -116,7 +118,7 @@ const HookScene: React.FC<{ad: Ad; layout: Layout}> = ({ad, layout}) => <Hook ad
 
 const SCENES: Record<string, React.FC<{ad: Ad; layout: Layout}>> = {hook: HookScene, gallery: Gallery, stack: Stack, price: PriceScene, cta: Cta};
 // Склеек в галерее — сколько долей в её сцене
-const CUTS = Math.floor(FORMAT.scenes.find((s) => s.id === 'gallery')!.frames / BEAT);
+const CUTS = Math.floor(FORMAT.scenes.find((s) => s.id === 'gallery')!.frames / SHOT);
 
 export const GalleryAd: React.FC<AdProps> = (props) => {
   const ad = resolveAd(props);
@@ -131,7 +133,9 @@ export const GalleryAd: React.FC<AdProps> = (props) => {
           // Следующая начинается ровно на своём кадре (склейка на долю темпа не сдвигается)
           const last = i === FORMAT.scenes.length - 1;
           return (
-            <Sequence key={s.id} name={s.title} from={s.from} durationInFrames={s.frames + (last ? 0 : SCENE_XFADE)}>
+            // premountFor — сцена и её фото готовы заранее (см. склейки галереи): иначе в превью
+            // на стыке сцен мелькал пустой фон
+            <Sequence key={s.id} name={s.title} from={s.from} durationInFrames={s.frames + (last ? 0 : SCENE_XFADE)} premountFor={30}>
               <SceneFade first={i === 0}><Scene ad={ad} layout={layout} /></SceneFade>
             </Sequence>
           );
