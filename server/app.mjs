@@ -12,6 +12,8 @@ import {
 import {reviewStoryboard} from '../src/shared/timeline.js';
 import {getFormat, listFormats, storyboardFrames} from './formats.mjs';
 import {addPhoto, applyBlur, photoInfo, removePhoto} from './photos.mjs';
+import {checkPhotoUrls, downloadPhoto, lookupCar} from './encar.mjs';
+import {usdKrw} from './rates.mjs';
 import {cancelJob, deleteJob, enqueue, getJob, listJobs, retryJob} from './renderer.mjs';
 import {
   UPLOAD_TMP, ambienceReview, createReview, getReview, ingestSource, listReviews, rebuildLines, reprocessSource,
@@ -278,6 +280,11 @@ export const createApp = ({photoOrigin}) => {
   // Запись лота — строго по очереди (автосохранение формы и операции с фото не должны перетирать друг друга)
   const withLot = (id, fn) => withLock(`lot:${id}`, () => fn(getLot(id)));
 
+  // Машина по ссылке Encar для формы лота. Бесплатно: кредиты — за сборку ролика, не за данные
+  api.post('/encar/lookup', wrap((req) => lookupCar(req.body?.link)));
+  // Курс ₩ за $1 на сегодня (обновляется раз в сутки, см. server/rates.mjs)
+  api.get('/rates/usd-krw', wrap(() => usdKrw()));
+
   api.get('/lots', wrap(() => listLots()));
   api.post('/lots', wrap((req) => createLot(req.body?.market ? {market: checkId(req.body.market)} : {})));
   api.get('/lots/:id', wrap((req) => getLot(req.params.id)));
@@ -298,6 +305,21 @@ export const createApp = ({photoOrigin}) => {
     for (const file of req.files ?? []) added.push(await addPhoto(lot.id, file.buffer, file.originalname));
     return saveLot(lot.id, {...lot, photos: [...lot.photos, ...added]});
   })));
+  // Фото из объявления Encar: скачиваем к себе и добавляем в конец, в порядке выбора.
+  // Скачивание — вне очереди лота: десяток фото это секунды, и держать всё это время
+  // автосохранение формы незачем. В очередь встаёт только запись списка фото
+  api.post('/lots/:id/photos/import', wrap(async (req) => {
+    const urls = checkPhotoUrls(req.body?.urls);
+    const lot = await getLot(req.params.id);
+    const added = [];
+    // По одному, а не разом: Encar на пачку одновременных запросов с одного адреса
+    // отвечает отказами, а выигрыш в секундах тут не важен
+    for (const [i, url] of urls.entries()) added.push(await addPhoto(lot.id, await downloadPhoto(url), `encar-${i + 1}.jpg`));
+    return withLot(lot.id, async (loading) => {
+      const current = await loading;
+      return saveLot(current.id, {...current, photos: [...current.photos, ...added]});
+    });
+  }));
   api.delete('/lots/:id/photos', wrap((req) => withLot(req.params.id, async (loading) => {
     const lot = await loading;
     return saveLot(lot.id, await removePhoto(lot, String(req.query.path || '')));

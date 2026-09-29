@@ -71,6 +71,8 @@ export type ClientRow = {
   platform_role: Role; credits: number; paid_krw: number; generations: number; last_generation: string | null;
   plan_title: string | null; plan_until: string | null;
 };
+// Курс ₩ за $1 на сегодня: сервер берёт его раз в сутки. stale — источник не ответил, курс старше суток
+export type UsdKrw = {krwPerUsd: number; fetchedAt: string; source: string; stale: boolean};
 export type StaffRow = {id: string; email: string; name: string | null; platform_role: Exclude<Role, null>};
 export type Registration = {name: string; email: string; phone: string; password: string; company: string};
 
@@ -119,6 +121,10 @@ export const api = {
   lots: () => request<LotEntry[]>('GET', '/api/lots'),
   createLot: (data: Partial<Lot>) => request<LotEntry>('POST', '/api/lots', data),
   saveLot: (lot: LotEntry) => request<LotEntry>('PUT', `/api/lots/${lot.id}`, lot),
+  // Машина по ссылке Encar (через шлюз kmotors) и фото из объявления — скачиваются в лот
+  lookupCar: (link: string) => request<CarouselCar>('POST', '/api/encar/lookup', {link}),
+  importPhotos: (id: string, urls: string[]) => request<LotEntry>('POST', `/api/lots/${id}/photos/import`, {urls}),
+  usdKrw: () => request<UsdKrw>('GET', '/api/rates/usd-krw'),
   uploadPhotos: (id: string, files: File[]) => {
     const form = new FormData();
     files.forEach((f) => form.append('photos', f));

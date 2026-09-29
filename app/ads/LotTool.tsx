@@ -7,6 +7,7 @@ import type {Market} from '../../src/shared/types';
 import {api, LotEntry} from '../api';
 import {useConfig} from '../config';
 import {LotForm} from '../LotForm';
+import {EncarImport} from './EncarImport';
 import {Preview} from '../Preview';
 import {RenderPanel} from '../RenderPanel';
 import {lastLot} from '../router';
@@ -84,6 +85,27 @@ export const LotTool: React.FC = () => {
     } catch (e) { report(e); }
   };
 
+  // Лот по ссылке Encar: создать и сразу заполнить, потом скачать выбранные фото.
+  // Создание принимает только рынок — поля докладываем вторым запросом
+  const createFromCar = async (fields: Partial<LotEntry>, urls: string[]) => {
+    if (save === 'dirty') await saveLot();
+    const created = await api.createLot({market: lot?.market ?? config.defaultMarket});
+    let next = await api.saveLot({...created, ...fields});
+    setLots((ls) => [next, ...ls]);
+    setLot(next);
+    setSave('saved');
+    if (urls.length) {
+      next = await api.importPhotos(next.id, urls);
+      setPhotos(next);
+    }
+  };
+  // В текущий лот: поля — обычной правкой формы (уйдут автосохранением), фото — в конец
+  const applyFromCar = async (fields: Partial<LotEntry>, urls: string[]) => {
+    if (!lot) return;
+    if (Object.keys(fields).length) editLot(fields);
+    if (urls.length) setPhotos(await api.importPhotos(lot.id, urls));
+  };
+
   // Данные для превью — из профиля клиента (тот же мост, что и рендер), а не из рынка лота
   const market = useMemo(() => marketFromProfile(profile, config.copy) as Market, [profile, config.copy]);
   const format = getFormat(lot?.format);
@@ -103,6 +125,8 @@ export const LotTool: React.FC = () => {
         <button className="btn" onClick={newLot}>+ Новый лот</button>
         {lot && <span className={`save save-${save}`}>{SAVE_LABEL[save]}</span>}
       </div>
+
+      <EncarImport lot={lot} onCreate={createFromCar} onApply={applyFromCar} onError={report} />
 
       <main className="grid">
         <section className="panel editor">

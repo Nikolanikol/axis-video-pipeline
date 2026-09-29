@@ -1,9 +1,9 @@
 // Форма лота: авто, характеристики, цена, фото. Автосохранение — в LotTool.
 // Поле Field отсюда переиспользуют остальные формы.
-import React, {useCallback, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {fmt, priceUsd} from '../src/shared/model';
 import type {FormatMeta, Market} from '../src/shared/types';
-import {api, LotEntry} from './api';
+import {api, LotEntry, UsdKrw} from './api';
 import {BlurEditor} from './BlurEditor';
 import {useConfig} from './config';
 
@@ -28,8 +28,23 @@ export const Field: React.FC<{label: string; hint?: React.ReactNode; children: R
   </label>
 );
 
+// Курс на сегодня (сервер обновляет раз в сутки) — один запрос на страницу, а не на каждый лот
+let todayRate: Promise<UsdKrw | null> | null = null;
+const useTodayRate = () => {
+  const [rate, setRate] = useState<UsdKrw | null>(null);
+  useEffect(() => {
+    todayRate ??= api.usdKrw().catch(() => null);
+    todayRate.then(setRate);
+  }, []);
+  return rate;
+};
+
 export const LotForm: React.FC<Props> = ({lot, market, format, onChange, onPhotos, onError}) => {
   const car = priceUsd(lot);
+  const rate = useTodayRate();
+  // Курс в лоте отличается от сегодняшнего больше чем на полпроцента — предлагаем обновить.
+  // Мелкие колебания не дёргаем: подсказка на каждой копейке приучила бы её не замечать
+  const rateOff = rate && lot.krwPerUsd && Math.abs(lot.krwPerUsd - rate.krwPerUsd) / rate.krwPerUsd > 0.005;
   const freight = lot.freightUsd ?? market.freightUsd;
   const port = lot.port ?? market.port;
   const setSpec = (i: number, value: string) => onChange({specs: lot.specs.map((s, j) => (j === i ? value : s))});
@@ -63,8 +78,15 @@ export const LotForm: React.FC<Props> = ({lot, market, format, onChange, onPhoto
           <input inputMode="decimal" value={lot.carPriceKrw ? String(lot.carPriceKrw / 10000) : ''}
             onChange={(e) => { const v = num(e.target.value); onChange({carPriceKrw: v === null || Number.isNaN(v) ? null : Math.round(v * 10000)}); }} />
         </Field>
-        <Field label="Курс, ₩ за $1">
-          <input inputMode="decimal" value={lot.krwPerUsd ?? ''} placeholder="спросить"
+        <Field label="Курс, ₩ за $1" hint={rate && (
+          <>
+            {rate.stale ? 'курс не обновился, последний: ' : 'сегодня '}{rate.krwPerUsd.toLocaleString('ru-RU')}
+            {(!lot.krwPerUsd || rateOff) && (
+              <> · <button type="button" className="link" onClick={() => onChange({krwPerUsd: rate.krwPerUsd})}>подставить</button></>
+            )}
+          </>
+        )}>
+          <input inputMode="decimal" value={lot.krwPerUsd ?? ''} placeholder={rate ? String(rate.krwPerUsd) : 'спросить'}
             onChange={(e) => { const v = num(e.target.value); onChange({krwPerUsd: v === null || Number.isNaN(v) ? null : v}); }} />
         </Field>
         <Field label="или сразу, $" hint="если заполнено — главнее ₩">
