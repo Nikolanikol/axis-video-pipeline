@@ -1,6 +1,6 @@
 // Общие детали роликов AXIS: тема, шрифты, медь, фото, затемнение, логотип.
 import React, {createContext, useContext, useEffect, useState} from 'react';
-import {AbsoluteFill, Img, continueRender, delayRender, interpolate, staticFile, useCurrentFrame} from 'remotion';
+import {AbsoluteFill, Easing, Img, continueRender, delayRender, interpolate, staticFile, useCurrentFrame} from 'remotion';
 import '@fontsource/oswald/cyrillic-700.css';
 import '@fontsource/oswald/latin-700.css';
 import '@fontsource/oswald/cyrillic-500.css';
@@ -176,24 +176,64 @@ const usePhotoRatio = (url: string) => {
   return ratio;
 };
 
-// Фото в вертикальном кадре. Вертикальное — сверху во всю ширину (3:4 → 1080×1440),
-// горизонтальное — целиком полосой под логотипом, вокруг размытый фон.
-export const Photo: React.FC<{src?: string; dur: number}> = ({src: s, dur}) => {
+/**
+ * Высота полосы под горизонтальное фото. Фото Encar — 16:9, и раньше оно ложилось целиком
+ * полосой 1080×607 под логотипом: машина занимала верхнюю треть кадра, а в ленте Reels и
+ * TikTok решает первая секунда. Теперь полоса 1150 px — машина почти вдвое крупнее, — по
+ * ширине видно чуть больше половины снимка, и камера за сцену проходит его вдоль машины.
+ * Почему не весь кадр 1920: тогда по ширине осталась бы треть снимка (машина не влезает),
+ * а низ кадра всё равно занят текстом под затемнением Shade (с ~54% высоты).
+ */
+export const LANDSCAPE_BAND = 1150;
+
+// Фото в вертикальном кадре. Вертикальное — сверху во всю ширину (3:4 → 1080×1440) с лёгким
+// наездом; горизонтальное — полосой LANDSCAPE_BAND с проходом камеры вдоль машины.
+// pan — куда идёт камера: 1 — слева направо, -1 — справа налево. Соседние фото сцены
+// чередуют направление: два прохода в одну сторону подряд на склейке читаются как рывок.
+export const Photo: React.FC<{src?: string; dur: number; pan?: 1 | -1}> = ({src: s, dur, pan = 1}) => {
   const C = useTheme();
   const f = useCurrentFrame();
   const url = s ? src(s) : '';
   const ratio = usePhotoRatio(url);
   const zoom = interpolate(f, [0, dur], [1.0, 1.07]);
   if (!url || ratio === null) return <AbsoluteFill style={{background: C.bg}} />;
-  const portrait = ratio < 1;
-  const h = Math.min(1920, Math.round(1080 / ratio));
-  const top = portrait ? 0 : 230;
+  const blurred = (
+    <Img src={url} style={{position: 'absolute', inset: -80, width: 'calc(100% + 160px)', height: 'calc(100% + 160px)',
+      objectFit: 'cover', filter: 'blur(50px) brightness(0.35)'}} />
+  );
+  if (ratio < 1) {
+    return (
+      <AbsoluteFill style={{background: C.bg}}>
+        {blurred}
+        <div style={{position: 'absolute', top: 0, left: 0, width: 1080, height: Math.min(1920, Math.round(1080 / ratio)), overflow: 'hidden'}}>
+          <Img src={url} style={{width: '100%', height: '100%', objectFit: 'cover', transform: `scale(${zoom})`}} />
+        </div>
+      </AbsoluteFill>
+    );
+  }
+  // Горизонтальное: высота полосы, ширина по пропорции. Почти квадратное фото уже кадра
+  // по ширине — растягиваем до 1080, и проходить нечего
+  // Верх снимка срезаем: у Encar там значок «True Encar» в правом углу и пустой фон.
+  // Без среза проход камеры приводил значок ровно под наш логотип (раскадровка 30.09).
+  // Замер на BMW 520d: значок кончается на ~19% высоты снимка, крыша машины начинается
+  // ниже трети — 12% оставляли край значка, 22% убирают его и не задевают машину
+  const TOP_CROP = 0.22;
+  const h = Math.round(LANDSCAPE_BAND / (1 - TOP_CROP));
+  const w = Math.max(1080, Math.round(h * ratio));
+  const travel = w - 1080;
+  // Проход — 80% запаса по центру, а не от края до края: крайние полосы снимков Encar —
+  // обычно пустая площадка и соседние машины. Разгон и торможение мягкие, чтобы на
+  // склейке камера не дёргалась
+  const t = interpolate(f, [0, dur], [0, 1], {...clamp, easing: Easing.inOut(Easing.sin)});
+  const x = -travel * (0.1 + 0.8 * (pan === 1 ? t : 1 - t));
   return (
     <AbsoluteFill style={{background: C.bg}}>
-      <Img src={url} style={{position: 'absolute', inset: -80, width: 'calc(100% + 160px)', height: 'calc(100% + 160px)',
-        objectFit: 'cover', filter: 'blur(50px) brightness(0.35)'}} />
-      <div style={{position: 'absolute', top, left: 0, width: 1080, height: h, overflow: 'hidden'}}>
-        <Img src={url} style={{width: '100%', height: '100%', objectFit: 'cover', transform: `scale(${zoom})`}} />
+      {blurred}
+      <div style={{position: 'absolute', top: 0, left: 0, width: 1080, height: LANDSCAPE_BAND, overflow: 'hidden'}}>
+        <Img src={url} style={{position: 'absolute', top: -Math.round(h * TOP_CROP), left: x, width: w, height: h, objectFit: 'cover'}} />
+        {/* Низ полосы растворяется в размытом фоне — без жёсткой линии посреди кадра */}
+        <div style={{position: 'absolute', left: 0, right: 0, bottom: 0, height: 260,
+          background: `linear-gradient(180deg, ${C.bg}00, ${C.bg}d9)`}} />
       </div>
     </AbsoluteFill>
   );

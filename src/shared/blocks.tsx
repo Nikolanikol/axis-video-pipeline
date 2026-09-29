@@ -1,7 +1,7 @@
 // Блоки, общие для роликов: заголовок авто, цена до порта с оговоркой, контакты
 import React from 'react';
 import {AbsoluteFill, Easing, Img, interpolate, spring, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
-import {fmt, totalUsd} from './model';
+import {fmt, totalInCurrency} from './model';
 import type {Ad} from './types';
 import {BODY, CopperText, HEAD, Metal, PAD, clamp, useAsset, useTheme} from './ui';
 
@@ -56,7 +56,8 @@ export const PriceTag: React.FC<{ad: Ad; delay?: number; padding?: string}> = ({
   const C = useTheme();
   const f = useCurrentFrame(); const {fps} = useVideoConfig();
   const from = delay ?? atSec(1.5, fps);
-  const total = totalUsd(ad);
+  // В валюте профиля: у KRW — воны, иначе доллары (см. totalInCurrency)
+  const total = totalInCurrency(ad);
   const count = interpolate(f, [from, from + atSec(1.33, fps)], [0, 1], {...clamp, easing: Easing.out(Easing.cubic)});
   const num = total === null ? null : count >= 1 ? total : Math.round((total * count) / 10) * 10;
   const sign = currencySign(ad.currency);
@@ -69,7 +70,9 @@ export const PriceTag: React.FC<{ad: Ad; delay?: number; padding?: string}> = ({
         {(ad.texts.priceLabel ?? '').replace('{port}', ad.port)}
       </div>
       <div style={{transform: `scale(${0.85 + 0.15 * priceIn})`, transformOrigin: 'left center', opacity: Math.min(1, priceIn * 1.5)}}>
-        <CopperText style={{fontFamily: HEAD, fontWeight: 700, fontSize: label.length > 8 ? 190 : 230, lineHeight: 1.1,
+        {/* Кегль по длине: «25 340 000 ₩» вдвое длиннее «18 646 $» и в 230 не влезает в ширину
+            между левым полем и колонкой кнопок Reels (80…930 px). Oswald — цифра ≈0,5 кегля */}
+        <CopperText style={{fontFamily: HEAD, fontWeight: 700, fontSize: Math.min(230, Math.floor(850 / (label.length * 0.5))), lineHeight: 1.1,
           display: 'inline-block', whiteSpace: 'nowrap'}}>
           {label}
         </CopperText>

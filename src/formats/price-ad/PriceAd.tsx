@@ -26,9 +26,10 @@ const Specs: React.FC<{ad: Ad}> = ({ad}) => {
   const f = useCurrentFrame(); const {fps, durationInFrames} = useVideoConfig();
   const half = Math.round(durationInFrames / 2);
   const [p0, p1, p2] = ad.photos;
+  // Два фото сцены — камера навстречу: второй проход в ту же сторону читался бы как рывок
   return (
     <AbsoluteFill>
-      <Sequence durationInFrames={half}><Photo src={p1 ?? p0} dur={half} /></Sequence>
+      <Sequence durationInFrames={half}><Photo src={p1 ?? p0} dur={half} pan={-1} /></Sequence>
       <Sequence from={half}><Photo src={p2 ?? p1 ?? p0} dur={durationInFrames - half} /></Sequence>
       <Shade />
       <AbsoluteFill style={{justifyContent: 'flex-end', alignItems: 'flex-start', padding: PAD, gap: 20}}>

@@ -37,6 +37,24 @@ export const totalUsd = (ad: Pick<Ad, 'carPriceUsd' | 'carPriceKrw' | 'krwPerUsd
   return car === null ? null : car + ad.freightUsd;
 };
 
+/**
+ * Цена к показу в валюте профиля. KRW — в вонах: цена авто как на Encar плюс фрахт,
+ * пересчитанный по курсу лота. Любая другая валюта — прежняя цена в долларах.
+ * Раньше ролик всегда считал в долларах, а значок брал из профиля: у профиля с KRW выходило
+ * «18 646 ₩» при цене машины 25 340 000 ₩ (нашли на раскадровке 30.09).
+ * Конвертации в евро и прочее нет: там дилер вводит своё число, и считаем его долларами.
+ */
+export const totalInCurrency = (ad: Pick<Ad, 'carPriceUsd' | 'carPriceKrw' | 'krwPerUsd' | 'freightUsd' | 'currency'>): number | null => {
+  if (ad.currency !== 'KRW') return totalUsd(ad);
+  const rate = ad.krwPerUsd ?? null;
+  // Цена в вонах: из лота, иначе из долларовой по курсу
+  const car = ad.carPriceKrw ?? (ad.carPriceUsd && rate ? Math.round(ad.carPriceUsd * rate) : null);
+  if (car === null) return null;
+  // Фрахт задан в долларах. Без курса его не пересчитать — показываем цену без фрахта,
+  // а не падаем: курс в лоте теперь подставляется сам, пустым он бывает редко
+  return car + (ad.freightUsd && rate ? Math.round(ad.freightUsd * rate) : 0);
+};
+
 // 12345 → «12 345» (Chrome ставит неразрывные пробелы — меняем на обычные)
 export const fmt = (n: number) => n.toLocaleString('ru-RU').replace(/[\u00a0\u202f]/g, ' ');
 

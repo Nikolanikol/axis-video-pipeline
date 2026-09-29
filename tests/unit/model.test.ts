@@ -1,7 +1,7 @@
 // Логика лота: цена, лот поверх настроек рынка, чего не хватает для рендера
 import {describe, expect, it} from 'vitest';
 import mk from '../../config/markets/mk.json';
-import {fmt, getFormat, missing, priceUsd, resolveAd, totalUsd} from '../../src/shared/model';
+import {fmt, getFormat, missing, priceUsd, resolveAd, totalInCurrency, totalUsd} from '../../src/shared/model';
 import type {Lot, Market} from '../../src/shared/types';
 
 const market = mk as Market;
@@ -34,6 +34,22 @@ describe('цена', () => {
     expect(fmt(10349)).toBe('10 349');
     expect(fmt(105000)).toBe('105 000');
     expect(fmt(950)).toBe('950');
+  });
+});
+
+describe('цена в валюте профиля', () => {
+  const bmw = {carPriceUsd: null, carPriceKrw: 25340000, krwPerUsd: 1358.97, freightUsd: 0};
+  it('KRW — воны как на Encar, а не доллары со значком ₩ (было «18 646 ₩» на раскадровке)', () => {
+    expect(totalInCurrency({...bmw, currency: 'KRW'})).toBe(25340000);
+    expect(totalInCurrency({...bmw, currency: 'USD'})).toBe(18646);
+  });
+  it('фрахт в долларах пересчитывается по курсу лота; без курса — цена без фрахта', () => {
+    expect(totalInCurrency({...bmw, freightUsd: 1500, currency: 'KRW'})).toBe(25340000 + 2038455);
+    expect(totalInCurrency({...bmw, krwPerUsd: null, freightUsd: 1500, currency: 'KRW'})).toBe(25340000);
+  });
+  it('цена задана только в долларах — в воны по курсу; нет ни цены, ни курса — черновик', () => {
+    expect(totalInCurrency({carPriceUsd: 10000, carPriceKrw: null, krwPerUsd: 1400, freightUsd: 0, currency: 'KRW'})).toBe(14000000);
+    expect(totalInCurrency({carPriceUsd: 10000, carPriceKrw: null, krwPerUsd: null, freightUsd: 0, currency: 'KRW'})).toBeNull();
   });
 });
 
