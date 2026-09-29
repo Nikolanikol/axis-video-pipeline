@@ -483,3 +483,5 @@ a.tab { text-decoration: none; }
 .encar-photo.on { border-color: var(--accent-line); }
 .encar-label { position: absolute; left: 0; right: 0; bottom: 0; padding: 12px 6px 4px; font-size: 11px; text-align: left; background: linear-gradient(transparent, #000c); color: var(--text); }
 .encar-num { position: absolute; top: 4px; right: 4px; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px; background: var(--accent); color: var(--text); font-size: 12px; font-weight: 700; line-height: 22px; }
+/* Место фото в «Галерее»: список поверх низа миниатюры, над подписью места */
+.thumb .slot { position: absolute; left: 4px; right: 4px; bottom: 22px; width: auto; padding: 2px 4px; font-size: 11px; background: #000b; border-color: #ffffff33; }

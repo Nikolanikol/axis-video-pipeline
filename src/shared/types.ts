@@ -63,6 +63,9 @@ export type Lot = Partial<Omit<Market, 'texts'>> & {
   carPriceUsd?: number | null; carPriceKrw?: number | null; krwPerUsd?: number | null;
   // Путь в public/, абсолютный путь сервера (/data/...) или http-ссылка
   photos: string[];
+  // Места фото в «Галерее», выбранные руками: ключ — имя файла без версии (photoKey),
+  // нет ключа — «авто», место по порядку. См. src/shared/photoSlots.ts
+  slots?: Record<string, 'auto' | 'hook' | 'stack' | 'gallery' | 'skip'>;
   texts?: Partial<Texts>;
 };
 
@@ -86,6 +89,8 @@ export type FormatMeta = {
   photoRoles: string[];
   // Подпись фото сверх photoRoles: «Галерея» у формата, который берёт их все; нет — «запас»
   photoRest?: string;
+  // Места фото выбираются руками (хук / стопка / галерея / не брать) — у «Галереи»
+  photoSlots?: boolean;
   texts: TextField[];
 };
 

@@ -2,6 +2,7 @@
 // Поле Field отсюда переиспользуют остальные формы.
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {fmt, priceUsd} from '../src/shared/model';
+import {SLOT_TITLES, photoKey, photoLayout, type Slot} from '../src/shared/photoSlots';
 import type {FormatMeta, Market} from '../src/shared/types';
 import {api, LotEntry, UsdKrw} from './api';
 import {BlurEditor} from './BlurEditor';
@@ -101,7 +102,7 @@ export const LotForm: React.FC<Props> = ({lot, market, format, onChange, onPhoto
       </div>
 
       <h2>Фото <span className="muted">перетаскивай, чтобы поменять порядок</span></h2>
-      <Photos lot={lot} roles={format.photoRoles} rest={format.photoRest ?? 'запас'} onChange={onChange} onPhotos={onPhotos} onError={onError} />
+      <Photos lot={lot} roles={format.photoRoles} rest={format.photoRest ?? 'запас'} slots={!!format.photoSlots} onChange={onChange} onPhotos={onPhotos} onError={onError} />
 
       <Field label="Заметка" hint="в ролик не попадает" wide>
         <textarea rows={2} value={lot.note ?? ''} placeholder="источник, пометки: аукцион, номер лота, «демо»…"
@@ -129,7 +130,7 @@ export const LotForm: React.FC<Props> = ({lot, market, format, onChange, onPhoto
   );
 };
 
-const Photos: React.FC<Pick<Props, 'lot' | 'onChange' | 'onPhotos' | 'onError'> & {roles: string[]; rest: string}> = ({lot, roles, rest, onChange, onPhotos, onError}) => {
+const Photos: React.FC<Pick<Props, 'lot' | 'onChange' | 'onPhotos' | 'onError'> & {roles: string[]; rest: string; slots: boolean}> = ({lot, roles, rest, slots, onChange, onPhotos, onError}) => {
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState<number | null>(null);
   const [over, setOver] = useState(false);
@@ -148,6 +149,21 @@ const Photos: React.FC<Pick<Props, 'lot' | 'onChange' | 'onPhotos' | 'onError'> 
   };
   const remove = async (path: string) => {
     try { onPhotos(await api.deletePhoto(lot.id, path)); } catch (e) { onError(e); }
+  };
+  // Места в «Галерее»: подпись под фото — из той же раскладки, что рендер, поэтому
+  // «Стопка 2» здесь и есть второе фото стопки в ролике
+  const layout = slots ? photoLayout(lot.photos, lot.slots) : null;
+  const placeOf = (p: string) => {
+    const at = layout?.placed[p];
+    if (!layout) return null;
+    if (at === 'stack') return `Стопка ${layout.stack.indexOf(p) + 1}`;
+    return at ? SLOT_TITLES[at] : 'не в ролике';
+  };
+  const setSlot = (p: string, value: Slot) => {
+    const next = {...lot.slots};
+    // «Авто» не храним: нет ключа — место по порядку
+    if (value === 'auto') delete next[photoKey(p)]; else next[photoKey(p)] = value;
+    onChange({slots: next});
   };
   const move = (from: number, to: number) => {
     if (from === to) return;
@@ -174,8 +190,15 @@ const Photos: React.FC<Pick<Props, 'lot' | 'onChange' | 'onPhotos' | 'onError'> 
           {/* Тянется только фото: кнопки вне перетаскиваемого блока, иначе браузер съедает их клики */}
           <div className="drag" draggable onDragStart={() => setDrag(i)} onDragEnd={() => setDrag(null)}>
             <img src={p.startsWith('http') || p.startsWith('/') ? p : `/${p}`} alt="" />
-            <span className="role">{i + 1}. {roles[i] ?? rest}</span>
+            <span className="role">{i + 1}. {layout ? placeOf(p) : roles[i] ?? rest}</span>
           </div>
+          {layout && (
+            // Вне перетаскиваемого блока — иначе браузер съедает клик по списку
+            <select className="slot" value={lot.slots?.[photoKey(p)] ?? 'auto'} title="Куда идёт фото в ролике"
+              onChange={(e) => setSlot(p, e.target.value as Slot)}>
+              {(Object.keys(SLOT_TITLES) as Slot[]).map((s) => <option key={s} value={s}>{SLOT_TITLES[s]}</option>)}
+            </select>
+          )}
           <button className="icon del" title="Удалить фото" onClick={() => remove(p)}>×</button>
           {p.startsWith(own) && (
             <button className={blurCount(p) ? 'blur-btn on' : 'blur-btn'} title="Размыть номер или лишнее" onClick={() => setEditing(p)}>

@@ -5,11 +5,13 @@
 // десятка, все горизонтальные. «Авто с ценой» берёт три фото — здесь до двенадцати: движение
 // ролику дают склейки на долю темпа, а не камера (проход камеры вдоль машины укачивал).
 //
-// Фото по местам: 1-е — хук, 2–4-е — стопка (обзорные: перед, зад, салон — ровно то, что
-// сетка Encar выбирает как «рекомендованные»), 5-е и дальше — галерея.
+// Фото по местам — src/shared/photoSlots.ts: по умолчанию по порядку (1-е хук, 2–4-е стопка —
+// обзорные, как «рекомендованные» из Encar, — остальные галерея), а в форме лота у каждого
+// фото можно выбрать место руками.
 import React from 'react';
 import {AbsoluteFill, Easing, Img, Sequence, interpolate, spring, useCurrentFrame, useVideoConfig} from 'remotion';
 import {getFormat, resolveAd, themeOf} from '../../shared/model';
+import {photoLayout, type Layout} from '../../shared/photoSlots';
 import {BackgroundMusic} from '../../shared/music';
 import type {Ad, AdProps} from '../../shared/types';
 import {BODY, LANDSCAPE_BAND, Landscape, Metal, PAD, Shade, ThemeProvider, TopLogo, clamp, photoSrc, useTheme} from '../../shared/ui';
@@ -26,18 +28,6 @@ const BEAT = Math.round((60 / FORMAT.bpm) * FORMAT.fps);
 const XFADE = 8;
 // Между сценами — чуть длиннее: там меняется вся раскладка кадра (полоса → стопка → цена)
 const SCENE_XFADE = 12;
-
-/**
- * Фото для галереи: сначала пятое и дальше (их никто больше не показывает), потом 2–4-е из
- * стопки — если своих на все склейки не хватает. Раньше брали только с пятого, и у лота из
- * пяти фото все восемь склеек показывали один снимок (раскадровка 30.09). Хук не берём:
- * он и так открывает ролик. Одно фото на весь лот — повторяем его, пустой кадр хуже.
- */
-export const galleryPhotos = (photos: string[], cuts: number): string[] => {
-  const pool = [...photos.slice(4), ...photos.slice(1, 4)];
-  const list = pool.length ? pool : photos;
-  return list.length ? Array.from({length: cuts}, (_, i) => list[i % list.length]) : [];
-};
 
 // Кадр без движения камеры: фото стоит, внутри доли — едва заметное отдаление 3%,
 // чтобы склейка не казалась застывшей картинкой
@@ -59,9 +49,8 @@ const Cut: React.FC<{src: string}> = ({src}) => {
 };
 
 // Сцена 2: склейки под бит
-const Gallery: React.FC<{ad: Ad}> = ({ad}) => {
-  const {durationInFrames} = useVideoConfig();
-  const shots = galleryPhotos(ad.photos, Math.floor(durationInFrames / BEAT));
+const Gallery: React.FC<{ad: Ad; layout: Layout}> = ({layout}) => {
+  const shots = layout.gallery;
   return (
     <AbsoluteFill>
       {shots.map((src, i) => (
@@ -77,14 +66,15 @@ const Gallery: React.FC<{ad: Ad}> = ({ad}) => {
 
 // Сцена 3: три обзорных фото стопкой, целиком — 3 × 607 px это почти ровно высота кадра.
 // Появляются по одному на долю; характеристики — поверх нижнего, выше подписи Reels
-const Stack: React.FC<{ad: Ad}> = ({ad}) => {
+const Stack: React.FC<{ad: Ad; layout: Layout}> = ({ad, layout}) => {
   const C = useTheme();
   const f = useCurrentFrame(); const {fps} = useVideoConfig();
   const H = 607;
   const GAP = 10;
   const top0 = Math.round((1920 - 3 * H - 2 * GAP) / 2);
-  const [p0, p1, p2, p3] = ad.photos;
-  const three = [p1 ?? p0, p2 ?? p1 ?? p0, p3 ?? p2 ?? p1 ?? p0].filter(Boolean) as string[];
+  // Меньше трёх (фото мало или отмечено «не брать») — повторяем последнее, пустая полоса хуже
+  const own = layout.stack.length ? layout.stack : layout.hook ? [layout.hook] : [];
+  const three = own.length ? Array.from({length: 3}, (_, i) => own[Math.min(i, own.length - 1)]) : [];
   return (
     <AbsoluteFill style={{background: C.bg}}>
       {three.map((src, n) => {
@@ -121,11 +111,17 @@ const SceneFade: React.FC<{first: boolean; children: React.ReactNode}> = ({first
   return <AbsoluteFill style={{opacity}}>{children}</AbsoluteFill>;
 };
 
-const SCENES: Record<string, React.FC<{ad: Ad}>> = {hook: Hook, gallery: Gallery, stack: Stack, price: PriceScene, cta: Cta};
+// Хук — общая сцена «Авто с ценой», она берёт первое фото: подкладываем ей выбранное
+const HookScene: React.FC<{ad: Ad; layout: Layout}> = ({ad, layout}) => <Hook ad={{...ad, photos: layout.hook ? [layout.hook] : []}} />;
+
+const SCENES: Record<string, React.FC<{ad: Ad; layout: Layout}>> = {hook: HookScene, gallery: Gallery, stack: Stack, price: PriceScene, cta: Cta};
+// Склеек в галерее — сколько долей в её сцене
+const CUTS = Math.floor(FORMAT.scenes.find((s) => s.id === 'gallery')!.frames / BEAT);
 
 export const GalleryAd: React.FC<AdProps> = (props) => {
   const ad = resolveAd(props);
   const theme = themeOf(props.theme);
+  const layout = photoLayout(ad.photos, props.lot.slots, CUTS);
   return (
     <ThemeProvider value={theme}>
       <AbsoluteFill style={{background: theme.bg}}>
@@ -136,7 +132,7 @@ export const GalleryAd: React.FC<AdProps> = (props) => {
           const last = i === FORMAT.scenes.length - 1;
           return (
             <Sequence key={s.id} name={s.title} from={s.from} durationInFrames={s.frames + (last ? 0 : SCENE_XFADE)}>
-              <SceneFade first={i === 0}><Scene ad={ad} /></SceneFade>
+              <SceneFade first={i === 0}><Scene ad={ad} layout={layout} /></SceneFade>
             </Sequence>
           );
         })}
