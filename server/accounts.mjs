@@ -11,7 +11,7 @@ import path from 'node:path';
 import {promisify} from 'node:util';
 import {db} from './db/index.mjs';
 import {CONFIG_DIR, HttpError, readJson} from './store.mjs';
-import {addLot, balanceOf, signupCredits} from './billing.mjs';
+import {addLot, balanceOf, signupCredits, subscriptionOf} from './billing.mjs';
 import {appUrl, resetMail, verifyMail} from './mailer.mjs';
 
 const scrypt = promisify(crypto.scrypt);
@@ -366,12 +366,17 @@ export const upsertAdmin = async ({email, password, workspaceId}) => {
 
 const PACK_ID_RE = /^[a-z0-9][a-z0-9-]{0,31}$/;
 
-/** Пакеты: all — вместе со снятыми с продажи (для админки), иначе только действующие (прайс клиенту) */
+/**
+ * Пакеты: all — вместе со снятыми с продажи (для админки), иначе только действующие (прайс
+ * клиенту). kind: plan — подписка на месяц, topup — докупка сверх подписки. Подписки первыми
+ */
 export const listPacks = async ({all = false} = {}) => (await db().query(
-  `SELECT id, title, credits, price_krw, valid_days, active, sort FROM smmaker_packs
-    ${all ? '' : 'WHERE active'} ORDER BY sort, credits`)).rows;
+  `SELECT id, title, credits, price_krw, valid_days, active, sort, kind FROM smmaker_packs
+    ${all ? '' : 'WHERE active'} ORDER BY kind = 'topup', sort, credits`)).rows;
 
-export const savePack = async ({id, title, credits, price_krw: price, valid_days: days = 365, active = true, sort = 0}) => {
+const PACK_KINDS = new Set(['plan', 'topup']);
+
+export const savePack = async ({id, title, credits, price_krw: price, valid_days: days = 30, active = true, sort = 0, kind}) => {
   if (!PACK_ID_RE.test(String(id))) throw new HttpError(400, 'id пакета — латиница, цифры и дефис (например, base)');
   if (!String(title ?? '').trim()) throw new HttpError(400, 'Нужно название пакета');
   const c = Number(credits);
@@ -380,28 +385,55 @@ export const savePack = async ({id, title, credits, price_krw: price, valid_days
   if (!Number.isInteger(c) || c < 1) throw new HttpError(400, 'Кредиты — целое число от 1');
   if (!Number.isInteger(p) || p < 0) throw new HttpError(400, 'Цена — целое число вон');
   if (!Number.isInteger(d) || d < 1 || d > 3660) throw new HttpError(400, 'Срок — целое число дней от 1');
+  // Вид не указан — у нового пакета докупка, у существующего прежний: правка цены без вида
+  // не должна молча превращать подписку в докупку
+  if (kind !== undefined && !PACK_KINDS.has(kind)) throw new HttpError(400, 'Вид пакета — подписка (plan) или докупка (topup)');
   const {rows: [pack]} = await db().query(
-    `INSERT INTO smmaker_packs (id, title, credits, price_krw, valid_days, active, sort) VALUES ($1, $2, $3, $4, $5, $6, $7)
-     ON CONFLICT (id) DO UPDATE SET title = $2, credits = $3, price_krw = $4, valid_days = $5, active = $6, sort = $7
-     RETURNING id, title, credits, price_krw, valid_days, active, sort`,
-    [id, String(title).trim(), c, p, d, Boolean(active), Number(sort) || 0]);
+    `INSERT INTO smmaker_packs (id, title, credits, price_krw, valid_days, active, sort, kind) VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, 'topup'))
+     ON CONFLICT (id) DO UPDATE SET title = $2, credits = $3, price_krw = $4, valid_days = $5, active = $6, sort = $7,
+       kind = COALESCE($8, smmaker_packs.kind)
+     RETURNING id, title, credits, price_krw, valid_days, active, sort, kind`,
+    [id, String(title).trim(), c, p, d, Boolean(active), Number(sort) || 0, kind ?? null]);
   return pack;
 };
 
 /**
- * Начислить пакет компании: партия с кредитами и сроком пакета, цена записана в партию —
- * по журналу видно, кто сколько заплатил. Цена берётся из пакета в момент начисления:
- * правка прайса потом не меняет уже проданное.
+ * Начислить пакет компании: партия с кредитами, цена записана в партию — по журналу видно,
+ * кто сколько заплатил. Цена берётся из пакета в момент начисления: правка прайса потом
+ * не меняет уже проданное.
+ *
+ * Срок зависит от вида пакета:
+ *   • подписка — месяц (valid_days) от конца действующей подписки, а если её нет — от сейчас.
+ *     Продлили за три дня до конца — эти три дня не теряются, новый месяц начнётся после них.
+ *     Кредиты новой партии доступны сразу, но списание берёт сначала из той, что сгорает
+ *     раньше, — то есть из текущего месяца;
+ *   • докупка — сгорает вместе с действующей подпиской (решение владельца). Подписки нет —
+ *     живёт valid_days от сейчас.
+ * Подписку ищем внутри той же транзакции, под блокировкой компании: два одновременных
+ * продления иначе оба взяли бы один и тот же конец и наложились бы.
  */
 export const grantPack = async ({workspaceId, packId, note = '', createdBy}) => {
   const {rows: [pack]} = await db().query('SELECT * FROM smmaker_packs WHERE id = $1 AND active', [packId]);
   if (!pack) throw new HttpError(404, 'Нет такого действующего пакета');
   const {rowCount} = await db().query('SELECT 1 FROM smmaker_workspaces WHERE id = $1', [workspaceId]);
   if (!rowCount) throw new HttpError(404, 'Нет такой компании');
-  await inTransaction((client) => addLot(client, {
-    workspaceId, credits: pack.credits, days: pack.valid_days, source: 'pack', packId: pack.id, priceKrw: pack.price_krw,
-    note: [`пакет «${pack.title}»`, String(note).trim()].filter(Boolean).join(' · '), createdBy,
-  }));
+  const plan = pack.kind === 'plan';
+  await inTransaction(async (client) => {
+    await client.query('SELECT id FROM smmaker_workspaces WHERE id = $1 FOR UPDATE', [workspaceId]);
+    const current = await subscriptionOf(workspaceId, client);
+    let expiresAt = null;
+    if (plan && current) {
+      const {rows: [r]} = await client.query(`SELECT $1::timestamptz + $2 * interval '1 day' AS at`, [current.until, pack.valid_days]);
+      expiresAt = r.at;
+    } else if (!plan && current) {
+      expiresAt = current.until;
+    }
+    await addLot(client, {
+      workspaceId, credits: pack.credits, days: pack.valid_days, expiresAt,
+      source: plan ? 'subscription' : 'pack', packId: pack.id, priceKrw: pack.price_krw,
+      note: [plan ? `подписка «${pack.title}»` : `докупка «${pack.title}»`, String(note).trim()].filter(Boolean).join(' · '), createdBy,
+    });
+  });
   return balanceOf(workspaceId);
 };
 
@@ -426,12 +458,19 @@ export const listClients = async () => {
     `SELECT w.id, w.name, w.created_at,
             u.name AS person, u.email, u.phone, u.platform_role,
             COALESCE((SELECT sum(remaining) FROM smmaker_credit_lots t WHERE t.workspace_id = w.id AND t.expires_at > now()), 0)::int AS credits,
-            COALESCE((SELECT sum(price_krw) FROM smmaker_credit_lots t WHERE t.workspace_id = w.id AND t.source = 'pack'), 0)::int AS paid_krw,
+            COALESCE((SELECT sum(price_krw) FROM smmaker_credit_lots t WHERE t.workspace_id = w.id AND t.source IN ('pack', 'subscription')), 0)::int AS paid_krw,
+            -- Подписка: тариф и конец оплаченного — менеджеру видно, кому пора продлевать
+            sub.title AS plan_title, sub.expires_at AS plan_until,
             (SELECT count(*) FROM smmaker_credit_ledger l WHERE l.workspace_id = w.id AND l.kind = 'charge')::int AS generations,
             (SELECT max(created_at) FROM smmaker_credit_ledger l WHERE l.workspace_id = w.id AND l.kind = 'charge') AS last_generation
        FROM smmaker_workspaces w
        LEFT JOIN LATERAL (SELECT user_id FROM smmaker_memberships m WHERE m.workspace_id = w.id ORDER BY created_at LIMIT 1) m ON true
        LEFT JOIN smmaker_users u ON u.id = m.user_id
+       LEFT JOIN LATERAL (
+         SELECT l.expires_at, COALESCE(p.title, l.pack_id) AS title FROM smmaker_credit_lots l
+           LEFT JOIN smmaker_packs p ON p.id = l.pack_id
+          WHERE l.workspace_id = w.id AND l.source = 'subscription' AND l.expires_at > now()
+          ORDER BY l.expires_at DESC LIMIT 1) sub ON true
       ORDER BY w.created_at DESC`);
   return rows;
 };

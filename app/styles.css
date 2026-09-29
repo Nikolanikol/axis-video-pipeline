@@ -466,3 +466,5 @@ a.tab { text-decoration: none; }
 .fine-warn { color: var(--danger-text); }
 .formats .pair { align-items: flex-start; }
 .format-shape { display: block; height: 44px; border: 2px solid var(--accent-line); border-radius: 4px; margin-bottom: 4px; }
+/* «Пора продлевать» в админке: метка латунью «внимание», текст обычный — как все состояния */
+.card.renew { border-left: 3px solid var(--warn); }

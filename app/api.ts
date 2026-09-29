@@ -47,16 +47,19 @@ export type Job = {
 // Кабинет SMMAKER: кто вошёл и сколько у компании кредитов
 export type CreditLot = {
   id: number; remaining: number; credits: number; expiresAt: string;
-  source: 'signup' | 'pack' | 'bonus' | 'legacy'; packId: string | null; createdAt: string;
+  source: 'signup' | 'pack' | 'bonus' | 'legacy' | 'subscription'; packId: string | null; createdAt: string;
 };
-export type Balance = {credits: number; nextExpiry: {at: string; credits: number} | null; lots: CreditLot[]};
+// Подписка: тариф и до какого числа оплачено (конец последней партии подписки)
+export type Subscription = {planId: string | null; title: string; credits: number; until: string};
+export type Balance = {credits: number; nextExpiry: {at: string; credits: number} | null; lots: CreditLot[]; subscription: Subscription | null};
 export type Role = 'admin' | 'manager' | null;
 export type User = {id: string; email: string; name: string | null; emailVerified: boolean; role: Role; isAdmin: boolean; isStaff: boolean};
 export type Me =
   | {authRequired: false}
   | {authRequired: true; user: null; signup: {credits: number; days: number}}
   | {authRequired: true; user: User; workspace: {id: string; name: string; role: string} | null; balance: Balance | null};
-export type Pack = {id: string; title: string; credits: number; price_krw: number; valid_days: number; active: boolean; sort: number};
+// kind: plan — подписка на месяц (кредиты сгорают в конце месяца), topup — докупка, сгорает вместе с подпиской
+export type Pack = {id: string; title: string; credits: number; price_krw: number; valid_days: number; active: boolean; sort: number; kind: 'plan' | 'topup'};
 export type Offer = {contacts: {whatsapp?: string; telegram?: string; email?: string}; packs: Pack[]};
 export type LedgerRow = {
   id: number; delta: number; kind: 'grant' | 'charge' | 'refund' | 'adjust'; pipeline: string | null;
@@ -66,6 +69,7 @@ export type LedgerRow = {
 export type ClientRow = {
   id: string; name: string; created_at: string; person: string | null; email: string | null; phone: string | null;
   platform_role: Role; credits: number; paid_krw: number; generations: number; last_generation: string | null;
+  plan_title: string | null; plan_until: string | null;
 };
 export type StaffRow = {id: string; email: string; name: string | null; platform_role: Exclude<Role, null>};
 export type Registration = {name: string; email: string; phone: string; password: string; company: string};

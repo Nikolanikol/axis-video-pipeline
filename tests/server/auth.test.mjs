@@ -106,7 +106,7 @@ suite('вход и кабинеты SMMAKER', () => {
     expect(m0.user).toMatchObject({role: 'admin', isAdmin: true, isStaff: true});
     expect(m0.workspace.id).toBe('k-axis');
     const packs = (await owner.call('GET', '/api/admin/packs')).body;
-    expect(packs.map((p) => p.id)).toEqual(['start', 'base', 'pro']);
+    expect(packs.map((p) => p.id)).toEqual(['plan-basic', 'plan-standard', 'plan-pro', 'start', 'base']);
   });
 
   it('без имени или с негодным телефоном — отказ, и ничего не остаётся', async () => {
@@ -230,7 +230,7 @@ suite('вход и кабинеты SMMAKER', () => {
     const offer = (await a.call('GET', '/api/account/offer')).body;
     expect(offer.contacts.whatsapp).toMatch(/\d/);
     expect(offer.contacts._note).toBeUndefined();
-    expect(offer.packs.map((p) => p.id)).toEqual(['start', 'base', 'pro']);
+    expect(offer.packs.map((p) => p.id)).toEqual(['plan-basic', 'plan-standard', 'plan-pro', 'start', 'base']);
     // Номер продаж перекрывается переменной окружения
     process.env.SMMAKER_SALES_WHATSAPP = '+82 10 0000 1111';
     expect((await a.call('GET', '/api/account/offer')).body.contacts.whatsapp).toBe('+82 10 0000 1111');
@@ -254,17 +254,52 @@ suite('вход и кабинеты SMMAKER', () => {
       expect(self.status).toBe(409);
     });
 
-    it('менеджер видит лидов с телефонами и начисляет пакет', async () => {
+    it('менеджер видит лидов с телефонами и начисляет докупку без подписки', async () => {
       const clients = (await m.call('GET', '/api/admin/clients')).body;
-      expect(clients.find((c) => c.id === wsA)).toMatchObject({person: 'Анна', phone: '+821011112222', credits: 7, paid_krw: 0});
+      expect(clients.find((c) => c.id === wsA)).toMatchObject({person: 'Анна', phone: '+821011112222', credits: 7, paid_krw: 0, plan_until: null});
       const res = await m.call('POST', `/api/admin/clients/${wsA}/packs`, {packId: 'start', note: 'перевод 123'});
       expect(res.status).toBe(200);
-      expect(res.body.credits).toBe(22);
+      expect(res.body.credits).toBe(17);
+      // Подписки нет — докупка живёт свой срок (30 дней), а не «вместе с подпиской»
       const pack = res.body.lots.find((l) => l.source === 'pack');
-      expect(daysTo(pack.expiresAt)).toBeGreaterThan(364.9);
-      // Ближайшее сгорание — бесплатные, а не купленные
+      expect(daysTo(pack.expiresAt)).toBeGreaterThan(29.9);
+      expect(daysTo(pack.expiresAt)).toBeLessThan(30.1);
+      expect(res.body.subscription).toBeNull();
+      // Ближайшее сгорание — бесплатные: они начислены раньше
       expect(res.body.nextExpiry.credits).toBe(7);
-      expect((await me(a)).balance.credits).toBe(22);
+      expect((await me(a)).balance.credits).toBe(17);
+    });
+
+    it('подписка: месяц, продление — от конца оплаченного, докупка сгорает вместе с ней', async () => {
+      const first = (await m.call('POST', `/api/admin/clients/${wsA}/packs`, {packId: 'plan-standard', note: 'октябрь'})).body;
+      expect(first.credits).toBe(67);
+      expect(first.subscription).toMatchObject({planId: 'plan-standard', title: 'Стандарт', credits: 50});
+      expect(daysTo(first.subscription.until)).toBeGreaterThan(29.9);
+      expect(daysTo(first.subscription.until)).toBeLessThan(30.1);
+
+      // Продлили заранее: новый месяц встаёт после оплаченного, дни не теряются
+      const renewed = (await m.call('POST', `/api/admin/clients/${wsA}/packs`, {packId: 'plan-basic'})).body;
+      expect(renewed.credits).toBe(97);
+      expect(renewed.subscription).toMatchObject({planId: 'plan-basic', title: 'Базовый'});
+      expect(daysTo(renewed.subscription.until)).toBeGreaterThan(59.9);
+      expect(daysTo(renewed.subscription.until)).toBeLessThan(60.1);
+
+      // Докупка — ровно до конца подписки
+      const topped = (await m.call('POST', `/api/admin/clients/${wsA}/packs`, {packId: 'base'})).body;
+      expect(topped.credits).toBe(122);
+      const topup = topped.lots.find((l) => l.source === 'pack' && l.packId === 'base');
+      expect(topup.expiresAt).toBe(topped.subscription.until);
+
+      // Менеджеру видно, у кого какая подписка и до какого числа; оплачено — всё вместе
+      const row = (await m.call('GET', '/api/admin/clients')).body.find((c) => c.id === wsA);
+      expect(row).toMatchObject({plan_title: 'Базовый', paid_krw: 19000 + 69000 + 49000 + 44000});
+      expect(new Date(row.plan_until).toISOString()).toBe(new Date(topped.subscription.until).toISOString());
+    });
+
+    it('правка цены без вида пакета не превращает подписку в докупку', async () => {
+      const saved = await owner.call('PUT', '/api/admin/packs/plan-pro', {title: 'Про', credits: 90, price_krw: 89000, valid_days: 30, sort: 3});
+      expect(saved.body).toMatchObject({kind: 'plan'});
+      expect((await owner.call('PUT', '/api/admin/packs/plan-pro', {title: 'Про', credits: 90, price_krw: 89000, kind: 'monthly'})).status).toBe(400);
     });
 
     it('менеджер не меняет цены, бонусы и сотрудников', async () => {
@@ -280,10 +315,12 @@ suite('вход и кабинеты SMMAKER', () => {
       expect((await a.call('GET', '/api/account/offer')).body.packs.map((p) => p.id)).not.toContain('start');
       expect((await owner.call('POST', `/api/admin/clients/${wsA}/packs`, {packId: 'start'})).status).toBe(404);
       const clients = (await owner.call('GET', '/api/admin/clients')).body;
-      expect(clients.find((c) => c.id === wsA).paid_krw).toBe(100000);
+      expect(clients.find((c) => c.id === wsA).paid_krw).toBe(19000 + 69000 + 49000 + 44000);
+      // Проданная докупка осталась по цене продажи, а не по новой
       const rows = (await a.call('GET', '/api/account/ledger')).body;
-      expect(rows[0]).toMatchObject({kind: 'grant', delta: 15, source: 'pack', price_krw: 100000});
-      expect(rows[0].note).toMatch(/Старт.*перевод 123/);
+      const sold = rows.find((r) => r.note.includes('перевод 123'));
+      expect(sold).toMatchObject({kind: 'grant', delta: 10, source: 'pack', price_krw: 19000});
+      expect(sold.note).toMatch(/\+10 кредитов.*перевод 123/);
     });
 
     it('негодный пакет в прайс не попадает', async () => {

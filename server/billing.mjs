@@ -1,8 +1,9 @@
 // Кредиты SMMAKER: партии со сроком, списание за генерацию, возврат при неудаче.
 //
 // Модель (решение владельца 28 сентября, см. CONTEXT.md «Кредиты»):
-//   • кредиты лежат партиями: бесплатные за подтверждение почты (10 на 30 дней), пакеты от менеджера
-//     (живут год), бонусы. У каждой партии свой остаток и срок;
+//   • кредиты лежат партиями: бесплатные за подтверждение почты (7 на 30 дней), подписка на месяц
+//     и докупка от менеджера (с 29.09 сгорают в конце месяца подписки), бонусы. У каждой партии
+//     свой остаток и срок; «подписка до» — срок последней партии подписки;
 //   • баланс — сумма остатков несгоревших партий;
 //   • кредит списывается при ЗАПУСКЕ — иначе с пятью кредитами можно поставить в очередь
 //     пятьдесят роликов — и берётся из партии, которая сгорает раньше: иначе бесплатные
@@ -43,13 +44,14 @@ const plural = (n) => {
 
 /**
  * Положить партию кредитов и записать начисление в журнал. Вызывать внутри транзакции.
- * source — signup | pack | bonus; days — сколько дней живёт партия.
+ * source — signup | pack | bonus | subscription. Срок — либо days от сейчас, либо точная
+ * дата expiresAt: подписка продлевается от конца текущей, докупка сгорает вместе с ней.
  */
-export const addLot = async (client, {workspaceId, credits, days, source, packId = null, priceKrw = null, note = '', createdBy = null}) => {
+export const addLot = async (client, {workspaceId, credits, days, expiresAt = null, source, packId = null, priceKrw = null, note = '', createdBy = null}) => {
   const {rows: [lot]} = await client.query(
     `INSERT INTO smmaker_credit_lots (workspace_id, credits, remaining, expires_at, source, pack_id, price_krw, note, created_by)
-     VALUES ($1, $2, $2, now() + $3 * interval '1 day', $4, $5, $6, $7, $8) RETURNING id, expires_at`,
-    [workspaceId, credits, days, source, packId, priceKrw, String(note).slice(0, 200), createdBy]);
+     VALUES ($1, $2, $2, COALESCE($9::timestamptz, now() + $3 * interval '1 day'), $4, $5, $6, $7, $8) RETURNING id, expires_at`,
+    [workspaceId, credits, days ?? 30, source, packId, priceKrw, String(note).slice(0, 200), createdBy, expiresAt]);
   await client.query(
     `INSERT INTO smmaker_credit_ledger (workspace_id, lot_id, delta, kind, note, created_by)
      VALUES ($1, $2, $3, 'grant', $4, $5)`,
@@ -58,8 +60,24 @@ export const addLot = async (client, {workspaceId, credits, days, source, packId
 };
 
 /**
- * Баланс компании: сумма несгоревших остатков и ближайшее сгорание — чтобы в кабинете
- * было видно «10 кредитов, 4 из них сгорят 27 октября».
+ * Действующая подписка: тариф и до какого числа. Берём партию подписки, которая сгорает
+ * позже всех: продлённая заранее подписка — это вторая партия со сроком после первой,
+ * и «до» должно показывать конец оплаченного, а не текущего месяца. Остаток не важен:
+ * все кредиты месяца потрачены, а подписка идёт. null — подписки нет или она кончилась.
+ */
+export const subscriptionOf = async (workspaceId, client = db()) => {
+  const {rows: [s]} = await client.query(
+    `SELECT l.expires_at, l.pack_id, COALESCE(p.title, l.pack_id) AS title, l.credits
+       FROM smmaker_credit_lots l LEFT JOIN smmaker_packs p ON p.id = l.pack_id
+      WHERE l.workspace_id = $1 AND l.source = 'subscription' AND l.expires_at > now()
+      ORDER BY l.expires_at DESC LIMIT 1`,
+    [workspaceId]);
+  return s ? {planId: s.pack_id, title: s.title, credits: s.credits, until: s.expires_at} : null;
+};
+
+/**
+ * Баланс компании: сумма несгоревших остатков, ближайшее сгорание и подписка — чтобы в
+ * кабинете было видно «10 кредитов, 4 из них сгорят 27 октября, подписка до 27 октября».
  */
 export const balanceOf = async (workspaceId, client = db()) => {
   const {rows} = await client.query(
@@ -69,6 +87,7 @@ export const balanceOf = async (workspaceId, client = db()) => {
   const credits = rows.reduce((s, r) => s + r.remaining, 0);
   return {
     credits,
+    subscription: await subscriptionOf(workspaceId, client),
     nextExpiry: rows[0] ? {at: rows[0].expires_at, credits: rows[0].remaining} : null,
     lots: rows.map((r) => ({id: Number(r.id), remaining: r.remaining, credits: r.credits, expiresAt: r.expires_at,
       source: r.source, packId: r.pack_id, createdAt: r.created_at})),
@@ -96,7 +115,7 @@ export const charge = async ({workspaceId, pipeline, jobId, note = '', userId = 
       [workspaceId]);
     const balance = lots.reduce((s, l) => s + l.remaining, 0);
     if (balance < cost) {
-      throw new HttpError(402, `Не хватает кредитов: ${PIPELINE_TITLES[pipeline] ?? pipeline} стоит ${cost} ${plural(cost)}, осталось ${balance}. Напишите нам — пополним пакетом`);
+      throw new HttpError(402, `Не хватает кредитов: ${PIPELINE_TITLES[pipeline] ?? pipeline} стоит ${cost} ${plural(cost)}, осталось ${balance}. Напишите нам — продлим подписку или докупим кредиты`);
     }
     // Из партии, которая сгорает раньше
     const taken = [];

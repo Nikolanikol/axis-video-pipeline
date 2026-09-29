@@ -1,7 +1,8 @@
 // Кабинет компании и админка платформы.
 //
-// Кредиты покупаются вне системы: клиент пишет нам, платит, менеджер начисляет пакет.
-// Поэтому кабинет — это остаток, прайс и кнопка «написать», а админка — лиды и начисление.
+// Кредиты покупаются вне системы: клиент пишет нам, платит, менеджер начисляет подписку на
+// месяц или докупку. Поэтому кабинет — это остаток, подписка, прайс и кнопка «написать»,
+// а админка — лиды, кому пора продлевать, и начисление.
 import React, {useCallback, useEffect, useState} from 'react';
 import {Balance, ClientRow, CreditLot, LedgerRow, Offer, Pack, Role, StaffRow, api} from './api';
 import {day, daysLeft, useSession} from './auth';
@@ -10,7 +11,12 @@ import {Field} from './LotForm';
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const won = (n: number) => `₩${n.toLocaleString('ru-RU')}`;
 const when = (iso: string) => new Date(iso).toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
-const SOURCE: Record<CreditLot['source'], string> = {signup: 'подарок за регистрацию', pack: 'пакет', bonus: 'бонус', legacy: 'перенесено'};
+const SOURCE: Record<CreditLot['source'], string> = {
+  signup: 'подарок за регистрацию', subscription: 'подписка', pack: 'докупка', bonus: 'бонус', legacy: 'перенесено',
+};
+// За сколько дней до конца подписки предупреждать — клиента плашкой, менеджера списком.
+// Пять дней: успеть написать, оплатить переводом и получить начисление до сгорания
+export const RENEW_DAYS = 5;
 
 // ——— Мой кабинет ———
 
@@ -48,6 +54,10 @@ const BalanceFacts: React.FC<{balance: Balance | null}> = ({balance}) => {
     <>
       <dl className="facts">
         <dt>Кредитов</dt><dd><b>{balance.credits}</b> <span className="muted">· карусель 1, рекламный ролик 3</span></dd>
+        <dt>Подписка</dt>
+        <dd>{balance.subscription
+          ? <>«{balance.subscription.title}» до {day(balance.subscription.until)} <span className="muted">· через {daysLeft(balance.subscription.until)} дн.</span></>
+          : <span className="muted">нет — напишите нам, подключим</span>}</dd>
         {balance.nextExpiry && (
           <><dt>Ближайшее сгорание</dt><dd>{balance.nextExpiry.credits} кр. — {day(balance.nextExpiry.at)} <span className="muted">· через {daysLeft(balance.nextExpiry.at)} дн.</span></dd></>
         )}
@@ -64,35 +74,34 @@ const BalanceFacts: React.FC<{balance: Balance | null}> = ({balance}) => {
         </table>
       )}
       {balance.credits <= 0 && (
-        <p className="auth-error">Кредиты закончились. Готовое можно смотреть и скачивать; чтобы создавать новое — пополните пакетом.</p>
+        <p className="auth-error">Кредиты закончились. Готовое можно смотреть и скачивать; чтобы создавать новое — продлите подписку или докупите кредиты.</p>
       )}
     </>
   );
 };
 
-// Прайс и куда писать. Оплата — вне системы, поэтому здесь ссылка на мессенджер, а не касса
+// Прайс и куда писать. Оплата — вне системы, поэтому здесь ссылка на мессенджер, а не касса.
+// Сначала подписки (основной способ), ниже докупка — на случай, если месяца не хватило
 const OfferCard: React.FC = () => {
   const [offer, setOffer] = useState<Offer | null>(null);
   useEffect(() => { api.offer().then(setOffer).catch(() => setOffer(null)); }, []);
   if (!offer) return null;
   const {whatsapp, telegram, email} = offer.contacts;
+  const plans = offer.packs.filter((p) => p.kind === 'plan');
+  const topups = offer.packs.filter((p) => p.kind === 'topup');
   return (
     <section className="card">
-      <h2>Пополнить кредиты</h2>
-      {offer.packs.length > 0 && (
-        <table className="table">
-          <thead><tr><th>Пакет</th><th>Кредитов</th><th>Цена</th><th>За кредит</th></tr></thead>
-          <tbody>
-            {offer.packs.map((p) => (
-              <tr key={p.id}>
-                <td>{p.title}</td><td>{p.credits}</td><td>{won(p.price_krw)}</td>
-                <td className="muted">{won(Math.round(p.price_krw / p.credits))}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      <h2>Подписка</h2>
+      {plans.length > 0 && <PriceTable packs={plans} head="Тариф" perMonth />}
+      <p className="note">Кредиты подписки действуют месяц и сгорают в конце — чем больше тариф, тем дешевле кредит.</p>
+      {topups.length > 0 && (
+        <>
+          <h2>Не хватило на месяц</h2>
+          <PriceTable packs={topups} head="Докупка" />
+          <p className="note">Докупленные кредиты сгорают вместе с подпиской.</p>
+        </>
       )}
-      <p className="note">Кредиты пакета действуют {offer.packs[0] ? Math.round(offer.packs[0].valid_days / 30) : 12} мес. Напишите нам — пришлём реквизиты и начислим пакет.</p>
+      <p className="note">Напишите нам — пришлём реквизиты и подключим.</p>
       <div className="btn-row">
         {whatsapp && <a className="btn primary" href={`https://wa.me/${whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer">WhatsApp</a>}
         {telegram && <a className="btn" href={`https://t.me/${telegram.replace(/^@/, '')}`} target="_blank" rel="noreferrer">Telegram</a>}
@@ -101,6 +110,20 @@ const OfferCard: React.FC = () => {
     </section>
   );
 };
+
+const PriceTable: React.FC<{packs: Pack[]; head: string; perMonth?: boolean}> = ({packs, head, perMonth}) => (
+  <table className="table">
+    <thead><tr><th>{head}</th><th>Кредитов</th><th>{perMonth ? 'В месяц' : 'Цена'}</th><th>За кредит</th></tr></thead>
+    <tbody>
+      {packs.map((p) => (
+        <tr key={p.id}>
+          <td>{p.title}</td><td>{p.credits}</td><td>{won(p.price_krw)}</td>
+          <td className="muted">{won(Math.round(p.price_krw / p.credits))}</td>
+        </tr>
+      ))}
+    </tbody>
+  </table>
+);
 
 const KIND: Record<LedgerRow['kind'], string> = {grant: 'Начислено', charge: 'Списано', refund: 'Возврат', adjust: 'Правка'};
 const WHAT: Record<string, string> = {ads: 'Ролик', carousels: 'Карусель', reviews: 'Обзор'};
@@ -188,21 +211,42 @@ const Clients: React.FC<{clients: ClientRow[]; packs: Pack[]; isAdmin: boolean; 
   const [query, setQuery] = useState('');
   const q = query.trim().toLowerCase();
   const shown = q ? clients.filter((c) => [c.name, c.person, c.email, c.phone].some((v) => v?.toLowerCase().includes(q))) : clients;
+  // Кому пора продлевать: подписка кончается в ближайшие RENEW_DAYS дней — ближайшие сверху.
+  // Отдельным блоком над списком: в общем списке новые лиды сверху, и эти строки утонули бы
+  const renew = clients.filter((c) => c.plan_until && daysLeft(c.plan_until) <= RENEW_DAYS)
+    .sort((a, b) => a.plan_until!.localeCompare(b.plan_until!));
   return (
     <>
+      {renew.length > 0 && (
+        <section className="card wide renew">
+          <h2>Пора продлевать <span className="muted">{renew.length}</span></h2>
+          <table className="table">
+            <tbody>
+              {renew.map((c) => (
+                <tr key={c.id}>
+                  <td>{c.name}<br /><span className="muted">{c.person ?? ''} {c.phone ?? ''}</span></td>
+                  <td>«{c.plan_title}» до {day(c.plan_until)}<br /><span className="muted">через {daysLeft(c.plan_until)} дн. · осталось {c.credits} кр.</span></td>
+                  <td><button className="btn ghost" onClick={() => setOpenId(c.id)}>Открыть</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </section>
+      )}
       <section className="card wide">
         <div className="row">
           <h2>Клиенты <span className="muted">{clients.length}</span></h2>
           <input placeholder="Поиск: имя, почта, телефон" value={query} onChange={(e) => setQuery(e.target.value)} />
         </div>
         <table className="table">
-          <thead><tr><th>Компания</th><th>Контакт</th><th>С нами с</th><th>Кредитов</th><th>Генераций</th><th>Оплачено</th><th /></tr></thead>
+          <thead><tr><th>Компания</th><th>Контакт</th><th>С нами с</th><th>Подписка</th><th>Кредитов</th><th>Генераций</th><th>Оплачено</th><th /></tr></thead>
           <tbody>
             {shown.map((c) => (
               <tr key={c.id} className={open?.id === c.id ? 'active' : ''}>
                 <td>{c.name}{c.platform_role && <span className="badge">{c.platform_role === 'admin' ? 'админ' : 'менеджер'}</span>}</td>
                 <td>{c.person ?? '—'}<br /><span className="muted">{c.phone ?? ''} {c.email ?? ''}</span></td>
                 <td>{day(c.created_at)}</td>
+                <td>{c.plan_until ? <>{c.plan_title}<br /><span className="muted">до {day(c.plan_until)}</span></> : <span className="muted">—</span>}</td>
                 <td>{c.credits}</td>
                 <td>{c.generations}{c.last_generation && <span className="muted"> · {day(c.last_generation)}</span>}</td>
                 <td>{c.paid_krw ? won(c.paid_krw) : <span className="muted">—</span>}</td>
@@ -248,15 +292,22 @@ const ClientCard: React.FC<{client: ClientRow; packs: Pack[]; isAdmin: boolean; 
         <form className="form" onSubmit={grant}>
           <h2>{client.name} <span className="muted">{client.credits} кр.</span></h2>
           <div className="row">
-            <Field label="Пакет">
+            <Field label="Что начислить" hint={pack?.kind === 'plan'
+              ? (client.plan_until ? `продлится до ${day(addDays(client.plan_until, pack.valid_days))}` : `месяц с сегодняшнего дня`)
+              : (client.plan_until ? `сгорит вместе с подпиской ${day(client.plan_until)}` : `подписки нет — сгорит через ${pack?.valid_days ?? 30} дн.`)}>
               <select value={pack?.id} onChange={(e) => setPackId(e.target.value)}>
-                {packs.map((p) => <option key={p.id} value={p.id}>{p.title} · {p.credits} кр. · {won(p.price_krw)} · {p.valid_days} дн.</option>)}
+                <optgroup label="Подписка на месяц">
+                  {packs.filter((p) => p.kind === 'plan').map((p) => <option key={p.id} value={p.id}>{p.title} · {p.credits} кр. · {won(p.price_krw)}</option>)}
+                </optgroup>
+                <optgroup label="Докупка">
+                  {packs.filter((p) => p.kind === 'topup').map((p) => <option key={p.id} value={p.id}>{p.title} · {won(p.price_krw)}</option>)}
+                </optgroup>
               </select>
             </Field>
             <Field label="Заметка" hint="как оплатил, номер перевода"><input value={note} onChange={(e) => setNote(e.target.value)} /></Field>
           </div>
           <div className="btn-row">
-            <button className="btn primary" disabled={busy || !pack}>Начислить пакет</button>
+            <button className="btn primary" disabled={busy || !pack}>{pack?.kind === 'plan' ? 'Начислить подписку' : 'Начислить докупку'}</button>
             {isAdmin && (
               <>
                 <input type="number" min={1} value={bonus} onChange={(e) => setBonus(Number(e.target.value) || 1)} style={{width: 80}} />
@@ -272,7 +323,10 @@ const ClientCard: React.FC<{client: ClientRow; packs: Pack[]; isAdmin: boolean; 
   );
 };
 
-const EMPTY_PACK: Pack = {id: '', title: '', credits: 100, price_krw: 100000, valid_days: 365, active: true, sort: 0};
+const EMPTY_PACK: Pack = {id: '', title: '', credits: 30, price_krw: 49000, valid_days: 30, active: true, sort: 0, kind: 'plan'};
+// Дата через n дней — подсказка менеджеру, до какого числа продлится подписка. Считает
+// сервер (от конца действующей подписки); здесь только то же правило для подписи
+const addDays = (iso: string, n: number) => new Date(new Date(iso).getTime() + n * 864e5).toISOString();
 
 const PackEditor: React.FC<{packs: Pack[]; onSaved: () => void; onError: (e: string) => void}> = ({packs, onSaved, onError}) => {
   const [pack, setPack] = useState<Pack>(EMPTY_PACK);
@@ -293,13 +347,13 @@ const PackEditor: React.FC<{packs: Pack[]; onSaved: () => void; onError: (e: str
   return (
     <section className="card">
       <form className="form" onSubmit={save}>
-        <h2>Пакеты</h2>
+        <h2>Подписки и докупка</h2>
         <table className="table">
-          <thead><tr><th>Пакет</th><th>Кредиты</th><th>Цена</th><th>За кредит</th><th>Дней</th><th /></tr></thead>
+          <thead><tr><th>Пакет</th><th>Вид</th><th>Кредиты</th><th>Цена</th><th>За кредит</th><th>Дней</th><th /></tr></thead>
           <tbody>
             {packs.map((p) => (
               <tr key={p.id} className={p.active ? '' : 'muted'}>
-                <td>{p.title} <span className="muted">{p.id}</span></td><td>{p.credits}</td><td>{won(p.price_krw)}</td>
+                <td>{p.title} <span className="muted">{p.id}</span></td><td>{p.kind === 'plan' ? 'подписка' : 'докупка'}</td><td>{p.credits}</td><td>{won(p.price_krw)}</td>
                 <td className="muted">{won(Math.round(p.price_krw / p.credits))}</td><td>{p.valid_days}</td>
                 <td><button type="button" className="btn ghost" onClick={() => { setPack(p); setEditing(true); }}>Изменить</button></td>
               </tr>
@@ -309,11 +363,17 @@ const PackEditor: React.FC<{packs: Pack[]; onSaved: () => void; onError: (e: str
         <div className="row">
           <Field label="id" hint="латиницей, не меняется"><input value={pack.id} onChange={(e) => set({id: e.target.value.toLowerCase()})} disabled={editing} required /></Field>
           <Field label="Название"><input value={pack.title} onChange={(e) => set({title: e.target.value})} required /></Field>
+          <Field label="Вид">
+            <select value={pack.kind} onChange={(e) => set({kind: e.target.value as Pack['kind']})}>
+              <option value="plan">подписка на месяц</option>
+              <option value="topup">докупка</option>
+            </select>
+          </Field>
         </div>
         <div className="row">
           <Field label="Кредитов"><input type="number" min={1} value={pack.credits} onChange={(e) => set({credits: Number(e.target.value)})} /></Field>
           <Field label="Цена, ₩"><input type="number" min={0} step={1000} value={pack.price_krw} onChange={(e) => set({price_krw: Number(e.target.value)})} /></Field>
-          <Field label="Действует, дней"><input type="number" min={1} value={pack.valid_days} onChange={(e) => set({valid_days: Number(e.target.value)})} /></Field>
+          <Field label="Действует, дней" hint="у подписки — длина месяца; у докупки — если подписки нет"><input type="number" min={1} value={pack.valid_days} onChange={(e) => set({valid_days: Number(e.target.value)})} /></Field>
         </div>
         <div className="checks">
           <label><input type="checkbox" checked={pack.active} onChange={(e) => set({active: e.target.checked})} /> продаётся</label>
@@ -353,7 +413,7 @@ const Staff: React.FC<{onError: (e: string) => void}> = ({onError}) => {
         <Field label="Сделать менеджером" hint="человек сначала регистрируется сам — пароль остаётся только у него">
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="почта" required />
         </Field>
-        <p className="hint">Менеджер видит клиентов и начисляет пакеты; прайс, бонусы и сотрудников не меняет.</p>
+        <p className="hint">Менеджер видит клиентов и начисляет подписки и докупку; прайс, бонусы и сотрудников не меняет.</p>
         <button className="btn primary">Назначить</button>
       </form>
     </section>

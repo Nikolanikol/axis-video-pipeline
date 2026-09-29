@@ -2,8 +2,8 @@
 import React, {Suspense, useCallback, useState} from 'react';
 import {Loading} from './Loading';
 import {ConfigProvider, useConfig} from './config';
-import {AuthGate, VerifyBanner, day, useOutOfCredits, useSession} from './auth';
-import {AccountPage, AdminPage} from './Account';
+import {AuthGate, VerifyBanner, day, daysLeft, useOutOfCredits, useSession} from './auth';
+import {AccountPage, AdminPage, RENEW_DAYS} from './Account';
 import {Home, PipelinePage} from './Home';
 import {Pipeline, ToolMeta, findPipeline, isClosed, toolKey, visiblePipelines} from './pipelines';
 import {href, useRoute} from './router';
@@ -76,10 +76,11 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
       <VerifyBanner />
       {outOfCredits && (
         <div className="readonly">
-          Кредиты закончились: готовое можно смотреть и скачивать, новое — после пополнения.{' '}
-          <a href={href('account')}>Пополнить пакетом</a>
+          Кредиты закончились: готовое можно смотреть и скачивать, новое — после продления подписки или докупки.{' '}
+          <a href={href('account')}>Тарифы</a>
         </div>
       )}
+      {!outOfCredits && <RenewBanner />}
 
       <div className="tool">
         {route.pipeline === 'account' ? <AccountPage />
@@ -92,6 +93,30 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
                 : <ToolScreen pipeline={pipeline} tool={tool} />}
       </div>
     </>
+  );
+};
+
+/**
+ * Подписка скоро кончится: за RENEW_DAYS дней до конца. Кредиты подписки сгорают, поэтому
+ * говорим и сколько сгорит — это и напоминание продлить, и повод потратить остаток.
+ * Когда кредиты уже кончились, показывается своя полоса «кредиты закончились» — две
+ * полосы подряд про одно и то же были бы лишними.
+ */
+const RenewBanner: React.FC = () => {
+  const {enabled, isStaff, balance} = useSession();
+  const sub = balance?.subscription;
+  if (!enabled || isStaff || !sub) return null;
+  const left = daysLeft(sub.until);
+  if (left > RENEW_DAYS) return null;
+  // Сгорят только кредиты с этим сроком: продлённый заранее месяц уже лежит отдельной партией
+  const burning = balance!.lots.filter((l) => new Date(l.expiresAt).getTime() <= new Date(sub.until).getTime())
+    .reduce((n, l) => n + l.remaining, 0);
+  return (
+    <div className="readonly">
+      Подписка «{sub.title}» заканчивается {day(sub.until)}{left <= 1 ? ' — завтра или сегодня' : ` — через ${left} дн.`}
+      {burning > 0 && <>, вместе с ней сгорят {burning} кр.</>}.{' '}
+      <a href={href('account')}>Продлить</a>
+    </div>
   );
 };
 
