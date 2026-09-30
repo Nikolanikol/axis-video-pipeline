@@ -63,6 +63,10 @@ export type Lot = Partial<Omit<Market, 'texts'>> & {
   carPriceUsd?: number | null; carPriceKrw?: number | null; krwPerUsd?: number | null;
   // Путь в public/, абсолютный путь сервера (/data/...) или http-ссылка
   photos: string[];
+  // История машины из Encar (без списка выплат — ролику нужны только счётчики).
+  // null/нет — истории не знаем: это НЕ то же самое, что «случаев не было»
+  history?: {accidentsTotal: number; accidentsOwn: number; accidentsOther: number; ownerChanges: number;
+    theft: number; flood: number; totalLoss: number} | null;
   // Места фото в «Галерее», выбранные руками: ключ — имя файла без версии (photoKey),
   // нет ключа — «авто», место по порядку. См. src/shared/photoSlots.ts
   slots?: Record<string, 'auto' | 'hook' | 'stack' | 'gallery' | 'skip'>;

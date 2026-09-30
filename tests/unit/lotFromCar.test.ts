@@ -1,6 +1,6 @@
 // Лот по машине из Encar: поля формы на языке профиля и порядок фото
 import {describe, expect, it} from 'vitest';
-import {SPEC_MAX, carPhotos, lotFieldsFromCar, lotIsBlank} from '../../src/shared/lotFromCar';
+import {SPEC_MAX, TAGLINE_MAX, carPhotos, lotFieldsFromCar, lotIsBlank, taglineFromCar} from '../../src/shared/lotFromCar';
 import type {CarouselCar} from '../../src/shared/types';
 
 const plain = (s: string) => s.replace(/[\u00a0\u202f]/g, ' ');
@@ -55,3 +55,26 @@ describe('пустой ли лот', () => {
     expect(lotIsBlank({...blank, carPriceUsd: 9000})).toBe(false);
   });
 });
+
+describe('подзаголовок из данных', () => {
+  const clean = {accidentsOwn: 0, accidentsOther: 0, accidentsTotal: 0, accidentYears: [], maxPayoutKrw: null, claims: [],
+    ownerChanges: 0, theft: 0, flood: 0, totalLoss: 0};
+  it('чистая история и один владелец — оба факта, точными словами (не «без ДТП»)', () => {
+    expect(taglineFromCar({...car, history: clean}, 'ru')).toBe('Без страховых случаев');
+    // Вместе не влезают в строку — остаётся первый, он сильнее
+    expect(`Без страховых случаев · Один владелец`.length).toBeGreaterThan(TAGLINE_MAX);
+    expect(taglineFromCar({...car, history: clean}, 'en')).toBe('No insurance claims');
+  });
+  it('были случаи — о них молчим; малый пробег — пишем', () => {
+    const hit = {...clean, accidentsTotal: 3, accidentsOwn: 3, ownerChanges: 0};
+    // По-русски два факта не влезают (33 знака) — первый; по-английски короче — оба
+    expect(taglineFromCar({...car, history: hit, mileageKm: 31500}, 'ru')).toBe('Один владелец');
+    expect(taglineFromCar({...car, history: hit, mileageKm: 31500}, 'en')).toBe('One owner · Only 32k km');
+    expect(taglineFromCar({...car, history: null, mileageKm: 31500}, 'ru')).toBe('Пробег 32 тыс. км');
+  });
+  it('истории нет и пробег обычный — пусто: ролик возьмёт фразу профиля', () => {
+    expect(taglineFromCar({...car, history: null}, 'ru')).toBe('');
+    expect(lotFieldsFromCar({...car, history: null}, 'ru')).toMatchObject({history: null, hookTagline: ''});
+  });
+});
+

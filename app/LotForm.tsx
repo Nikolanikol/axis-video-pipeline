@@ -61,6 +61,12 @@ export const LotForm: React.FC<Props> = ({lot, market, format, onChange, onPhoto
         <Field label="Версия"><input value={lot.trim ?? ''} placeholder="35 TDI" onChange={(e) => onChange({trim: e.target.value})} /></Field>
         <Field label="Год"><input type="number" value={lot.year ?? ''} onChange={(e) => onChange({year: Number(e.target.value)})} /></Field>
       </div>
+      {/* Подзаголовок под годом в первом кадре. Пусто — фраза из профиля («Из Кореи»);
+          из Encar подставляется по фактам: без страховых случаев, один владелец, малый пробег */}
+      <Field label="Подзаголовок" hint={`пусто — «${market.texts.hookTagline ?? ''}» из профиля`}>
+        <input value={lot.texts?.hookTagline ?? ''} placeholder={market.texts.hookTagline ?? ''} maxLength={40}
+          onChange={(e) => onChange({texts: {...lot.texts, hookTagline: e.target.value || undefined}})} />
+      </Field>
 
       <h2>Характеристики <span className="muted">на языке постов</span></h2>
       {lot.specs.map((s, i) => (

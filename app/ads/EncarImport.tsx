@@ -52,9 +52,12 @@ export const EncarImport: React.FC<Props> = ({lot, onCreate, onApply, onError}) 
   // один для всех лотов. Цена в долларах сбрасывается: иначе она «главнее ₩» и старая
   // перекрыла бы новую
   const fields = async (): Promise<Partial<LotEntry>> => {
-    const base: CarFields = lotFieldsFromCar(car!, profile.language);
+    const {hookTagline, ...base}: CarFields = lotFieldsFromCar(car!, profile.language);
     const rate = await api.usdKrw().catch(() => null);
-    return {...base, carPriceUsd: null, krwPerUsd: rate?.krwPerUsd ?? lot?.krwPerUsd ?? null};
+    // Подзаголовок — в тексты лота (они поверх текстов профиля). Сказать нечего — не трогаем:
+    // пустой подзаголовок стёр бы фразу, которую человек мог вписать сам
+    const texts = hookTagline ? {texts: {...lot?.texts, hookTagline}} : {};
+    return {...base, ...texts, carPriceUsd: null, krwPerUsd: rate?.krwPerUsd ?? lot?.krwPerUsd ?? null};
   };
   const note = (current?: string) => (current?.trim() ? undefined : `Encar ${car!.id}`);
 
