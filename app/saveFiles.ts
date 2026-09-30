@@ -44,3 +44,52 @@ export const shareFiles = async (files: File[]) => {
     if ((e as Error)?.name !== 'AbortError') throw e;
   }
 };
+
+// ——— Компьютер: все файлы в выбранную папку, картинками, без архива ———
+// File System Access API: браузер один раз спрашивает папку и даёт писать в неё. Есть в
+// Chrome и Edge; в Safari и Firefox нет — там остаётся ZIP (владелец 30.09 выбрал папку:
+// архив приходится распаковывать, а серия отдельных загрузок в Chrome упирается в вопрос
+// «Разрешить скачивать несколько файлов?» и иногда теряет часть).
+type DirHandle = {
+  name: string;
+  getFileHandle: (name: string, opts: {create: boolean}) => Promise<{createWritable: () => Promise<{write: (b: Blob) => Promise<void>; close: () => Promise<void>}>}>;
+};
+type PickerWindow = Window & {showDirectoryPicker?: (opts?: {id?: string; mode?: 'readwrite'; startIn?: string}) => Promise<DirHandle>};
+
+// typeof window — проверка не должна падать там, где окна нет (тесты, серверная сборка)
+export const canSaveToFolder = !canSaveToGallery && typeof window !== 'undefined'
+  && typeof (window as PickerWindow).showDirectoryPicker === 'function';
+
+/**
+ * Спросить папку и записать в неё файлы. Папку спрашиваем ПЕРВЫМ делом: браузер показывает
+ * выбор только сразу после нажатия, как и «Поделиться». id — браузер запоминает последнюю
+ * папку, и в следующий раз предлагает её же. Возвращает имя папки или null, если отменили.
+ */
+export const saveToFolder = async (files: {url: string; name: string}[], onProgress: (done: number) => void): Promise<string | null> => {
+  let dir: DirHandle;
+  try {
+    dir = await (window as PickerWindow).showDirectoryPicker!({id: 'kok-carousel', mode: 'readwrite', startIn: 'downloads'});
+  } catch (e) {
+    if ((e as Error)?.name === 'AbortError') return null;
+    throw e;
+  }
+  for (const [i, {url, name}] of files.entries()) {
+    const blob = await (await fetch(url)).blob();
+    const out = await (await dir.getFileHandle(name, {create: true})).createWritable();
+    await out.write(blob);
+    await out.close();
+    onProgress(i + 1);
+  }
+  return dir.name;
+};
+
+/**
+ * Имя файла слайда — то же, что отдаёт сервер при скачивании (slideFileName в
+ * server/carousel.mjs): марка-модель-номер-порядок. Порядок в имени обязателен: в папке их
+ * до двенадцати подряд, и порядок должен читаться без открытия.
+ */
+export const slideName = (car: {brand?: string; model?: string; id?: string}, n: number) => {
+  const name = [car.brand, car.model].filter(Boolean).join('-').toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-').replace(/^-+|-+$/g, '') || 'car';
+  return `${name}-${car.id ?? '0'}-${n}.png`;
+};

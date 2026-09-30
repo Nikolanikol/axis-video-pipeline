@@ -9,7 +9,7 @@ import {useCost, useSession} from '../auth';
 import {carouselLang} from '../../src/carousel/i18n';
 import {Field} from '../LotForm';
 import {BusyModal} from '../BusyModal';
-import {canSaveToGallery, shareFiles, usePreparedFiles} from '../saveFiles';
+import {canSaveToFolder, canSaveToGallery, saveToFolder, shareFiles, slideName, usePreparedFiles} from '../saveFiles';
 
 const km = (v: number | null) => (v === null ? '—' : `${v.toLocaleString('ru-RU')} км`);
 
@@ -152,6 +152,18 @@ export const CarouselTool: React.FC = () => {
 
   // Скачать все: на компьютере — одним архивом (раньше — 7 загрузок подряд, браузер спрашивал
   // разрешение и часть терял); на телефоне — «В галерею» через «Поделиться» (saveFiles.ts)
+  // В папку (Chrome, Edge): сколько уже записано и куда — для подписи на кнопке
+  const [saving, setSaving] = useState<number | null>(null);
+  const [savedTo, setSavedTo] = useState<{id: string; folder: string} | null>(null);
+  const saveAll = async () => {
+    if (!entry) return;
+    const files = entry.slides.map((_, i) => ({url: `/api/carousels/${entry.id}/slide/${i + 1}/download`, name: slideName(entry.car, i + 1)}));
+    setSaving(0);
+    try {
+      const folder = await saveToFolder(files, setSaving);
+      if (folder) setSavedTo({id: entry.id, folder});
+    } catch (e) { report(e); } finally { setSaving(null); }
+  };
   const slideFiles = usePreparedFiles(entry?.id ?? null, (entry?.slides ?? []).map((_, i) => ({
     url: `/api/carousels/${entry!.id}/slide/${i + 1}/download`,
     name: `${entry!.id}-${i + 1}.png`, type: 'image/png',
@@ -194,8 +206,15 @@ export const CarouselTool: React.FC = () => {
                     onClick={() => slideFiles && shareFiles(slideFiles).catch(report)}>
                     {slideFiles ? `В галерею: все ${entry.slides.length}` : 'Готовлю слайды…'}
                   </button>
+                ) : canSaveToFolder ? (
+                  <button className="btn primary" onClick={saveAll} disabled={busy || saving !== null}>
+                    {saving !== null ? `Сохраняю ${saving} из ${entry.slides.length}…` : `Скачать все ${entry.slides.length} в папку`}
+                  </button>
                 ) : (
                   <a className="btn primary" href={`/api/carousels/${entry.id}/zip`}>Скачать все {entry.slides.length} · ZIP</a>
+                )}
+                {savedTo?.id === entry.id && saving === null && (
+                  <span className="hint" style={{flexBasis: '100%', color: 'var(--ok)'}}>Сохранено {entry.slides.length} слайдов в папку «{savedTo.folder}»</span>
                 )}
                 {canSaveToGallery && <span className="hint" style={{flexBasis: '100%'}}>В меню выберите «Сохранить изображения» — слайды попадут в «Фото». Там же можно сразу в Instagram.</span>}
                 <a className="btn ghost" href={entry.car.source} target="_blank" rel="noreferrer">Открыть в каталоге</a>
