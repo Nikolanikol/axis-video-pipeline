@@ -18,6 +18,20 @@ type Props = {
 const time = (iso: string) => new Date(iso).toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
 const active = (j: Job) => j.status === 'queued' || j.status === 'running';
 
+// «Поделиться» файлом — на телефоне ролик сразу уходит в Instagram или TikTok, без скачивания
+// в галерею и поиска его там. Есть только там, где браузер умеет делиться файлами (телефоны,
+// Safari на Mac); проверяем пробным файлом того же типа
+const canShareVideo = (() => {
+  try {
+    return typeof navigator.canShare === 'function'
+      && navigator.canShare({files: [new File([''], 'x.mp4', {type: 'video/mp4'})]});
+  } catch { return false; }
+})();
+const shareVideo = async (j: Job) => {
+  const blob = await (await fetch(`/api/renders/${j.id}/download`)).blob();
+  await navigator.share({files: [new File([blob], `${j.title || 'ролик'}.mp4`, {type: 'video/mp4'})]});
+};
+
 export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, start, onError, pipeline}) => {
   const {config} = useConfig();
   const {refresh: refreshAccess} = useSession();
@@ -93,6 +107,12 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
             {j.status === 'done' && (
               <>
                 <a className="btn primary" href={`/api/renders/${j.id}/download`}>Скачать mp4</a>
+                {canShareVideo && (
+                  <button className="btn" onClick={() => shareVideo(j).catch((e) => {
+                    // Отмена в окне «Поделиться» — не ошибка
+                    if (e?.name !== 'AbortError') onError(e);
+                  })}>Поделиться</button>
+                )}
                 <a className="btn ghost" href={j.video} target="_blank" rel="noreferrer">Смотреть</a>
               </>
             )}

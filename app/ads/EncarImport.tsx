@@ -12,7 +12,7 @@ import {useConfig} from '../config';
 type Props = {
   lot: LotEntry | null;
   // Новый лот: поля и фото в порядке выбора. Возвращает, когда всё готово
-  onCreate: (fields: Partial<LotEntry>, urls: string[]) => Promise<void>;
+  onCreate: (fields: Partial<LotEntry>, urls: string[]) => Promise<unknown>;
   // В текущий: поля (уже решено, перетирать ли) и фото в конец
   onApply: (fields: Partial<LotEntry>, urls: string[]) => Promise<void>;
   onError: (e: unknown) => void;

@@ -143,8 +143,10 @@ export const SceneFade: React.FC<{first: boolean; children: React.ReactNode}> = 
 const HookScene: React.FC<{ad: Ad; layout: Layout}> = ({ad, layout}) => <Hook ad={{...ad, photos: layout.hook ? [layout.hook] : []}} />;
 
 const SCENES: Record<string, React.FC<{ad: Ad; layout: Layout}>> = {hook: HookScene, gallery: Gallery, stack: Stack, price: PriceScene, cta: Cta};
-// Склеек в галерее — сколько долей в её сцене
-const CUTS = Math.floor(FORMAT.scenes.find((s) => s.id === 'gallery')!.frames / SHOT);
+// Склеек в галерее — сколько кадров по SHOT в её сцене. Экспорт — для подписей фото в форме
+// лота: они считаются той же раскладкой и обязаны знать то же число склеек
+export const GALLERY_CUTS = Math.floor(FORMAT.scenes.find((s) => s.id === 'gallery')!.frames / SHOT);
+const CUTS = GALLERY_CUTS;
 
 export const GalleryAd: React.FC<AdProps> = (props) => {
   const ad = resolveAd(props);

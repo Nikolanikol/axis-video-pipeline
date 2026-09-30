@@ -1,6 +1,6 @@
 // Лот по машине из Encar: поля формы на языке профиля и порядок фото
 import {describe, expect, it} from 'vitest';
-import {SPEC_MAX, TAGLINE_MAX, carPhotos, lotFieldsFromCar, lotIsBlank, taglineFromCar} from '../../src/shared/lotFromCar';
+import {AUTO_PHOTOS, SPEC_MAX, TAGLINE_MAX, autoPickPhotos, carPhotos, lotFieldsFromCar, lotIsBlank, taglineFromCar} from '../../src/shared/lotFromCar';
 import type {CarouselCar} from '../../src/shared/types';
 
 const plain = (s: string) => s.replace(/[\u00a0\u202f]/g, ' ');
@@ -75,6 +75,21 @@ describe('подзаголовок из данных', () => {
   it('истории нет и пробег обычный — пусто: ролик возьмёт фразу профиля', () => {
     expect(taglineFromCar({...car, history: null}, 'ru')).toBe('');
     expect(lotFieldsFromCar({...car, history: null}, 'ru')).toMatchObject({history: null, hookTagline: ''});
+  });
+});
+
+describe('автовыбор фото', () => {
+  it('сначала рекомендованные ракурсы, потом вперемешку снаружи и салон, без повторов', () => {
+    const many = {...car, photos: {...car.photos,
+      exterior: [pic('001'), pic('002'), pic('003'), pic('004'), pic('005')],
+      interior: [pic('007'), pic('009'), pic('010'), pic('011')], other: [pic('020')]}} as CarouselCar;
+    const got = autoPickPhotos(many).map((u) => u.match(/_(\d+)\./)![1]);
+    expect(got).toHaveLength(AUTO_PHOTOS);
+    expect(got.slice(0, 4)).toEqual(['001', '003', '007', '008']);
+    expect(new Set(got).size).toBe(got.length);
+  });
+  it('фото меньше, чем нужно, — берём все', () => {
+    expect(autoPickPhotos(car)).toHaveLength(carPhotos(car).length);
   });
 });
 

@@ -1,7 +1,9 @@
 // Форма лота: авто, характеристики, цена, фото. Автосохранение — в LotTool.
 // Поле Field отсюда переиспользуют остальные формы.
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {fmt, priceUsd} from '../src/shared/model';
+import {GALLERY_CUTS} from '../src/formats/gallery-ad/GalleryAd';
+import {currencySign} from '../src/shared/blocks';
+import {fmt, priceUsd, totalInCurrency} from '../src/shared/model';
 import {SLOT_TITLES, photoKey, photoLayout, type Slot} from '../src/shared/photoSlots';
 import type {FormatMeta, Market} from '../src/shared/types';
 import {api, LotEntry, UsdKrw} from './api';
@@ -42,6 +44,8 @@ const useTodayRate = () => {
 
 export const LotForm: React.FC<Props> = ({lot, market, format, onChange, onPhotos, onError}) => {
   const car = priceUsd(lot);
+  const total = totalInCurrency({...lot, freightUsd: lot.freightUsd ?? market.freightUsd, currency: market.currency});
+  const sign = currencySign(market.currency);
   const rate = useTodayRate();
   // Курс в лоте отличается от сегодняшнего больше чем на полпроцента — предлагаем обновить.
   // Мелкие колебания не дёргаем: подсказка на каждой копейке приучила бы её не замечать
@@ -101,10 +105,13 @@ export const LotForm: React.FC<Props> = ({lot, market, format, onChange, onPhoto
             onChange={(e) => { const v = num(e.target.value); onChange({carPriceUsd: v === null || Number.isNaN(v) ? null : v}); }} />
         </Field>
       </div>
-      <div className={car === null ? 'total warn' : 'total'}>
-        {car === null
-          ? 'Цены нет — в ролике будет заглушка «XX XXX $»'
-          : <>Авто ${fmt(car)} + фрахт ${fmt(freight)} = <b>{fmt(car + freight)} $</b> до {port}</>}
+      {/* Итог — ровно то число и та валюта, что будут в ролике (totalInCurrency). Раньше здесь
+          всегда были доллары, а ролик при валюте профиля KRW показывал воны — экран и ролик
+          говорили разное (30.09) */}
+      <div className={total === null ? 'total warn' : 'total'}>
+        {total === null
+          ? `Цены нет — в ролике будет заглушка «XX XXX ${sign}»`
+          : <>В ролике: <b>{fmt(total)} {sign}</b>{freight > 0 && car !== null ? <span className="muted"> · с фрахтом {fmt(freight)} $</span> : null}{port ? <span className="muted"> · до {port}</span> : null}</>}
       </div>
 
       <h2>Фото <span className="muted">перетаскивай, чтобы поменять порядок</span></h2>
@@ -158,7 +165,8 @@ const Photos: React.FC<Pick<Props, 'lot' | 'onChange' | 'onPhotos' | 'onError'> 
   };
   // Места в «Галерее»: подпись под фото — из той же раскладки, что рендер, поэтому
   // «Стопка 2» здесь и есть второе фото стопки в ролике
-  const layout = slots ? photoLayout(lot.photos, lot.slots) : null;
+  // Число склеек — то же, что у ролика: подпись считалась по 8, а в ролик шло 5 (30.09)
+  const layout = slots ? photoLayout(lot.photos, lot.slots, GALLERY_CUTS) : null;
   const placeOf = (p: string) => {
     const at = layout?.placed[p];
     if (!layout) return null;

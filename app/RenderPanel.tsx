@@ -27,7 +27,7 @@ export const RenderPanel: React.FC<Props> = ({lot, format, unsavedSettings, befo
   return (
     <JobsPanel
       query={{lot: lot.id}}
-      label={`Рендер: ${format.title}`}
+      label="Собрать ролик"
       warnings={warnings}
       disabled={!lot.photos.length}
       start={async () => { await beforeRender(); return api.render(lot.id, format.id); }}

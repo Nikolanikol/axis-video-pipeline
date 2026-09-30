@@ -5,7 +5,8 @@ import {FORMAT_COMPONENTS} from '../src/formats';
 import type {AdProps, FormatMeta} from '../src/shared/types';
 import {withoutMusic} from '../src/shared/nomusic.js';
 
-export const Preview: React.FC<{input: AdProps; format: FormatMeta}> = ({input, format}) => {
+// autoPlay — основной экран лота: превью играет само по кругу, без клика (звука в превью нет)
+export const Preview: React.FC<{input: AdProps; format: FormatMeta; autoPlay?: boolean}> = ({input, format, autoPlay}) => {
   const ref = useRef<PlayerRef>(null);
   return (
     <div className="player-wrap">
@@ -23,6 +24,7 @@ export const Preview: React.FC<{input: AdProps; format: FormatMeta}> = ({input, 
           style={{width: '100%', height: '100%'}}
           controls
           loop
+          autoPlay={autoPlay}
           clickToPlay
         />
       </div>

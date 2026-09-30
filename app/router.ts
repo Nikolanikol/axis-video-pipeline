@@ -26,3 +26,11 @@ export const lastLot = {
   get: (): string | null => { try { return localStorage.getItem(LAST_LOT); } catch { return null; } },
   set: (id: string) => { try { localStorage.setItem(LAST_LOT, id); } catch { /* приватный режим */ } },
 };
+
+// Последний выбранный формат ролика — новый лот по ссылке сразу в нём: человек обычно
+// держится одного формата, и выбирать его заново на каждой машине — лишний клик
+const LAST_FORMAT = 'axis-video:last-format';
+export const lastFormat = {
+  get: (): string | null => { try { return localStorage.getItem(LAST_FORMAT); } catch { return null; } },
+  set: (id: string) => { try { localStorage.setItem(LAST_FORMAT, id); } catch { /* приватный режим */ } },
+};

@@ -1,7 +1,11 @@
-// Пайплайн «Реклама авто» → инструмент «Ролик по лоту»: лот, превью в выбранном формате, рендер
+// Пайплайн «Реклама авто» → инструмент «Ролик по лоту».
+// Основной путь — три действия (QuickLot.tsx): вставил ссылку Encar → «Собрать» → «Скачать».
+// Ручное управление (форма лота, выбор фото из объявления, тексты) — под «Изменить».
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Loading} from '../Loading';
-import {FORMATS, getFormat} from '../../src/shared/model';
+import {currencySign} from '../../src/shared/blocks';
+import {autoPickPhotos, lotFieldsFromCar} from '../../src/shared/lotFromCar';
+import {FORMATS, fmt, getFormat, totalInCurrency} from '../../src/shared/model';
 import {marketFromProfile} from '../../src/shared/profile';
 import type {Market} from '../../src/shared/types';
 import {api, LotEntry} from '../api';
@@ -10,7 +14,8 @@ import {LotForm} from '../LotForm';
 import {EncarImport} from './EncarImport';
 import {Preview} from '../Preview';
 import {RenderPanel} from '../RenderPanel';
-import {lastLot} from '../router';
+import {lastFormat, lastLot} from '../router';
+import {FormatChips, QuickLink, RecentLots} from './QuickLot';
 
 type SaveState = 'saved' | 'dirty' | 'saving' | 'error';
 const SAVE_LABEL: Record<SaveState, string> = {saved: 'Сохранено', dirty: 'Есть правки', saving: 'Сохраняю…', error: 'Не сохранено'};
@@ -87,7 +92,9 @@ export const LotTool: React.FC = () => {
 
   // Лот по ссылке Encar: создать и сразу заполнить, потом скачать выбранные фото.
   // Создание принимает только рынок — поля докладываем вторым запросом
-  const createFromCar = async (fields: Partial<LotEntry>, urls: string[]) => {
+  // Возвращает созданный лот: вызывающему он нужен сразу, а состояние React к этому
+  // моменту может ещё не обновиться
+  const createFromCar = async (fields: Partial<LotEntry>, urls: string[]): Promise<LotEntry> => {
     if (save === 'dirty') await saveLot();
     const created = await api.createLot({market: lot?.market ?? config.defaultMarket});
     let next = await api.saveLot({...created, ...fields});
@@ -98,6 +105,7 @@ export const LotTool: React.FC = () => {
       next = await api.importPhotos(next.id, urls);
       setPhotos(next);
     }
+    return next;
   };
   // В текущий лот: поля — обычной правкой формы (уйдут автосохранением), фото — в конец
   const applyFromCar = async (fields: Partial<LotEntry>, urls: string[]) => {
@@ -106,6 +114,40 @@ export const LotTool: React.FC = () => {
     if (urls.length) setPhotos(await api.importPhotos(lot.id, urls));
   };
 
+  // ——— Основной путь: вставил ссылку, и всё сделалось само ———
+  const [stage, setStage] = useState('');
+  const [quickError, setQuickError] = useState('');
+  const [editing, setEditing] = useState(false);
+  const quickFromLink = async (link: string) => {
+    setQuickError('');
+    try {
+      setStage('Ищу машину на Encar…');
+      const car = await api.lookupCar(link);
+      // Эта машина уже есть — открываем её, а не плодим второй лот с теми же фото
+      const known = lots.find((l) => l.note?.trim() === `Encar ${car.id}`);
+      if (known) { await selectLot(known.id); setStage(''); return; }
+      const {hookTagline, ...fields} = lotFieldsFromCar(car, profile.language);
+      const rate = await api.usdKrw().catch(() => null);
+      setStage('Создаю лот…');
+      const urls = autoPickPhotos(car);
+      const format = FORMATS.find((f) => f.id === lastFormat.get())?.id ?? FORMATS[0].id;
+      // Лот появляется сразу с полями, фото догружаются следом: превью и название видны,
+      // пока фото качаются, — человек видит, что дело идёт
+      const created = await createFromCar({
+        ...fields, format, note: `Encar ${car.id}`, carPriceUsd: null, krwPerUsd: rate?.krwPerUsd ?? null,
+        ...(hookTagline ? {texts: {hookTagline}} : {}),
+      }, []);
+      if (urls.length) {
+        setStage(`Загружаю ${urls.length} фото…`);
+        setPhotos(await api.importPhotos(created.id, urls));
+      }
+    } catch (e) {
+      // Ошибку показываем здесь же, под ссылкой: человек смотрит сюда, а не в шапку
+      setQuickError(e instanceof Error ? e.message : String(e));
+    } finally { setStage(''); }
+  };
+  const chooseFormat = (id: string) => { lastFormat.set(id); editLot({format: id}); };
+
   // Данные для превью — из профиля клиента (тот же мост, что и рендер), а не из рынка лота
   const market = useMemo(() => marketFromProfile(profile, config.copy) as Market, [profile, config.copy]);
   const format = getFormat(lot?.format);
@@ -113,43 +155,30 @@ export const LotTool: React.FC = () => {
   const savedProfile = config.profiles.find((p) => p.id === profile.id);
   const unsavedSettings = profile !== savedProfile || brand !== config.brand;
 
+  // Цена в карточке — та же, что в ролике: валюта профиля, фрахт
+  const priceOf = (l: LotEntry) => {
+    const total = totalInCurrency({...l, freightUsd: l.freightUsd ?? market.freightUsd, currency: market.currency});
+    return total === null ? '' : `${fmt(total)} ${currencySign(market.currency)}`;
+  };
+
   if (!loaded) return <Loading text="Загрузка лотов…" />;
 
   return (
-    <>
-      <div className="toolbar">
-        <select value={lot?.id ?? ''} onChange={(e) => selectLot(e.target.value)} disabled={!lots.length}>
-          {!lots.length && <option value="">Лотов пока нет</option>}
-          {lots.map((l) => <option key={l.id} value={l.id}>{lotTitle(l)}</option>)}
-        </select>
-        <button className="btn" onClick={newLot}>+ Новый лот</button>
-        {lot && <span className={`save save-${save}`}>{SAVE_LABEL[save]}</span>}
-      </div>
+    <div className="quick">
+      <QuickLink onLink={quickFromLink} stage={stage} error={quickError} busy={!!stage} />
 
-      <EncarImport lot={lot} onCreate={createFromCar} onApply={applyFromCar} onError={report} />
-
-      <main className="grid">
-        <section className="panel editor">
-          {lot
-            ? <LotForm lot={lot} market={market} format={format} onChange={editLot} onPhotos={setPhotos} onError={report} />
-            : <div className="empty">Создай первый лот кнопкой «+ Новый лот».</div>}
-        </section>
-
-        <section className="panel preview">
-          <div className="format-bar">
-            <label className="format-select">
-              <span className="label">Формат</span>
-              <select value={format.id} disabled={!lot} onChange={(e) => editLot({format: e.target.value})}>
-                {FORMATS.map((f) => <option key={f.id} value={f.id}>{f.title}</option>)}
-              </select>
-            </label>
-            <span className="muted">{format.description}</span>
-          </div>
-          {input ? <Preview input={input} format={format} /> : <div className="empty">Здесь будет превью ролика</div>}
-        </section>
-
-        <section className="panel renders">
-          {lot && (
+      {lot ? (
+        <main className="quick-main">
+          <section className="quick-preview">
+            {input && <Preview input={input} format={format} autoPlay />}
+          </section>
+          <section className="quick-side">
+            <div className="quick-title">
+              <h1>{[lot.brand, lot.model].filter(Boolean).join(' ') || 'Новый лот'} <span className="muted">{lot.year || ''}</span></h1>
+              <div className="quick-price">{priceOf(lot) || <span className="warn-inline">цены нет — впишите в «Изменить»</span>}</div>
+              {lot.texts?.hookTagline && <div className="muted">{lot.texts.hookTagline}</div>}
+            </div>
+            <FormatChips value={format.id} onChange={chooseFormat} />
             <RenderPanel
               lot={lot}
               format={format}
@@ -157,9 +186,26 @@ export const LotTool: React.FC = () => {
               beforeRender={async () => { if (save !== 'saved') await saveLot(); }}
               onError={report}
             />
-          )}
+            <div className="quick-edit">
+              <button className="btn ghost" onClick={() => setEditing(!editing)} aria-expanded={editing}>
+                {editing ? 'Скрыть ручные настройки' : 'Изменить вручную'}
+              </button>
+              <span className={`save save-${save}`}>{SAVE_LABEL[save]}</span>
+            </div>
+          </section>
+        </main>
+      ) : (
+        <div className="empty">Вставьте ссылку на объявление Encar — лот, фото и превью появятся сами.</div>
+      )}
+
+      {lot && editing && (
+        <section className="panel quick-editor">
+          <EncarImport lot={lot} onCreate={createFromCar} onApply={applyFromCar} onError={report} />
+          <LotForm lot={lot} market={market} format={format} onChange={editLot} onPhotos={setPhotos} onError={report} />
         </section>
-      </main>
-    </>
+      )}
+
+      <RecentLots lots={lots} current={lot?.id} onOpen={selectLot} onBlank={newLot} price={priceOf} />
+    </div>
   );
 };

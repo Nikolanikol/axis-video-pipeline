@@ -94,6 +94,32 @@ export const carPhotos = (car: CarouselCar): CarPhoto[] => {
 };
 
 /**
+ * Сколько фото брать, когда выбирает автоматика. Самому ёмкому формату («Галерея») нужно 9:
+ * хук, три в стопку, пять в галерею. Больше не качаем — лишние секунды ожидания, а добавить
+ * руками можно в «Изменить».
+ */
+export const AUTO_PHOTOS = 9;
+
+/**
+ * Фото, которые автоматика берёт в лот без вопросов (основной путь «вставил ссылку →
+ * собрал»). Сначала рекомендованные ракурсы — перед, зад, салон, приборы: они и встают
+ * в хук и стопку. Дальше вперемешку снаружи и салон: галерея из восьми фото салона подряд
+ * скучнее, чем чередование.
+ */
+export const autoPickPhotos = (car: CarouselCar, count = AUTO_PHOTOS): string[] => {
+  const all = carPhotos(car);
+  const picked = all.filter((p) => p.recommended).map((p) => p.url);
+  const rest = all.filter((p) => !p.recommended);
+  const outside = rest.filter((p) => p.label === 'снаружи').map((p) => p.url);
+  const inside = rest.filter((p) => p.label !== 'снаружи').map((p) => p.url);
+  while (picked.length < count && (outside.length || inside.length)) {
+    const next = (picked.length % 2 ? inside.shift() ?? outside.shift() : outside.shift() ?? inside.shift())!;
+    picked.push(next);
+  }
+  return picked.slice(0, count);
+};
+
+/**
  * Лот ещё не заполнен — данные из Encar можно вписать, не спрашивая. Заполнен хоть чем-то
  * (марка, модель, характеристики, цена) — интерфейс сначала спросит: правки человека
  * молча не перетираем. Год не считаем: у нового лота он уже стоит текущий.
