@@ -16,7 +16,7 @@ const atSec = (sec: number, fps: number) => Math.round(sec * fps);
 // в евро/фунтах. Значение цены как есть — конвертация валют вне MVP, дилер вводит своё число;
 // а вот символ обязан совпадать с валютой профиля, иначе «€ по цене $» выглядит обманом.
 const CURRENCY_SYMBOL: Record<string, string> = {USD: '$', EUR: '€', GBP: '£', JPY: '¥', KRW: '₩'};
-const currencySign = (code?: string) => CURRENCY_SYMBOL[code ?? 'USD'] ?? code ?? '$';
+export const currencySign = (code?: string) => CURRENCY_SYMBOL[code ?? 'USD'] ?? code ?? '$';
 
 // Марка, модель, год, версия и подзаголовок — выезжают снизу
 export const CarTitle: React.FC<CarTitleProps> = ({brand, model, year, trim, tagline}) => {

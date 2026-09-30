@@ -194,5 +194,97 @@
       }
     ],
     "photoSlots": true
+  },
+  {
+    "id": "price-first",
+    "title": "Цена сразу",
+    "description": "Машина с ценой в первом кадре → галерея → история авто → призыв. 15 секунд: главный довод — в первую секунду.",
+    "width": 1080,
+    "height": 1920,
+    "fps": 30,
+    "durationInFrames": 450,
+    "bpm": 120,
+    "scenes": [
+      {
+        "id": "hook",
+        "title": "Цена",
+        "from": 0,
+        "frames": 105,
+        "preview": 60
+      },
+      {
+        "id": "gallery",
+        "title": "Галерея",
+        "from": 105,
+        "frames": 120,
+        "preview": 180
+      },
+      {
+        "id": "history",
+        "title": "История",
+        "from": 225,
+        "frames": 120,
+        "preview": 330
+      },
+      {
+        "id": "cta",
+        "title": "CTA",
+        "from": 345,
+        "frames": 105,
+        "preview": 440
+      }
+    ],
+    "requires": [
+      "photos",
+      "price"
+    ],
+    "photoRoles": [
+      "Цена",
+      "История"
+    ],
+    "photoRest": "Галерея",
+    "texts": [
+      {
+        "key": "hookTagline",
+        "label": "Подзаголовок хука",
+        "hint": "сцена 1, под годом"
+      },
+      {
+        "key": "priceLabel",
+        "label": "Подпись над ценой",
+        "hint": "{port} заменится на порт"
+      },
+      {
+        "key": "priceNoteIncluded",
+        "label": "Под ценой: что включено",
+        "hint": "сцена 3"
+      },
+      {
+        "key": "priceNoteExcluded",
+        "label": "Под ценой: что не включено",
+        "hint": "сцена 3, серым"
+      },
+      {
+        "key": "ctaTitle",
+        "label": "Заголовок CTA",
+        "hint": "Enter — перенос строки",
+        "multiline": true
+      },
+      {
+        "key": "ctaAccent",
+        "label": "Акцент CTA (медью)",
+        "hint": "последняя строка заголовка"
+      },
+      {
+        "key": "ctaBenefit",
+        "label": "Преимущество (с рукопожатием)",
+        "hint": "сцена 4"
+      },
+      {
+        "key": "whatsappLabel",
+        "label": "Подпись над номером",
+        "hint": "сцена 4"
+      }
+    ]
   }
 ]

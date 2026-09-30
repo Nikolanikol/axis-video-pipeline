@@ -58,3 +58,20 @@ describe('выбор руками', () => {
     expect(l.placed[photos[0]]).toBe('stack');
   });
 });
+
+describe('«Цена сразу»: фото и строки истории', async () => {
+  const {priceFirstPhotos, historyLines} = await import('../../src/formats/price-first/PriceFirst');
+  it('1-е — первый кадр, 2-е — фон истории, дальше галерея; своих мало — добираем', () => {
+    const p = priceFirstPhotos(['a', 'b', 'c', 'd', 'e', 'f'], 4);
+    expect(p).toEqual({hook: 'a', history: 'b', gallery: ['c', 'd', 'e', 'f']});
+    expect(priceFirstPhotos(['a', 'b', 'c'], 4).gallery).toEqual(['c', 'a', 'b', 'c']);
+    expect(priceFirstPhotos(['a'], 2)).toEqual({hook: 'a', history: 'a', gallery: ['a', 'a']});
+  });
+  it('история как есть — и хорошее, и нет; истории нет — пусто, а не «чисто»', () => {
+    const h = {accidentsTotal: 1, accidentsOwn: 1, accidentsOther: 0, ownerChanges: 0, theft: 0, flood: 0, totalLoss: 0};
+    expect(historyLines(h, 'ru')).toEqual(['Страховые случаи: 1', 'Один владелец', 'Угонов и затоплений нет']);
+    expect(historyLines({...h, accidentsTotal: 0, ownerChanges: 3, flood: 1}, 'en'))
+      .toEqual(['No insurance claims', 'Owner changes: 3', 'Flood records: 1']);
+    expect(historyLines(null, 'ru')).toEqual([]);
+  });
+});

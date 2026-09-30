@@ -20,16 +20,16 @@ import {Cta, Hook, PriceScene} from '../price-ad/PriceAd';
 const FORMAT = getFormat('gallery-ad');
 // Доля темпа в кадрах: 120 ударов в минуту при 30 кадрах — полсекунды. Склейки галереи
 // и появление фото стопки — на доли, чтобы с музыкой всё шло в такт
-const BEAT = Math.round((60 / FORMAT.bpm) * FORMAT.fps);
+export const BEAT = Math.round((60 / FORMAT.bpm) * FORMAT.fps);
 // Фото галереи стоит две доли (секунду) и растворяется в следующее за долю.
 // Было полсекунды и растворение 8 кадров — владелец: «очень сильно моргает». Замер яркости
 // по кадрам готового ролика (30.09): 27 → 59 → 43 → 27 → 59 дважды в секунду — тёмный салон,
 // яркая фара, снова салон. Это мигание 2 Гц, и растворение его лишь размазывало. Секунда
 // на кадр и растворение в полсекунды превращают смену в плавный переход, а не в мигание.
-const SHOT = 2 * BEAT;
+export const SHOT = 2 * BEAT;
 const XFADE = BEAT;
 // Между сценами — растворение 12 кадров: там меняется вся раскладка кадра
-const SCENE_XFADE = 12;
+export const SCENE_XFADE = 12;
 
 // Кадр галереи: фото стоит на месте. Прежнее отдаление 3% на каждом кадре давало «пульс»
 // дважды в секунду — движение здесь только в самой смене кадров
@@ -73,7 +73,7 @@ const GalleryTitle: React.FC<{ad: Ad}> = ({ad}) => {
 };
 
 // Сцена 2: склейки под бит
-const Gallery: React.FC<{ad: Ad; layout: Layout}> = ({ad, layout}) => {
+export const Gallery: React.FC<{ad: Ad; layout: Layout}> = ({ad, layout}) => {
   const shots = layout.gallery;
   return (
     <AbsoluteFill>
@@ -133,7 +133,7 @@ const Stack: React.FC<{ad: Ad; layout: Layout}> = ({ad, layout}) => {
 };
 
 // Растворение сцены поверх предыдущей за SCENE_XFADE кадров; первая сцена — без него
-const SceneFade: React.FC<{first: boolean; children: React.ReactNode}> = ({first, children}) => {
+export const SceneFade: React.FC<{first: boolean; children: React.ReactNode}> = ({first, children}) => {
   const f = useCurrentFrame();
   const opacity = first ? 1 : interpolate(f, [0, SCENE_XFADE], [0, 1], {...clamp, easing: Easing.inOut(Easing.quad)});
   return <AbsoluteFill style={{opacity}}>{children}</AbsoluteFill>;
