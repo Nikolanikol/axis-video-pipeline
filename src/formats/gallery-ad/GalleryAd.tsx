@@ -14,7 +14,7 @@ import {getFormat, resolveAd, themeOf} from '../../shared/model';
 import {photoLayout, type Layout} from '../../shared/photoSlots';
 import {BackgroundMusic} from '../../shared/music';
 import type {Ad, AdProps} from '../../shared/types';
-import {BODY, LANDSCAPE_BAND, Landscape, Metal, PAD, Shade, ThemeProvider, TopLogo, clamp, photoSrc, useTheme} from '../../shared/ui';
+import {BODY, CopperText, HEAD, LANDSCAPE_BAND, Landscape, Metal, PAD, Shade, ThemeProvider, TopLogo, clamp, photoSrc, useTheme} from '../../shared/ui';
 import {Cta, Hook, PriceScene} from '../price-ad/PriceAd';
 
 const FORMAT = getFormat('gallery-ad');
@@ -47,8 +47,33 @@ const Cut: React.FC<{src: string}> = ({src}) => {
   );
 };
 
+/**
+ * Модель и год под фото галереи. Без них нижняя половина кадра пять секунд стояла пустой
+ * и тёмной (владелец 30.09: «внизу галереи можно поставить модель и год»). Компактнее, чем
+ * в хуке, — чтобы не повторять его один в один; появляется один раз и стоит, пока меняются фото.
+ */
+const GalleryTitle: React.FC<{ad: Ad}> = ({ad}) => {
+  const C = useTheme();
+  const f = useCurrentFrame(); const {fps} = useVideoConfig();
+  // После растворения сцены: иначе надпись проступала бы вместе с первым фото и терялась
+  const a = spring({frame: f - 14, fps, config: {damping: 200}});
+  return (
+    <AbsoluteFill style={{justifyContent: 'flex-end', padding: PAD}}>
+      <div style={{opacity: a, transform: `translateY(${(1 - a) * 30}px)`}}>
+        <CopperText style={{fontFamily: BODY, fontWeight: 600, fontSize: 40, letterSpacing: 12, textTransform: 'uppercase'}}>{ad.brand}</CopperText>
+        <div style={{display: 'flex', alignItems: 'baseline', gap: 28, flexWrap: 'wrap'}}>
+          {/* Кегль по длине названия: «5-Series» и «Grand Starex» должны влезть в строку до кнопок Reels */}
+          <div style={{fontFamily: HEAD, fontWeight: 700, fontSize: Math.min(150, Math.floor(1300 / Math.max(1, ad.model.length))),
+            lineHeight: 1, color: C.white, textTransform: 'uppercase'}}>{ad.model}</div>
+          <CopperText style={{fontFamily: HEAD, fontWeight: 700, fontSize: 96, lineHeight: 1}}>{ad.year}</CopperText>
+        </div>
+      </div>
+    </AbsoluteFill>
+  );
+};
+
 // Сцена 2: склейки под бит
-const Gallery: React.FC<{ad: Ad; layout: Layout}> = ({layout}) => {
+const Gallery: React.FC<{ad: Ad; layout: Layout}> = ({ad, layout}) => {
   const shots = layout.gallery;
   return (
     <AbsoluteFill>
@@ -61,6 +86,7 @@ const Gallery: React.FC<{ad: Ad; layout: Layout}> = ({layout}) => {
         <Sequence key={i} from={i === 0 ? -XFADE : i * SHOT} durationInFrames={SHOT + XFADE * 2} premountFor={SHOT}><Cut src={src} /></Sequence>
       ))}
       <Shade />
+      <GalleryTitle ad={ad} />
       <TopLogo scrim={false} />
     </AbsoluteFill>
   );

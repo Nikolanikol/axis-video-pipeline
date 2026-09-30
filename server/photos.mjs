@@ -6,10 +6,13 @@ import sharp from 'sharp';
 import {HttpError, lotPhotosDir, photoUrl} from './store.mjs';
 
 const WIDTH = 1080;          // ширина рабочей копии вертикального фото — ровно ширина кадра
-// Горизонтальное фото в ролике — полоса 1150 px в высоту (LANDSCAPE_BAND в src/shared/ui.tsx),
-// то есть ~2000 px в ширину. Копия в 1080 растягивалась почти вдвое и мылилась (раскадровка
-// 30.09 на фото Encar 2200×1238). 2200 — ширина снимков Encar: больше взять неоткуда
-const LANDSCAPE_WIDTH = 2200;
+// Горизонтальное фото в ролике — полоса 1150 px с верхом, срезанным на 22% (LANDSCAPE_BAND
+// и TOP_CROP в src/shared/ui.tsx): на экране снимок 1474 px в высоту, плюс наезд 5%.
+// Копию готовим сразу такой высоты. Иначе увеличивал бы браузер при рендере простым
+// сглаживанием, и выходило мыло: у студийного снимка Encar (1344×768 — больше у Encar нет)
+// увеличение почти вдвое, у обычных 2200×1238 — в 1,2 раза. Здесь увеличение ланцошем
+// с лёгкой резкостью заметно чище (сравнение кадров хука 30.09)
+const LANDSCAPE_HEIGHT = 1500;
 const SOURCE_MAX = 2560;     // оригинал ужимаем до разумного размера
 const srcDir = (lotId) => path.join(lotPhotosDir(lotId), 'src');
 const srcFile = (lotId, stem) => path.join(srcDir(lotId), `${stem}.jpg`);
@@ -51,12 +54,19 @@ const blurPatch = async (image, W, H, [x, y, w, h]) => {
   return {input, left, top};
 };
 
-// Рабочая копия: оригинал → 1080 по ширине (горизонтальное — до 2200) → размытые области.
+// Рабочая копия: оригинал → 1080 по ширине (горизонтальное — 1500 по высоте) → размытые области.
 // Области размытия — в долях кадра, поэтому ширина копии на них не влияет
 export const buildPhoto = async (source, regions, out) => {
   const meta = await sharp(source).metadata();
-  const width = (meta.width ?? 0) > (meta.height ?? 0) ? LANDSCAPE_WIDTH : WIDTH;
-  const {data, info} = await sharp(source).resize({width, withoutEnlargement: true}).toBuffer({resolveWithObject: true});
+  const landscape = (meta.width ?? 0) > (meta.height ?? 0);
+  // Вертикальное — только уменьшаем до ширины кадра. Горизонтальное — к высоте на экране,
+  // в обе стороны; при увеличении резкость, иначе ланцош тоже даёт мягкую картинку
+  const enlarge = landscape && (meta.height ?? 0) < LANDSCAPE_HEIGHT;
+  let image = sharp(source).resize(landscape
+    ? {height: LANDSCAPE_HEIGHT, kernel: 'lanczos3'}
+    : {width: WIDTH, withoutEnlargement: true});
+  if (enlarge) image = image.sharpen({sigma: 0.8, m1: 0.5, m2: 1.5});
+  const {data, info} = await image.toBuffer({resolveWithObject: true});
   const patches = [];
   for (const region of regions) {
     const patch = await blurPatch(data, info.width, info.height, region);

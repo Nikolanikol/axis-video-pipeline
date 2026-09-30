@@ -67,12 +67,14 @@ describe('размытие', () => {
     expect([meta.width, meta.height]).toEqual([1080, 1440]);
   });
 
-  it('горизонтальное (фото Encar) — копия до 2200 по ширине: в ролике оно крупнее кадра', async () => {
-    const wide = path.join(dir, 'wide.png');
-    await sharp({create: {width: 2200, height: 1238, channels: 3, background: '#445566'}}).png().toFile(wide);
-    const out = path.join(dir, 'wide.jpg');
-    await buildPhoto(wide, [], out);
-    expect((await sharp(out).metadata()).width).toBe(2200);
+  it('горизонтальное (фото Encar) — копия 1500 по высоте, даже маленькое: в ролике оно крупнее кадра', async () => {
+    for (const [w, h] of [[2200, 1238], [1344, 768]]) {
+      const wide = path.join(dir, `wide-${w}.png`);
+      await sharp({create: {width: w, height: h, channels: 3, background: '#445566'}}).png().toFile(wide);
+      const out = path.join(dir, `wide-${w}.jpg`);
+      await buildPhoto(wide, [], out);
+      expect((await sharp(out).metadata()).height).toBe(1500);
+    }
   });
 
   it('область у края кадра не ломает сборку', async () => {
