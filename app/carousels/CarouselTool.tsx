@@ -11,6 +11,7 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {parseCarLink} from '../../src/shared/encarLink.js';
 import {QuickLink} from '../ads/QuickLot';
+import {ExternalLink, RefreshCw, Trash2} from 'lucide-react';
 import {api, CarouselEntry, CarouselFormat} from '../api';
 import {useConfig} from '../config';
 import {useCost, useSession} from '../auth';
@@ -99,31 +100,57 @@ const FormatList: React.FC<{formats: CarouselFormat[]; value: string; onChange: 
     </div>
   );
 
-/** Собранные карусели — колонка слева: обложка, машина, формат. Открыть — один клик */
-const CarouselsPanel: React.FC<{items: CarouselEntry[]; current?: string; formats: CarouselFormat[]; onOpen: (e: CarouselEntry) => void}> =
-  ({items, current, formats, onOpen}) => {
-    const [query, setQuery] = useState('');
-    const q = query.trim().toLowerCase();
-    const shown = q ? items.filter((c) => [c.car.brand, c.car.model, c.id].join(' ').toLowerCase().includes(q)) : items;
-    return (
-      <aside className="lots-panel">
-        {items.length > 6 && <input className="lots-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск: марка, модель, номер" />}
-        <div className="lots-title">Карусели <span className="muted">{items.length}</span></div>
-        <div className="lots-list">
-          {shown.map((c) => (
-            <button key={c.id} className={c.id === current ? 'lot-row on' : 'lot-row'} onClick={() => onOpen(c)}>
-              <img src={`${c.slides[0]}?v=${encodeURIComponent(c.updatedAt)}`} alt="" loading="lazy" />
-              <span className="lot-row-text">
+const shortDate = (iso: string) => new Date(iso).toLocaleDateString('ru-RU', {day: '2-digit', month: '2-digit'});
+
+/**
+ * Собранные карусели — колонка слева во всю высоту. Карточка: обложка в своей пропорции
+ * (раньше — обрезанная полоса 16:9, где надпись на обложке не читалась), машина, год, формат,
+ * число слайдов, дата. На карточке — свои кнопки: пересобрать, в каталоге, удалить (владелец
+ * 30.09: «верни кнопки управления, плашка куцая и бедная»). Клик по карточке — открыть.
+ * У открытой кнопки видны всегда, у остальных — при наведении, чтобы список не рябил.
+ */
+const CarouselsPanel: React.FC<{
+  items: CarouselEntry[]; current?: string; formats: CarouselFormat[]; busy: boolean; cost: string;
+  onOpen: (e: CarouselEntry) => void; onRebuild: (e: CarouselEntry) => void; onDelete: (e: CarouselEntry) => void;
+}> = ({items, current, formats, busy, cost, onOpen, onRebuild, onDelete}) => {
+  const [query, setQuery] = useState('');
+  const q = query.trim().toLowerCase();
+  const shown = q ? items.filter((c) => [c.car.brand, c.car.model, c.id].join(' ').toLowerCase().includes(q)) : items;
+  return (
+    <aside className="lots-panel carousels-panel">
+      <div className="lots-title">Карусели <span className="muted">{items.length}</span></div>
+      {items.length > 4 && <input className="lots-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск: марка, модель, номер" />}
+      <div className="lots-list">
+        {shown.map((c) => {
+          const f = formats.find((x) => x.id === (c.format ?? 'classic'));
+          const stop = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn(); };
+          return (
+            // div, а не button: внутри свои кнопки, а кнопка в кнопке — недопустимая разметка
+            <div key={c.id} role="button" tabIndex={0} className={c.id === current ? 'car-card on' : 'car-card'}
+              onClick={() => onOpen(c)} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(c); }}>
+              <img src={`${c.slides[0]}?v=${encodeURIComponent(c.updatedAt)}`} alt=""
+                style={{aspectRatio: f ? `${f.width} / ${f.height}` : '9 / 16'}} loading="lazy" />
+              <div className="car-card-body">
                 <b>{[c.car.brand, c.car.model].filter(Boolean).join(' ') || `№ ${c.id}`}</b>
-                <span className="muted">{[c.car.year, formats.find((f) => f.id === (c.format ?? 'classic'))?.title].filter(Boolean).join(' · ')}</span>
-              </span>
-            </button>
-          ))}
-          {!shown.length && <div className="empty small">{q ? 'Ничего не нашлось' : 'Каруселей пока нет — вставьте ссылку сверху'}</div>}
-        </div>
-      </aside>
-    );
-  };
+                <span className="muted">{[c.car.year, f?.title].filter(Boolean).join(' · ')}</span>
+                <span className="muted small">{c.slides.length} слайдов · {shortDate(c.updatedAt)}</span>
+                <div className="car-card-actions">
+                  <button className="icon-btn" title={`Пересобрать в формате «${f?.title ?? ''}»${cost}`} aria-label="Пересобрать"
+                    disabled={busy} onClick={stop(() => onRebuild(c))}><RefreshCw size={16} /></button>
+                  <a className="icon-btn" href={c.car.source} target="_blank" rel="noreferrer" title="Открыть в каталоге"
+                    aria-label="Открыть в каталоге" onClick={(e) => e.stopPropagation()}><ExternalLink size={16} /></a>
+                  <button className="icon-btn danger" title="Удалить" aria-label="Удалить" disabled={busy}
+                    onClick={stop(() => onDelete(c))}><Trash2 size={16} /></button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        {!shown.length && <div className="empty small">{q ? 'Ничего не нашлось' : 'Каруселей пока нет — вставьте ссылку сверху'}</div>}
+      </div>
+    </aside>
+  );
+};
 
 /**
  * Слайды по центру: один большой, как в ленте Instagram, стрелки и полоса миниатюр.
@@ -187,11 +214,13 @@ export const CarouselTool: React.FC = () => {
   }, [report]);
   useEffect(refresh, [refresh]);
 
-  const run = async (link: string, seed?: number) => {
+  // fmt — в каком формате собрать: по умолчанию выбранный справа; «Пересобрать» из списка
+  // передаёт формат самой карусели, иначе пересборка молча меняла бы её формат
+  const run = async (link: string, seed?: number, fmt: string = format) => {
     setBusy(true);
     setLinkError('');
     try {
-      const made = await api.buildCarousel(link, format, seed);
+      const made = await api.buildCarousel(link, fmt, seed);
       setEntry(made);
       setHistory((h) => [made, ...h.filter((x) => x.id !== made.id)]);
     } catch (e) {
@@ -211,7 +240,9 @@ export const CarouselTool: React.FC = () => {
   };
 
   const remove = async (id: string) => {
-    if (!window.confirm('Удалить карусель со всеми слайдами?')) return;
+    const c = history.find((h) => h.id === id);
+    const name = c ? [c.car.brand, c.car.model].filter(Boolean).join(' ') || `№ ${id}` : `№ ${id}`;
+    if (!window.confirm(`Удалить карусель «${name}» со всеми слайдами?`)) return;
     try {
       await api.deleteCarousel(id);
       setHistory((h) => h.filter((x) => x.id !== id));
@@ -255,7 +286,10 @@ export const CarouselTool: React.FC = () => {
         note="Обычно 10–20 секунд. Не закрывайте страницу" />
 
       <main className="quick-main">
-        <CarouselsPanel items={history} current={entry?.id} formats={formats} onOpen={(e) => { setEntry(e); setLinkError(''); }} />
+        <CarouselsPanel items={history} current={entry?.id} formats={formats} busy={busy} cost={cost}
+          onOpen={(e) => { setEntry(e); setLinkError(''); }}
+          onRebuild={(e) => run(e.id, e.seed, e.format ?? 'classic')}
+          onDelete={(e) => remove(e.id)} />
 
         <section className="quick-preview">
           {entry

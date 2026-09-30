@@ -563,9 +563,33 @@ a.tab { text-decoration: none; }
 .carousel-actions .btn.big { width: 100%; }
 .quick-title .job { margin: 8px 0 0; }
 
+/* Колонка каруселей: во всю высоту экрана и шире колонки лотов — на карточке обложка в
+   своей пропорции и кнопки. Раньше колонка кончалась на второй машине и выглядела куцей */
+.quick-main:has(.carousels-panel) { grid-template-columns: 300px auto minmax(300px, 380px); }
+.carousels-panel { height: calc(100vh - 190px); }
+.car-card { position: relative; display: flex; gap: 12px; padding: 10px; border-radius: 10px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--panel-2); color: var(--text); }
+.car-card:hover { border-color: var(--accent-line); }
+.car-card.on { border-color: var(--accent-line); box-shadow: inset 3px 0 0 var(--accent); }
+/* align-self — иначе строка флекса тянет картинку по высоте карточки, и квадратная обложка
+   Витрины выходила 76×106 */
+.car-card img { flex: none; align-self: flex-start; width: 76px; max-height: 136px; object-fit: cover; border-radius: 6px; background: var(--panel); }
+.car-card-body { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.car-card-body b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.car-card-body .small { font-size: 12px; }
+.car-card-actions { display: flex; gap: 6px; margin-top: auto; padding-top: 6px; opacity: 0; transition: opacity .15s; }
+.car-card:hover .car-card-actions, .car-card.on .car-card-actions, .car-card:focus-within .car-card-actions { opacity: 1; }
+.icon-btn { display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0; border-radius: 7px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--panel); color: var(--muted); }
+.icon-btn:hover:not(:disabled) { color: var(--text); border-color: var(--accent-line); }
+.icon-btn.danger:hover:not(:disabled) { color: var(--danger-text); border-color: var(--danger); }
+.icon-btn:disabled { opacity: .4; cursor: default; }
+/* Касание — наведения нет: кнопки видны всегда */
+@media (hover: none) { .car-card-actions { opacity: 1; } }
+
 /* Узкий ноутбук: колонки лотов и сборки уже, превью посередине остаётся целым */
 @media (max-width: 1150px) and (min-width: 901px) {
-  .quick-main { grid-template-columns: 200px auto minmax(250px, 300px); gap: 16px; }
+  .quick-main, .quick-main:has(.carousels-panel) { grid-template-columns: 220px auto minmax(250px, 300px); gap: 16px; }
   .lot-row img, .lot-row-empty { width: 56px; }
 }
 /* Телефон: одна колонка — ссылка, превью, формат, «Собрать». Дилеры работают с телефона,
@@ -580,6 +604,8 @@ a.tab { text-decoration: none; }
   .quick-preview { order: 1; }
   .quick-side { order: 2; }
   .lots-panel { order: 3; max-height: none; }
+  .quick-main:has(.carousels-panel) { grid-template-columns: minmax(0, 1fr); }
+  .carousels-panel { height: auto; }
   /* Превью ниже, чем на компьютере: на экране 375×812 кнопка «Собрать» уходила под край
      (замер 30.09: 1054 px при высоте 812). С 42vh и форматами в строку ссылка, превью,
      формат и «Собрать» помещаются на одном экране (столбец форматов с подписями снова
