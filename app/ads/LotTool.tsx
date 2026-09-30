@@ -16,6 +16,7 @@ import {Preview} from '../Preview';
 import {RenderPanel} from '../RenderPanel';
 import {lastFormat, lastLot} from '../router';
 import {FormatChips, ImportModal, LotsPanel, QuickLink, type ImportStage} from './QuickLot';
+import {toast} from '../Toast';
 
 type SaveState = 'saved' | 'dirty' | 'saving' | 'error';
 const SAVE_LABEL: Record<SaveState, string> = {saved: 'Сохранено', dirty: 'Есть правки', saving: 'Сохраняю…', error: 'Не сохранено'};
@@ -148,6 +149,53 @@ export const LotTool: React.FC = () => {
   };
   const chooseFormat = (id: string) => { lastFormat.set(id); editLot({format: id}); };
 
+  // ——— Управление лотами из колонки: удалить, удалить пустые, дублировать ———
+  // pending — какие карточки сейчас удаляются: тускнеют с «Удаляю…», второй раз не нажать
+  const [pending, setPending] = useState<Set<string>>(new Set());
+  const mark = (ids: string[], on: boolean) => setPending((p) => {
+    const next = new Set(p);
+    ids.forEach((id) => (on ? next.add(id) : next.delete(id)));
+    return next;
+  });
+  const dropFromList = (ids: string[]) => {
+    const rest = lots.filter((l) => !ids.includes(l.id));
+    setLots(rest);
+    // Удалили открытый — открываем следующий, а не пустой экран
+    if (lot && ids.includes(lot.id)) { setLot(rest[0] ?? null); setSave('saved'); }
+  };
+  const deleteLot = async (l: LotEntry) => {
+    if (!window.confirm(`Удалить лот «${lotTitle(l)}» вместе с его фото и готовыми роликами?`)) return;
+    mark([l.id], true);
+    try {
+      await api.deleteLot(l.id);
+      dropFromList([l.id]);
+      toast(`Удалено: ${lotTitle(l)}`);
+    } catch (e) { report(e); } finally { mark([l.id], false); }
+  };
+  const deleteEmpty = async (list: LotEntry[]) => {
+    if (!window.confirm(`Удалить пустые лоты (${list.length}) — без фото и без машины?`)) return;
+    const ids = list.map((l) => l.id);
+    mark(ids, true);
+    const done: string[] = [];
+    try {
+      for (const id of ids) { await api.deleteLot(id); done.push(id); }
+    } catch (e) { report(e); } finally {
+      dropFromList(done);
+      mark(ids, false);
+      if (done.length) toast(`Удалено пустых лотов: ${done.length}`);
+    }
+  };
+  const copyLot = async (l: LotEntry) => {
+    try {
+      if (save === 'dirty') await saveLot();
+      const copy = await api.copyLot(l.id);
+      setLots((ls) => [copy, ...ls]);
+      setLot(copy);
+      setSave('saved');
+      toast(`Создана копия: ${lotTitle(copy)}`);
+    } catch (e) { report(e); }
+  };
+
   // Данные для превью — из профиля клиента (тот же мост, что и рендер), а не из рынка лота
   const market = useMemo(() => marketFromProfile(profile, config.copy) as Market, [profile, config.copy]);
   const format = getFormat(lot?.format);
@@ -171,7 +219,8 @@ export const LotTool: React.FC = () => {
       {/* Три колонки: лоты — превью — формат и сборка (владелец, 30.09). Ссылка — над ними:
           это первое действие, и новый лот из неё появляется в колонке лотов */}
       <main className="quick-main">
-        <LotsPanel lots={lots} current={lot?.id} onOpen={selectLot} onBlank={newLot} price={priceOf} />
+        <LotsPanel lots={lots} current={lot?.id} pending={pending} onOpen={selectLot} onBlank={newLot} price={priceOf}
+          onCopy={copyLot} onDelete={deleteLot} onDeleteEmpty={deleteEmpty} />
 
         <section className="quick-preview">
           {input

@@ -5,7 +5,7 @@ import path from 'node:path';
 import express from 'express';
 import multer from 'multer';
 import {
-  CONFIG_DIR, DATA_DIR, DEFAULT_MARKET, DEFAULT_PROFILE, DEFAULT_WORKSPACE, withWorkspace, HttpError, PRODUCTION, checkId, createLot, getBrand, getCopy,
+  CONFIG_DIR, DATA_DIR, DEFAULT_MARKET, DEFAULT_PROFILE, DEFAULT_WORKSPACE, withWorkspace, HttpError, PRODUCTION, checkId, createLot, getBrand, getCopy, lotDir, lotPhotosDir,
   getLot, getMarket, getProfile, listLots, listMarkets, listProfiles, readJson, renderMarket, saveBrand, saveLot,
   saveMarket, saveProfile, withLock, currentWorkspace, rendersDir, workspaceUrl,
 } from './store.mjs';
@@ -287,6 +287,34 @@ export const createApp = ({photoOrigin}) => {
   api.get('/rates/usd-krw', wrap(() => usdKrw()));
 
   api.get('/lots', wrap(() => listLots()));
+  // Удалить лот вместе с фото и готовыми роликами — список лотов копится (владелец 30.09:
+  // «плашка будет засоряться, их надо удалять»). Идущий рендер этого лота — отказ: иначе
+  // удалили бы файл, который прямо сейчас пишется (так же устроено удаление ролика)
+  api.delete('/lots/:id', wrap((req) => withLot(req.params.id, async (loading) => {
+    const lot = await loading.catch(() => { throw new HttpError(404, 'Нет такого лота'); });
+    const own = await listJobs({lotId: lot.id});
+    if (own.some((j) => j.status === 'queued' || j.status === 'running')) {
+      throw new HttpError(409, 'Ролик этого лота сейчас собирается — дождитесь или отмените сборку');
+    }
+    for (const j of own) await deleteJob(j.id);
+    await fs.rm(lotDir(lot.id), {recursive: true, force: true});
+    return {id: lot.id, deleted: true, renders: own.length};
+  })));
+  // Копия лота: попробовать другой формат или тексты, не трогая исходный. Фото копируются
+  // файлами (с оригиналами — размытие пересобирается и в копии), адреса переписываются на
+  // новую папку. Выбор мест фото и размытие хранятся по имени файла — переносятся как есть.
+  // Пометку «Encar <номер>» меняем: по ней вставка той же ссылки находит лот, и копия
+  // перехватывала бы оригинал
+  api.post('/lots/:id/copy', wrap(async (req) => {
+    const src = await getLot(req.params.id).catch(() => { throw new HttpError(404, 'Нет такого лота'); });
+    const {id: _old, updatedAt: _u, ...data} = src;
+    const created = await createLot({market: data.market});
+    await fs.cp(lotPhotosDir(src.id), lotPhotosDir(created.id), {recursive: true});
+    const from = `/lots/${src.id}/photos/`;
+    const to = `/lots/${created.id}/photos/`;
+    const note = (data.note ?? '').replace(/^Encar (\d+)/, 'копия Encar $1') || 'копия';
+    return saveLot(created.id, {...data, photos: data.photos.map((p) => p.replace(from, to)), note});
+  }));
   api.post('/lots', wrap((req) => createLot(req.body?.market ? {market: checkId(req.body.market)} : {})));
   api.get('/lots/:id', wrap((req) => getLot(req.params.id)));
   api.put('/lots/:id', wrap((req) => withLot(req.params.id, async (loading) => {

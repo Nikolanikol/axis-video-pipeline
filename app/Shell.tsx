@@ -8,6 +8,7 @@ import {Home, PipelinePage} from './Home';
 import {Pipeline, ToolMeta, findPipeline, isClosed, toolKey, visiblePipelines} from './pipelines';
 import {href, useRoute} from './router';
 import {TOOLS, hasTool} from './tools';
+import {Toasts} from './Toast';
 
 export const Shell: React.FC = () => {
   const [error, setError] = useState('');
@@ -19,6 +20,7 @@ export const Shell: React.FC = () => {
           <Frame error={error} clearError={() => setError('')} />
         </ConfigProvider>
       </AuthGate>
+      <Toasts />
     </div>
   );
 };

@@ -210,3 +210,31 @@ describe('рендер (только проверки перед запуско�
     expect((await call('GET', `/api/renders?lot=${lot.id}`)).body).toEqual([]);
   });
 });
+
+describe('копия и удаление лота', () => {
+  it('копия — свои фото в своей папке, выбор мест и размытие на месте, пометка Encar сменена', async () => {
+    const {body: lot} = await call('POST', '/api/lots', {});
+    const {body: withPhoto} = await upload(lot.id, [['a.png', await image(1600, 900), 'image/png']]);
+    const stem = withPhoto.photos[0].split('/').pop().replace('.jpg', '');
+    await call('PUT', `/api/lots/${lot.id}`, {...withPhoto, brand: 'BMW', note: 'Encar 42403328', slots: {[stem]: 'hook'}});
+    const {status, body: copy} = await call('POST', `/api/lots/${lot.id}/copy`);
+    expect(status).toBe(200);
+    expect(copy.id).not.toBe(lot.id);
+    expect(copy).toMatchObject({brand: 'BMW', note: 'копия Encar 42403328', slots: {[stem]: 'hook'}});
+    expect(copy.photos[0]).toContain(`/lots/${copy.id}/photos/`);
+    expect(await exists(fileOf(copy.id, copy.photos[0]))).toBe(true);
+    // Оригинал цел
+    expect((await call('GET', `/api/lots/${lot.id}`)).body.note).toBe('Encar 42403328');
+  });
+
+  it('удаление убирает лот с диска; второй раз — понятный отказ', async () => {
+    const {body: lot} = await call('POST', '/api/lots', {});
+    await upload(lot.id, [['a.png', await image(800, 600), 'image/png']]);
+    const {status, body} = await call('DELETE', `/api/lots/${lot.id}`);
+    expect(status).toBe(200);
+    expect(body).toMatchObject({id: lot.id, deleted: true});
+    expect(await exists(path.join(env.ws, 'lots', lot.id))).toBe(false);
+    expect((await call('GET', '/api/lots')).body.map((l) => l.id)).not.toContain(lot.id);
+    expect((await call('DELETE', `/api/lots/${lot.id}`)).status).toBe(404);
+  });
+});

@@ -10,6 +10,8 @@ import {FORMATS} from '../../src/shared/model';
 import type {FormatMeta} from '../../src/shared/types';
 import type {LotEntry} from '../api';
 import {BusyModal} from '../BusyModal';
+import {Copy, ExternalLink, Trash2} from 'lucide-react';
+import {lotIsBlank} from '../../src/shared/lotFromCar';
 
 /** Где сейчас загрузка лота по ссылке: шаг 0 — поиск машины, 1 — лот, 2 — фото */
 export type ImportStage = {step: 0 | 1 | 2; photos?: number} | null;
@@ -66,32 +68,82 @@ export const FormatChips: React.FC<{value: string; onChange: (id: string) => voi
   </div>
 );
 
+type Sort = 'new' | 'old' | 'name';
+const SORTS: Record<Sort, string> = {new: 'Сначала новые', old: 'Сначала старые', name: 'По названию'};
+const titleOf = (l: LotEntry) => [l.brand, l.model].filter(Boolean).join(' ') || 'Новый лот';
+// Ссылка на объявление по пометке лота «Encar 12345» (и «копия Encar 12345»)
+const encarUrl = (l: LotEntry) => {
+  const m = l.note?.match(/Encar (\d+)/);
+  return m ? `https://fem.encar.com/cars/detail/${m[1]}` : null;
+};
+/** Пустой лот: без фото и без машины — копятся от «+ Новый лот», их удаляют пачкой */
+export const isEmptyLot = (l: LotEntry) => !l.photos.length && lotIsBlank(l);
+
 /**
- * Лоты — колонка слева: сверху заметная «+ Новый лот», под ней поиск и список машин, над
- * которыми работали. Раньше это была лента карточек внизу страницы с мелкой ссылкой «пустой
- * лот» — владелец (30.09): непонятно, что даёт, кнопку не видно.
+ * Лоты — колонка слева: «+ Новый лот», сортировка, «удалить пустые», поиск и карточки.
+ * На карточке — «Дублировать», «На Encar» (если лот из Encar), «Удалить» (владелец 30.09:
+ * «плашка будет засоряться, их надо удалять, сортировать, перерабатывать»). Кнопки у
+ * открытого видны всегда, у остальных — при наведении, на касании — всегда. Удаляемая
+ * карточка тускнеет с «Удаляю…», пока сервер отвечает, — повторное нажатие невозможно.
  */
-export const LotsPanel: React.FC<{lots: LotEntry[]; current?: string; onOpen: (id: string) => void; onBlank: () => void; price: (l: LotEntry) => string}> = (
-  {lots, current, onOpen, onBlank, price},
-) => {
+export const LotsPanel: React.FC<{
+  lots: LotEntry[]; current?: string; pending: Set<string>;
+  onOpen: (id: string) => void; onBlank: () => void; price: (l: LotEntry) => string;
+  onCopy: (l: LotEntry) => void; onDelete: (l: LotEntry) => void; onDeleteEmpty: (list: LotEntry[]) => void;
+}> = ({lots, current, pending, onOpen, onBlank, price, onCopy, onDelete, onDeleteEmpty}) => {
   const [query, setQuery] = useState('');
+  const [sort, setSort] = useState<Sort>('new');
   const q = query.trim().toLowerCase();
-  const shown = q ? lots.filter((l) => [l.brand, l.model, String(l.year ?? '')].join(' ').toLowerCase().includes(q)) : lots;
+  const empty = lots.filter(isEmptyLot);
+  const shown = (q ? lots.filter((l) => [l.brand, l.model, String(l.year ?? '')].join(' ').toLowerCase().includes(q)) : lots)
+    .slice().sort((a, b) => sort === 'name' ? titleOf(a).localeCompare(titleOf(b), 'ru')
+      : sort === 'old' ? (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '') : (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''));
+  const stop = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn(); };
   return (
-    <aside className="lots-panel">
+    <aside className="lots-panel carousels-panel">
       <button className="btn primary lots-new" onClick={onBlank}>+ Новый лот</button>
-      {lots.length > 6 && <input className="lots-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск: марка, модель, год" />}
+      <div className="lots-tools">
+        <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label="Сортировка лотов">
+          {(Object.keys(SORTS) as Sort[]).map((k) => <option key={k} value={k}>{SORTS[k]}</option>)}
+        </select>
+        {empty.length > 0 && (
+          <button className="btn ghost" title="Лоты без фото и без машины" onClick={() => onDeleteEmpty(empty)}>
+            Удалить пустые ({empty.length})
+          </button>
+        )}
+      </div>
+      {lots.length > 4 && <input className="lots-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск: марка, модель, год" />}
       <div className="lots-title">Лоты <span className="muted">{lots.length}</span></div>
       <div className="lots-list">
-        {shown.map((l) => (
-          <button key={l.id} className={l.id === current ? 'lot-row on' : 'lot-row'} onClick={() => onOpen(l.id)}>
-            {l.photos[0] ? <img src={l.photos[0]} alt="" loading="lazy" /> : <span className="lot-row-empty">нет фото</span>}
-            <span className="lot-row-text">
-              <b>{[l.brand, l.model].filter(Boolean).join(' ') || 'Новый лот'}</b>
-              <span className="muted">{[l.year, price(l)].filter(Boolean).join(' · ') || 'пустой'}</span>
-            </span>
-          </button>
-        ))}
+        {shown.map((l) => {
+          const busy = pending.has(l.id);
+          const url = encarUrl(l);
+          return (
+            // div, а не button: внутри свои кнопки, а кнопка в кнопке — недопустимая разметка
+            <div key={l.id} role="button" tabIndex={0} className={`car-card${l.id === current ? ' on' : ''}${busy ? ' pending' : ''}`}
+              onClick={() => onOpen(l.id)} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(l.id); }}>
+              {l.photos[0]
+                ? <img src={l.photos[0]} alt="" loading="lazy" style={{aspectRatio: '16 / 9', width: 96}} />
+                : <span className="lot-row-empty" style={{width: 96}}>нет фото</span>}
+              <div className="car-card-body">
+                <b>{titleOf(l)}</b>
+                <span className="muted">{[l.year, price(l)].filter(Boolean).join(' · ') || 'пустой'}</span>
+                {busy ? <span className="car-card-status">Удаляю…</span> : (
+                  <div className="car-card-actions">
+                    <button className="icon-btn" title="Дублировать — копия с теми же фото и полями" aria-label="Дублировать"
+                      onClick={stop(() => onCopy(l))}><Copy size={16} /></button>
+                    {url && (
+                      <a className="icon-btn" href={url} target="_blank" rel="noreferrer" title="Открыть объявление на Encar"
+                        aria-label="Открыть на Encar" onClick={(e) => e.stopPropagation()}><ExternalLink size={16} /></a>
+                    )}
+                    <button className="icon-btn danger" title="Удалить лот вместе с его роликами" aria-label="Удалить"
+                      onClick={stop(() => onDelete(l))}><Trash2 size={16} /></button>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
         {!shown.length && <div className="empty small">{q ? 'Ничего не нашлось' : 'Лотов пока нет — вставьте ссылку сверху'}</div>}
       </div>
     </aside>

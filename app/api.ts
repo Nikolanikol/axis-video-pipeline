@@ -121,6 +121,9 @@ export const api = {
   lots: () => request<LotEntry[]>('GET', '/api/lots'),
   createLot: (data: Partial<Lot>) => request<LotEntry>('POST', '/api/lots', data),
   saveLot: (lot: LotEntry) => request<LotEntry>('PUT', `/api/lots/${lot.id}`, lot),
+  // Удалить лот вместе с фото и роликами; копия — новый лот с теми же полями и фото
+  deleteLot: (id: string) => request<{id: string; deleted: boolean; renders: number}>('DELETE', `/api/lots/${id}`),
+  copyLot: (id: string) => request<LotEntry>('POST', `/api/lots/${id}/copy`),
   // Машина по ссылке Encar (через шлюз kmotors) и фото из объявления — скачиваются в лот
   lookupCar: (link: string) => request<CarouselCar>('POST', '/api/encar/lookup', {link}),
   importPhotos: (id: string, urls: string[]) => request<LotEntry>('POST', `/api/lots/${id}/photos/import`, {urls}),

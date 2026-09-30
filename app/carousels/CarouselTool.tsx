@@ -12,6 +12,7 @@ import React, {useCallback, useEffect, useState} from 'react';
 import {parseCarLink} from '../../src/shared/encarLink.js';
 import {QuickLink} from '../ads/QuickLot';
 import {ExternalLink, RefreshCw, Trash2} from 'lucide-react';
+import {toast} from '../Toast';
 import {api, CarouselEntry, CarouselFormat} from '../api';
 import {useConfig} from '../config';
 import {useCost, useSession} from '../auth';
@@ -110,9 +111,9 @@ const shortDate = (iso: string) => new Date(iso).toLocaleDateString('ru-RU', {da
  * У открытой кнопки видны всегда, у остальных — при наведении, чтобы список не рябил.
  */
 const CarouselsPanel: React.FC<{
-  items: CarouselEntry[]; current?: string; formats: CarouselFormat[]; busy: boolean; cost: string;
+  items: CarouselEntry[]; current?: string; formats: CarouselFormat[]; busy: boolean; cost: string; pending: Set<string>;
   onOpen: (e: CarouselEntry) => void; onRebuild: (e: CarouselEntry) => void; onDelete: (e: CarouselEntry) => void;
-}> = ({items, current, formats, busy, cost, onOpen, onRebuild, onDelete}) => {
+}> = ({items, current, formats, busy, cost, pending, onOpen, onRebuild, onDelete}) => {
   const [query, setQuery] = useState('');
   const q = query.trim().toLowerCase();
   const shown = q ? items.filter((c) => [c.car.brand, c.car.model, c.id].join(' ').toLowerCase().includes(q)) : items;
@@ -126,7 +127,7 @@ const CarouselsPanel: React.FC<{
           const stop = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn(); };
           return (
             // div, а не button: внутри свои кнопки, а кнопка в кнопке — недопустимая разметка
-            <div key={c.id} role="button" tabIndex={0} className={c.id === current ? 'car-card on' : 'car-card'}
+            <div key={c.id} role="button" tabIndex={0} className={`car-card${c.id === current ? ' on' : ''}${pending.has(c.id) ? ' pending' : ''}`}
               onClick={() => onOpen(c)} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(c); }}>
               <img src={`${c.slides[0]}?v=${encodeURIComponent(c.updatedAt)}`} alt=""
                 style={{aspectRatio: f ? `${f.width} / ${f.height}` : '9 / 16'}} loading="lazy" />
@@ -134,14 +135,14 @@ const CarouselsPanel: React.FC<{
                 <b>{[c.car.brand, c.car.model].filter(Boolean).join(' ') || `№ ${c.id}`}</b>
                 <span className="muted">{[c.car.year, f?.title].filter(Boolean).join(' · ')}</span>
                 <span className="muted small">{c.slides.length} слайдов · {shortDate(c.updatedAt)}</span>
-                <div className="car-card-actions">
+                {pending.has(c.id) ? <span className="car-card-status">Удаляю…</span> : <div className="car-card-actions">
                   <button className="icon-btn" title={`Пересобрать в формате «${f?.title ?? ''}»${cost}`} aria-label="Пересобрать"
                     disabled={busy} onClick={stop(() => onRebuild(c))}><RefreshCw size={16} /></button>
                   <a className="icon-btn" href={c.car.source} target="_blank" rel="noreferrer" title="Открыть в каталоге"
                     aria-label="Открыть в каталоге" onClick={(e) => e.stopPropagation()}><ExternalLink size={16} /></a>
                   <button className="icon-btn danger" title="Удалить" aria-label="Удалить" disabled={busy}
                     onClick={stop(() => onDelete(c))}><Trash2 size={16} /></button>
-                </div>
+                </div>}
               </div>
             </div>
           );
@@ -200,6 +201,7 @@ export const CarouselTool: React.FC = () => {
   const [format, setFormatState] = useState<string>(() => savedFormat() ?? 'showcase');
   const setFormat = (id: string) => { setFormatState(id); try { localStorage.setItem(FORMAT_KEY, id); } catch { /* приватный режим */ } };
   const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<Set<string>>(new Set());
   const [linkError, setLinkError] = useState('');
   const [entry, setEntry] = useState<CarouselEntry | null>(null);
   const [history, setHistory] = useState<CarouselEntry[]>([]);
@@ -243,11 +245,16 @@ export const CarouselTool: React.FC = () => {
     const c = history.find((h) => h.id === id);
     const name = c ? [c.car.brand, c.car.model].filter(Boolean).join(' ') || `№ ${id}` : `№ ${id}`;
     if (!window.confirm(`Удалить карусель «${name}» со всеми слайдами?`)) return;
+    // Пока сервер отвечает — карточка тусклая с «Удаляю…», второй раз не нажать; после — плашка
+    setPending((p) => new Set(p).add(id));
     try {
       await api.deleteCarousel(id);
       setHistory((h) => h.filter((x) => x.id !== id));
       setEntry((e) => (e?.id === id ? null : e));
-    } catch (e) { report(e); }
+      toast(`Удалено: ${name}`);
+    } catch (e) { report(e); } finally {
+      setPending((p) => { const next = new Set(p); next.delete(id); return next; });
+    }
   };
 
   // Удалили открытую карусель — показываем следующую из истории, а не пустой экран
@@ -286,7 +293,7 @@ export const CarouselTool: React.FC = () => {
         note="Обычно 10–20 секунд. Не закрывайте страницу" />
 
       <main className="quick-main">
-        <CarouselsPanel items={history} current={entry?.id} formats={formats} busy={busy} cost={cost}
+        <CarouselsPanel items={history} current={entry?.id} formats={formats} busy={busy} cost={cost} pending={pending}
           onOpen={(e) => { setEntry(e); setLinkError(''); }}
           onRebuild={(e) => run(e.id, e.seed, e.format ?? 'classic')}
           onDelete={(e) => remove(e.id)} />
