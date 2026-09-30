@@ -11,7 +11,7 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {encarAdUrl, parseCarLink} from '../../src/shared/encarLink.js';
 import {QuickLink} from '../ads/QuickLot';
-import {Check, ExternalLink, Images, List, RefreshCw, Trash2} from 'lucide-react';
+import {Check, ChevronLeft, ChevronRight, Download, ExternalLink, Images, List, RefreshCw, Trash2, X} from 'lucide-react';
 import {MobileTabs, usePanelSwipes} from '../MobileTabs';
 import {toast} from '../Toast';
 import {api, CarouselEntry, CarouselFormat} from '../api';
@@ -49,6 +49,59 @@ const CarSummary: React.FC<{entry: CarouselEntry}> = ({entry}) => {
 };
 
 /**
+ * Свайп по слайду пальцем (владелец 01.10: «свайпы не работают, а хотелось бы»): влево —
+ * следующий, вправо — предыдущий, вниз — закрыть (если задан onDown). Картинка идёт за
+ * пальцем, при отпускании возвращается на место — листание делает уже смена слайда.
+ * Порог 50 px или быстрый «щелчок»: меньше — палец просто дрогнул при нажатии.
+ * Слушатели руками: touchmove с passive: false, чтобы под слайдом не ехала страница
+ */
+const useSlideSwipe = (ref: React.RefObject<HTMLElement | null>, onMove: (d: number) => void, onDown?: () => void) => {
+  const move = useRef(onMove); move.current = onMove;
+  const down = useRef(onDown); down.current = onDown;
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    let x0 = 0; let y0 = 0; let t0 = 0; let dx = 0; let dy = 0; let axis: 'x' | 'y' | null = null;
+    const img = () => el.querySelector<HTMLElement>('img');
+    const start = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = performance.now(); dx = 0; dy = 0; axis = null;
+      const i = img(); if (i) i.style.transition = 'none';
+    };
+    const drag = (e: TouchEvent) => {
+      if (e.touches.length !== 1) return;
+      dx = e.touches[0].clientX - x0; dy = e.touches[0].clientY - y0;
+      if (!axis && Math.hypot(dx, dy) > 8) axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+      // Вертикаль без onDown — это прокрутка страницы, её не трогаем
+      if (axis === 'y' && !down.current) return;
+      if (!axis) return;
+      e.preventDefault();
+      const i = img(); if (!i) return;
+      i.style.transform = axis === 'x' ? `translateX(${dx}px)` : `translateY(${Math.max(0, dy)}px)`;
+      if (axis === 'y') i.style.opacity = String(Math.max(0.3, 1 - Math.max(0, dy) / 400));
+    };
+    const end = () => {
+      const i = img();
+      if (i) { i.style.transition = 'transform .2s ease-out, opacity .2s'; i.style.transform = ''; i.style.opacity = ''; }
+      const fast = performance.now() - t0 < 250;
+      if (axis === 'x' && (Math.abs(dx) > 50 || (fast && Math.abs(dx) > 20))) move.current(dx < 0 ? 1 : -1);
+      else if (axis === 'y' && down.current && dy > 90) down.current();
+      axis = null;
+    };
+    el.addEventListener('touchstart', start, {passive: true});
+    el.addEventListener('touchmove', drag, {passive: false});
+    el.addEventListener('touchend', end);
+    el.addEventListener('touchcancel', end);
+    return () => {
+      el.removeEventListener('touchstart', start);
+      el.removeEventListener('touchmove', drag);
+      el.removeEventListener('touchend', end);
+      el.removeEventListener('touchcancel', end);
+    };
+  }, [ref]);
+};
+
+/**
  * Слайд во весь экран. Нужен потому, что в сетке превью размером с ноготь, а решать
  * про дизайн приходится по мелочам — читается ли подпись, не съехала ли цифра.
  */
@@ -63,18 +116,34 @@ const Lightbox: React.FC<{entry: CarouselEntry; at: number; onClose: () => void;
       window.addEventListener('keydown', onKey);
       return () => window.removeEventListener('keydown', onKey);
     }, [onClose, onMove]);
+    const stage = useRef<HTMLDivElement>(null);
+    useSlideSwipe(stage, onMove, onClose);
+    const stop = (e: React.MouseEvent) => e.stopPropagation();
 
+    // Нажатие мимо слайда и кнопок (на затемнение) закрывает — владелец 01.10: «логичное
+    // поведение». Раньше внутренний блок во весь экран глотал клик, и закрыть можно было
+    // только кнопкой. Клик по самой картинке не закрывает: по ней возят курсором и разглядывают
     return (
-      <div className="lightbox" onClick={onClose}>
-        {/* Клик по самой картинке не закрывает: по ней хочется возить курсором и разглядывать */}
-        <div className="lightbox-inner" onClick={(e) => e.stopPropagation()}>
-          <img src={`${entry.slides[at]}?v=${encodeURIComponent(entry.updatedAt)}`} alt={`Слайд ${at + 1}`} />
-          <div className="lightbox-bar">
-            <button className="btn ghost" onClick={() => onMove(-1)} disabled={at === 0}>← Назад</button>
-            <span className="muted">{at + 1} / {entry.slides.length}</span>
-            <button className="btn ghost" onClick={() => onMove(1)} disabled={at === entry.slides.length - 1}>Вперёд →</button>
-            <a className="btn primary" href={`/api/carousels/${entry.id}/slide/${at + 1}/download`}>Скачать</a>
-            <button className="btn ghost" onClick={onClose}>Закрыть</button>
+      <div className="lightbox" onClick={onClose} role="dialog" aria-modal="true" aria-label={`Слайд ${at + 1} из ${entry.slides.length}`}>
+        <button className="lightbox-close" onClick={onClose} aria-label="Закрыть"><X size={22} /></button>
+        <div className="lightbox-inner">
+          {/* Картинка — ровно по размеру слайда, а поле вокруг неё — подложка: раньше картинка
+              тянулась на всю высоту, и нажатие в чёрную полосу над квадратным слайдом считалось
+              нажатием на слайд и ничего не закрывало (рамка при этом обводила пустоту) */}
+          <div className="lightbox-stage" ref={stage}>
+            <img src={`${entry.slides[at]}?v=${encodeURIComponent(entry.updatedAt)}`} alt={`Слайд ${at + 1}`} onClick={stop} />
+          </div>
+          {/* На телефоне подписи «Назад / Вперёд» прячутся — остаются стрелки, иначе строка
+              не помещалась в 375 px и «Закрыть» уезжала за край */}
+          <div className="lightbox-bar" onClick={stop}>
+            <button className="btn ghost" onClick={() => onMove(-1)} disabled={at === 0} aria-label="Предыдущий слайд">
+              <ChevronLeft size={18} /><span className="lb-label">Назад</span>
+            </button>
+            <span className="muted lb-count">{at + 1} / {entry.slides.length}</span>
+            <button className="btn ghost" onClick={() => onMove(1)} disabled={at === entry.slides.length - 1} aria-label="Следующий слайд">
+              <span className="lb-label">Вперёд</span><ChevronRight size={18} />
+            </button>
+            <a className="btn primary" href={`/api/carousels/${entry.id}/slide/${at + 1}/download`}><Download size={17} />Скачать</a>
           </div>
         </div>
       </div>
@@ -172,9 +241,12 @@ const SlideViewer: React.FC<{entry: CarouselEntry; ratio: string; onZoom: (i: nu
   const n = entry.slides.length;
   const go = (d: number) => setAt((i) => Math.min(n - 1, Math.max(0, i + d)));
   const v = `?v=${encodeURIComponent(entry.updatedAt)}`;
+  // Слайды листаются и пальцем — как карусель в ленте (только вбок, вертикаль — прокрутка)
+  const stage = useRef<HTMLDivElement>(null);
+  useSlideSwipe(stage, go);
   return (
     <div className="slide-viewer">
-      <div className="slide-stage" style={{aspectRatio: ratio}}>
+      <div className="slide-stage" style={{aspectRatio: ratio}} ref={stage}>
         {/* Ключ по времени сборки: иначе браузер покажет прежнюю картинку из кэша */}
         <img src={`${entry.slides[at]}${v}`} alt={`Слайд ${at + 1}`} onClick={() => onZoom(at)} title="Открыть во весь экран" />
         {at > 0 && <button className="slide-arrow left" onClick={() => go(-1)} aria-label="Предыдущий слайд">‹</button>}
