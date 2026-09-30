@@ -4,18 +4,61 @@
 // Всё, что можно решить за человека, решается само: поиск машины, лот, поля, курс,
 // подзаголовок, фото (autoPickPhotos), формат — последний использованный. Ручное
 // управление не убрано, а спрятано под «Изменить» и нигде не обязательно.
-import React, {useRef, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
+import {createPortal} from 'react-dom';
 import {parseCarLink} from '../../src/shared/encarLink.js';
 import {FORMATS} from '../../src/shared/model';
 import type {FormatMeta} from '../../src/shared/types';
 import type {LotEntry} from '../api';
+import {RecMark} from '../Loading';
+
+/** Где сейчас загрузка лота по ссылке: шаг 0 — поиск машины, 1 — лот, 2 — фото */
+export type ImportStage = {step: 0 | 1 | 2; photos?: number} | null;
+
+/**
+ * Окно загрузки поверх всего экрана. Экран под ним не нажимается (владелец 30.09: «чтобы
+ * человек не мог в это время нажимать какую-то другую ерунду»): переключение лота или
+ * формата посреди загрузки записало бы фото и поля не туда. Шаги с отметками — видно, что
+ * дело идёт, а не зависло: самый долгий шаг, фото, ~10 секунд.
+ * Отмены нет намеренно: лот к этому моменту уже создаётся, и прерванная загрузка оставила
+ * бы его наполовину пустым.
+ */
+export const ImportModal: React.FC<{stage: ImportStage}> = ({stage}) => {
+  const open = !!stage;
+  // Страница под окном — inert: иначе мышь закрыта затемнением, а Tab с клавиатуры всё равно
+  // доходит до кнопок под ним. Окно — в body через портал, поэтому само под inert не попадает
+  useEffect(() => {
+    const root = document.getElementById('root');
+    if (!open || !root) return;
+    root.inert = true;
+    return () => { root.inert = false; };
+  }, [open]);
+  if (!stage) return null;
+  const steps = ['Ищу машину на Encar', 'Создаю лот', stage.photos ? `Загружаю ${stage.photos} фото` : 'Загружаю фото'];
+  return createPortal(
+    <div className="modal-backdrop import-backdrop" role="dialog" aria-modal="true" aria-label="Загрузка машины из Encar">
+      <div className="import-modal" role="status">
+        <RecMark />
+        <ol className="import-steps">
+          {steps.map((s, i) => (
+            <li key={s} className={i < stage.step ? 'done' : i === stage.step ? 'now' : ''}>
+              <span className="import-mark" aria-hidden="true">{i < stage.step ? '✓' : i + 1}</span>{s}{i === stage.step ? '…' : ''}
+            </li>
+          ))}
+        </ol>
+        <div className="muted import-note">Обычно 10–15 секунд. Не закрывайте страницу.</div>
+      </div>
+    </div>,
+    document.body,
+  );
+};
 
 /**
  * Строка ссылки. Вставка ссылки Encar — это и есть первое действие: поиск запускается
  * сам, без кнопки «Подтянуть». Набранную руками ссылку запускает Enter или кнопка.
  */
-export const QuickLink: React.FC<{onLink: (link: string) => void; stage: string; error: string; busy: boolean}> = (
-  {onLink, stage, error, busy},
+export const QuickLink: React.FC<{onLink: (link: string) => void; error: string; busy: boolean}> = (
+  {onLink, error, busy},
 ) => {
   const [value, setValue] = useState('');
   const ref = useRef<HTMLInputElement>(null);
@@ -37,7 +80,6 @@ export const QuickLink: React.FC<{onLink: (link: string) => void; stage: string;
           }} />
         <button className="btn" disabled={busy || !value.trim()}>Найти</button>
       </form>
-      {busy && <div className="quick-stage"><div className="bar wait"><div /></div><span>{stage}</span></div>}
       {!busy && error && <div className="error" style={{margin: '8px 0 0'}}>{error}</div>}
     </div>
   );

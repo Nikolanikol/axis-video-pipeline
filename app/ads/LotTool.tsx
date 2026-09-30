@@ -15,7 +15,7 @@ import {EncarImport} from './EncarImport';
 import {Preview} from '../Preview';
 import {RenderPanel} from '../RenderPanel';
 import {lastFormat, lastLot} from '../router';
-import {FormatChips, LotsPanel, QuickLink} from './QuickLot';
+import {FormatChips, ImportModal, LotsPanel, QuickLink, type ImportStage} from './QuickLot';
 
 type SaveState = 'saved' | 'dirty' | 'saving' | 'error';
 const SAVE_LABEL: Record<SaveState, string> = {saved: 'Сохранено', dirty: 'Есть правки', saving: 'Сохраняю…', error: 'Не сохранено'};
@@ -115,20 +115,20 @@ export const LotTool: React.FC = () => {
   };
 
   // ——— Основной путь: вставил ссылку, и всё сделалось само ———
-  const [stage, setStage] = useState('');
+  const [stage, setStage] = useState<ImportStage>(null);
   const [quickError, setQuickError] = useState('');
   const [editing, setEditing] = useState(false);
   const quickFromLink = async (link: string) => {
     setQuickError('');
     try {
-      setStage('Ищу машину на Encar…');
+      setStage({step: 0});
       const car = await api.lookupCar(link);
       // Эта машина уже есть — открываем её, а не плодим второй лот с теми же фото
       const known = lots.find((l) => l.note?.trim() === `Encar ${car.id}`);
-      if (known) { await selectLot(known.id); setStage(''); return; }
+      if (known) { await selectLot(known.id); setStage(null); return; }
       const {hookTagline, ...fields} = lotFieldsFromCar(car, profile.language);
       const rate = await api.usdKrw().catch(() => null);
-      setStage('Создаю лот…');
+      setStage({step: 1});
       const urls = autoPickPhotos(car);
       const format = FORMATS.find((f) => f.id === lastFormat.get())?.id ?? FORMATS[0].id;
       // Лот появляется сразу с полями, фото догружаются следом: превью и название видны,
@@ -138,13 +138,13 @@ export const LotTool: React.FC = () => {
         ...(hookTagline ? {texts: {hookTagline}} : {}),
       }, []);
       if (urls.length) {
-        setStage(`Загружаю ${urls.length} фото…`);
+        setStage({step: 2, photos: urls.length});
         setPhotos(await api.importPhotos(created.id, urls));
       }
     } catch (e) {
       // Ошибку показываем здесь же, под ссылкой: человек смотрит сюда, а не в шапку
       setQuickError(e instanceof Error ? e.message : String(e));
-    } finally { setStage(''); }
+    } finally { setStage(null); }
   };
   const chooseFormat = (id: string) => { lastFormat.set(id); editLot({format: id}); };
 
@@ -165,7 +165,8 @@ export const LotTool: React.FC = () => {
 
   return (
     <div className="quick">
-      <QuickLink onLink={quickFromLink} stage={stage} error={quickError} busy={!!stage} />
+      <QuickLink onLink={quickFromLink} error={quickError} busy={!!stage} />
+      <ImportModal stage={stage} />
 
       {/* Три колонки: лоты — превью — формат и сборка (владелец, 30.09). Ссылка — над ними:
           это первое действие, и новый лот из неё появляется в колонке лотов */}

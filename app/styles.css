@@ -492,8 +492,20 @@ a.tab { text-decoration: none; }
 .quick { flex: 1; overflow: auto; width: 100%; max-width: 1400px; margin: 0 auto; padding: 16px 20px 40px; display: flex; flex-direction: column; gap: 18px; }
 .quick-link form { display: flex; gap: 8px; }
 .quick-link input { font-size: 16px; padding: 14px 16px; }
-.quick-stage { display: flex; align-items: center; gap: 12px; margin-top: 10px; color: var(--muted); }
-.quick-stage .bar { width: 180px; }
+/* Окно загрузки из Encar: поверх всего, включая шапку (z-index выше неё), фон не нажимается */
+.import-backdrop { z-index: 100; backdrop-filter: blur(2px); }
+.import-modal { display: flex; flex-direction: column; align-items: center; gap: 18px; width: min(360px, 92vw);
+  padding: 28px 24px 22px; border-radius: 14px; border: 1px solid var(--line); background: var(--panel); }
+.import-modal .rec { width: 64px; height: 64px; }
+.import-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; align-self: stretch; }
+.import-steps li { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 15px; }
+.import-steps li.now { color: var(--text); font-weight: 700; }
+.import-steps li.done { color: var(--text); }
+.import-mark { flex: none; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 13px;
+  border: 1px solid var(--line); }
+.import-steps li.now .import-mark { border-color: var(--accent-line); color: var(--accent-text); }
+.import-steps li.done .import-mark { border-color: var(--ok); color: var(--ok); }
+.import-note { font-size: 12px; text-align: center; }
 .quick-main { display: grid; grid-template-columns: 260px auto minmax(300px, 380px); gap: 24px; align-items: start; justify-content: center; }
 .quick-preview .player-box { height: min(calc(100vh - 250px), 760px); }
 .quick-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
