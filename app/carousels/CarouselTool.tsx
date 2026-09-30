@@ -49,43 +49,65 @@ const CarSummary: React.FC<{entry: CarouselEntry}> = ({entry}) => {
 };
 
 /**
- * Свайп по слайду пальцем (владелец 01.10: «свайпы не работают, а хотелось бы»): влево —
- * следующий, вправо — предыдущий, вниз — закрыть (если задан onDown). Картинка идёт за
- * пальцем, при отпускании возвращается на место — листание делает уже смена слайда.
- * Порог 50 px или быстрый «щелчок»: меньше — палец просто дрогнул при нажатии.
- * Слушатели руками: touchmove с passive: false, чтобы под слайдом не ехала страница
+ * Лента слайдов, которую тянут пальцем, — как карусель в ленте Instagram (владелец 01.10:
+ * «лента не перетаскивается, а просто меняется фото»). Все слайды стоят в ряд в .slide-track,
+ * сдвиг ленты — translateX(-at × 100%). Пока палец на экране, лента идёт за ним и из-за края
+ * виден соседний слайд; при отпускании доезжает до него (или возвращается, если потянули
+ * слабо). На краях ленты тянется втрое туже — видно, что дальше слайдов нет.
+ * Свайп вниз закрывает (если задан onDown), тогда за пальцем едет сам слайд.
+ * Слушатели руками: touchmove с passive: false, чтобы под лентой не ехала страница.
+ * Кнопки и миниатюры двигают ту же ленту — переход анимирует transition из styles.css
  */
-const useSlideSwipe = (ref: React.RefObject<HTMLElement | null>, onMove: (d: number) => void, onDown?: () => void) => {
-  const move = useRef(onMove); move.current = onMove;
-  const down = useRef(onDown); down.current = onDown;
+const useSlideTrack = (ref: React.RefObject<HTMLElement | null>, at: number, count: number,
+  onMove: (d: number) => void, onDown?: () => void) => {
+  const state = useRef({at, count, onMove, onDown});
+  state.current = {at, count, onMove, onDown};
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     let x0 = 0; let y0 = 0; let t0 = 0; let dx = 0; let dy = 0; let axis: 'x' | 'y' | null = null;
-    const img = () => el.querySelector<HTMLElement>('img');
+    const track = () => el.querySelector<HTMLElement>('.slide-track');
+    const current = () => el.querySelectorAll<HTMLElement>('.slide-cell')[state.current.at];
     const start = (e: TouchEvent) => {
       if (e.touches.length !== 1) return;
       x0 = e.touches[0].clientX; y0 = e.touches[0].clientY; t0 = performance.now(); dx = 0; dy = 0; axis = null;
-      const i = img(); if (i) i.style.transition = 'none';
     };
     const drag = (e: TouchEvent) => {
       if (e.touches.length !== 1) return;
       dx = e.touches[0].clientX - x0; dy = e.touches[0].clientY - y0;
       if (!axis && Math.hypot(dx, dy) > 8) axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
       // Вертикаль без onDown — это прокрутка страницы, её не трогаем
-      if (axis === 'y' && !down.current) return;
-      if (!axis) return;
+      if (!axis || (axis === 'y' && !state.current.onDown)) return;
       e.preventDefault();
-      const i = img(); if (!i) return;
-      i.style.transform = axis === 'x' ? `translateX(${dx}px)` : `translateY(${Math.max(0, dy)}px)`;
-      if (axis === 'y') i.style.opacity = String(Math.max(0.3, 1 - Math.max(0, dy) / 400));
+      const {at: i, count: n} = state.current;
+      if (axis === 'x') {
+        const t = track(); if (!t) return;
+        const edge = (i === 0 && dx > 0) || (i === n - 1 && dx < 0);
+        t.style.transition = 'none';
+        t.style.transform = `translateX(calc(${-i * 100}% + ${edge ? dx / 3 : dx}px))`;
+      } else {
+        const c = current(); if (!c) return;
+        c.style.transition = 'none';
+        c.style.transform = `translateY(${Math.max(0, dy)}px)`;
+        c.style.opacity = String(Math.max(0.3, 1 - Math.max(0, dy) / 400));
+      }
     };
     const end = () => {
-      const i = img();
-      if (i) { i.style.transition = 'transform .2s ease-out, opacity .2s'; i.style.transform = ''; i.style.opacity = ''; }
-      const fast = performance.now() - t0 < 250;
-      if (axis === 'x' && (Math.abs(dx) > 50 || (fast && Math.abs(dx) > 20))) move.current(dx < 0 ? 1 : -1);
-      else if (axis === 'y' && down.current && dy > 90) down.current();
+      const {at: i, count: n, onMove: move, onDown: down} = state.current;
+      if (axis === 'x') {
+        const t = track();
+        const width = el.clientWidth || 1;
+        // Доезжает, если потянули на четверть ширины или быстрым «щелчком»
+        const fast = performance.now() - t0 < 250 && Math.abs(dx) > 20;
+        const d = Math.abs(dx) > width / 4 || fast ? (dx < 0 ? 1 : -1) : 0;
+        const next = Math.min(n - 1, Math.max(0, i + d));
+        if (t) { t.style.transition = ''; t.style.transform = `translateX(${-next * 100}%)`; }
+        if (next !== i) move(next - i);
+      } else if (axis === 'y') {
+        const c = current();
+        if (down && dy > 90) down();
+        else if (c) { c.style.transition = 'transform .2s ease-out, opacity .2s'; c.style.transform = ''; c.style.opacity = ''; }
+      }
       axis = null;
     };
     el.addEventListener('touchstart', start, {passive: true});
@@ -100,6 +122,21 @@ const useSlideSwipe = (ref: React.RefObject<HTMLElement | null>, onMove: (d: num
     };
   }, [ref]);
 };
+
+/**
+ * Слайды лентой. Картинки — только у открытого и двух соседних: их и видно при
+ * перетаскивании, а грузить сразу все 12 PNG по 1080 px незачем
+ */
+const SlideTrack: React.FC<{slides: string[]; at: number; v: string; imgProps?: (i: number) => React.ImgHTMLAttributes<HTMLImageElement>}> =
+  ({slides, at, v, imgProps}) => (
+    <div className="slide-track" style={{transform: `translateX(${-at * 100}%)`}}>
+      {slides.map((src, i) => (
+        <div key={src} className="slide-cell" aria-hidden={i !== at}>
+          {Math.abs(i - at) <= 1 && <img src={`${src}${v}`} alt={`Слайд ${i + 1}`} draggable={false} {...imgProps?.(i)} />}
+        </div>
+      ))}
+    </div>
+  );
 
 /**
  * Слайд во весь экран. Нужен потому, что в сетке превью размером с ноготь, а решать
@@ -117,7 +154,7 @@ const Lightbox: React.FC<{entry: CarouselEntry; at: number; onClose: () => void;
       return () => window.removeEventListener('keydown', onKey);
     }, [onClose, onMove]);
     const stage = useRef<HTMLDivElement>(null);
-    useSlideSwipe(stage, onMove, onClose);
+    useSlideTrack(stage, at, entry.slides.length, onMove, onClose);
     const stop = (e: React.MouseEvent) => e.stopPropagation();
 
     // Нажатие мимо слайда и кнопок (на затемнение) закрывает — владелец 01.10: «логичное
@@ -131,7 +168,7 @@ const Lightbox: React.FC<{entry: CarouselEntry; at: number; onClose: () => void;
               тянулась на всю высоту, и нажатие в чёрную полосу над квадратным слайдом считалось
               нажатием на слайд и ничего не закрывало (рамка при этом обводила пустоту) */}
           <div className="lightbox-stage" ref={stage}>
-            <img src={`${entry.slides[at]}?v=${encodeURIComponent(entry.updatedAt)}`} alt={`Слайд ${at + 1}`} onClick={stop} />
+            <SlideTrack slides={entry.slides} at={at} v={`?v=${encodeURIComponent(entry.updatedAt)}`} imgProps={() => ({onClick: stop})} />
           </div>
           {/* На телефоне подписи «Назад / Вперёд» прячутся — остаются стрелки, иначе строка
               не помещалась в 375 px и «Закрыть» уезжала за край */}
@@ -241,14 +278,15 @@ const SlideViewer: React.FC<{entry: CarouselEntry; ratio: string; onZoom: (i: nu
   const n = entry.slides.length;
   const go = (d: number) => setAt((i) => Math.min(n - 1, Math.max(0, i + d)));
   const v = `?v=${encodeURIComponent(entry.updatedAt)}`;
-  // Слайды листаются и пальцем — как карусель в ленте (только вбок, вертикаль — прокрутка)
+  // Слайды листаются и пальцем — лентой, как карусель в ленте (только вбок, вертикаль — прокрутка)
   const stage = useRef<HTMLDivElement>(null);
-  useSlideSwipe(stage, go);
+  useSlideTrack(stage, at, n, go);
   return (
     <div className="slide-viewer">
       <div className="slide-stage" style={{aspectRatio: ratio}} ref={stage}>
-        {/* Ключ по времени сборки: иначе браузер покажет прежнюю картинку из кэша */}
-        <img src={`${entry.slides[at]}${v}`} alt={`Слайд ${at + 1}`} onClick={() => onZoom(at)} title="Открыть во весь экран" />
+        {/* ?v= — время сборки: иначе браузер покажет прежнюю картинку из кэша */}
+        <SlideTrack slides={entry.slides} at={at} v={v}
+          imgProps={(i) => ({onClick: () => onZoom(i), title: 'Открыть во весь экран'})} />
         {at > 0 && <button className="slide-arrow left" onClick={() => go(-1)} aria-label="Предыдущий слайд">‹</button>}
         {at < n - 1 && <button className="slide-arrow right" onClick={() => go(1)} aria-label="Следующий слайд">›</button>}
       </div>

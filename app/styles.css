@@ -401,11 +401,11 @@ a.tab { text-decoration: none; }
 }
 /* Место под слайд — всё, что осталось над кнопками; слайд вписывается в него по своей
    пропорции (9:16, 1:1, 4:5), а не растягивается — пустое поле вокруг остаётся подложкой */
-/* Строка и столбец сетки — minmax(0, 1fr): у строки по умолчанию высота по содержимому, и
-   max-height: 100% у картинки не от чего было считать — на компьютере слайд 1082 px вылезал
-   за окно высотой 900 */
-.lightbox-stage { flex: 1 1 0; min-height: 0; width: 100%; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); place-items: center; touch-action: none; }
-.lightbox-stage img {
+/* Место под ленту слайдов — всё, что осталось над кнопками. Ячейка ленты — сетка
+   minmax(0, 1fr): у строки по умолчанию высота по содержимому, и max-height: 100% у картинки
+   не от чего было бы считать — слайд 1082 px вылезал за окно высотой 900 */
+.lightbox-stage { flex: 1 1 0; min-height: 0; width: 100%; overflow: hidden; touch-action: none; }
+.lightbox-stage .slide-cell img {
   max-width: 100%;
   max-height: 100%;
   width: auto;
@@ -419,6 +419,11 @@ a.tab { text-decoration: none; }
   border-radius: 50%; border: 1px solid var(--line); background: #000b; color: var(--text); cursor: pointer; }
 .lightbox-close:hover { border-color: var(--accent-line); }
 .slide-stage { touch-action: pan-y; }
+/* Лента слайдов (CarouselTool, SlideTrack): слайды в ряд, видна одна ячейка. transition —
+   для кнопок и миниатюр; пока тянут пальцем, её снимает useSlideTrack */
+.slide-track { display: flex; width: 100%; height: 100%; transition: transform .32s cubic-bezier(.22,.8,.26,1); will-change: transform; }
+.slide-cell { flex: 0 0 100%; min-width: 0; height: 100%; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); place-items: center; }
+@media (prefers-reduced-motion: reduce) { .slide-track { transition: none; } }
 @media (max-width: 720px) {
   /* Телефон: слайд во всю ширину, внизу одна строка — стрелки, счётчик, «Скачать». Кнопка
      закрытия — крестиком в углу; ещё закрывают нажатие мимо и свайп вниз */
