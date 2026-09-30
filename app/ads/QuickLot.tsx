@@ -24,8 +24,8 @@ export const ImportModal: React.FC<{stage: ImportStage}> = ({stage}) => (
  * Строка ссылки. Вставка ссылки Encar — это и есть первое действие: поиск запускается
  * сам, без кнопки «Подтянуть». Набранную руками ссылку запускает Enter или кнопка.
  */
-export const QuickLink: React.FC<{onLink: (link: string) => void; error: string; busy: boolean}> = (
-  {onLink, error, busy},
+export const QuickLink: React.FC<{onLink: (link: string) => void; error: string; busy: boolean; placeholder?: string}> = (
+  {onLink, error, busy, placeholder = 'Вставьте ссылку на объявление Encar — остальное сделается само'},
 ) => {
   const [value, setValue] = useState('');
   const ref = useRef<HTMLInputElement>(null);
@@ -39,7 +39,7 @@ export const QuickLink: React.FC<{onLink: (link: string) => void; error: string;
     <div className="quick-link">
       <form onSubmit={(e) => { e.preventDefault(); go(value); }}>
         <input ref={ref} value={value} disabled={busy} autoFocus
-          placeholder="Вставьте ссылку на объявление Encar — остальное сделается само"
+          placeholder={placeholder}
           onChange={(e) => setValue(e.target.value)}
           onPaste={(e) => {
             // Вставили ссылку — сразу в работу; не ссылку — пусть ляжет в поле как текст

@@ -538,6 +538,31 @@ a.tab { text-decoration: none; }
 .lot-row-empty { display: grid; place-items: center; font-size: 10px; color: var(--muted); }
 .lot-row-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .lot-row-text b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* ——— Карусель в три колонки: слайды по центру ———
+   Большой слайд по высоте экрана (как в ленте), стрелки, полоса миниатюр под ним */
+.slide-viewer { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.slide-stage { position: relative; height: min(calc(100vh - 330px), 680px); max-width: min(100%, 680px); border-radius: 10px; overflow: hidden;
+  background: var(--panel); border: 1px solid var(--line); }
+.slide-stage img { width: 100%; height: 100%; object-fit: contain; display: block; cursor: zoom-in; }
+.slide-arrow { position: absolute; top: 50%; transform: translateY(-50%); width: 40px; height: 40px; border-radius: 50%;
+  border: none; background: #000a; color: #fff; font-size: 26px; line-height: 1; cursor: pointer; }
+.slide-arrow:hover { background: var(--accent); }
+.slide-arrow.left { left: 8px; }
+.slide-arrow.right { right: 8px; }
+.slide-bar { display: flex; gap: 14px; align-items: baseline; font-size: 13px; }
+.slide-thumbs { display: flex; gap: 6px; max-width: 100%; overflow-x: auto; padding-bottom: 4px; }
+.slide-thumb { flex: none; height: 64px; padding: 0; border-radius: 5px; overflow: hidden; cursor: pointer;
+  border: 2px solid transparent; background: var(--panel-2); opacity: .6; }
+.slide-thumb.on { border-color: var(--accent-line); opacity: 1; }
+.slide-thumb:hover { opacity: 1; }
+.slide-thumb img { height: 100%; width: 100%; object-fit: cover; display: block; }
+.format-item-name { display: inline-flex; align-items: center; gap: 8px; }
+.format-shape-mini { display: inline-block; height: 16px; border: 2px solid var(--muted); border-radius: 2px; }
+.format-item.on .format-shape-mini { border-color: var(--accent-text); }
+.carousel-actions { display: flex; flex-direction: column; gap: 10px; }
+.carousel-actions .btn.big { width: 100%; }
+.quick-title .job { margin: 8px 0 0; }
+
 /* Узкий ноутбук: колонки лотов и сборки уже, превью посередине остаётся целым */
 @media (max-width: 1150px) and (min-width: 901px) {
   .quick-main { grid-template-columns: 200px auto minmax(250px, 300px); gap: 16px; }
@@ -547,7 +572,10 @@ a.tab { text-decoration: none; }
    а Reels и TikTok — телефонные; действия те же 2–3 касания */
 @media (max-width: 900px) {
   .quick { padding: 12px 12px 32px; gap: 12px; }
-  .quick-main { grid-template-columns: 1fr; gap: 12px; }
+  /* minmax(0, 1fr), а не 1fr: у 1fr нижняя граница — ширина содержимого, и строка миниатюр
+     слайдов с четырьмя форматами в ряд распирала колонку до 480 px при экране 375 */
+  .quick-main { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .quick-preview, .quick-side { min-width: 0; }
   /* Порядок на телефоне: превью → формат и сборка → лоты (лоты — не первое, что нужно) */
   .quick-preview { order: 1; }
   .quick-side { order: 2; }
@@ -564,9 +592,16 @@ a.tab { text-decoration: none; }
   .quick-price { font-size: 22px; }
   .quick-side { gap: 10px; }
   .format-list { flex-direction: row; }
-  .format-item { flex: 1; padding: 8px 10px; }
+  /* min-width: 0 — иначе четыре формата карусели в ряд не сжимались уже своего текста
+     и распирали экран на 59 px */
+  .format-item { flex: 1; min-width: 0; padding: 8px 8px; }
   .format-item-head { flex-direction: column; gap: 0; font-size: 13px; }
   .format-item-sub, .quick-label { display: none; }
+  /* Слайд ниже, а сводку по машине прячем (название остаётся): иначе кнопка скачивания
+     уходила под экран — замер 30.09: 953 px при высоте 812 */
+  .slide-stage { height: 40vh; }
+  .quick-title .job { display: none; }
+  .slide-thumb { height: 48px; }
   .quick-link input { padding: 12px; }
 }
 /* Шапка на телефоне: крошки прячем, вкладки прокручиваются вбок — иначе они распирали
