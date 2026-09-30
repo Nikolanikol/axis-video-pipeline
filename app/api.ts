@@ -51,6 +51,7 @@ export type CreditLot = {
 };
 // Подписка: тариф и до какого числа оплачено (конец последней партии подписки)
 export type Subscription = {planId: string | null; title: string; credits: number; until: string};
+// Баланс для шапки и кабинета; subscription — чтобы показать «подписка до» и полосу продления
 export type Balance = {credits: number; nextExpiry: {at: string; credits: number} | null; lots: CreditLot[]; subscription: Subscription | null};
 export type Role = 'admin' | 'manager' | null;
 export type User = {id: string; email: string; name: string | null; emailVerified: boolean; role: Role; isAdmin: boolean; isStaff: boolean};

@@ -15,6 +15,7 @@ type Props = {
   note?: string;
 };
 
+/** step — индекс текущего шага (что до него — отмечено галочкой), null — окна нет */
 export const BusyModal: React.FC<Props> = ({step, steps, label, note}) => {
   const open = step !== null;
   // Секунды с начала — когда шаг один и долгий (сборка карусели), видно, что дело идёт

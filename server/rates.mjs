@@ -16,6 +16,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {DATA_DIR, HttpError} from './store.mjs';
 
+// Источник, срок кэша и таймаут — почему именно они, см. шапку файла
 const SOURCE = 'https://open.er-api.com/v6/latest/USD';
 const TTL_MS = 24 * 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 10_000;

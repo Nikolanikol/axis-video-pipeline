@@ -101,6 +101,7 @@ const FormatList: React.FC<{formats: CarouselFormat[]; value: string; onChange: 
     </div>
   );
 
+// Дата сборки на карточке: по ней видно, какая карусель свежая, а какую пора пересобрать
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString('ru-RU', {day: '2-digit', month: '2-digit'});
 
 /**

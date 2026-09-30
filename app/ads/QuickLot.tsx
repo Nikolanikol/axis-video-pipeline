@@ -68,6 +68,7 @@ export const FormatChips: React.FC<{value: string; onChange: (id: string) => voi
   </div>
 );
 
+// Сортировка списка лотов — только на экране (в этом браузере), лоты на сервере не трогаем
 type Sort = 'new' | 'old' | 'name';
 const SORTS: Record<Sort, string> = {new: 'Сначала новые', old: 'Сначала старые', name: 'По названию'};
 const titleOf = (l: LotEntry) => [l.brand, l.model].filter(Boolean).join(' ') || 'Новый лот';

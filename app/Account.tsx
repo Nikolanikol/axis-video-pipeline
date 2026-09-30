@@ -11,6 +11,8 @@ import {Field} from './LotForm';
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const won = (n: number) => `₩${n.toLocaleString('ru-RU')}`;
 const when = (iso: string) => new Date(iso).toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
+// Откуда партия кредитов — подпись в кабинете. «pack» с 29.09 — докупка: пакеты на год
+// стали докупкой к подписке (миграция 006)
 const SOURCE: Record<CreditLot['source'], string> = {
   signup: 'подарок за регистрацию', subscription: 'подписка', pack: 'докупка', bonus: 'бонус', legacy: 'перенесено',
 };
@@ -111,6 +113,7 @@ const OfferCard: React.FC = () => {
   );
 };
 
+// Таблица цен с ценой за кредит: по ней клиент видит, что больший тариф выгоднее
 const PriceTable: React.FC<{packs: Pack[]; head: string; perMonth?: boolean}> = ({packs, head, perMonth}) => (
   <table className="table">
     <thead><tr><th>{head}</th><th>Кредитов</th><th>{perMonth ? 'В месяц' : 'Цена'}</th><th>За кредит</th></tr></thead>
@@ -323,6 +326,7 @@ const ClientCard: React.FC<{client: ClientRow; packs: Pack[]; isAdmin: boolean; 
   );
 };
 
+// Новый пакет в прайсе по умолчанию — подписка «Базовый»: чаще всего добавляют тариф, а не докупку
 const EMPTY_PACK: Pack = {id: '', title: '', credits: 30, price_krw: 49000, valid_days: 30, active: true, sort: 0, kind: 'plan'};
 // Дата через n дней — подсказка менеджеру, до какого числа продлится подписка. Считает
 // сервер (от конца действующей подписки); здесь только то же правило для подписи

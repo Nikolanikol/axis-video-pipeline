@@ -24,6 +24,8 @@ type Props = {
 // В лот идёт исходный адрес — полный размер для ролика
 const thumb = (url: string) => url.split('?')[0];
 
+// Ручной импорт: основной путь — вставка ссылки в QuickLink (сама всё выбирает), а здесь
+// человек сам выбирает фото и порядок — под «Изменить вручную»
 export const EncarImport: React.FC<Props> = ({lot, onCreate, onApply, onError}) => {
   const {profile} = useConfig();
   const [link, setLink] = useState('');

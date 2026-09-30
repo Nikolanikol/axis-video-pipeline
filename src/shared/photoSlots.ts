@@ -9,6 +9,7 @@ import type {Lot} from './types';
 export type Slot = NonNullable<Lot['slots']>[string];
 export const SLOT_TITLES: Record<Slot, string> = {auto: 'Авто', hook: 'Хук', stack: 'Стопка', gallery: 'Галерея', skip: 'Не брать'};
 
+// Стопка — три фото: 3 × 607 px почти ровно высота кадра 1920 (см. GalleryAd)
 export const STACK_SIZE = 3;
 
 /**
@@ -27,6 +28,10 @@ export type Layout = {
   placed: Record<string, 'hook' | 'stack' | 'gallery' | null>;
 };
 
+/**
+ * Раскладка фото по местам «Галереи». cuts — сколько склеек в галерее (GALLERY_CUTS),
+ * подписи в форме лота обязаны передавать то же число: при 8 против 5 они врали (30.09).
+ */
 export const photoLayout = (photos: string[], slots: Lot['slots'] = {}, cuts = 8): Layout => {
   const slot = (p: string): Slot => slots?.[photoKey(p)] ?? 'auto';
   const usable = photos.filter((p) => slot(p) !== 'skip');

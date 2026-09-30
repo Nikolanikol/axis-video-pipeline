@@ -9,6 +9,7 @@ import type {CarouselCar, Lot} from './types';
 // Строка характеристики длиннее этого упрётся в безопасную зону кадра (как SPEC_MAX в форме)
 export const SPEC_MAX = 26;
 
+// hookTagline — не поле лота: интерфейс кладёт его в lot.texts, если есть что сказать
 export type CarFields = Pick<Lot, 'brand' | 'model' | 'trim' | 'year' | 'specs' | 'carPriceKrw' | 'history'> & {hookTagline: string};
 
 // Подзаголовок хука длиннее — не влезает в строку под годом (кегль 64, заглавные)
@@ -66,6 +67,7 @@ export const lotFieldsFromCar = (car: CarouselCar, language?: string): CarFields
   };
 };
 
+// recommended — ракурс опознан шлюзом (перед, зад, салон, приборы): такие выбраны по умолчанию
 export type CarPhoto = {url: string; label: string; recommended: boolean};
 
 /**

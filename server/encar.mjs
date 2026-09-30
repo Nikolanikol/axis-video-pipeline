@@ -13,6 +13,8 @@ import {parseCarLink} from '../src/shared/encarLink.js';
 const PHOTO_URL_RE = /^https:\/\/ci\.encar\.com\/[^\s]+$/;
 // Сколько фото за раз: в объявлении Encar их обычно 20–25, в ролике нужно 3–8
 export const MAX_IMPORT = 25;
+// Оригинал Encar — 0,4–1,3 МБ; 15 МБ — с запасом, но не даст забить память, если адрес
+// вдруг отдаст что-то огромное
 const PHOTO_MAX_BYTES = 15 * 1024 * 1024;
 const PHOTO_TIMEOUT_MS = 20_000;
 

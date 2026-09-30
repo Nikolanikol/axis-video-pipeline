@@ -148,6 +148,8 @@ const SCENES: Record<string, React.FC<{ad: Ad; layout: Layout}>> = {hook: HookSc
 export const GALLERY_CUTS = Math.floor(FORMAT.scenes.find((s) => s.id === 'gallery')!.frames / SHOT);
 const CUTS = GALLERY_CUTS;
 
+// Раскладка фото считается один раз на весь ролик: хук, стопка и галерея не должны
+// спорить за одно фото, а подписи в форме лота считаются той же photoLayout
 export const GalleryAd: React.FC<AdProps> = (props) => {
   const ad = resolveAd(props);
   const theme = themeOf(props.theme);

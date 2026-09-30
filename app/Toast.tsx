@@ -3,6 +3,8 @@
 // сработало ли. Вызывается откуда угодно — toast('…'); показывает <Toasts/> в оболочке.
 import React, {useEffect, useState} from 'react';
 
+// Через событие окна, а не контекст React: toast() зовут из обработчиков в любых экранах,
+// и тянуть туда провайдер ради одной плашки — лишнее
 const EVENT = 'kok-toast';
 type Item = {id: number; text: string; kind: 'ok' | 'error'};
 
@@ -12,6 +14,7 @@ export const toast = (text: string, kind: Item['kind'] = 'ok') =>
 // Сколько держать плашку: успеть прочитать два-три слова, но не мешать дальше
 const SHOW_MS = 3200;
 
+// Показываем не больше трёх плашек разом: серия удалений не должна закрывать пол-экрана
 export const Toasts: React.FC = () => {
   const [items, setItems] = useState<Item[]>([]);
   useEffect(() => {

@@ -374,8 +374,10 @@ export const listPacks = async ({all = false} = {}) => (await db().query(
   `SELECT id, title, credits, price_krw, valid_days, active, sort, kind FROM smmaker_packs
     ${all ? '' : 'WHERE active'} ORDER BY kind = 'topup', sort, credits`)).rows;
 
+// Вид пакета: plan — подписка на месяц, topup — докупка (миграция 006)
 const PACK_KINDS = new Set(['plan', 'topup']);
 
+/** Сохранить пакет прайса (только админ). Цена меняет будущие начисления, проданное — нет */
 export const savePack = async ({id, title, credits, price_krw: price, valid_days: days = 30, active = true, sort = 0, kind}) => {
   if (!PACK_ID_RE.test(String(id))) throw new HttpError(400, 'id пакета — латиница, цифры и дефис (например, base)');
   if (!String(title ?? '').trim()) throw new HttpError(400, 'Нужно название пакета');

@@ -19,6 +19,7 @@ import {Gallery, SCENE_XFADE, SHOT, SceneFade} from '../gallery-ad/GalleryAd';
 import {Cta} from '../price-ad/PriceAd';
 
 const FORMAT = getFormat('price-first');
+// Склеек в галерее — сколько кадров по SHOT (секунда) в её сцене; SHOT общий с «Галереей»
 const CUTS = Math.floor(FORMAT.scenes.find((s) => s.id === 'gallery')!.frames / SHOT);
 
 /** Фото по местам: первый кадр, фон истории и галерея (своих мало — добираем, пустой кадр хуже) */
@@ -149,6 +150,8 @@ const History: React.FC<{ad: Ad; photo: string | null}> = ({ad, photo}) => {
   );
 };
 
+// Сцены собираются здесь, а не по реестру, как у «Галереи»: у первого кадра и истории
+// свои фото (priceFirstPhotos), а галерея общая
 export const PriceFirst: React.FC<AdProps> = (props) => {
   const ad = resolveAd(props);
   const theme = themeOf(props.theme);

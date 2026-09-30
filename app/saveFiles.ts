@@ -54,6 +54,7 @@ type DirHandle = {
   name: string;
   getFileHandle: (name: string, opts: {create: boolean}) => Promise<{createWritable: () => Promise<{write: (b: Blob) => Promise<void>; close: () => Promise<void>}>}>;
 };
+// Своих типов у showDirectoryPicker в lib.dom нет (API есть не во всех браузерах) — описываем нужное
 type PickerWindow = Window & {showDirectoryPicker?: (opts?: {id?: string; mode?: 'readwrite'; startIn?: string}) => Promise<DirHandle>};
 
 // typeof window — проверка не должна падать там, где окна нет (тесты, серверная сборка)

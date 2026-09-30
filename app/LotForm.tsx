@@ -33,6 +33,7 @@ export const Field: React.FC<{label: string; hint?: React.ReactNode; children: R
 
 // Курс на сегодня (сервер обновляет раз в сутки) — один запрос на страницу, а не на каждый лот
 let todayRate: Promise<UsdKrw | null> | null = null;
+// Курс в подсказке у поля «Курс»: один запрос на страницу — промис общий на все лоты
 const useTodayRate = () => {
   const [rate, setRate] = useState<UsdKrw | null>(null);
   useEffect(() => {
