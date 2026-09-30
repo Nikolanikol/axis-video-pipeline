@@ -14,6 +14,7 @@ import {getFormat, listFormats, storyboardFrames} from './formats.mjs';
 import {addPhoto, applyBlur, photoInfo, removePhoto} from './photos.mjs';
 import {checkPhotoUrls, downloadPhoto, lookupCar} from './encar.mjs';
 import {usdKrw} from './rates.mjs';
+import {makeZip} from './zip.mjs';
 import {cancelJob, deleteJob, enqueue, getJob, listJobs, retryJob} from './renderer.mjs';
 import {
   UPLOAD_TMP, ambienceReview, createReview, getReview, ingestSource, listReviews, rebuildLines, reprocessSource,
@@ -437,6 +438,25 @@ export const createApp = ({photoOrigin}) => {
       // Слайдов столько, сколько в собранной карусели: у форматов их от 6 до 12
       if (!Number.isInteger(n) || n < 1 || n > meta.slides.length) throw new HttpError(400, 'Нет такого слайда');
       res.download(path.join(carouselsDir(), id, `slide-${n}.png`), slideFileName(meta.car, n));
+    } catch (e) { next(e); }
+  });
+
+  // Все слайды одним файлом. Раньше «Скачать все» запускало 7 загрузок подряд с паузами —
+  // браузер спрашивал разрешение на множество файлов, а часть загрузок терялась. Архив
+  // собирается в памяти: у карусели 6–12 PNG по 1–3 МБ
+  api.get('/carousels/:id/zip', async (req, res, next) => {
+    try {
+      const id = checkId(req.params.id);
+      const meta = await readJson(path.join(carouselsDir(), id, 'carousel.json'))
+        .catch(() => { throw new HttpError(404, 'Карусель не собрана'); });
+      const files = [];
+      for (let n = 1; n <= meta.slides.length; n++) {
+        files.push({name: slideFileName(meta.car, n), data: await fs.readFile(path.join(carouselsDir(), id, `slide-${n}.png`))});
+      }
+      const name = slideFileName(meta.car, 0).replace(/-0\.png$/, '.zip');
+      res.set('Content-Type', 'application/zip');
+      res.attachment(name);
+      res.send(makeZip(files));
     } catch (e) { next(e); }
   });
 

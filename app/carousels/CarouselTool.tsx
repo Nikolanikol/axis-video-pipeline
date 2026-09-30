@@ -8,6 +8,8 @@ import {useConfig} from '../config';
 import {useCost, useSession} from '../auth';
 import {carouselLang} from '../../src/carousel/i18n';
 import {Field} from '../LotForm';
+import {BusyModal} from '../BusyModal';
+import {canSaveToGallery, shareFiles, usePreparedFiles} from '../saveFiles';
 
 const km = (v: number | null) => (v === null ? '—' : `${v.toLocaleString('ru-RU')} км`);
 
@@ -148,21 +150,12 @@ export const CarouselTool: React.FC = () => {
   // Удалили открытую карусель — показываем следующую из истории, а не пустой экран
   useEffect(() => { if (!entry && history.length) setEntry(history[0]); }, [entry, history]);
 
-  // Скачиваем по одному файлу: в Instagram и TikTok слайды всё равно загружаются
-  // по отдельности, и архив пришлось бы распаковывать. Пауза между файлами — чтобы
-  // браузер не счёл это за лавину загрузок и не отменил половину.
-  const downloadAll = async () => {
-    if (!entry) return;
-    for (let n = 1; n <= entry.slides.length; n++) {
-      const a = document.createElement('a');
-      a.href = `/api/carousels/${entry.id}/slide/${n}/download`;
-      a.download = '';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      await new Promise((r) => setTimeout(r, 350));
-    }
-  };
+  // Скачать все: на компьютере — одним архивом (раньше — 7 загрузок подряд, браузер спрашивал
+  // разрешение и часть терял); на телефоне — «В галерею» через «Поделиться» (saveFiles.ts)
+  const slideFiles = usePreparedFiles(entry?.id ?? null, (entry?.slides ?? []).map((_, i) => ({
+    url: `/api/carousels/${entry!.id}/slide/${i + 1}/download`,
+    name: `${entry!.id}-${i + 1}.png`, type: 'image/png',
+  })));
 
   return (
     <main className="grid grid-carousel">
@@ -187,14 +180,24 @@ export const CarouselTool: React.FC = () => {
               {busy ? 'Собираю…' : `Собрать карусель${cost}`}
             </button>
           </div>
-          {busy && <div className="bar wait"><div /></div>}
+          {/* Сборка — 10–20 секунд (замер 30.09: 13 с на 9 слайдов); экран закрыт окном, как у лота по ссылке */}
+          <BusyModal step={busy ? 0 : null} steps={['Собираю карусель: данные и слайды']} label="Сборка карусели"
+            note="Обычно 10–20 секунд. Не закрывайте страницу" />
 
           {entry && (
             <>
               <h2>Машина</h2>
               <CarSummary entry={entry} />
               <div className="job-actions">
-                <button className="btn primary" onClick={downloadAll} disabled={busy}>Скачать все {entry.slides.length}</button>
+                {canSaveToGallery ? (
+                  <button className="btn primary" disabled={busy || !slideFiles}
+                    onClick={() => slideFiles && shareFiles(slideFiles).catch(report)}>
+                    {slideFiles ? `В галерею: все ${entry.slides.length}` : 'Готовлю слайды…'}
+                  </button>
+                ) : (
+                  <a className="btn primary" href={`/api/carousels/${entry.id}/zip`}>Скачать все {entry.slides.length} · ZIP</a>
+                )}
+                {canSaveToGallery && <span className="hint" style={{flexBasis: '100%'}}>В меню выберите «Сохранить изображения» — слайды попадут в «Фото». Там же можно сразу в Instagram.</span>}
                 <a className="btn ghost" href={entry.car.source} target="_blank" rel="noreferrer">Открыть в каталоге</a>
                 <button className="btn" onClick={() => rebuild(true)} disabled={busy}
                   title="Те же компоновка и фразы, свежие данные и текущий бренд">Пересобрать{cost}</button>

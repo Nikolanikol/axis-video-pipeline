@@ -3,6 +3,7 @@ import React, {useCallback, useEffect, useState} from 'react';
 import {api, Job, JobQuery} from './api';
 import {useCost, useSession} from './auth';
 import {useConfig} from './config';
+import {canSaveToGallery, shareFiles, usePreparedFiles} from './saveFiles';
 
 type Props = {
   query: JobQuery;
@@ -18,20 +19,6 @@ type Props = {
 const time = (iso: string) => new Date(iso).toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
 const active = (j: Job) => j.status === 'queued' || j.status === 'running';
 
-// «Поделиться» файлом — на телефоне ролик сразу уходит в Instagram или TikTok, без скачивания
-// в галерею и поиска его там. Есть только там, где браузер умеет делиться файлами (телефоны,
-// Safari на Mac); проверяем пробным файлом того же типа
-const canShareVideo = (() => {
-  try {
-    return typeof navigator.canShare === 'function'
-      && navigator.canShare({files: [new File([''], 'x.mp4', {type: 'video/mp4'})]});
-  } catch { return false; }
-})();
-const shareVideo = async (j: Job) => {
-  const blob = await (await fetch(`/api/renders/${j.id}/download`)).blob();
-  await navigator.share({files: [new File([blob], `${j.title || 'ролик'}.mp4`, {type: 'video/mp4'})]});
-};
-
 export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, start, onError, pipeline}) => {
   const {config} = useConfig();
   const {refresh: refreshAccess} = useSession();
@@ -45,6 +32,12 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
 
   // Пока что-то рендерится — опрашиваем раз в секунду
   const running = jobs.some(active);
+  // «В галерею» на телефоне — у последнего готового ролика. Файл качается заранее: iPhone
+  // открывает «Поделиться» только сразу после нажатия (см. saveFiles.ts). Раньше видео
+  // качалось уже после нажатия, и на iPhone меню не открывалось
+  const latestDone = jobs.find((j) => j.status === 'done');
+  const video = usePreparedFiles(latestDone?.id ?? null, latestDone
+    ? [{url: `/api/renders/${latestDone.id}/download`, name: `${latestDone.title || 'ролик'}.mp4`, type: 'video/mp4'}] : []);
   // Рендер закончился — остаток в шапке мог измениться: при неудаче кредит вернулся
   useEffect(() => { if (!running) refreshAccess(); }, [running, refreshAccess]);
   useEffect(() => {
@@ -107,11 +100,10 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
             {j.status === 'done' && (
               <>
                 <a className="btn primary" href={`/api/renders/${j.id}/download`}>Скачать mp4</a>
-                {canShareVideo && (
-                  <button className="btn" onClick={() => shareVideo(j).catch((e) => {
-                    // Отмена в окне «Поделиться» — не ошибка
-                    if (e?.name !== 'AbortError') onError(e);
-                  })}>Поделиться</button>
+                {canSaveToGallery && j.id === latestDone?.id && (
+                  <button className="btn" disabled={!video} onClick={() => video && shareFiles(video).catch(onError)}>
+                    {video ? 'В галерею' : 'Готовлю…'}
+                  </button>
                 )}
                 <a className="btn ghost" href={j.video} target="_blank" rel="noreferrer">Смотреть</a>
               </>
