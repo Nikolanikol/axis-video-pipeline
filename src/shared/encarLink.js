@@ -20,6 +20,14 @@ const PATTERNS = [
 ];
 
 /**
+ * Адрес объявления на Encar по номеру машины. Единственное место, где он собирается: и
+ * «На Encar» у лота, и у карусели ведут на оригинал объявления, а не на каталог kmotors —
+ * KOK самостоятельный продукт и с kmotors не связан (владелец 01.10).
+ * @param {string} id
+ */
+export const encarAdUrl = (id) => `https://fem.encar.com/cars/detail/${encodeURIComponent(id)}`;
+
+/**
  * Разобрать ссылку. Бросает с человеческим текстом — он уходит прямо в интерфейс.
  * @param {string} raw
  * @returns {ParsedLink}

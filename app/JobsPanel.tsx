@@ -25,6 +25,10 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
   const cost = useCost(pipeline ?? '', config.credits);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [starting, setStarting] = useState(false);
+  // Телефон («Ролик по объявлению»): под кнопкой сборки — только последний ролик, прежние
+  // под «Показать все»: каждая карточка с раскадровкой — пол-экрана. На компьютере список
+  // прокручивается внутри колонки, и кнопки там нет (styles.css)
+  const [showAll, setShowAll] = useState(false);
   const key = JSON.stringify(query);
 
   const refresh = useCallback(() => api.jobs(JSON.parse(key)).then(setJobs).catch(onError), [key, onError]);
@@ -78,6 +82,9 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
       {warnings.length > 0 && <ul className="warnings">{warnings.map((w) => <li key={w}>{w}</li>)}</ul>}
 
       <h2>Ролики</h2>
+      {/* Отдельный блок — чтобы в «Ролике по лоту» история прокручивалась внутри колонки,
+          а кнопка сборки оставалась на месте (styles.css, .quick-side .jobs-list) */}
+      <div className={showAll ? 'jobs-list' : 'jobs-list collapsed'}>
       {!jobs.length && <div className="empty small">Пока пусто</div>}
       {jobs.map((j) => (
         <div key={j.id} className={`job job-${j.status}`}>
@@ -117,6 +124,12 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
           </div>
         </div>
       ))}
+      </div>
+      {jobs.length > 1 && (
+        <button className="btn ghost jobs-more" onClick={() => setShowAll(!showAll)}>
+          {showAll ? 'Свернуть' : `Показать все ролики (${jobs.length})`}
+        </button>
+      )}
     </div>
   );
 };

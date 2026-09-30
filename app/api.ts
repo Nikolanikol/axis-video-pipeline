@@ -8,7 +8,8 @@ export type ProfileEntry = Profile & {id: string};
 export type Copy = Record<string, Record<string, Texts>>;
 // Размытие: [x, y, w, h] в долях кадра, по «стволу» имени файла фото
 export type Region = [number, number, number, number];
-export type LotEntry = Lot & {id: string; updatedAt?: string; note?: string; blur?: Record<string, Region[]>};
+// sources — откуда скачано фото (имя файла без версии → адрес снимка Encar); ведёт сервер
+export type LotEntry = Lot & {id: string; updatedAt?: string; note?: string; blur?: Record<string, Region[]>; sources?: Record<string, string>};
 export type PhotoInfo = {path: string; source: string; regions: Region[]};
 // Пара шрифтов из config/fonts.json. url пустой — пара встроена в проект и не требует сети
 export type FontPair = {id: string; title: string; note: string; head: string; body: string; url: string};

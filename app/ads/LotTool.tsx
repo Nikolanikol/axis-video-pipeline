@@ -17,11 +17,19 @@ import {RenderPanel} from '../RenderPanel';
 import {lastFormat, lastLot} from '../router';
 import {FormatChips, ImportModal, LotsPanel, QuickLink, type ImportStage} from './QuickLot';
 import {toast} from '../Toast';
+import {Clapperboard, List, SlidersHorizontal} from 'lucide-react';
+import {MobileTabs, useIsPhone, usePanelSwipes} from '../MobileTabs';
 
 type SaveState = 'saved' | 'dirty' | 'saving' | 'error';
 const SAVE_LABEL: Record<SaveState, string> = {saved: 'Сохранено', dirty: 'Есть правки', saving: 'Сохраняю…', error: 'Не сохранено'};
 
-export const lotTitle = (l: LotEntry) => [l.brand, l.model, l.year].filter(Boolean).join(' ') || 'Новый лот';
+// В интерфейсе лот называется «объявление» (владелец 01.10: «лот» — аукционное слово, клиенту
+// непонятное); в коде, данных и адресах остаётся lot. Без марки и модели — «Без названия»:
+// «Новый…» врало бы про карточку, которая висит неделю
+// Какие разделы телефона — выдвижные панели и с какой стороны (MobileTabs.tsx)
+const LOT_PANELS = {list: 'left', edit: 'right'} as const;
+
+export const lotTitle = (l: LotEntry) => [l.brand, l.model, l.year].filter(Boolean).join(' ') || 'Без названия';
 
 export const LotTool: React.FC = () => {
   const {config, profile, brand, report} = useConfig();
@@ -69,17 +77,24 @@ export const LotTool: React.FC = () => {
     setLot((l) => (l ? {...l, ...patch} : l));
     setSave('dirty');
   }, []);
-  // Ответ сервера после операций с фото: берём только фото и размытие, текстовые правки не трогаем
+  // Ответ сервера после операций с фото: берём только фото, размытие и источники фото,
+  // текстовые правки не трогаем
   const setPhotos = useCallback((server: LotEntry) => {
-    const patch = {photos: server.photos, blur: server.blur};
+    const patch = {photos: server.photos, blur: server.blur, sources: server.sources};
     setLot((l) => (l && l.id === server.id ? {...l, ...patch} : l));
     setLots((ls) => ls.map((l) => (l.id === server.id ? {...l, ...patch} : l)));
   }, []);
 
+  // Телефон: на экране один раздел — список объявлений, ролик (ссылка, превью, формат,
+  // сборка) или ручная правка (MobileTabs.tsx); порядок в панели — как колонки на компьютере. Выбрали или создали объявление — сразу
+  // показываем его ролик: остаться в списке значило бы гадать, открылось ли оно
+  const phone = useIsPhone();
+  const [mtab, setMtab] = useState<'main' | 'list' | 'edit'>('main');
+
   const selectLot = async (id: string) => {
     if (save === 'dirty') await saveLot();
     const next = lots.find((l) => l.id === id);
-    if (next) { setLot(next); setSave('saved'); }
+    if (next) { setLot(next); setSave('saved'); setMtab('main'); }
   };
   const newLot = async () => {
     try {
@@ -88,6 +103,8 @@ export const LotTool: React.FC = () => {
       setLots((ls) => [created, ...ls]);
       setLot(created);
       setSave('saved');
+      // Пустую карточку создают, чтобы заполнить руками, — на телефоне сразу ведём к форме
+      setMtab('edit');
     } catch (e) { report(e); }
   };
 
@@ -102,6 +119,7 @@ export const LotTool: React.FC = () => {
     setLots((ls) => [next, ...ls]);
     setLot(next);
     setSave('saved');
+    setMtab('main');
     if (urls.length) {
       next = await api.importPhotos(next.id, urls);
       setPhotos(next);
@@ -119,6 +137,49 @@ export const LotTool: React.FC = () => {
   const [stage, setStage] = useState<ImportStage>(null);
   const [quickError, setQuickError] = useState('');
   const [editing, setEditing] = useState(false);
+  // Ручные настройки открываются под первым экраном — подводим к ним, иначе кнопка
+  // «Изменить вручную» выглядит так, будто ничего не сделала. Едем сами, за 0,6 с с
+  // замедлением к концу: мгновенный прыжок сбивал с толку (владелец 01.10). Своя анимация,
+  // а не scrollIntoView({behavior: 'smooth'}): у той скорость выбирает браузер, и её не
+  // остановить, когда человек сам берётся за колесо
+  const editorRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const editor = editorRef.current;
+    const box = editor?.parentElement;
+    // На телефоне ручные настройки — отдельный раздел, ехать некуда
+    if (phone || !editing || !editor || !box) return;
+    const from = box.scrollTop;
+    // 12 px воздуха над панелью; дальше конца прокрутки не уехать
+    const to = Math.min(from + editor.getBoundingClientRect().top - box.getBoundingClientRect().top - 12, box.scrollHeight - box.clientHeight);
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { box.scrollTop = to; return; }
+    const started = performance.now();
+    let frame = requestAnimationFrame(function step(now) {
+      const t = Math.min((now - started) / 600, 1);
+      box.scrollTop = from + (to - from) * (1 - Math.pow(1 - t, 3));
+      if (t < 1) frame = requestAnimationFrame(step);
+    });
+    // Человек сам взялся за колесо или тачпад — не тянем страницу против его руки
+    const stop = () => cancelAnimationFrame(frame);
+    box.addEventListener('wheel', stop, {passive: true});
+    box.addEventListener('touchstart', stop, {passive: true});
+    return () => { stop(); box.removeEventListener('wheel', stop); box.removeEventListener('touchstart', stop); };
+  }, [editing, phone]);
+  // «Ролик» — дом; «Объявления» выезжает слева, «Правка» справа, свайпами и кнопками панели.
+  // Прокрутку разделов не сбрасываем: панели прокручиваются сами, а ролик под ними стоит
+  const quickRef = useRef<HTMLDivElement>(null);
+  usePanelSwipes(quickRef, mtab, 'main', setMtab, LOT_PANELS, loaded);
+  // Плеер живёт, пока открыт «Ролик», и ещё 350 мс после ухода — пока панель наезжает и
+  // картинка под ней не должна пропасть. Потом его нет совсем: играющий под панелью он
+  // рисует кадры 1080×1920 впустую, и прокрутка подлагивает (владелец 01.10)
+  const [previewLive, setPreviewLive] = useState(true);
+  useEffect(() => {
+    if (!phone || mtab === 'main') { setPreviewLive(true); return; }
+    const t = setTimeout(() => setPreviewLive(false), 350);
+    return () => clearTimeout(t);
+  }, [phone, mtab]);
+  // На телефоне правка смонтирована всегда, пока есть объявление: выезжающей панели нужно
+  // что двигать, а размонтирование на закрытии съедало бы анимацию. На компьютере — как раньше
+  const showEditor = phone || editing;
   const quickFromLink = async (link: string) => {
     setQuickError('');
     try {
@@ -164,7 +225,7 @@ export const LotTool: React.FC = () => {
     if (lot && ids.includes(lot.id)) { setLot(rest[0] ?? null); setSave('saved'); }
   };
   const deleteLot = async (l: LotEntry) => {
-    if (!window.confirm(`Удалить лот «${lotTitle(l)}» вместе с его фото и готовыми роликами?`)) return;
+    if (!window.confirm(`Удалить объявление «${lotTitle(l)}» вместе с его фото и готовыми роликами?`)) return;
     mark([l.id], true);
     try {
       await api.deleteLot(l.id);
@@ -173,7 +234,7 @@ export const LotTool: React.FC = () => {
     } catch (e) { report(e); } finally { mark([l.id], false); }
   };
   const deleteEmpty = async (list: LotEntry[]) => {
-    if (!window.confirm(`Удалить пустые лоты (${list.length}) — без фото и без машины?`)) return;
+    if (!window.confirm(`Удалить пустые объявления (${list.length}) — без фото и без машины?`)) return;
     const ids = list.map((l) => l.id);
     mark(ids, true);
     const done: string[] = [];
@@ -182,7 +243,7 @@ export const LotTool: React.FC = () => {
     } catch (e) { report(e); } finally {
       dropFromList(done);
       mark(ids, false);
-      if (done.length) toast(`Удалено пустых лотов: ${done.length}`);
+      if (done.length) toast(`Удалено пустых объявлений: ${done.length}`);
     }
   };
   const copyLot = async (l: LotEntry) => {
@@ -192,6 +253,7 @@ export const LotTool: React.FC = () => {
       setLots((ls) => [copy, ...ls]);
       setLot(copy);
       setSave('saved');
+      setMtab('main');
       toast(`Создана копия: ${lotTitle(copy)}`);
     } catch (e) { report(e); }
   };
@@ -209,12 +271,16 @@ export const LotTool: React.FC = () => {
     return total === null ? '' : `${fmt(total)} ${currencySign(market.currency)}`;
   };
 
-  if (!loaded) return <Loading text="Загрузка лотов…" />;
+  if (!loaded) return <Loading text="Загрузка объявлений…" />;
 
   return (
-    <div className="quick">
-      <QuickLink onLink={quickFromLink} error={quickError} busy={!!stage} />
+    <>
+    <div className="quick" data-mtab={mtab} ref={quickRef}>
       <ImportModal stage={stage} />
+      {/* quick-screen — ровно один экран: ссылка и три колонки. Колонки не растут вместе с
+          содержимым, длинные списки (лоты, ролики) прокручиваются внутри себя */}
+      <div className="quick-screen">
+      <QuickLink onLink={quickFromLink} error={quickError} busy={!!stage} />
 
       {/* Три колонки: лоты — превью — формат и сборка (владелец, 30.09). Ссылка — над ними:
           это первое действие, и новый лот из неё появляется в колонке лотов */}
@@ -223,15 +289,18 @@ export const LotTool: React.FC = () => {
           onCopy={copyLot} onDelete={deleteLot} onDeleteEmpty={deleteEmpty} />
 
         <section className="quick-preview">
-          {input
+          {/* На телефоне плеер живёт только в разделе «Ролик»: скрытый стилями, он продолжал
+              играть и рисовать кадры 1080×1920, и прокрутка «Правки» подлагивала (владелец
+              01.10); каждая перестановка фото ещё и перерисовывала его */}
+          {input && previewLive
             ? <Preview input={input} format={format} autoPlay />
-            : <div className="empty">Вставьте ссылку на объявление Encar — лот, фото и превью появятся сами.</div>}
+            : <div className="empty">Вставьте ссылку на объявление Encar — машина, фото и превью появятся сами.</div>}
         </section>
 
         {lot && (
           <section className="quick-side">
             <div className="quick-title">
-              <h1>{[lot.brand, lot.model].filter(Boolean).join(' ') || 'Новый лот'} <span className="muted">{lot.year || ''}</span></h1>
+              <h1>{[lot.brand, lot.model].filter(Boolean).join(' ') || 'Без названия'} <span className="muted">{lot.year || ''}</span></h1>
               <div className="quick-price">{priceOf(lot) || <span className="warn-inline">цены нет — впишите в «Изменить вручную»</span>}</div>
               {lot.texts?.hookTagline && <div className="muted">{lot.texts.hookTagline}</div>}
               <div className="quick-edit">
@@ -253,13 +322,26 @@ export const LotTool: React.FC = () => {
           </section>
         )}
       </main>
+      </div>
 
-      {lot && editing && (
-        <section className="panel quick-editor">
-          <EncarImport lot={lot} onCreate={createFromCar} onApply={applyFromCar} onError={report} />
+      {lot && showEditor && (
+        <section className="panel quick-editor" ref={editorRef} data-mpanel="edit">
+          {/* На телефоне раздел правки открыт без превью и названия — подписываем, что правим */}
+          <div className="quick-editor-title">
+            <b>{lotTitle(lot)}</b>
+            <span className={`save save-${save}`}>{SAVE_LABEL[save]}</span>
+          </div>
+          <EncarImport lot={lot} onApply={applyFromCar} onError={report} />
           <LotForm lot={lot} market={market} format={format} onChange={editLot} onPhotos={setPhotos} onError={report} />
         </section>
       )}
+      {!lot && <div className="empty mtab-empty">Объявления пока нет — вставьте ссылку в разделе «Ролик».</div>}
     </div>
+    <MobileTabs value={mtab} onChange={setMtab} tabs={[
+      {id: 'list', label: 'Объявления', icon: <List size={20} />, badge: lots.length},
+      {id: 'main', label: 'Ролик', icon: <Clapperboard size={20} />},
+      {id: 'edit', label: 'Правка', icon: <SlidersHorizontal size={20} />},
+    ]} />
+    </>
   );
 };

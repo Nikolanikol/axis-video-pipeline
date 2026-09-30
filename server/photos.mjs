@@ -29,9 +29,9 @@ export const ownFile = (lotId, url) => {
 export const stemOf = (name) => name.replace(/\.jpg$/, '').replace(/~\d+$/, '');
 
 const findOwn = (lot, url) => {
-  if (!lot.photos.includes(url)) throw new HttpError(404, 'Фото нет в лоте');
+  if (!lot.photos.includes(url)) throw new HttpError(404, 'Этого фото нет в объявлении');
   const name = ownFile(lot.id, url);
-  if (!name) throw new HttpError(400, 'Это фото лежит вне папки лота — редактировать его здесь нельзя');
+  if (!name) throw new HttpError(400, 'Это фото лежит вне папки объявления — редактировать его здесь нельзя');
   return name;
 };
 
@@ -124,14 +124,17 @@ export const applyBlur = async (lot, url, rawRegions) => {
 };
 
 export const removePhoto = async (lot, url) => {
-  if (!lot.photos.includes(url)) throw new HttpError(404, 'Фото нет в лоте');
+  if (!lot.photos.includes(url)) throw new HttpError(404, 'Этого фото нет в объявлении');
   const name = ownFile(lot.id, url);
   const blur = {...lot.blur};
+  // Запись об источнике уходит вместе с фото: в палитре объявления снимок снова свободен
+  const sources = lot.sources && {...lot.sources};
   if (name) {
     const stem = stemOf(name);
     await fs.rm(path.join(lotPhotosDir(lot.id), name), {force: true});
     await fs.rm(srcFile(lot.id, stem), {force: true});
     delete blur[stem];
+    if (sources) delete sources[stem];
   }
-  return {...lot, photos: lot.photos.filter((p) => p !== url), blur};
+  return {...lot, photos: lot.photos.filter((p) => p !== url), blur, sources};
 };

@@ -40,7 +40,7 @@ export const BusyModal: React.FC<Props> = ({step, steps, label, note}) => {
             </li>
           ))}
         </ol>
-        <div className="muted import-note">{note}{secs >= 3 ? ` · ${secs} с` : ''}</div>
+        <div className="muted import-note">{note}{secs >= 3 ? ` · ${secs}\u00a0с` : ''}</div>
       </div>
     </div>,
     document.body,

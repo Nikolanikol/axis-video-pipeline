@@ -1,5 +1,6 @@
 // Оболочка: шапка с пайплайнами, вкладки инструментов, экран выбранного инструмента
-import React, {Suspense, useCallback, useState} from 'react';
+import React, {Suspense, useCallback, useEffect, useState} from 'react';
+import {Menu, X} from 'lucide-react';
 import {Loading} from './Loading';
 import {ConfigProvider, useConfig} from './config';
 import {AuthGate, VerifyBanner, day, daysLeft, useOutOfCredits, useSession} from './auth';
@@ -37,8 +38,27 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
   const main = pipelines.filter((p) => p.kind !== 'settings');
   const settings = pipelines.find((p) => p.kind === 'settings');
 
+  // Разделы одним списком: на компьютере это вкладки в шапке, на телефоне — пункты меню-бургера
+  const navItems = [
+    ...main.map((p) => ({key: p.id, to: href(p.id, firstReady(p)?.id), label: p.title, active: p.id === pipeline?.id})),
+    ...(settings ? [{key: settings.id, to: href(settings.id, firstReady(settings)?.id), label: settings.title, active: settings.id === pipeline?.id}] : []),
+    ...(session.enabled && session.isStaff ? [{key: 'admin', to: href('admin'), label: 'Админка', active: route.pipeline === 'admin'}] : []),
+  ];
+
+  // Меню-бургер (телефон, владелец 01.10: вкладки не помещались, шапка получала полосу
+  // прокрутки). Закрывается при переходе, по Escape и по нажатию мимо меню
+  const [menuOpen, setMenuOpen] = useState(false);
+  useEffect(() => { setMenuOpen(false); }, [route.pipeline, route.tool]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [menuOpen]);
+
   return (
     <>
+      <div className={menuOpen ? 'menu-scrim open' : 'menu-scrim'} onClick={() => setMenuOpen(false)} aria-hidden="true" />
       <header className="top">
         <a href={href()} className="top-home" title="Все пайплайны">
           <img src="/kok/wordmark.svg" alt="KOK" className="top-logo" />
@@ -49,19 +69,23 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
           {pipeline && tool && <><span>›</span><b>{tool.title}</b></>}
         </nav>
         <nav className="tabs">
-          {main.map((p) => (
-            <a key={p.id} href={href(p.id, firstReady(p)?.id)} className={p.id === pipeline?.id ? 'tab active' : 'tab'}>{p.title}</a>
-          ))}
-          {settings && (
-            <a href={href(settings.id, firstReady(settings)?.id)} className={settings.id === pipeline?.id ? 'tab active' : 'tab'}>
-              {settings.title}
-            </a>
-          )}
-          {session.enabled && session.isStaff && (
-            <a href={href('admin')} className={route.pipeline === 'admin' ? 'tab active' : 'tab'}>Админка</a>
-          )}
+          {navItems.map((i) => <a key={i.key} href={i.to} className={i.active ? 'tab active' : 'tab'}>{i.label}</a>)}
         </nav>
         {session.enabled && <AccountChip />}
+        {/* Только телефон: остаток кредитов всегда на виду, остальное — в меню */}
+        {session.enabled && !session.isStaff && session.balance && (
+          <a className="top-credits" href={href('account')} title="Кабинет и тарифы">{session.balance.credits} кр.</a>
+        )}
+        <button className="burger" onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen} aria-controls="menu-sheet"
+          aria-label={menuOpen ? 'Закрыть меню' : 'Открыть меню'}>
+          {menuOpen ? <X size={22} /> : <Menu size={22} />}
+        </button>
+        <div id="menu-sheet" className={menuOpen ? 'menu-sheet open' : 'menu-sheet'}>
+          <nav className="menu-links" aria-label="Разделы">
+            {navItems.map((i) => <a key={i.key} href={i.to} className={i.active ? 'menu-link active' : 'menu-link'}>{i.label}</a>)}
+          </nav>
+          {session.enabled && <AccountChip />}
+        </div>
       </header>
 
       {pipeline && pipeline.tools.length > 1 && (
@@ -199,7 +223,7 @@ const Unavailable: React.FC<{pipeline: Pipeline}> = ({pipeline}) => (
       <span className="badge">скоро</span>
       <h1>{pipeline.title}</h1>
       <p>{pipeline.description}</p>
-      <p className="muted">Этот раздел пока недоступен — готовим его к запуску. Карусели и ролики по лотам работают.</p>
+      <p className="muted">Этот раздел пока недоступен — готовим его к запуску. Карусели и ролики по объявлениям работают.</p>
       <div className="actions-row">
         <a className="btn" href={href()}>Все пайплайны</a>
       </div>

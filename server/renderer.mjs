@@ -258,7 +258,7 @@ export const cancelJob = async (id) => {
 // один раз; пересборка удачного — это новая генерация.
 export const retryJob = async (id, bill = null) => {
   const job = ownJob(id);
-  if (!job?.input) throw new HttpError(409, 'Исходные данные этого ролика уже не в памяти — запусти рендер заново из лота или обзора');
+  if (!job?.input) throw new HttpError(409, 'Исходные данные этого ролика уже не в памяти — запусти рендер заново из объявления или обзора');
   return enqueue({
     owner: job.lotId ? {lotId: job.lotId} : {reviewId: job.reviewId},
     composition: job.format, compositionTitle: job.formatTitle, title: job.title,

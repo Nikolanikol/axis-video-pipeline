@@ -65,8 +65,8 @@ export const SegmentList: React.FC<Props> = ({segments, source, selectedId, onSe
                 <label className="check"><input type="checkbox" checked={Boolean(s.accent)} onChange={(e) => update(s.id, {accent: e.target.checked})} /> медью</label>
               </div>
             )}
-            {s.kind === 'hook' && <div className="hint">Марка, модель и год — из привязанного лота</div>}
-            {s.kind === 'final' && <div className="hint">Цена до порта и контакты — из лота и профиля</div>}
+            {s.kind === 'hook' && <div className="hint">Марка, модель и год — из привязанного объявления</div>}
+            {s.kind === 'final' && <div className="hint">Цена до порта и контакты — из объявления и профиля</div>}
           </div>
         );
       })}

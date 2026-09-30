@@ -8,10 +8,11 @@
 // Отличие от ролика: превью ролика живое, и формат там меняется бесплатно, а карусель надо
 // собрать — это кредит. Поэтому клик по формату только выбирает его, пересборка — отдельной
 // кнопкой, а ссылка на уже собранную машину открывает готовую карусель, а не собирает заново.
-import React, {useCallback, useEffect, useState} from 'react';
-import {parseCarLink} from '../../src/shared/encarLink.js';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {encarAdUrl, parseCarLink} from '../../src/shared/encarLink.js';
 import {QuickLink} from '../ads/QuickLot';
-import {ExternalLink, RefreshCw, Trash2} from 'lucide-react';
+import {Check, ExternalLink, Images, List, RefreshCw, Trash2} from 'lucide-react';
+import {MobileTabs, usePanelSwipes} from '../MobileTabs';
 import {toast} from '../Toast';
 import {api, CarouselEntry, CarouselFormat} from '../api';
 import {useConfig} from '../config';
@@ -82,18 +83,24 @@ const Lightbox: React.FC<{entry: CarouselEntry; at: number; onClose: () => void;
 
 /** Формат столбцом справа: пропорция нарисована («1:1» и «4:5» словами различают не все),
  *  число слайдов и одна строка, зачем этот формат */
-const FormatList: React.FC<{formats: CarouselFormat[]; value: string; onChange: (id: string) => void}> =
-  ({formats, value, onChange}) => (
-    <div className="format-list" role="radiogroup" aria-label="Формат карусели">
+// built — формат, в котором открытая карусель уже собрана (у машины карусель одна, так что
+// «собранный» формат всегда один): помечаем его, чтобы было видно, что готово, ещё до клика
+const FormatList: React.FC<{formats: CarouselFormat[]; value: string; built?: string; onChange: (id: string) => void}> =
+  ({formats, value, built, onChange}) => (
+    <div className="format-list format-grid" role="radiogroup" aria-label="Формат карусели">
       {formats.map((f) => (
         <button key={f.id} type="button" role="radio" aria-checked={f.id === value}
-          className={f.id === value ? 'format-item on' : 'format-item'} onClick={() => onChange(f.id)}>
+          className={`format-item${f.id === value ? ' on' : ''}${f.id === built ? ' built' : ''}`} onClick={() => onChange(f.id)}>
           <span className="format-item-head">
             <span className="format-item-name">
               <span className="format-shape-mini" style={{aspectRatio: `${f.width} / ${f.height}`}} />
               <b>{f.title}</b>
+              {f.id === built && <Check className="format-built-icon" size={15} aria-hidden />}
             </span>
-            <span className="muted">{f.slides.length} слайдов</span>
+            <span className="muted">
+              {f.slides.length} слайдов
+              {f.id === built && <span className="format-built-label"> · собрана</span>}
+            </span>
           </span>
           <span className="format-item-sub">{f.note}</span>
         </button>
@@ -107,7 +114,7 @@ const shortDate = (iso: string) => new Date(iso).toLocaleDateString('ru-RU', {da
 /**
  * Собранные карусели — колонка слева во всю высоту. Карточка: обложка в своей пропорции
  * (раньше — обрезанная полоса 16:9, где надпись на обложке не читалась), машина, год, формат,
- * число слайдов, дата. На карточке — свои кнопки: пересобрать, в каталоге, удалить (владелец
+ * число слайдов, дата. На карточке — свои кнопки: пересобрать, на Encar, удалить (владелец
  * 30.09: «верни кнопки управления, плашка куцая и бедная»). Клик по карточке — открыть.
  * У открытой кнопки видны всегда, у остальных — при наведении, чтобы список не рябил.
  */
@@ -119,7 +126,7 @@ const CarouselsPanel: React.FC<{
   const q = query.trim().toLowerCase();
   const shown = q ? items.filter((c) => [c.car.brand, c.car.model, c.id].join(' ').toLowerCase().includes(q)) : items;
   return (
-    <aside className="lots-panel carousels-panel">
+    <aside className="lots-panel carousels-panel" data-mpanel="list">
       <div className="lots-title">Карусели <span className="muted">{items.length}</span></div>
       {items.length > 4 && <input className="lots-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск: марка, модель, номер" />}
       <div className="lots-list">
@@ -139,8 +146,8 @@ const CarouselsPanel: React.FC<{
                 {pending.has(c.id) ? <span className="car-card-status">Удаляю…</span> : <div className="car-card-actions">
                   <button className="icon-btn" title={`Пересобрать в формате «${f?.title ?? ''}»${cost}`} aria-label="Пересобрать"
                     disabled={busy} onClick={stop(() => onRebuild(c))}><RefreshCw size={16} /></button>
-                  <a className="icon-btn" href={c.car.source} target="_blank" rel="noreferrer" title="Открыть в каталоге"
-                    aria-label="Открыть в каталоге" onClick={(e) => e.stopPropagation()}><ExternalLink size={16} /></a>
+                  <a className="icon-btn" href={encarAdUrl(c.id)} target="_blank" rel="noreferrer" title="Открыть объявление на Encar"
+                    aria-label="Открыть на Encar" onClick={(e) => e.stopPropagation()}><ExternalLink size={16} /></a>
                   <button className="icon-btn danger" title="Удалить" aria-label="Удалить" disabled={busy}
                     onClick={stop(() => onDelete(c))}><Trash2 size={16} /></button>
                 </div>}
@@ -192,6 +199,9 @@ const SlideViewer: React.FC<{entry: CarouselEntry; ratio: string; onZoom: (i: nu
 const FORMAT_KEY = 'axis-video:carousel-format';
 const savedFormat = () => { try { return localStorage.getItem(FORMAT_KEY); } catch { return null; } };
 
+// Панель «Собранные» выезжает слева; объект вне компонента — чтобы не менять ссылку на каждый кадр
+const CAROUSEL_PANELS = {list: 'left'} as const;
+
 export const CarouselTool: React.FC = () => {
   const {config, profile, report} = useConfig();
   // Язык слайдов — из профиля: виден здесь, чтобы не удивляться английской карусели
@@ -208,6 +218,10 @@ export const CarouselTool: React.FC = () => {
   const [history, setHistory] = useState<CarouselEntry[]>([]);
   // Какой слайд открыт во весь экран; null — нет
   const [open, setOpen] = useState<number | null>(null);
+  // Телефон: на экране либо открытая карусель, либо список собранных (MobileTabs.tsx)
+  const [mtab, setMtab] = useState<'main' | 'list'>('main');
+  const quickRef = useRef<HTMLDivElement>(null);
+  usePanelSwipes(quickRef, mtab, 'main', setMtab, CAROUSEL_PANELS);
 
   const refresh = useCallback(() => {
     api.carousels().then((list) => {
@@ -225,6 +239,7 @@ export const CarouselTool: React.FC = () => {
     try {
       const made = await api.buildCarousel(link, fmt, seed);
       setEntry(made);
+      setMtab('main');
       setHistory((h) => [made, ...h.filter((x) => x.id !== made.id)]);
     } catch (e) {
       // Ошибку сборки по ссылке — под строкой ссылки: человек смотрит туда
@@ -238,7 +253,7 @@ export const CarouselTool: React.FC = () => {
     let id: string;
     try { ({id} = parseCarLink(link)); } catch (e) { setLinkError(e instanceof Error ? e.message : String(e)); return; }
     const known = history.find((h) => h.id === id);
-    if (known) { setEntry(known); setLinkError(''); return; }
+    if (known) { setEntry(known); setLinkError(''); setMtab('main'); return; }
     run(link);
   };
 
@@ -286,7 +301,10 @@ export const CarouselTool: React.FC = () => {
   const ratio = entryFormat ? `${entryFormat.width} / ${entryFormat.height}` : '9 / 16';
 
   return (
-    <div className="quick">
+    <>
+    <div className="quick" data-mtab={mtab} ref={quickRef}>
+      {/* quick-screen — один экран, как у «Ролика по лоту»: колонки прокручиваются внутри */}
+      <div className="quick-screen">
       <QuickLink onLink={fromLink} error={linkError} busy={busy}
         placeholder={`Вставьте ссылку на объявление Encar — карусель соберётся сама (слайды на ${slidesLang})`} />
       {/* Сборка — 10–20 секунд (замер 30.09: 13 с на 9 слайдов); экран закрыт окном, как у лота по ссылке */}
@@ -295,7 +313,7 @@ export const CarouselTool: React.FC = () => {
 
       <main className="quick-main">
         <CarouselsPanel items={history} current={entry?.id} formats={formats} busy={busy} cost={cost} pending={pending}
-          onOpen={(e) => { setEntry(e); setLinkError(''); }}
+          onOpen={(e) => { setEntry(e); setLinkError(''); setMtab('main'); }}
           onRebuild={(e) => run(e.id, e.seed, e.format ?? 'classic')}
           onDelete={(e) => remove(e.id)} />
 
@@ -313,7 +331,7 @@ export const CarouselTool: React.FC = () => {
             </div>
           )}
           <div className="quick-label">Формат карусели</div>
-          <FormatList formats={formats} value={format} onChange={setFormat} />
+          <FormatList formats={formats} value={format} built={entry ? (entry.format ?? 'classic') : undefined} onChange={setFormat} />
 
           {entry && (
             <div className="carousel-actions">
@@ -347,13 +365,14 @@ export const CarouselTool: React.FC = () => {
                   <button className="btn ghost" onClick={() => run(entry.id, entry.seed)} disabled={busy}
                     title="Те же компоновка и фразы, свежие данные и текущий бренд">Пересобрать{cost}</button>
                 )}
-                <a className="btn ghost" href={entry.car.source} target="_blank" rel="noreferrer">В каталоге</a>
+                <a className="btn ghost" href={encarAdUrl(entry.id)} target="_blank" rel="noreferrer">На Encar</a>
                 <button className="btn ghost" onClick={() => remove(entry.id)} disabled={busy}>Удалить</button>
               </div>
             </div>
           )}
         </section>
       </main>
+      </div>
 
       {entry && open !== null && (
         <Lightbox
@@ -364,5 +383,10 @@ export const CarouselTool: React.FC = () => {
         />
       )}
     </div>
+    <MobileTabs value={mtab} onChange={setMtab} tabs={[
+      {id: 'list', label: 'Собранные', icon: <List size={20} />, badge: history.length},
+      {id: 'main', label: 'Карусель', icon: <Images size={20} />},
+    ]} />
+    </>
   );
 };

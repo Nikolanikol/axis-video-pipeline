@@ -5,12 +5,12 @@
 // подзаголовок, фото (autoPickPhotos), формат — последний использованный. Ручное
 // управление не убрано, а спрятано под «Изменить» и нигде не обязательно.
 import React, {useRef, useState} from 'react';
-import {parseCarLink} from '../../src/shared/encarLink.js';
+import {encarAdUrl, parseCarLink} from '../../src/shared/encarLink.js';
 import {FORMATS} from '../../src/shared/model';
 import type {FormatMeta} from '../../src/shared/types';
 import type {LotEntry} from '../api';
 import {BusyModal} from '../BusyModal';
-import {Copy, ExternalLink, Trash2} from 'lucide-react';
+import {Copy, ExternalLink, Link2, Search, Trash2} from 'lucide-react';
 import {lotIsBlank} from '../../src/shared/lotFromCar';
 
 /** Где сейчас загрузка лота по ссылке: шаг 0 — поиск машины, 1 — лот, 2 — фото */
@@ -19,7 +19,7 @@ export type ImportStage = {step: 0 | 1 | 2; photos?: number} | null;
 /** Окно загрузки машины из Encar — общее окно BusyModal с тремя шагами */
 export const ImportModal: React.FC<{stage: ImportStage}> = ({stage}) => (
   <BusyModal step={stage?.step ?? null} label="Загрузка машины из Encar" note="Обычно 10–15 секунд. Не закрывайте страницу"
-    steps={['Ищу машину на Encar', 'Создаю лот', stage?.photos ? `Загружаю ${stage.photos} фото` : 'Загружаю фото']} />
+    steps={['Ищу машину на Encar', 'Создаю объявление', stage?.photos ? `Загружаю ${stage.photos} фото` : 'Загружаю фото']} />
 );
 
 /**
@@ -39,15 +39,18 @@ export const QuickLink: React.FC<{onLink: (link: string) => void; error: string;
   };
   return (
     <div className="quick-link">
-      <form onSubmit={(e) => { e.preventDefault(); go(value); }}>
+      {/* Пустое поле кнопку не гасит: погашенная винная кнопка выглядит сломанной, а строка —
+          первое действие на экране. Нажали с пустым полем — ставим курсор в поле */}
+      <form className="link-bar" onSubmit={(e) => { e.preventDefault(); if (!value.trim()) ref.current?.focus(); else go(value); }}>
+        <Link2 className="link-bar-icon" size={20} aria-hidden />
         <input ref={ref} value={value} disabled={busy} autoFocus
-          placeholder={placeholder}
+          placeholder={placeholder} aria-label="Ссылка на объявление Encar"
           onChange={(e) => setValue(e.target.value)}
           onPaste={(e) => {
             // Вставили ссылку — сразу в работу; не ссылку — пусть ляжет в поле как текст
             if (go(e.clipboardData.getData('text'))) e.preventDefault();
           }} />
-        <button className="btn" disabled={busy || !value.trim()}>Найти</button>
+        <button className="btn primary link-go" disabled={busy}><Search size={17} aria-hidden />Найти</button>
       </form>
       {!busy && error && <div className="error" style={{margin: '8px 0 0'}}>{error}</div>}
     </div>
@@ -71,11 +74,13 @@ export const FormatChips: React.FC<{value: string; onChange: (id: string) => voi
 // Сортировка списка лотов — только на экране (в этом браузере), лоты на сервере не трогаем
 type Sort = 'new' | 'old' | 'name';
 const SORTS: Record<Sort, string> = {new: 'Сначала новые', old: 'Сначала старые', name: 'По названию'};
-const titleOf = (l: LotEntry) => [l.brand, l.model].filter(Boolean).join(' ') || 'Новый лот';
-// Ссылка на объявление по пометке лота «Encar 12345» (и «копия Encar 12345»)
-const encarUrl = (l: LotEntry) => {
+const titleOf = (l: LotEntry) => [l.brand, l.model].filter(Boolean).join(' ') || 'Без названия';
+// Ссылка на объявление по пометке лота «Encar 12345» (и «копия Encar 12345»). Она же —
+// «сохранённая ссылка» лота: номер машины уже лежит в пометке, отдельное поле не нужно,
+// и работает это для лотов, созданных до 01.10
+export const encarUrl = (l: LotEntry) => {
   const m = l.note?.match(/Encar (\d+)/);
-  return m ? `https://fem.encar.com/cars/detail/${m[1]}` : null;
+  return m ? encarAdUrl(m[1]) : null;
 };
 /** Пустой лот: без фото и без машины — копятся от «+ Новый лот», их удаляют пачкой */
 export const isEmptyLot = (l: LotEntry) => !l.photos.length && lotIsBlank(l);
@@ -101,20 +106,22 @@ export const LotsPanel: React.FC<{
       : sort === 'old' ? (a.updatedAt ?? '').localeCompare(b.updatedAt ?? '') : (b.updatedAt ?? '').localeCompare(a.updatedAt ?? ''));
   const stop = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); fn(); };
   return (
-    <aside className="lots-panel carousels-panel">
-      <button className="btn primary lots-new" onClick={onBlank}>+ Новый лот</button>
+    <aside className="lots-panel carousels-panel" data-mpanel="list">
+      {/* «Добавить вручную», а не «Новое объявление»: главный вход — строка ссылки сверху,
+          эта кнопка создаёт пустую карточку под ручное заполнение */}
+      <button className="btn primary lots-new" onClick={onBlank}>+ Добавить вручную</button>
       <div className="lots-tools">
-        <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label="Сортировка лотов">
+        <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} aria-label="Сортировка объявлений">
           {(Object.keys(SORTS) as Sort[]).map((k) => <option key={k} value={k}>{SORTS[k]}</option>)}
         </select>
         {empty.length > 0 && (
-          <button className="btn ghost" title="Лоты без фото и без машины" onClick={() => onDeleteEmpty(empty)}>
+          <button className="btn ghost" title="Объявления без фото и без машины" onClick={() => onDeleteEmpty(empty)}>
             Удалить пустые ({empty.length})
           </button>
         )}
       </div>
       {lots.length > 4 && <input className="lots-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск: марка, модель, год" />}
-      <div className="lots-title">Лоты <span className="muted">{lots.length}</span></div>
+      <div className="lots-title">Объявления <span className="muted">{lots.length}</span></div>
       <div className="lots-list">
         {shown.map((l) => {
           const busy = pending.has(l.id);
@@ -137,7 +144,7 @@ export const LotsPanel: React.FC<{
                       <a className="icon-btn" href={url} target="_blank" rel="noreferrer" title="Открыть объявление на Encar"
                         aria-label="Открыть на Encar" onClick={(e) => e.stopPropagation()}><ExternalLink size={16} /></a>
                     )}
-                    <button className="icon-btn danger" title="Удалить лот вместе с его роликами" aria-label="Удалить"
+                    <button className="icon-btn danger" title="Удалить объявление вместе с его роликами" aria-label="Удалить"
                       onClick={stop(() => onDelete(l))}><Trash2 size={16} /></button>
                   </div>
                 )}
@@ -145,7 +152,7 @@ export const LotsPanel: React.FC<{
             </div>
           );
         })}
-        {!shown.length && <div className="empty small">{q ? 'Ничего не нашлось' : 'Лотов пока нет — вставьте ссылку сверху'}</div>}
+        {!shown.length && <div className="empty small">{q ? 'Ничего не нашлось' : 'Объявлений пока нет — вставьте ссылку сверху'}</div>}
       </div>
     </aside>
   );

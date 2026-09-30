@@ -193,7 +193,7 @@ export const ReviewTool: React.FC = () => {
     segments.length > 0 && !segments.some((s) => s.kind === 'hook') && 'нет хука',
     segments.length > 0 && !segments.some((s) => s.kind === 'final') && 'нет финала с ценой и контактами',
     totalSec > MAX_REVIEW_SEC && `ролик ${sec(totalSec)} — длиннее ${MAX_REVIEW_SEC} с`,
-    lot && !lot.carPriceUsd && !(lot.carPriceKrw && lot.krwPerUsd) && 'у лота нет цены — будет «XX XXX $»',
+    lot && !lot.carPriceUsd && !(lot.carPriceKrw && lot.krwPerUsd) && 'у объявления нет цены — будет «XX XXX $»',
     speechStale(review?.speech, source) && 'речь распознана по другому видео — субтитры и озвучка лягут мимо кадра',
   ].filter(Boolean) as string[];
 

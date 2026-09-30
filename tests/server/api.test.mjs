@@ -97,11 +97,13 @@ describe('лоты', () => {
     const {body: lot} = await call('POST', '/api/lots', {});
     const {body: saved} = await call('PUT', `/api/lots/${lot.id}`, {
       ...lot, brand: 'Audi', format: 'price-ad', photos: ['/etc/passwd'], blur: {x: [[0, 0, 1, 1]]},
+      sources: {x: 'https://ci.encar.com/x.jpg'},
     });
     expect(saved.brand).toBe('Audi');
     expect(saved.format).toBe('price-ad');
     expect(saved.photos).toEqual([]);
     expect(saved.blur).toBeUndefined();
+    expect(saved.sources).toBeUndefined();
   });
 });
 

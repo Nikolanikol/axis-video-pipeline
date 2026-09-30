@@ -11,7 +11,7 @@ import {
 } from './store.mjs';
 import {reviewStoryboard} from '../src/shared/timeline.js';
 import {getFormat, listFormats, storyboardFrames} from './formats.mjs';
-import {addPhoto, applyBlur, photoInfo, removePhoto} from './photos.mjs';
+import {addPhoto, applyBlur, ownFile, photoInfo, removePhoto, stemOf} from './photos.mjs';
 import {checkPhotoUrls, downloadPhoto, lookupCar} from './encar.mjs';
 import {usdKrw} from './rates.mjs';
 import {makeZip} from './zip.mjs';
@@ -291,10 +291,10 @@ export const createApp = ({photoOrigin}) => {
   // «плашка будет засоряться, их надо удалять»). Идущий рендер этого лота — отказ: иначе
   // удалили бы файл, который прямо сейчас пишется (так же устроено удаление ролика)
   api.delete('/lots/:id', wrap((req) => withLot(req.params.id, async (loading) => {
-    const lot = await loading.catch(() => { throw new HttpError(404, 'Нет такого лота'); });
+    const lot = await loading.catch(() => { throw new HttpError(404, 'Нет такого объявления'); });
     const own = await listJobs({lotId: lot.id});
     if (own.some((j) => j.status === 'queued' || j.status === 'running')) {
-      throw new HttpError(409, 'Ролик этого лота сейчас собирается — дождитесь или отмените сборку');
+      throw new HttpError(409, 'Ролик этого объявления сейчас собирается — дождитесь или отмените сборку');
     }
     for (const j of own) await deleteJob(j.id);
     await fs.rm(lotDir(lot.id), {recursive: true, force: true});
@@ -306,7 +306,7 @@ export const createApp = ({photoOrigin}) => {
   // Пометку «Encar <номер>» меняем: по ней вставка той же ссылки находит лот, и копия
   // перехватывала бы оригинал
   api.post('/lots/:id/copy', wrap(async (req) => {
-    const src = await getLot(req.params.id).catch(() => { throw new HttpError(404, 'Нет такого лота'); });
+    const src = await getLot(req.params.id).catch(() => { throw new HttpError(404, 'Нет такого объявления'); });
     const {id: _old, updatedAt: _u, ...data} = src;
     const created = await createLot({market: data.market});
     await fs.cp(lotPhotosDir(src.id), lotPhotosDir(created.id), {recursive: true});
@@ -319,11 +319,11 @@ export const createApp = ({photoOrigin}) => {
   api.get('/lots/:id', wrap((req) => getLot(req.params.id)));
   api.put('/lots/:id', wrap((req) => withLot(req.params.id, async (loading) => {
     const current = await loading;
-    // Фото и размытие меняются только своими запросами; из формы принимаем лишь новый порядок уже загруженных
+    // Фото, размытие и источники фото меняются только своими запросами; из формы принимаем лишь новый порядок уже загруженных
     const known = new Set(current.photos);
     const sent = [...new Set(Array.isArray(req.body.photos) ? req.body.photos.filter((p) => known.has(p)) : [])];
     const photos = sent.length === current.photos.length ? sent : current.photos;
-    return saveLot(current.id, {...req.body, photos, blur: current.blur});
+    return saveLot(current.id, {...req.body, photos, blur: current.blur, sources: current.sources});
   })));
 
   // Фото: оригинал + рабочая копия 1080 по ширине (поворот по EXIF, JPEG)
@@ -344,9 +344,14 @@ export const createApp = ({photoOrigin}) => {
     // По одному, а не разом: Encar на пачку одновременных запросов с одного адреса
     // отвечает отказами, а выигрыш в секундах тут не важен
     for (const [i, url] of urls.entries()) added.push(await addPhoto(lot.id, await downloadPhoto(url), `encar-${i + 1}.jpg`));
+    // Откуда каждое фото: по этой записи палитра объявления помечает снимки «в лоте» и не
+    // даёт загрузить их второй раз. Ключ — имя файла без версии, как у размытия (версия
+    // меняется при каждом размытии); адрес — без параметров размера: палитра показывает тот
+    // же снимок с другими параметрами
+    const sources = Object.fromEntries(added.map((p, i) => [stemOf(ownFile(lot.id, p)), urls[i].split('?')[0]]));
     return withLot(lot.id, async (loading) => {
       const current = await loading;
-      return saveLot(current.id, {...current, photos: [...current.photos, ...added]});
+      return saveLot(current.id, {...current, photos: [...current.photos, ...added], sources: {...current.sources, ...sources}});
     });
   }));
   api.delete('/lots/:id/photos', wrap((req) => withLot(req.params.id, async (loading) => {
