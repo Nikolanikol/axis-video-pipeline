@@ -15,7 +15,7 @@ import {EncarImport} from './EncarImport';
 import {Preview} from '../Preview';
 import {RenderPanel} from '../RenderPanel';
 import {lastFormat, lastLot} from '../router';
-import {FormatChips, QuickLink, RecentLots} from './QuickLot';
+import {FormatChips, LotsPanel, QuickLink} from './QuickLot';
 
 type SaveState = 'saved' | 'dirty' | 'saving' | 'error';
 const SAVE_LABEL: Record<SaveState, string> = {saved: 'Сохранено', dirty: 'Есть правки', saving: 'Сохраняю…', error: 'Не сохранено'};
@@ -167,17 +167,31 @@ export const LotTool: React.FC = () => {
     <div className="quick">
       <QuickLink onLink={quickFromLink} stage={stage} error={quickError} busy={!!stage} />
 
-      {lot ? (
-        <main className="quick-main">
-          <section className="quick-preview">
-            {input && <Preview input={input} format={format} autoPlay />}
-          </section>
+      {/* Три колонки: лоты — превью — формат и сборка (владелец, 30.09). Ссылка — над ними:
+          это первое действие, и новый лот из неё появляется в колонке лотов */}
+      <main className="quick-main">
+        <LotsPanel lots={lots} current={lot?.id} onOpen={selectLot} onBlank={newLot} price={priceOf} />
+
+        <section className="quick-preview">
+          {input
+            ? <Preview input={input} format={format} autoPlay />
+            : <div className="empty">Вставьте ссылку на объявление Encar — лот, фото и превью появятся сами.</div>}
+        </section>
+
+        {lot && (
           <section className="quick-side">
             <div className="quick-title">
               <h1>{[lot.brand, lot.model].filter(Boolean).join(' ') || 'Новый лот'} <span className="muted">{lot.year || ''}</span></h1>
-              <div className="quick-price">{priceOf(lot) || <span className="warn-inline">цены нет — впишите в «Изменить»</span>}</div>
+              <div className="quick-price">{priceOf(lot) || <span className="warn-inline">цены нет — впишите в «Изменить вручную»</span>}</div>
               {lot.texts?.hookTagline && <div className="muted">{lot.texts.hookTagline}</div>}
+              <div className="quick-edit">
+                <button className="btn ghost" onClick={() => setEditing(!editing)} aria-expanded={editing}>
+                  {editing ? 'Скрыть ручные настройки' : 'Изменить вручную'}
+                </button>
+                <span className={`save save-${save}`}>{SAVE_LABEL[save]}</span>
+              </div>
             </div>
+            <div className="quick-label">Формат ролика</div>
             <FormatChips value={format.id} onChange={chooseFormat} />
             <RenderPanel
               lot={lot}
@@ -186,17 +200,9 @@ export const LotTool: React.FC = () => {
               beforeRender={async () => { if (save !== 'saved') await saveLot(); }}
               onError={report}
             />
-            <div className="quick-edit">
-              <button className="btn ghost" onClick={() => setEditing(!editing)} aria-expanded={editing}>
-                {editing ? 'Скрыть ручные настройки' : 'Изменить вручную'}
-              </button>
-              <span className={`save save-${save}`}>{SAVE_LABEL[save]}</span>
-            </div>
           </section>
-        </main>
-      ) : (
-        <div className="empty">Вставьте ссылку на объявление Encar — лот, фото и превью появятся сами.</div>
-      )}
+        )}
+      </main>
 
       {lot && editing && (
         <section className="panel quick-editor">
@@ -204,8 +210,6 @@ export const LotTool: React.FC = () => {
           <LotForm lot={lot} market={market} format={format} onChange={editLot} onPhotos={setPhotos} onError={report} />
         </section>
       )}
-
-      <RecentLots lots={lots} current={lot?.id} onOpen={selectLot} onBlank={newLot} price={priceOf} />
     </div>
   );
 };

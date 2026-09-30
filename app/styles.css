@@ -489,12 +489,12 @@ a.tab { text-decoration: none; }
 /* ——— «Ролик по лоту»: основной путь в три действия (app/ads/QuickLot.tsx) ———
    Сверху ссылка, под ней превью и справа всё, что нужно для сборки. Превью влезает в экран
    целиком: раньше плеер был выше окна, и до «плей» и сцен приходилось прокручивать */
-.quick { flex: 1; overflow: auto; width: 100%; max-width: 1280px; margin: 0 auto; padding: 16px 20px 40px; display: flex; flex-direction: column; gap: 18px; }
+.quick { flex: 1; overflow: auto; width: 100%; max-width: 1400px; margin: 0 auto; padding: 16px 20px 40px; display: flex; flex-direction: column; gap: 18px; }
 .quick-link form { display: flex; gap: 8px; }
 .quick-link input { font-size: 16px; padding: 14px 16px; }
 .quick-stage { display: flex; align-items: center; gap: 12px; margin-top: 10px; color: var(--muted); }
 .quick-stage .bar { width: 180px; }
-.quick-main { display: grid; grid-template-columns: auto minmax(320px, 420px); gap: 28px; align-items: start; justify-content: center; }
+.quick-main { display: grid; grid-template-columns: 260px auto minmax(300px, 380px); gap: 24px; align-items: start; justify-content: center; }
 .quick-preview .player-box { height: min(calc(100vh - 250px), 760px); }
 .quick-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .quick-title h1 { margin: 0 0 4px; font: 800 26px var(--font); letter-spacing: -.01em; }
@@ -502,36 +502,59 @@ a.tab { text-decoration: none; }
 .quick-edit { display: flex; align-items: center; gap: 12px; }
 .quick-editor { padding: 0 0 16px; overflow: visible; }
 .quick-editor .form { padding: 16px 20px 0; max-width: 760px; }
-.format-chips { display: flex; gap: 8px; }
-.chip { flex: 1; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 10px 12px; border-radius: 8px;
-  border: 1px solid var(--line); background: var(--panel-2); color: var(--text); font-weight: 700; cursor: pointer; text-align: left; }
-.chip:hover { border-color: var(--accent-line); }
-.chip.on { border-color: var(--accent-line); box-shadow: inset 0 0 0 1px var(--accent-line); }
-.chip-sub { font-size: 12px; font-weight: 500; color: var(--muted); }
-.recent-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.recent-head h2 { margin: 0 0 10px; }
-.recent-list { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; }
-.recent-card { flex: 0 0 180px; display: flex; flex-direction: column; gap: 3px; padding: 8px; border-radius: 10px; text-align: left;
-  border: 1px solid var(--line); background: var(--panel); color: var(--text); cursor: pointer; font-size: 13px; }
-.recent-card:hover, .recent-card.on { border-color: var(--accent-line); }
-.recent-card img, .recent-empty { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 6px; background: var(--panel-2); margin-bottom: 4px; }
-.recent-empty { display: grid; place-items: center; color: var(--muted); font-size: 12px; }
+/* Формат — столбцом справа: название, длительность, одна строка отличия */
+.quick-label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; font-weight: 700; margin-bottom: -6px; }
+.format-list { display: flex; flex-direction: column; gap: 8px; }
+.format-item { display: flex; flex-direction: column; gap: 3px; padding: 12px 14px; border-radius: 10px; text-align: left; cursor: pointer;
+  border: 1px solid var(--line); background: var(--panel-2); color: var(--text); }
+.format-item:hover { border-color: var(--accent-line); }
+.format-item.on { border-color: var(--accent-line); box-shadow: inset 3px 0 0 var(--accent); background: var(--panel); }
+.format-item-head { display: flex; justify-content: space-between; gap: 8px; font-size: 15px; }
+.format-item-sub { font-size: 12px; color: var(--muted); line-height: 1.35; }
+/* Лоты — колонка слева: заметная «+ Новый лот», поиск (когда лотов много), список машин.
+   Высота — по экрану, список прокручивается внутри: превью и сборка остаются на месте */
+.lots-panel { display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 190px); min-height: 0;
+  padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.lots-new { width: 100%; padding: 12px; font-size: 15px; }
+.lots-title { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .12em; font-weight: 700; }
+.lots-list { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; min-height: 0; margin: 0 -4px; padding: 0 4px; }
+.lot-row { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 8px; text-align: left; cursor: pointer;
+  border: 1px solid transparent; background: none; color: var(--text); font-size: 13px; }
+.lot-row:hover { background: var(--panel-2); }
+.lot-row.on { border-color: var(--accent-line); background: var(--panel-2); }
+.lot-row img, .lot-row-empty { flex: none; width: 72px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 5px; background: var(--panel-2); }
+.lot-row-empty { display: grid; place-items: center; font-size: 10px; color: var(--muted); }
+.lot-row-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.lot-row-text b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Узкий ноутбук: колонки лотов и сборки уже, превью посередине остаётся целым */
+@media (max-width: 1150px) and (min-width: 901px) {
+  .quick-main { grid-template-columns: 200px auto minmax(250px, 300px); gap: 16px; }
+  .lot-row img, .lot-row-empty { width: 56px; }
+}
 /* Телефон: одна колонка — ссылка, превью, формат, «Собрать». Дилеры работают с телефона,
    а Reels и TikTok — телефонные; действия те же 2–3 касания */
 @media (max-width: 900px) {
   .quick { padding: 12px 12px 32px; gap: 12px; }
   .quick-main { grid-template-columns: 1fr; gap: 12px; }
+  /* Порядок на телефоне: превью → формат и сборка → лоты (лоты — не первое, что нужно) */
+  .quick-preview { order: 1; }
+  .quick-side { order: 2; }
+  .lots-panel { order: 3; max-height: none; }
   /* Превью ниже, чем на компьютере: на экране 375×812 кнопка «Собрать» уходила под край
-     (замер 30.09: 1054 px при высоте 812). С 46vh ссылка, превью, формат и «Собрать»
-     помещаются на одном экране */
+     (замер 30.09: 1054 px при высоте 812). С 42vh и форматами в строку ссылка, превью,
+     формат и «Собрать» помещаются на одном экране (столбец форматов с подписями снова
+     уводил кнопку на 904 px) */
   /* !important — чтобы перебить старое «.player-box { height: 70vh !important }» узких экранов
      (прежняя трёхколоночная раскладка); здесь нужна своя высота */
-  .quick-preview .player-box { height: 46vh !important; margin: 0 auto; }
+  .quick-preview .player-box { height: 42vh !important; margin: 0 auto; }
   .quick-preview .scenes { display: none; }
   .quick-title h1 { font-size: 20px; }
   .quick-price { font-size: 22px; }
   .quick-side { gap: 10px; }
-  .chip { padding: 8px; font-size: 13px; }
+  .format-list { flex-direction: row; }
+  .format-item { flex: 1; padding: 8px 10px; }
+  .format-item-head { flex-direction: column; gap: 0; font-size: 13px; }
+  .format-item-sub, .quick-label { display: none; }
   .quick-link input { padding: 12px; }
 }
 /* Шапка на телефоне: крошки прячем, вкладки прокручиваются вбок — иначе они распирали

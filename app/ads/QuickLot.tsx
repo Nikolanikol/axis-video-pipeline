@@ -43,36 +43,48 @@ export const QuickLink: React.FC<{onLink: (link: string) => void; stage: string;
   );
 };
 
-// Короткие названия форматов на кнопках: полные описания остаются подсказкой
+// Выбор формата — справа, столбцом: название, длительность и одна строка, чем отличается.
+// Выпадающий список прятал форматы, а три кнопки в строку не вмещали объяснения
 export const FormatChips: React.FC<{value: string; onChange: (id: string) => void}> = ({value, onChange}) => (
-  <div className="format-chips" role="radiogroup" aria-label="Формат ролика">
+  <div className="format-list" role="radiogroup" aria-label="Формат ролика">
     {FORMATS.map((f: FormatMeta) => (
       <button key={f.id} role="radio" aria-checked={f.id === value} title={f.description}
-        className={f.id === value ? 'chip on' : 'chip'} onClick={() => onChange(f.id)}>
-        {f.title}
-        <span className="chip-sub">{Math.round(f.durationInFrames / f.fps)} с</span>
+        className={f.id === value ? 'format-item on' : 'format-item'} onClick={() => onChange(f.id)}>
+        <span className="format-item-head"><b>{f.title}</b><span className="muted">{Math.round(f.durationInFrames / f.fps)} с</span></span>
+        {f.short && <span className="format-item-sub">{f.short}</span>}
       </button>
     ))}
   </div>
 );
 
-/** Недавние лоты карточками: открыть старую машину — один клик, а не поиск в выпадающем списке */
-export const RecentLots: React.FC<{lots: LotEntry[]; current?: string; onOpen: (id: string) => void; onBlank: () => void; price: (l: LotEntry) => string}> = (
+/**
+ * Лоты — колонка слева: сверху заметная «+ Новый лот», под ней поиск и список машин, над
+ * которыми работали. Раньше это была лента карточек внизу страницы с мелкой ссылкой «пустой
+ * лот» — владелец (30.09): непонятно, что даёт, кнопку не видно.
+ */
+export const LotsPanel: React.FC<{lots: LotEntry[]; current?: string; onOpen: (id: string) => void; onBlank: () => void; price: (l: LotEntry) => string}> = (
   {lots, current, onOpen, onBlank, price},
-) => (
-  <section className="recent">
-    <div className="recent-head">
-      <h2>Лоты <span className="muted">{lots.length}</span></h2>
-      <button className="link" onClick={onBlank}>+ пустой лот без ссылки</button>
-    </div>
-    <div className="recent-list">
-      {lots.map((l) => (
-        <button key={l.id} className={l.id === current ? 'recent-card on' : 'recent-card'} onClick={() => onOpen(l.id)}>
-          {l.photos[0] ? <img src={l.photos[0]} alt="" loading="lazy" /> : <div className="recent-empty">нет фото</div>}
-          <b>{[l.brand, l.model].filter(Boolean).join(' ') || 'Новый лот'}</b>
-          <span className="muted">{[l.year, price(l)].filter(Boolean).join(' · ')}</span>
-        </button>
-      ))}
-    </div>
-  </section>
-);
+) => {
+  const [query, setQuery] = useState('');
+  const q = query.trim().toLowerCase();
+  const shown = q ? lots.filter((l) => [l.brand, l.model, String(l.year ?? '')].join(' ').toLowerCase().includes(q)) : lots;
+  return (
+    <aside className="lots-panel">
+      <button className="btn primary lots-new" onClick={onBlank}>+ Новый лот</button>
+      {lots.length > 6 && <input className="lots-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск: марка, модель, год" />}
+      <div className="lots-title">Лоты <span className="muted">{lots.length}</span></div>
+      <div className="lots-list">
+        {shown.map((l) => (
+          <button key={l.id} className={l.id === current ? 'lot-row on' : 'lot-row'} onClick={() => onOpen(l.id)}>
+            {l.photos[0] ? <img src={l.photos[0]} alt="" loading="lazy" /> : <span className="lot-row-empty">нет фото</span>}
+            <span className="lot-row-text">
+              <b>{[l.brand, l.model].filter(Boolean).join(' ') || 'Новый лот'}</b>
+              <span className="muted">{[l.year, price(l)].filter(Boolean).join(' · ') || 'пустой'}</span>
+            </span>
+          </button>
+        ))}
+        {!shown.length && <div className="empty small">{q ? 'Ничего не нашлось' : 'Лотов пока нет — вставьте ссылку сверху'}</div>}
+      </div>
+    </aside>
+  );
+};

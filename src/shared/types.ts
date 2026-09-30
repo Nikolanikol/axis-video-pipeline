@@ -95,6 +95,8 @@ export type FormatMeta = {
   photoRest?: string;
   // Места фото выбираются руками (хук / стопка / галерея / не брать) — у «Галереи»
   photoSlots?: boolean;
+  // Одна строка под названием формата на кнопке выбора: чем отличается от остальных
+  short?: string;
   texts: TextField[];
 };
 
