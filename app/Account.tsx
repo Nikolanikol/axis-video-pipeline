@@ -7,6 +7,8 @@ import React, {useCallback, useEffect, useState} from 'react';
 import {Balance, ClientRow, CreditLot, LedgerRow, Offer, Pack, Role, StaffRow, api} from './api';
 import {day, daysLeft, useSession} from './auth';
 import {Field} from './LotForm';
+import {useOnboarding} from './Onboarding';
+import {href} from './router';
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 const won = (n: number) => `₩${n.toLocaleString('ru-RU')}`;
@@ -24,6 +26,7 @@ export const RENEW_DAYS = 5;
 
 export const AccountPage: React.FC = () => {
   const {email, name, workspace, balance, enabled, isStaff} = useSession();
+  const onboarding = useOnboarding();
 
   if (!enabled) {
     return (
@@ -42,6 +45,8 @@ export const AccountPage: React.FC = () => {
           <h2>{workspace?.name}</h2>
           <p className="muted">{[name, email].filter(Boolean).join(' · ')}</p>
           {isStaff ? <p className="note">Сотрудники платформы генерируют без кредитов.</p> : <BalanceFacts balance={balance} />}
+          {/* Скрытый список «Первые шаги» возвращается отсюда — так обещает сам список */}
+          {!isStaff && <p className="hint"><a className="link" href={href('start')} onClick={onboarding.show}>Первые шаги</a> — почта, профиль, бренд, первый ролик</p>}
         </section>
         {!isStaff && <OfferCard />}
       </div>

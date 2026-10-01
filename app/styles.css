@@ -1133,6 +1133,56 @@ a.tab { text-decoration: none; }
 }
 @media (prefers-reduced-motion: reduce) { .landing { scroll-behavior: auto; } .land-cta, .land-chip, .land-swatch { transition: none; } .land-modal, .land-modal-card { animation: none; } }
 
+/* ——— «Первые шаги» после регистрации (app/Onboarding.tsx) ———
+   Список с номерами и прогрессом; пройденный шаг — зелёная галочка, текущий — винная
+   кнопка, пропущенный и закрытый — приглушены. Почта — крупной карточкой с клетками кода */
+.page.start { max-width: 760px; }
+.start-lead { margin: -8px 0 18px; }
+.start-progress { display: flex; align-items: center; gap: 14px; margin-bottom: 18px; font-weight: 700; white-space: nowrap; }
+.start-bar { flex: 1; height: 8px; border-radius: 4px; background: var(--panel-2); overflow: hidden; }
+.start-bar div { height: 100%; background: var(--accent); border-radius: 4px; transition: width .4s ease-out; }
+.start-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.start-step { display: flex; gap: 16px; padding: 18px; border-radius: 14px; background: var(--panel); border: 1px solid var(--line); }
+.start-step.done { border-color: var(--ok-line); }
+.start-step.skipped, .start-step.locked { opacity: .6; }
+.start-mark { flex: none; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; font-weight: 800;
+  background: var(--panel-2); border: 1px solid var(--line); }
+.start-step.done .start-mark { background: var(--ok-bg); border-color: var(--ok-line); color: var(--ok); }
+.start-body { flex: 1; min-width: 0; }
+.start-body h3 { margin: 4px 0 6px; font-size: 17px; text-transform: none; letter-spacing: 0; }
+.start-body > p { margin: 0 0 12px; line-height: 1.5; }
+.start-ok { color: var(--ok); }
+.start-edit { font-size: 13px; }
+.start-body .btn-row { margin: 0; }
+.start-finish { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 18px; padding: 16px 18px; border-radius: 14px;
+  background: var(--ok-bg); border: 1px solid var(--ok-line); }
+.start-finish .btn { margin-left: auto; }
+.start-foot { margin-top: 16px; }
+.start-foot .link { font-size: inherit; }
+/* Карточка на главной */
+.start-card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 18px; margin-bottom: 20px;
+  text-decoration: none; color: inherit; border-color: #c8304f66; background: linear-gradient(140deg, #8e0d2c33, var(--panel) 55%); }
+.start-card > div:first-child { display: flex; flex-direction: column; gap: 2px; }
+.start-card:hover { border-color: var(--accent-line); }
+/* Почта: шесть клеток под код */
+.verify-card { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; margin-top: 4px; }
+.verify-to { display: flex; align-items: center; gap: 8px; margin: 0; }
+.verify-to svg { color: var(--accent-text); }
+.otp { display: flex; gap: 8px; }
+.otp input { width: 48px; height: 58px; padding: 0; text-align: center; font: 800 24px var(--font); border-radius: 10px; border-width: 1.5px; }
+.otp input:focus { border-color: var(--accent-line); box-shadow: 0 0 0 3px #c8304f33; }
+.verify-hint { margin: 0; font-size: 13px; line-height: 1.5; max-width: 520px; }
+.verify-card .auth-error, .verify-card .auth-ok { margin: 0; }
+@media (max-width: 720px) {
+  .start-step { padding: 14px; gap: 12px; }
+  .start-card { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+  .otp { gap: 5px; }
+  /* 6 клеток в 375 px: по 40 с зазором 5 — 265 px; с отступами страницы, шага и номера
+     шага остаётся поле справа (при 42 последняя клетка упиралась в край карточки) */
+  .otp input { width: 40px; height: 50px; font-size: 21px; }
+  .start-finish .btn { margin-left: 0; width: 100%; }
+}
+
 /* Плашки внизу экрана (app/Toast.tsx): метка состояния слева, текст — тёплый белый */
 .toasts { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 120; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
 .toast { padding: 10px 16px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line); border-left: 3px solid var(--ok);

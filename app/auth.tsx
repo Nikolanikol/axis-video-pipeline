@@ -132,28 +132,20 @@ const ResetScreen: React.FC<{token: string}> = ({token}) => {
 };
 
 /**
- * Полоса «подтвердите почту»: ввести код из письма или запросить новый. До подтверждения
- * бесплатных кредитов нет — без полосы человек не понял бы, почему генерация закрыта
+ * Полоса «подтвердите почту» на всех страницах, кроме «Первых шагов»: до подтверждения
+ * бесплатных кредитов нет, и без полосы человек не понял бы, почему генерация закрыта. Сам
+ * код вводится крупно на «Первых шагах» (app/Onboarding.tsx) — владелец 01.10: «почту
+ * явно, а не тонкой полосой». Здесь — только напоминание и ссылка туда
  */
 export const VerifyBanner: React.FC = () => {
-  const {enabled, isStaff, emailVerified, email, refresh} = useSession();
-  const [code, setCode] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState('');
-  if (!enabled || isStaff || emailVerified) return null;
-  const run = async (fn: () => Promise<unknown>, ok: string) => {
-    setBusy(true);
-    setNote('');
-    try { await fn(); setNote(ok); } catch (err) { setNote(err instanceof Error ? err.message : String(err)); } finally { setBusy(false); }
-  };
+  const {enabled, isStaff, emailVerified, email} = useSession();
+  const route = useRoute();
+  if (!enabled || isStaff || emailVerified || route.pipeline === 'start') return null;
   return (
-    <form className="readonly verify" onSubmit={(e) => { e.preventDefault(); run(async () => { await api.verify(code); refresh(); }, ''); }}>
-      <span>Подтвердите почту: код отправлен на <b>{email}</b>. После подтверждения придут бесплатные кредиты.</span>
-      <input value={code} onChange={(e) => setCode(e.target.value)} placeholder="6 цифр" inputMode="numeric" autoComplete="one-time-code" maxLength={7} required />
-      <button className="btn primary" disabled={busy}>Подтвердить</button>
-      <button type="button" className="btn ghost" disabled={busy} onClick={() => run(() => api.resendVerify(), 'Отправили новый код')}>Отправить ещё раз</button>
-      {note && <span className="muted">{note}</span>}
-    </form>
+    <div className="readonly verify">
+      <span>Подтвердите почту <b>{email}</b> — после этого придут бесплатные кредиты.</span>
+      <a className="btn primary" href="#/start">Ввести код</a>
+    </div>
   );
 };
 
@@ -187,7 +179,12 @@ export const AuthCard: React.FC<{signup: {credits: number; days: number}; notice
         return;
       }
       if (mode === 'login') await api.login(form.email, form.password);
-      else await api.register(form);
+      else {
+        await api.register(form);
+        // Новый кабинет — сразу на «Первые шаги»: подтвердить почту и настроиться
+        // (app/Onboarding.tsx), а не в пустой кабинет с тонкой полосой сверху
+        window.location.hash = '#/start';
+      }
       // Перезагрузка, а не смена состояния: настройки, бренд и списки должны прийти уже
       // от имени вошедшей компании, с нуля
       window.location.reload();

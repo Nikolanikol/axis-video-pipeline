@@ -3,6 +3,7 @@ import React from 'react';
 import {Pipeline, visiblePipelines} from './pipelines';
 import {href} from './router';
 import {useConfig} from './config';
+import {StartCard} from './Onboarding';
 
 const ToolList: React.FC<{pipeline: Pipeline}> = ({pipeline}) => (
   <div className="tool-list">
@@ -22,6 +23,8 @@ export const Home: React.FC = () => {
   const settings = pipelines.filter((p) => p.kind === 'settings');
   return (
     <div className="page">
+      {/* Пока «Первые шаги» не пройдены — карточка над пайплайнами, иначе ничего */}
+      <StartCard />
       <h1 className="page-title">Пайплайны</h1>
       <div className="cards">
         {main.map((p) => (

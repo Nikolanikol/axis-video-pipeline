@@ -6,6 +6,7 @@ import {ConfigProvider, useConfig} from './config';
 import {AuthGate, VerifyBanner, day, daysLeft, useOutOfCredits, useSession} from './auth';
 import {AccountPage, AdminPage, RENEW_DAYS} from './Account';
 import {Home, PipelinePage} from './Home';
+import {StartPage} from './Onboarding';
 import {Pipeline, ToolMeta, findPipeline, isClosed, toolKey, visiblePipelines} from './pipelines';
 import {href, useRoute} from './router';
 import {TOOLS, hasTool} from './tools';
@@ -110,6 +111,7 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
 
       <div className="tool">
         {route.pipeline === 'account' ? <AccountPage />
+          : route.pipeline === 'start' ? <StartPage />
           : route.pipeline === 'admin' ? <AdminPage />
           : !route.pipeline ? <Home />
           : !pipeline ? <NotFound />
