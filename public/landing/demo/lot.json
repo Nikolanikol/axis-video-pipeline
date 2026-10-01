@@ -1,0 +1,29 @@
+{
+  "brand": "Hyundai",
+  "model": "Kona",
+  "trim": "Smart",
+  "year": 2023,
+  "specs": [
+    "35 626 км",
+    "1,6 л · бензин+электро",
+    "Автомат · белый"
+  ],
+  "carPriceKrw": 20040000,
+  "krwPerUsd": 1353.68,
+  "carPriceUsd": null,
+  "texts": {
+    "hookTagline": "Один владелец"
+  },
+  "photos": [
+    "/landing/demo/photo-1.jpg",
+    "/landing/demo/photo-2.jpg",
+    "/landing/demo/photo-3.jpg",
+    "/landing/demo/photo-4.jpg",
+    "/landing/demo/photo-5.jpg",
+    "/landing/demo/photo-6.jpg",
+    "/landing/demo/photo-7.jpg",
+    "/landing/demo/photo-8.jpg",
+    "/landing/demo/photo-9.jpg"
+  ],
+  "market": "demo"
+}

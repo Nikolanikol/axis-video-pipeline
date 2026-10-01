@@ -186,6 +186,22 @@ export const createApp = ({photoOrigin}) => {
   api.post('/auth/logout', (req, res, next) => Promise.resolve(authEnabled() ? dropSession(sessionToken(req)) : null)
     .then(() => { clearSessionCookie(res); res.json({ok: true}); }).catch(next));
 
+  // ——— Витрина гостя (app/Landing.tsx), открыто без сессии ———
+  // Владелец 01.10: «прозрачные и заманчивые условия» — до регистрации видно, сколько дарим,
+  // сколько стоит ролик и карусель и сколько стоят тарифы. Контакты продаж — для «написать
+  // нам». Из пакетов отдаём только то, что и так показывает кабинет: название, кредиты, цену
+  api.get('/public/offer', (_req, res, next) => (async () => {
+    const {_note, ...contacts} = await readJson(path.join(CONFIG_DIR, 'platform.json'));
+    const whatsapp = process.env.SMMAKER_SALES_WHATSAPP?.trim();
+    const packs = authEnabled() ? await listPacks() : [];
+    res.json({
+      signup: await signupCredits(),
+      costs: await creditCosts(),
+      contacts: whatsapp ? {...contacts, whatsapp} : contacts,
+      packs: packs.map(({id, title, credits, price_krw, valid_days, kind, sort}) => ({id, title, credits, price_krw, valid_days, kind, sort})),
+    });
+  })().catch(next));
+
   // Всё ниже — только после входа и от имени своей компании
   api.use(requireUser);
   api.use((req, _res, next) => { try { withWorkspace(wsOf(req), next); } catch (e) { next(e); } });

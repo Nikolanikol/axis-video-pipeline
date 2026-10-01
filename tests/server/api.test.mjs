@@ -86,6 +86,17 @@ describe('настройки', () => {
   });
 });
 
+describe('витрина гостя', () => {
+  it('условия открыты без входа: подарок за регистрацию, цены в кредитах, тарифы', async () => {
+    const {status, body} = await call('GET', '/api/public/offer');
+    expect(status).toBe(200);
+    expect(body.signup.credits).toBeGreaterThan(0);
+    expect(body.costs.ads).toBeGreaterThan(0);
+    expect(body.costs.carousels).toBeGreaterThan(0);
+    expect(Array.isArray(body.packs)).toBe(true);
+  });
+});
+
 describe('лоты', () => {
   it('два лота, созданные подряд, не затирают друг друга', async () => {
     const [a, b] = await Promise.all([call('POST', '/api/lots', {}), call('POST', '/api/lots', {})]);

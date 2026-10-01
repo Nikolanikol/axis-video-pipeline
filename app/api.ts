@@ -63,6 +63,8 @@ export type Me =
 // kind: plan — подписка на месяц (кредиты сгорают в конце месяца), topup — докупка, сгорает вместе с подпиской
 export type Pack = {id: string; title: string; credits: number; price_krw: number; valid_days: number; active: boolean; sort: number; kind: 'plan' | 'topup'};
 export type Offer = {contacts: {whatsapp?: string; telegram?: string; email?: string}; packs: Pack[]};
+// Условия для витрины гостя: без входа (GET /api/public/offer)
+export type PublicOffer = Offer & {signup: {credits: number; days: number}; costs: Record<string, number>};
 export type LedgerRow = {
   id: number; delta: number; kind: 'grant' | 'charge' | 'refund' | 'adjust'; pipeline: string | null;
   job_id: string | null; note: string; created_at: string;
@@ -104,6 +106,7 @@ export const api = {
   reset: (token: string, password: string) => request<{ok: true}>('POST', '/api/auth/reset', {token, password}),
   ledger: () => request<LedgerRow[]>('GET', '/api/account/ledger'),
   offer: () => request<Offer>('GET', '/api/account/offer'),
+  publicOffer: () => request<PublicOffer>('GET', '/api/public/offer'),
   admin: {
     clients: () => request<ClientRow[]>('GET', '/api/admin/clients'),
     clientLedger: (id: string) => request<LedgerRow[]>('GET', `/api/admin/clients/${id}/ledger`),

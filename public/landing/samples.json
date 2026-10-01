@@ -1,0 +1,79 @@
+{
+  "videos": [
+    {
+      "title": "Genesis GV80",
+      "year": 2024,
+      "format": "Цена сразу",
+      "palette": "Медь на графите",
+      "video": "/landing/video/price-first-copper.mp4",
+      "poster": "/landing/video/price-first-copper.jpg"
+    },
+    {
+      "title": "Hyundai Palisade",
+      "year": 2023,
+      "format": "Галерея",
+      "palette": "Золото на чёрном",
+      "video": "/landing/video/gallery-ad-gold.mp4",
+      "poster": "/landing/video/gallery-ad-gold.jpg"
+    },
+    {
+      "title": "Hyundai Grandeur",
+      "year": 2022,
+      "format": "Авто с ценой",
+      "palette": "Сталь на тёмно-синем",
+      "video": "/landing/video/price-ad-steel.mp4",
+      "poster": "/landing/video/price-ad-steel.jpg"
+    }
+  ],
+  "carousels": [
+    {
+      "title": "BMW 3-Series",
+      "year": 2017,
+      "format": "Витрина",
+      "ratio": "1080 / 1080",
+      "palette": "Медь на графите",
+      "slides": [
+        "/landing/carousel/showcase-1.jpg",
+        "/landing/carousel/showcase-2.jpg",
+        "/landing/carousel/showcase-3.jpg",
+        "/landing/carousel/showcase-4.jpg",
+        "/landing/carousel/showcase-5.jpg",
+        "/landing/carousel/showcase-6.jpg",
+        "/landing/carousel/showcase-7.jpg",
+        "/landing/carousel/showcase-8.jpg",
+        "/landing/carousel/showcase-9.jpg"
+      ]
+    },
+    {
+      "title": "Genesis GV70",
+      "year": 2021,
+      "format": "Классика",
+      "ratio": "1080 / 1920",
+      "palette": "Синий на ночном",
+      "slides": [
+        "/landing/carousel/classic-1.jpg",
+        "/landing/carousel/classic-2.jpg",
+        "/landing/carousel/classic-3.jpg",
+        "/landing/carousel/classic-4.jpg",
+        "/landing/carousel/classic-5.jpg",
+        "/landing/carousel/classic-6.jpg",
+        "/landing/carousel/classic-7.jpg"
+      ]
+    },
+    {
+      "title": "Hyundai Palisade",
+      "year": 2023,
+      "format": "Разворот",
+      "ratio": "1080 / 1350",
+      "palette": "Золото на чёрном",
+      "slides": [
+        "/landing/carousel/spread-1.jpg",
+        "/landing/carousel/spread-2.jpg",
+        "/landing/carousel/spread-3.jpg",
+        "/landing/carousel/spread-4.jpg",
+        "/landing/carousel/spread-5.jpg",
+        "/landing/carousel/spread-6.jpg"
+      ]
+    }
+  ]
+}

@@ -1,11 +1,16 @@
 // Вход в SMMAKER: экран входа и регистрации, контекст «кто вошёл».
 //
 // Интерфейс начинает с /api/auth/me. Вход выключен (нет базы — Mac без DATABASE_URL,
-// тесты) — сразу пускаем внутрь, как было. Включён и никто не вошёл — экран входа.
-import React, {createContext, useCallback, useContext, useEffect, useState} from 'react';
+// тесты) — сразу пускаем внутрь, как было. Включён и никто не вошёл — витрина KOK с формой
+// входа и регистрации (app/Landing.tsx).
+import React, {Suspense, createContext, lazy, useCallback, useContext, useEffect, useState} from 'react';
 import {Loading} from './Loading';
 import {Balance, Me, Registration, User, api} from './api';
 import {Field} from './LotForm';
+import {useRoute} from './router';
+
+// Витрина — отдельным куском сборки: в ней плеер и композиции роликов, вошедшему они не нужны
+const Landing = lazy(() => import('./Landing').then((m) => ({default: m.Landing})));
 
 type Session = {
   enabled: boolean;
@@ -40,6 +45,7 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
 
   // Ссылка из письма: #/verify?t=… или #/reset?t=…. Читаем один раз при загрузке
   const [link] = useState(readEmailLink);
+  const route = useRoute();
   const [notice, setNotice] = useState('');
 
   // Перечитать, кто вошёл: после подтверждения почты меняются и признак, и баланс
@@ -65,7 +71,12 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
   if (link?.kind === 'reset') return <ResetScreen token={link.token} />;
   if (error) return <div className="boot">Сервер не отвечает: {error}</div>;
   if (!me) return <Loading />;
-  if (me.authRequired && !me.user) return <LoginScreen signup={me.signup} notice={notice} />;
+  // Гость — витрина KOK с образцами, условиями и формой (владелец 01.10: «зазвать людей»).
+  // #/welcome показывает её и без базы — посмотреть витрину на копии сервера без входа
+  if (me.authRequired && !me.user) return <Suspense fallback={<Loading />}><Landing signup={me.signup} notice={notice} /></Suspense>;
+  if (!me.authRequired && route.pipeline === 'welcome') {
+    return <Suspense fallback={<Loading />}><Landing signup={{credits: 7, days: 30}} notice="" /></Suspense>;
+  }
 
   const session: Session = signedIn(me)
     ? {enabled: true, email: me.user.email, name: me.user.name, isAdmin: me.user.isAdmin, isStaff: me.user.isStaff,
@@ -148,8 +159,16 @@ export const VerifyBanner: React.FC = () => {
 
 const EMPTY: Registration = {name: '', email: '', phone: '', password: '', company: ''};
 
-const LoginScreen: React.FC<{signup: {credits: number; days: number}; notice: string}> = ({signup, notice}) => {
-  const [mode, setMode] = useState<'login' | 'register' | 'forgot'>('login');
+export type AuthMode = 'login' | 'register' | 'forgot';
+
+/**
+ * Форма входа и регистрации. Живёт на витрине гостя (app/Landing.tsx) — режим держит
+ * витрина: кнопки «Войти» и «Попробовать бесплатно» в шапке и на первом экране переключают
+ * её и подводят к ней
+ */
+export const AuthCard: React.FC<{signup: {credits: number; days: number}; notice: string; mode: AuthMode; setMode: (m: AuthMode) => void}> = (
+  {signup, notice, mode, setMode},
+) => {
   const [sent, setSent] = useState(false);
   const [form, setForm] = useState<Registration>(EMPTY);
   const [busy, setBusy] = useState(false);
@@ -179,8 +198,6 @@ const LoginScreen: React.FC<{signup: {credits: number; days: number}; notice: st
   };
 
   return (
-    <div className="auth">
-      <img src="/kok/full.svg" alt="KOK — контент одной кнопкой" className="auth-logo" />
       <form className="auth-card form" onSubmit={submit}>
         <div className="btn-row auth-switch">
           <button type="button" className={`btn ${mode === 'login' ? 'primary' : 'ghost'}`} onClick={() => setMode('login')}>Вход</button>
@@ -195,7 +212,7 @@ const LoginScreen: React.FC<{signup: {credits: number; days: number}; notice: st
         {mode === 'register' && (
           <>
             {signup.credits > 0 && (
-              <p className="note">Подтвердите почту — и получите {signup.credits} кредитов бесплатно на {signup.days} дней: карусель стоит 1 кредит, рекламный ролик — 3.</p>
+              <p className="note auth-gift">Подтвердите почту — и получите <b>{signup.credits} кредитов бесплатно</b> на {signup.days} дней: карусель стоит 1 кредит, рекламный ролик — 3.</p>
             )}
             <Field label="Имя"><input value={form.name} onChange={set('name')} autoComplete="name" required /></Field>
             <Field label="Телефон" hint="с кодом страны — свяжемся, если понадобится помощь">
@@ -220,7 +237,6 @@ const LoginScreen: React.FC<{signup: {credits: number; days: number}; notice: st
         {mode === 'login' && <p className="hint"><button type="button" className="link" onClick={() => { setMode('forgot'); setSent(false); }}>Забыли пароль?</button></p>}
         {mode === 'forgot' && <p className="hint"><button type="button" className="link" onClick={() => setMode('login')}>Вернуться ко входу</button></p>}
       </form>
-    </div>
   );
 };
 
