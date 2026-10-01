@@ -3,13 +3,16 @@
 //
 // Сверху вниз: что это и что вы получите → живое превью, которое можно трогать (формат и
 // палитра меняют ролик сразу, всё считается в браузере — без входа и без затрат сервера) →
-// как это работает → образцы роликов и каруселей → условия и тарифы → вопросы → регистрация.
+// как это работает → образцы роликов и каруселей → условия и тарифы → вопросы → призыв.
+// Вход и регистрация — окном поверх витрины из любой кнопки («Войти», «Попробовать»,
+// «Получить кредиты»), а не формой в самом низу: владелец 01.10 — «форма внизу странная»,
+// до неё надо было долистывать через всю страницу.
 //
 // Образцы и демо-объявление — статика в public/landing/, собирает tools/landing-samples.mjs
 // от имени демо-компании «Ваша компания» (src/shared/landingDemo.js): на публичной странице
 // не светим работы настоящего клиента.
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {ArrowRight, Check, ChevronLeft, ChevronRight, Download, Link2, Palette, Sparkles} from 'lucide-react';
+import {ArrowRight, Check, ChevronLeft, ChevronRight, Download, Link2, Palette, Sparkles, X} from 'lucide-react';
 import brand from '../config/brand.json';
 import copy from '../config/copy.json';
 import palettes from '../config/palettes.json';
@@ -35,6 +38,7 @@ const credits = (n: number) => {
 
 export const Landing: React.FC<{signup: {credits: number; days: number}; notice: string}> = ({signup, notice}) => {
   const [mode, setMode] = useState<AuthMode>('register');
+  const [authOpen, setAuthOpen] = useState(false);
   const [offer, setOffer] = useState<PublicOffer | null>(null);
   const [samples, setSamples] = useState<Samples | null>(null);
   useEffect(() => {
@@ -43,14 +47,12 @@ export const Landing: React.FC<{signup: {credits: number; days: number}; notice:
     api.publicOffer().then((o) => setOffer(o?.signup && o.costs ? o : null)).catch(() => setOffer(null));
     fetch('/landing/samples.json').then((r) => r.json()).then(setSamples).catch(() => setSamples(null));
   }, []);
-  // Пришёл по ссылке из письма (подтверждение почты, сброс) — сразу к форме входа
-  useEffect(() => { if (notice) { setMode('login'); toForm(); } }, [notice]);
+  // Пришёл по ссылке из письма (подтверждение почты, сброс) — сразу окно входа
+  useEffect(() => { if (notice) { setMode('login'); setAuthOpen(true); } }, [notice]);
 
   const gift = offer?.signup ?? signup;
   const costs = offer?.costs ?? {ads: 3, carousels: 1};
-  const joinRef = useRef<HTMLElement>(null);
-  const toForm = () => joinRef.current?.scrollIntoView({behavior: 'smooth', block: 'start'});
-  const start = (m: AuthMode) => { setMode(m); toForm(); };
+  const start = (m: AuthMode) => { setMode(m); setAuthOpen(true); };
 
   return (
     <div className="landing">
@@ -146,23 +148,61 @@ export const Landing: React.FC<{signup: {credits: number; days: number}; notice:
         </div>
       </section>
 
-      <section id="join" className="land-section land-join" ref={joinRef}>
-        <div className="land-join-text">
-          <h2 className="land-h2">Начните бесплатно</h2>
-          <ul className="land-perks">
-            <li><Check size={16} aria-hidden /> {credits(gift.credits)} на {gift.days} дней после подтверждения почты</li>
-            <li><Check size={16} aria-hidden /> Все форматы роликов и каруселей</li>
-            <li><Check size={16} aria-hidden /> Ваш логотип, цвета и контакты</li>
-            <li><Check size={16} aria-hidden /> Без карты и без обязательств</li>
-          </ul>
+      <section className="land-section">
+        <div className="land-final">
+          <div>
+            <h2 className="land-h2">Начните бесплатно</h2>
+            <ul className="land-perks">
+              <li><Check size={16} aria-hidden /> {credits(gift.credits)} на {gift.days} дней после подтверждения почты</li>
+              <li><Check size={16} aria-hidden /> Все форматы роликов и каруселей</li>
+              <li><Check size={16} aria-hidden /> Ваш логотип, цвета и контакты</li>
+              <li><Check size={16} aria-hidden /> Без карты и без обязательств</li>
+            </ul>
+          </div>
+          <div className="land-final-actions">
+            <button className="btn primary land-cta" onClick={() => start('register')}>
+              Создать кабинет бесплатно <ArrowRight size={18} aria-hidden />
+            </button>
+            <span className="muted">Уже есть кабинет? <button className="link" onClick={() => start('login')}>Войти</button></span>
+          </div>
         </div>
-        <AuthCard signup={gift} notice={notice} mode={mode} setMode={setMode} />
       </section>
+
+      {authOpen && <AuthModal mode={mode} onClose={() => setAuthOpen(false)}>
+        <AuthCard signup={gift} notice={notice} mode={mode} setMode={setMode} />
+      </AuthModal>}
 
       <footer className="land-foot">
         <img src="/kok/wordmark.svg" alt="KOK" className="land-logo" />
         <span className="muted">Контент одной кнопкой</span>
       </footer>
+    </div>
+  );
+};
+
+/**
+ * Окно входа и регистрации поверх витрины. Закрывается крестиком, Escape и нажатием мимо;
+ * пока открыто, витрина под ним не прокручивается. На телефоне — лист снизу во всю ширину
+ * (styles.css): так форма не прыгает под клавиатурой и закрывается привычно
+ */
+const AuthModal: React.FC<{mode: AuthMode; onClose: () => void; children: React.ReactNode}> = ({mode, onClose, children}) => {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    window.addEventListener('keydown', onKey);
+    const page = document.querySelector<HTMLElement>('.landing');
+    page?.classList.add('land-locked');
+    return () => { window.removeEventListener('keydown', onKey); page?.classList.remove('land-locked'); };
+  }, [onClose]);
+  const title = mode === 'login' ? 'Вход в KOK' : mode === 'register' ? 'Кабинет за минуту' : 'Новый пароль';
+  return (
+    <div className="land-modal" onClick={onClose} role="dialog" aria-modal="true" aria-label={title}>
+      <div className="land-modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="land-modal-head">
+          <b>{title}</b>
+          <button className="land-modal-close" onClick={onClose} aria-label="Закрыть"><X size={20} /></button>
+        </div>
+        {children}
+      </div>
     </div>
   );
 };

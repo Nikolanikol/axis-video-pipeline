@@ -1077,9 +1077,25 @@ a.tab { text-decoration: none; }
 .land-faq summary { cursor: pointer; font-weight: 700; }
 .land-faq p { margin: 10px 0 0; color: var(--muted); line-height: 1.5; }
 
-/* Регистрация */
-.land-join { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 40px; align-items: start; scroll-margin-top: 60px; }
-.land-join .auth-card { max-width: none; }
+/* Финальный призыв: текст слева, кнопка справа — форма открывается окном, а не стоит внизу */
+.land-final { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 32px; align-items: center; padding: 36px;
+  border-radius: 22px; border: 1px solid #c8304f55; background: linear-gradient(140deg, #8e0d2c4d, var(--panel) 55%); }
+.land-final .land-h2 { margin-bottom: 16px; }
+.land-final-actions { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.land-final-actions .link { font-size: inherit; }
+
+/* Окно входа и регистрации поверх витрины */
+.land-locked { overflow: hidden; }
+.land-modal { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 20px; overflow-y: auto;
+  background: #000b; backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); animation: land-fade .18s ease-out; }
+.land-modal-card { width: min(440px, 100%); animation: land-rise .22s cubic-bezier(.22,.8,.26,1); }
+.land-modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; font-size: 20px; }
+.land-modal-close { display: grid; place-items: center; width: 38px; height: 38px; padding: 0; border-radius: 50%; cursor: pointer;
+  border: 1px solid var(--line); background: var(--panel-2); color: var(--text); }
+.land-modal-close:hover { border-color: var(--accent-line); }
+.land-modal .auth-card { max-width: none; box-shadow: 0 30px 80px #000c; }
+@keyframes land-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes land-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 .auth-gift { padding: 10px 12px; border-radius: 10px; background: #8e0d2c26; border: 1px solid #c8304f40; color: var(--text); }
 .land-foot { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 30px 20px 40px; border-top: 1px solid var(--line); }
 
@@ -1094,7 +1110,15 @@ a.tab { text-decoration: none; }
   .land-phone { width: min(280px, 82vw); }
   .land-section { padding: 36px 14px; }
   .land-h2 { font-size: 26px; }
-  .land-steps, .land-price-cards, .land-join { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .land-steps, .land-price-cards { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .land-final { grid-template-columns: minmax(0, 1fr); padding: 22px; gap: 20px; }
+  .land-final-actions { align-items: stretch; text-align: center; }
+  /* Телефон: окно — лист снизу во всю ширину, прокручивается сам */
+  .land-modal { place-items: end stretch; padding: 0; }
+  .land-modal-card { width: 100%; max-height: 92dvh; overflow-y: auto; padding: 14px 12px calc(14px + env(safe-area-inset-bottom));
+    border-radius: 20px 20px 0 0; background: var(--bg); border-top: 1px solid var(--line); animation-name: land-sheet; }
+  .land-modal .auth-card { box-shadow: none; }
+  @keyframes land-sheet { from { transform: translateY(40px); opacity: 0; } to { transform: none; opacity: 1; } }
   .land-videos { grid-template-columns: repeat(3, 72%); overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; gap: 12px; }
   .land-videos::-webkit-scrollbar { display: none; }
   .land-video { scroll-snap-align: start; }
@@ -1107,7 +1131,7 @@ a.tab { text-decoration: none; }
   .land-arrow { display: none; }
   .land-big { font-size: 30px; }
 }
-@media (prefers-reduced-motion: reduce) { .landing { scroll-behavior: auto; } .land-cta, .land-chip, .land-swatch { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .landing { scroll-behavior: auto; } .land-cta, .land-chip, .land-swatch { transition: none; } .land-modal, .land-modal-card { animation: none; } }
 
 /* Плашки внизу экрана (app/Toast.tsx): метка состояния слева, текст — тёплый белый */
 .toasts { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 120; display: flex; flex-direction: column; gap: 8px; align-items: center; pointer-events: none; }
