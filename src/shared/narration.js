@@ -54,14 +54,23 @@ export const lineTimes = (spans, alignment) => {
 /**
  * Где взять звук строки: в единой начитке (отрезок) или в отдельном клипе (прежний способ).
  * Прежние обзоры не ломаем — у них у каждой строки свой файл.
- * @returns {{file: string, offset: number, duration: number} | null}
+ *
+ * Играем cutFrom…cutTo — границы, уточнённые по звуку (voiceCuts.js); их нет у озвучек,
+ * сделанных до 02.10, — тогда from…to из разметки, как раньше. rawFrom/rawTo — всегда
+ * разметка: по ней видно, сделала ли модель паузу между строками (см. voicePlan).
+ * @returns {{file: string, offset: number, duration: number, rawFrom?: number, rawTo?: number, joinedNext?: boolean} | null}
  */
 export const clipOf = (voice, lineId) => {
   const c = voice?.clips?.[lineId];
   if (!c) return null;
   // Единая начитка: отрезок внутри общей дорожки
   if (voice.track?.file && Number.isFinite(c.from) && Number.isFinite(c.to) && c.to > c.from) {
-    return {file: voice.track.file, offset: c.from, duration: Math.round((c.to - c.from) * 1000) / 1000};
+    const a = Number.isFinite(c.cutFrom) ? c.cutFrom : c.from;
+    const b = Number.isFinite(c.cutTo) && c.cutTo > a ? c.cutTo : c.to;
+    return {
+      file: voice.track.file, offset: a, duration: Math.round((b - a) * 1000) / 1000,
+      rawFrom: c.from, rawTo: c.to, joinedNext: Boolean(c.joinedNext),
+    };
   }
   // Прежний способ: свой файл на строку
   if (c.file && Number(c.duration) > 0) return {file: c.file, offset: 0, duration: c.duration};
@@ -138,9 +147,12 @@ export const voicePlan = (items, lines, voice, fps) => {
       // Шла ли эта фраза в дорожке встык с предыдущей. Начитка синтезируется одним куском,
       // и если модель не сделала паузу между двумя строками — она прочитала их как одно
       // предложение. Разносить такие строки по местам пауз автора нельзя (см. ниже).
+      // Смотрим на разметку (rawFrom/rawTo), а не на границы воспроизведения: те уже включают
+      // запас тишины и у обычной паузы почти смыкаются — её приняли бы за слитное чтение.
+      // joinedNext — граница слитной речи, поставленная по звуку (voiceCuts.js)
       const before = wanted[wanted.length - 1];
       const glued = Boolean(voice.track) && before
-        && Math.abs(clip.offset - (before.clip.offset + before.clip.duration)) < GLUE_SEC;
+        && (before.clip.joinedNext || Math.abs(clip.rawFrom - before.clip.rawTo) < GLUE_SEC);
       wanted.push({line, clip, want, glued, frames: Math.round(clip.duration * fps)});
     }
   }

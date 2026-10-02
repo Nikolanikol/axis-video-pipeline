@@ -10,6 +10,7 @@ import {apiSettings, resolveSpeaker, voiceConfig} from '../src/shared/voices.js'
 import {buildScript, lineTimes} from '../src/shared/narration.js';
 import {extractAudio, hasKey, hasVoice, synthesizeScript, transcribe, voiceHash} from './speech.mjs';
 import {hasSeparator, separateAmbience} from './ambience.mjs';
+import {refineCuts} from './voiceCuts.mjs';
 import {
   CONFIG_DIR, DATA_DIR, DEFAULT_MARKET, HttpError, checkId, workspaceDir, workspaceUrl, getLot, readJson, withLock, writeJson,
 } from './store.mjs';
@@ -342,6 +343,14 @@ export const voiceReview = async (id, {language, market} = {}) => {
       }
       voicing.set(id, {done: lines.length, total: lines.length});
       const {duration} = await probe(file);
+      // Границы фраз — по звуку, а не только по разметке: на слитных местах разметка выбрасывала
+      // кусок речи, и слово обрывалось. Делаем и для уже готовой начитки (hash тот же, звук не
+      // синтезируется заново — кредиты ElevenLabs не тратятся): кнопка «Озвучить» чинит старые.
+      // Не получилось — остаётся разметка, как было: озвучка важнее аккуратной границы
+      if (!Object.values(times).some((c) => Number.isFinite(c?.cutFrom))) {
+        times = await refineCuts(file, times, duration)
+          .catch((e) => { console.error(`Границы фраз ${id}: оставил по разметке —`, e.message); return times; });
+      }
       // Прежние файлы (в том числе построчные клипы старых обзоров) не копим
       for (const f of await fs.readdir(dir)) if (f !== name) await fs.rm(path.join(dir, f), {force: true});
       await saveVoice({

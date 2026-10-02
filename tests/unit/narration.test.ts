@@ -59,7 +59,8 @@ describe('откуда играть строку', () => {
   const old = {clips: {l1: {file: '/v/l1.mp3', duration: 2.5}}};
 
   it('единая начитка — отрезок общей дорожки', () => {
-    expect(clipOf(track, 'l1')).toEqual({file: '/v/track.mp3', offset: 1.5, duration: 2.5});
+    // toMatchObject: у отрезка есть ещё rawFrom/rawTo/joinedNext (границы по разметке, см. voiceCuts.js)
+    expect(clipOf(track, 'l1')).toMatchObject({file: '/v/track.mp3', offset: 1.5, duration: 2.5});
   });
 
   it('прежние обзоры со своим файлом на строку продолжают играть', () => {
