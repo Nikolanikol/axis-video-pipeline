@@ -381,7 +381,9 @@ const PackEditor: React.FC<{packs: Pack[]; onSaved: () => void; onError: (e: str
         </div>
         <div className="row">
           <Field label="Кредитов"><input type="number" min={1} value={pack.credits} onChange={(e) => set({credits: Number(e.target.value)})} /></Field>
-          <Field label="Цена, ₩"><input type="number" min={0} step={1000} value={pack.price_krw} onChange={(e) => set({price_krw: Number(e.target.value)})} /></Field>
+          {/* step={1}: любая сумма в вонах. Был step={1000}, и браузер не давал сохранить 24 900 —
+              «ближайшие допустимые 24 000 и 25 000» (владелец 04.10). Сервер всегда принимал любое целое */}
+          <Field label="Цена, ₩"><input type="number" min={0} step={1} value={pack.price_krw} onChange={(e) => set({price_krw: Number(e.target.value)})} /></Field>
           <Field label="Действует, дней" hint="у подписки — длина месяца; у докупки — если подписки нет"><input type="number" min={1} value={pack.valid_days} onChange={(e) => set({valid_days: Number(e.target.value)})} /></Field>
         </div>
         <div className="checks">
