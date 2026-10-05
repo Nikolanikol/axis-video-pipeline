@@ -62,6 +62,12 @@ docker build -t axis-video .
 `voicePlan` или `clipOf` — прогони `npm test` и `npm run test:render`. Встроенный ffmpeg
 Remotion умеет только WAV: сырой `s16le` и `flac` он не пишет.
 
+**kmotors.shop закрыт из Кореи целиком** (403, в том числе `/api/vehicle`). Лоты аукционов
+(`server/kmotorsLot.mjs`) локально берутся из образцов: `KMOTORS_LOT_FIXTURES=tests/fixtures/kmotors-lots`;
+живые страницы — только с сервера в Германии или через `office.kmotors.shop` (Cloudflare Access,
+нужен сервисный токен). Ломается разбор страницы — сними образец заново с немецкого сервера
+(одним запросом на площадку, с паузой), не ходи в carnect напрямую.
+
 **Всё, что зависит от частоты, бери из `REVIEW_FPS`.** Числом не пиши: смена частоты
 сломает это молча.
 
@@ -255,6 +261,7 @@ CONTEXT.md, раздел «Известные дыры» — что не дод�
 | Demucs | звуки машины без голоса (проба) | окружение `.venv-demucs`, необязательно |
 | Resend | письма: код подтверждения почты, сброс пароля | `RESEND_API_KEY`, `RESEND_FROM`, `SMMAKER_APP_URL` |
 | Postgres (общий Supabase) | база SMMAKER: кабинеты, пакеты, кредиты | `DATABASE_URL`, `SMMAKER_DB_SCHEMA` |
+| страницы лотов kmotors.shop | карусели по аукционным лотам (в работе) | `KMOTORS_LOT_ORIGIN`, `KMOTORS_LOT_FIXTURES`, `KMOTORS_CF_ACCESS_ID`, `KMOTORS_CF_ACCESS_SECRET` — все необязательные |
 
 Шлюз живёт в соседнем проекте `~/Desktop/recup/KMotors-1`: `src/app/api/vehicle/[id]/route.ts`.
 Оттуда же русский словарь карусели — `tools/sync-kmotors-dict.mjs`. Encar режет
