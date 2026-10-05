@@ -9,7 +9,8 @@
 // собрать — это кредит. Поэтому клик по формату только выбирает его, пересборка — отдельной
 // кнопкой, а ссылка на уже собранную машину открывает готовую карусель, а не собирает заново.
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {encarAdUrl, parseCarLink} from '../../src/shared/encarLink.js';
+import {encarAdUrl} from '../../src/shared/encarLink.js';
+import {parseCarouselSource} from '../../src/shared/kmotorsLot.js';
 import {QuickLink} from '../ads/QuickLot';
 import {Check, ChevronLeft, ChevronRight, Download, ExternalLink, Images, List, RefreshCw, Trash2, X} from 'lucide-react';
 import {MobileTabs, usePanelSwipes} from '../MobileTabs';
@@ -252,8 +253,9 @@ const CarouselsPanel: React.FC<{
                 {pending.has(c.id) ? <span className="car-card-status">Удаляю…</span> : <div className="car-card-actions">
                   <button className="icon-btn" title={`Пересобрать в формате «${f?.title ?? ''}»${cost}`} aria-label="Пересобрать"
                     disabled={busy} onClick={stop(() => onRebuild(c))}><RefreshCw size={16} /></button>
-                  <a className="icon-btn" href={encarAdUrl(c.id)} target="_blank" rel="noreferrer" title="Открыть объявление на Encar"
-                    aria-label="Открыть на Encar" onClick={(e) => e.stopPropagation()}><ExternalLink size={16} /></a>
+                  <a className="icon-btn" href={c.lot?.url ?? encarAdUrl(c.id)} target="_blank" rel="noreferrer"
+                    title={c.lot ? 'Открыть лот на kmotors' : 'Открыть объявление на Encar'}
+                    aria-label={c.lot ? 'Открыть лот' : 'Открыть на Encar'} onClick={(e) => e.stopPropagation()}><ExternalLink size={16} /></a>
                   <button className="icon-btn danger" title="Удалить" aria-label="Удалить" disabled={busy}
                     onClick={stop(() => onDelete(c))}><Trash2 size={16} /></button>
                 </div>}
@@ -361,7 +363,7 @@ export const CarouselTool: React.FC = () => {
   // затёрла бы прежнюю: карусель у машины одна). Нет — собираем в выбранном формате
   const fromLink = (link: string) => {
     let id: string;
-    try { ({id} = parseCarLink(link)); } catch (e) { setLinkError(e instanceof Error ? e.message : String(e)); return; }
+    try { ({id} = parseCarouselSource(link)); } catch (e) { setLinkError(e instanceof Error ? e.message : String(e)); return; }
     const known = history.find((h) => h.id === id);
     if (known) { setEntry(known); setLinkError(''); setMtab('main'); return; }
     run(link);
@@ -415,7 +417,7 @@ export const CarouselTool: React.FC = () => {
     <div className="quick" data-mtab={mtab} ref={quickRef}>
       {/* quick-screen — один экран, как у «Ролика по лоту»: колонки прокручиваются внутри */}
       <div className="quick-screen">
-      <QuickLink onLink={fromLink} error={linkError} busy={busy}
+      <QuickLink onLink={fromLink} error={linkError} busy={busy} parse={parseCarouselSource}
         placeholder={`Вставьте ссылку на объявление Encar — карусель соберётся сама (слайды на ${slidesLang})`} />
       {/* Сборка — 10–20 секунд (замер 30.09: 13 с на 9 слайдов); экран закрыт окном, как у лота по ссылке */}
       <BusyModal step={busy ? 0 : null} steps={['Собираю карусель: данные и слайды']} label="Сборка карусели"
@@ -475,7 +477,7 @@ export const CarouselTool: React.FC = () => {
                   <button className="btn ghost" onClick={() => run(entry.id, entry.seed)} disabled={busy}
                     title="Те же компоновка и фразы, свежие данные и текущий бренд">Пересобрать{cost}</button>
                 )}
-                <a className="btn ghost" href={encarAdUrl(entry.id)} target="_blank" rel="noreferrer">На Encar</a>
+                <a className="btn ghost" href={entry.lot?.url ?? encarAdUrl(entry.id)} target="_blank" rel="noreferrer">{entry.lot ? 'Открыть лот' : 'На Encar'}</a>
                 <button className="btn ghost" onClick={() => remove(entry.id)} disabled={busy}>Удалить</button>
               </div>
             </div>

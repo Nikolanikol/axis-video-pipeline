@@ -12,6 +12,7 @@ export const carouselFormat = (id?: string): CarouselFormat =>
 /**
  * Слайды формата с учётом истории: на проде её выключают (страховые случаи с датацентра
  * не приходят), и тогда слайдов на один меньше — нумерация считается от этого списка.
+ * skip — слайды, которым нечем заполниться (у лота аукциона нет цены, истории и опций).
  */
-export const carouselSlides = (id?: string, includeHistory = true) =>
-  carouselFormat(id).slides.filter((s) => includeHistory || s !== 'history');
+export const carouselSlides = (id?: string, includeHistory = true, skip: string[] = []) =>
+  carouselFormat(id).slides.filter((s) => (includeHistory || s !== 'history') && !skip.includes(s));

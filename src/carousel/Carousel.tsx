@@ -187,12 +187,23 @@ const BandSlide: React.FC<{
   );
 };
 
-const Interior: React.FC<SlideProps> = ({car, brandName, index, total, tx}) => (
-  <BandSlide index={index} total={total} brandName={brandName} kicker={tx.s.interior} photo={car.photos.interiorShot}
-    label="фото салона не пришло">
-    <Bullets items={car.options.comfort.slice(0, 5).map(tx.option)} size={44} />
-  </BandSlide>
-);
+const Interior: React.FC<SlideProps> = ({car, brandName, index, total, tx}) => {
+  const C = useTheme();
+  return (
+    <BandSlide index={index} total={total} brandName={brandName} kicker={tx.s.interior} photo={car.photos.interiorShot}
+      label="фото салона не пришло">
+      {car.options.comfort.length > 0
+        ? <Bullets items={car.options.comfort.slice(0, 5).map(tx.option)} size={44} />
+        // Лот аукциона: списка опций нет, и пустой низ слайда выглядел бы обрывом — вместо него
+        // ещё два кадра салона
+        : <div style={{display: 'flex', gap: 20, marginTop: 40}}>
+          {car.photos.interior.filter((u) => u !== car.photos.interiorShot).slice(0, 2).map((u) => (
+            <Img key={u} src={u} style={{flex: 1, minWidth: 0, height: 560, objectFit: 'cover', borderRadius: radius(C, 18)}} />
+          ))}
+        </div>}
+    </BandSlide>
+  );
+};
 
 const Technology: React.FC<SlideProps> = ({car, brandName, index, total, tx}) => (
   <BandSlide index={index} total={total} brandName={brandName} kicker={tx.s.technology} photo={car.photos.dashboard}
@@ -294,11 +305,14 @@ export const Carousel: React.FC<CarouselProps> = (props) => {
     return (
       <ThemeProvider value={theme}>
         <Deck {...props} frame={frame} tx={tx} brandName={brandName} seed={props.seed ?? 1}
-          slides={carouselSlides(props.format, withHistory)} />
+          slides={carouselSlides(props.format, withHistory, props.skip)} />
       </ThemeProvider>
     );
   }
-  const slides = [Cover, ...(withHistory ? [History] : []), Interior, Technology, Specs, Price, Cta];
+  const byName: Record<string, React.FC<SlideProps>> = {
+    cover: Cover, history: History, interior: Interior, technology: Technology, specs: Specs, price: Price, cta: Cta,
+  };
+  const slides = carouselSlides('classic', withHistory, props.skip).map((name) => byName[name]);
   const total = slides.length;
   const i = Math.min(total - 1, Math.max(0, frame));
   const Current = slides[i];

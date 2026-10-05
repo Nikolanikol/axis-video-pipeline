@@ -67,7 +67,7 @@ export const Root: React.FC = () => (
       calculateMetadata={({props}) => {
         const f = carouselFormat(props.format);
         return {width: f.width, height: f.height,
-          durationInFrames: carouselSlides(props.format, props.includeHistory !== false).length};
+          durationInFrames: carouselSlides(props.format, props.includeHistory !== false, props.skip).length};
       }}
     />
     {/* Обзоры: длительность считается по фрагментам */}

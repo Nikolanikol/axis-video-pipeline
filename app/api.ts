@@ -35,7 +35,9 @@ export type Config = {
 export type ReviewEntry = Review & {id: string};
 // Готовая карусель: карточка авто от шлюза и адреса семи картинок
 // format и seed — чем собрана: формат из реестра и зерно варианта (у старых карусель их нет — «Классика»)
-export type CarouselEntry = {id: string; car: CarouselCar; slides: string[]; updatedAt: string; format?: string; seed?: number};
+export type CarouselEntry = {id: string; car: CarouselCar; slides: string[]; updatedAt: string; format?: string; seed?: number;
+  // Только у каруселей по лотам аукционов: откуда собрана (для «Пересобрать» и кнопки «Открыть лот»)
+  lot?: {house: string; id: string; url: string}};
 export type CarouselFormat = {id: string; title: string; note: string; width: number; height: number; slides: string[]};
 export type JobQuery = {lot?: string; review?: string};
 export type Job = {

@@ -12,7 +12,8 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {bundle} from '@remotion/bundler';
 import {openBrowser, renderStill, selectComposition} from '@remotion/renderer';
-import {parseCarLink} from '../src/shared/encarLink.js';
+import {LOT_SKIP_SLIDES, carFromLot, lotPageUrl, missingForCarousel, parseCarouselSource} from '../src/shared/kmotorsLot.js';
+import {fetchLot} from './kmotorsLot.mjs';
 import {
   HttpError, PRODUCTION, ROOT, checkId, currentWorkspace, workspaceDir, workspaceUrl, getBrand, readJson, renderMarket, writeJson,
 } from './store.mjs';
@@ -70,6 +71,73 @@ export const fetchCar = async (id) => {
   return res.json();
 };
 
+// Фото лотов лежат на CDN площадок. Качаем только с известных хостов (адреса приходят со
+// страницы чужого сайта, и сервер не должен ходить по ним куда попало), только по одному
+// кадру за раз ограниченной пачкой, и кладём к себе: рендер берёт их с нашего адреса, а
+// не со ссылок, которые площадка вправе закрыть или сменить.
+const PHOTO_HOSTS = new Set([
+  'heydealer-api.s3.amazonaws.com', 'img-auction.autobell.co.kr', 'www.kcarauction.com',
+  'imgmk.lotteautoauction.net', 'aucmark.skcarrental.com', 'file.ahsellcar.co.kr',
+]);
+const PHOTO_MAX_BYTES = 15 * 1024 * 1024;
+const PHOTO_TIMEOUT_MS = 20_000;
+
+const downloadLotPhoto = async (url) => {
+  const u = new URL(url);
+  if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
+  if (!PHOTO_HOSTS.has(u.hostname)) return null;
+  const res = await fetch(url, {signal: AbortSignal.timeout(PHOTO_TIMEOUT_MS)});
+  // Перенаправление уводит на другой хост — на него разрешения не было
+  if (!res.ok || !PHOTO_HOSTS.has(new URL(res.url).hostname)) return null;
+  if (!(res.headers.get('content-type') || '').startsWith('image/')) return null;
+  const buf = Buffer.from(await res.arrayBuffer());
+  return buf.length > 0 && buf.length <= PHOTO_MAX_BYTES ? buf : null;
+};
+
+/**
+ * Перенести фото машины к нам и подменить адреса. Кадры, что не скачались, выпадают из списков
+ * (без обложки карусель не соберётся: слайд без картинки — пустой кадр). Возвращает карточку.
+ */
+const localizePhotos = async (car, dir, id, origin) => {
+  await fs.mkdir(path.join(dir, 'photos'), {recursive: true});
+  const all = [...new Set([car.photos.hero, car.photos.rear, car.photos.interiorShot, car.photos.dashboard,
+    ...car.photos.exterior, ...car.photos.interior, ...car.photos.other].filter(Boolean))];
+  const mapped = new Map();
+  let next = 0;
+  const worker = async () => {
+    while (next < all.length) {
+      const i = next++;
+      try {
+        const buf = await downloadLotPhoto(all[i]);
+        if (!buf) continue;
+        await fs.writeFile(path.join(dir, 'photos', `${i}.jpg`), buf);
+        mapped.set(all[i], `${origin}${workspaceUrl()}/carousels/${id}/photos/${i}.jpg`);
+      } catch { /* кадр пропускаем: хватит остальных */ }
+    }
+  };
+  await Promise.all(Array.from({length: 4}, worker));
+  const to = (u) => mapped.get(u) ?? null;
+  const p = car.photos;
+  if (!to(p.hero)) throw new HttpError(502, 'Не удалось скачать фото лота — площадка не отдаёт их с сервера. Попробуйте позже');
+  return {
+    ...car,
+    photos: {
+      hero: to(p.hero), rear: to(p.rear), interiorShot: to(p.interiorShot), dashboard: to(p.dashboard),
+      exterior: p.exterior.map(to).filter(Boolean), interior: p.interior.map(to).filter(Boolean), other: p.other.map(to).filter(Boolean),
+    },
+  };
+};
+
+/** Карточка машины по лоту аукциона: страница kmotors → разбор → форма слайдов */
+const carFromLink = async ({house, lotId}) => {
+  const lot = await fetchLot({house, id: lotId});
+  const miss = missingForCarousel({ok: true, lot});
+  if (miss.length) {
+    throw new HttpError(422, `У этого лота нет: ${miss.join(', ')}. Площадка не отдаёт эти данные — карусель по нему не собрать`);
+  }
+  return carFromLot(lot);
+};
+
 // Сборка проекта тяжёлая, а карусели делаются одна за другой — держим её между запусками.
 // Подпись по времени правок исходников: поменял слайды — пересоберётся само.
 let bundled = null;
@@ -114,14 +182,23 @@ const runKey = (id) => `${currentWorkspace()}:${id}`;
  * @returns {Promise<{id: string, car: object, slides: string[], updatedAt: string, format: string, seed: number}>}
  */
 export const buildCarousel = async (link, opts = {}) => {
-  const {id} = parseCarLink(link);
+  const src = parseCarouselSource(link);
+  const {id} = src;
   const format = await checkFormat(opts.format);
   const seed = Number.isInteger(opts.seed) && opts.seed > 0 ? opts.seed : 1 + Math.floor(Math.random() * 2 ** 30);
   const key = runKey(id);
   if (running.has(key)) throw new HttpError(409, 'Эта карусель уже собирается');
   running.add(key);
   try {
-    const car = await fetchCar(id);
+    // Лот аукциона: исходный номер берём из ссылки или, при «Пересобрать», из сохранённой карусели
+    let lot = null;
+    if (src.source === 'lot') lot = {house: src.house, id: src.lotId};
+    if (src.source === 'lot-saved') {
+      const saved = await readJson(path.join(carouselsDir(), id, 'carousel.json')).catch(() => null);
+      if (!saved?.lot) throw new HttpError(404, 'Карусель по лоту не найдена — вставь ссылку на лот заново');
+      lot = {house: saved.lot.house, id: saved.lot.id};
+    }
+    let car = lot ? await carFromLink({house: lot.house, lotId: lot.id}) : await fetchCar(id);
     // Карусель — всегда про корейское объявление (источник Encar), но контакты и компанию
     // берём из профиля клиента: бренд и подпись должны быть его.
     const [profileMarket, brand] = await Promise.all([renderMarket(), getBrand()]);
@@ -135,10 +212,12 @@ export const buildCarousel = async (link, opts = {}) => {
       ? Object.fromEntries(Object.entries(theme.assets)
         .map(([k, v]) => [k, typeof v === 'string' && v.startsWith('/') ? origin + v : v]))
       : theme.assets;
-    const inputProps = {car, market, theme: {...theme, assets}, includeHistory: INCLUDE_HISTORY, format, seed};
-
     const dir = path.join(carouselsDir(), id);
     await fs.mkdir(dir, {recursive: true});
+    if (lot) car = await localizePhotos(car, dir, id, origin);
+    // У лота нет цены, истории и опций: эти слайды не рисуем, а не заполняем прочерками
+    const inputProps = {car, market, theme: {...theme, assets}, includeHistory: INCLUDE_HISTORY, format, seed,
+      skip: lot ? LOT_SKIP_SLIDES : []};
     // Старые кадры убираем перед сборкой: та же машина, пересобранная на проде, даёт шесть
     // слайдов вместо прежних семи, и осиротевший slide-7.png остался бы на диске — со старой
     // историей. Ответ ссылается только на новые шесть, но файл-призрак в томе ни к чему.
@@ -167,6 +246,8 @@ export const buildCarousel = async (link, opts = {}) => {
       slides: Array.from({length: count}, (_, i) => `${workspaceUrl()}/carousels/${id}/slide-${i + 1}.png`),
       updatedAt: new Date().toISOString(),
       format, seed,
+      // Откуда лот: «Пересобрать» идёт по нему, кнопка «Открыть лот» — по адресу
+      ...(lot ? {lot: {...lot, url: lotPageUrl(lot.house, lot.id)}} : {}),
     };
     await writeJson(path.join(dir, 'carousel.json'), meta);
     return meta;

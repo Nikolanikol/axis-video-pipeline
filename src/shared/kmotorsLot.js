@@ -22,6 +22,8 @@
 // площадка этого не отдаёт. Разбор вернёт то, что есть, а решать, годится ли такой лот,
 // вызывающему (см. missingForCarousel).
 
+import {parseCarLink} from './encarLink.js';
+
 export const LOT_HOUSES = ['glovis', 'kcar', 'lotte', 'sk', 'autohub', 'heydealer'];
 
 const HOST = /(^|\.)(kmotors\.shop|carnect\.biz)$/i;
@@ -219,3 +221,100 @@ export const missingForCarousel = (parsed) => {
   if (l.photos.length < 3) miss.push('фото (меньше трёх)');
   return miss;
 };
+
+// ——— Лот → карусель ———
+
+/** Страница лота на kmotors — адрес для кнопки «Открыть лот» (владелец ходит туда за оригиналом) */
+export const lotPageUrl = (house, id) => `https://www.kmotors.shop/en/auction/lot/${house}/${encodeURIComponent(id)}`;
+
+/**
+ * Папка карусели для лота. Номера лотов бывают с «~ . + / =» и длиной с абзац, а id папки —
+ * строчные латиница, цифры и дефис, не длиннее 64. Поэтому «km-<площадка>-<отпечаток>»;
+ * исходный номер лежит в carousel.json, по нему и работает «Пересобрать».
+ * Отпечаток — два FNV-1a по 32 бита (40 бит): на личную коллекцию машин с запасом.
+ */
+export const lotCarId = (house, id) => {
+  const text = `${house}/${id}`;
+  let a = 0x811c9dc5; let b = 0x01000193 ^ 0x9e3779b9;
+  for (let i = 0; i < text.length; i++) {
+    a = Math.imul(a ^ text.charCodeAt(i), 0x01000193) >>> 0;
+    b = Math.imul(b ^ text.charCodeAt(i), 0x85ebca6b) >>> 0;
+  }
+  return `km-${house}-${(a.toString(16).padStart(8, '0') + b.toString(16).padStart(8, '0')).slice(0, 10)}`;
+};
+
+const SAVED_LOT = /^km-[a-z]+-[0-9a-f]{10}$/;
+
+/**
+ * Что дали в строку карусели: объявление Encar, лот аукциона (ссылка kmotors/carnect) или
+ * папка уже собранной карусели по лоту (так зовёт «Пересобрать»: у неё одного нет исходной ссылки).
+ * Бросает с текстом для интерфейса.
+ * @param {string} raw
+ * @returns {{source: 'encar', id: string} | {source: 'lot', id: string, house: string, lotId: string} | {source: 'lot-saved', id: string}}
+ */
+export const parseCarouselSource = (raw) => {
+  const text = String(raw ?? '').trim();
+  if (SAVED_LOT.test(text)) return {source: 'lot-saved', id: text};
+  let host = '';
+  try { host = new URL(text.startsWith('http') ? text : `https://${text}`).hostname; } catch { /* ниже скажет parseCarLink */ }
+  if (HOST.test(host)) {
+    const {house, id} = parseLotLink(text);
+    return {source: 'lot', id: lotCarId(house, id), house, lotId: id};
+  }
+  try { return parseCarLink(text); } catch (e) {
+    throw new Error(text && host ? `Беру ссылки Encar и лоты аукционов kmotors.shop, а это ${host}` : e.message);
+  }
+};
+
+/**
+ * Раскладка плоского списка фото лота по ролям карусели.
+ *
+ * У Encar у каждого кадра есть код ракурса, у лотов — нет: только порядок. Образцы шести
+ * площадок (06.10) сходятся в одном: первый кадр — машина спереди, за ним ещё несколько
+ * кузовных, дальше салон, в хвосте колёса, днище и повреждения. Границы плавают (у K Car
+ * салон начинается со второго кадра, у Autobell — с восемнадцатого), поэтому салон берём из
+ * середины списка, а не с жёсткого номера, и честно: это догадка по положению, а не
+ * распознавание. Владелец просматривает слайды перед публикацией.
+ * @param {string[]} urls
+ */
+export const lotPhotoRoles = (urls) => {
+  const n = urls.length;
+  const exterior = urls.slice(1, Math.min(6, n));
+  const from = Math.min(n - 1, Math.max(exterior.length + 1, Math.round(n * 0.25)));
+  const interior = urls.slice(from, Math.min(n, from + 6));
+  const taken = new Set([urls[0], ...exterior, ...interior]);
+  return {
+    hero: urls[0] ?? null,
+    rear: exterior[1] ?? exterior[0] ?? null,
+    interiorShot: interior[0] ?? null,
+    dashboard: interior[1] ?? interior[0] ?? null,
+    exterior, interior,
+    other: urls.filter((u) => !taken.has(u)).slice(0, 4),
+  };
+};
+
+/**
+ * Слайды, которым у лота нечем заполниться: нет цены (гостю её не отдают), страховой
+ * истории и списка опций. Остальное — фото и характеристики — на месте.
+ */
+export const LOT_SKIP_SLIDES = ['history', 'price', 'technology', 'safety', 'details'];
+
+/**
+ * Лот → карточка машины в форме, которую ждут слайды (CarouselCar).
+ * Цена, история и опции — пустые: у лота их нет, слайды с ними отключены (LOT_SKIP_SLIDES).
+ * @param {Record<string, any>} lot — из parseLotPage
+ */
+export const carFromLot = (lot) => ({
+  // Номер на последнем слайде и в имени файла: короткий и без знаков, портящих имя файла
+  id: String(lot.lotNo || lot.externalId).replace(/[^A-Za-z0-9]+/g, '').slice(0, 14) || '0',
+  source: `kmotors-lot:${lot.house}`,
+  brand: lot.make ?? '', model: lot.modelGroup ?? lot.model ?? '',
+  grade: lot.trim ?? '', trim: '',
+  year: lot.year, firstRegistered: lot.firstRegistered,
+  mileageKm: lot.mileageKm, displacementCc: lot.displacementCc,
+  transmission: lot.transmission ?? '', fuel: lot.fuel ?? '', body: lot.body ?? '', color: lot.color ?? '',
+  seats: null, vin: lot.vin, plate: lot.plate,
+  price: null, history: null,
+  options: {comfort: [], safety: [], other: [], total: 0},
+  photos: lotPhotoRoles(lot.photos),
+});

@@ -26,13 +26,17 @@ export const ImportModal: React.FC<{stage: ImportStage}> = ({stage}) => (
  * Строка ссылки. Вставка ссылки Encar — это и есть первое действие: поиск запускается
  * сам, без кнопки «Подтянуть». Набранную руками ссылку запускает Enter или кнопка.
  */
-export const QuickLink: React.FC<{onLink: (link: string) => void; error: string; busy: boolean; placeholder?: string}> = (
-  {onLink, error, busy, placeholder = 'Вставьте ссылку на объявление Encar — остальное сделается само'},
+export const QuickLink: React.FC<{
+  onLink: (link: string) => void; error: string; busy: boolean; placeholder?: string;
+  // Какие ссылки принимает экран: по умолчанию — Encar; карусели добавляют лоты аукционов
+  parse?: (link: string) => unknown;
+}> = (
+  {onLink, error, busy, placeholder = 'Вставьте ссылку на объявление Encar — остальное сделается само', parse = parseCarLink},
 ) => {
   const [value, setValue] = useState('');
   const ref = useRef<HTMLInputElement>(null);
   const go = (link: string) => {
-    try { parseCarLink(link); } catch { return false; }
+    try { parse(link); } catch { return false; }
     onLink(link);
     setValue('');
     return true;

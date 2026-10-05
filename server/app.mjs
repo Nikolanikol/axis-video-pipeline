@@ -26,7 +26,7 @@ import {hasSeparator} from './ambience.mjs';
 import {carouselFormats, carouselsDir, buildCarousel, deleteCarousel, listCarousels, slideFileName} from './carousel.mjs';
 import {LOGO_RULES, saveLogo, setLogoVariant} from './brand.mjs';
 import {balanceOf, billed, creditCosts, ledgerOf, signupCredits} from './billing.mjs';
-import {parseCarLink} from '../src/shared/encarLink.js';
+import {parseCarouselSource} from '../src/shared/kmotorsLot.js';
 import {PALETTE_KEYS, isHex} from '../src/shared/contrast.js';
 import {withoutMusic} from '../src/shared/nomusic.js';
 import {
@@ -470,7 +470,15 @@ export const createApp = ({photoOrigin}) => {
   api.post('/carousels', requireCredits, (req, _res, next) => {
     // Ссылку проверяем до списания: опечатка в ссылке — не повод гонять кредит туда-обратно
     // и засорять журнал клиента парой «списано / возврат»
-    try { parseCarLink(req.body?.link); next(); } catch (e) { next(new HttpError(400, e.message)); }
+    try {
+      const src = parseCarouselSource(req.body?.link);
+      // Лоты аукциона — источник владельца (решение 06.10): страницы kmotors разбираем для его
+      // каруселей, не как услугу клиентам. Без входа (локально) проверять некого
+      if (src.source !== 'encar' && req.user && !req.user.isStaff) {
+        return next(new HttpError(403, 'Карусели по лотам аукционов пока доступны только сотрудникам'));
+      }
+      next();
+    } catch (e) { next(new HttpError(400, e.message)); }
   }, wrap((req) => billed(
     {...billOf(req, 'carousels'), workspaceId: req.ws,
       jobId: `carousel-${req.ws}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
