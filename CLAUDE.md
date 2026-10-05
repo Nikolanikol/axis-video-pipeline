@@ -228,6 +228,13 @@ DNS добавляй только на поддоменах: корень `axis-
 копии перезагрузи страницу в панели браузера: она держит в кэше модули прежнего запуска, и
 проверка идёт по старому коду. Пробные лоты и карусели после проверки удаляй.
 
+**Карусели по лотам аукционов** (06.10): ссылка kmotors/carnect в строке каруселей →
+`parseCarouselSource` → `fetchLot` → `carFromLot`; фото качаются к нам (`carousels/<id>/photos`, только
+CDN из `PHOTO_HOSTS` в `server/carousel.mjs` — новая площадка = новый хост туда). Папка `km-<площадка>-<хеш>`,
+исходный лот в `carousel.json` → `lot` (по нему «Пересобрать»). Слайды без цены/истории/опций
+отключает проп `skip` (`LOT_SKIP_SLIDES`). Роли фото — по положению в списке, не по распознаванию.
+Только сотрудникам (403 остальным). Lotte не годится: нет марки и года.
+
 **Шлюз kmotors на Mac — порт 3000** (`KMOTORS_API_URL`). Признак зависшего kmotors — пустая
 страница со статусом 200 на любой запрос; карусели и лот по ссылке тогда падают с
 «Unexpected end of JSON input». Лечится перезапуском kmotors.
@@ -261,7 +268,7 @@ CONTEXT.md, раздел «Известные дыры» — что не дод�
 | Demucs | звуки машины без голоса (проба) | окружение `.venv-demucs`, необязательно |
 | Resend | письма: код подтверждения почты, сброс пароля | `RESEND_API_KEY`, `RESEND_FROM`, `SMMAKER_APP_URL` |
 | Postgres (общий Supabase) | база SMMAKER: кабинеты, пакеты, кредиты | `DATABASE_URL`, `SMMAKER_DB_SCHEMA` |
-| страницы лотов kmotors.shop | карусели по аукционным лотам (в работе) | `KMOTORS_LOT_ORIGIN`, `KMOTORS_LOT_FIXTURES`, `KMOTORS_CF_ACCESS_ID`, `KMOTORS_CF_ACCESS_SECRET` — все необязательные |
+| страницы лотов kmotors.shop | карусели по аукционным лотам (06.10, только сотрудникам) | `KMOTORS_LOT_ORIGIN`, `KMOTORS_LOT_FIXTURES`, `KMOTORS_CF_ACCESS_ID`, `KMOTORS_CF_ACCESS_SECRET` — все необязательные |
 
 Шлюз живёт в соседнем проекте `~/Desktop/recup/KMotors-1`: `src/app/api/vehicle/[id]/route.ts`.
 Оттуда же русский словарь карусели — `tools/sync-kmotors-dict.mjs`. Encar режет
