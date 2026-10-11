@@ -38,11 +38,13 @@ export const resolveSchema = (env = process.env, production = PRODUCTION) => {
 };
 
 /**
- * Номер PR, если это превью в Coolify, иначе null. Признак ставит сам Coolify
- * (COOLIFY_BRANCH=pull/<номер>/head), а не наши переменные, поэтому подмена боевыми
- * значениями его не стирает.
+ * Номер PR, если это превью в Coolify, иначе null. Признак — имя контейнера: превью Coolify
+ * всегда называет `<приложение>-pr-<номер>`, прод — `<приложение>-<время>`
+ * (generateApplicationContainerName). Переменную ставит сам Coolify, а не мы, поэтому
+ * подмена наших переменных боевыми её не стирает. COOLIFY_BRANCH не годится: в превью
+ * там ветка приложения (main), а не PR — на этом 11.10 метка и страховка молчали.
  */
-export const previewId = (env = process.env) => env.COOLIFY_BRANCH?.match(/^pull\/(\d+)\/head$/)?.[1] ?? null;
+export const previewId = (env = process.env) => env.COOLIFY_CONTAINER_NAME?.match(/-pr-(\d+)$/)?.[1] ?? null;
 
 export const hasDatabase = () => Boolean(process.env.DATABASE_URL);
 

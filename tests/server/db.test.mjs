@@ -17,14 +17,15 @@ describe('схема SMMAKER', () => {
   });
 
   it('превью PR не стартует на боевой схеме', () => {
-    const pr = {COOLIFY_BRANCH: 'pull/15/head'};
+    // Имена как у Coolify: превью — <uuid>-pr-<номер>, прод — <uuid>-<время>. Ветка в превью — main
+    const pr = {COOLIFY_CONTAINER_NAME: 'ji28ak34qdz1lqate7tbuwqh-pr-15', COOLIFY_BRANCH: 'main'};
     expect(previewId(pr)).toBe('15');
-    expect(previewId({COOLIFY_BRANCH: 'main'})).toBe(null);
+    expect(previewId({COOLIFY_CONTAINER_NAME: 'ji28ak34qdz1lqate7tbuwqh-153328748858'})).toBe(null);
     expect(previewId({})).toBe(null);
     expect(() => resolveSchema(pr, true)).toThrow(/PR #15/);
     expect(() => resolveSchema({...pr, SMMAKER_DB_SCHEMA: 'smmaker'}, true)).toThrow(/PR #15/);
     expect(resolveSchema({...pr, SMMAKER_DB_SCHEMA: 'smmaker_preview'}, true)).toBe('smmaker_preview');
-    expect(resolveSchema({COOLIFY_BRANCH: 'main'}, true)).toBe('smmaker');
+    expect(resolveSchema({COOLIFY_CONTAINER_NAME: 'ji28ak34qdz1lqate7tbuwqh-153328748858'}, true)).toBe('smmaker');
   });
 });
 
