@@ -58,6 +58,7 @@ export const Landing: React.FC<{signup: {credits: number; days: number}; notice:
     <div className="landing">
       <header className="land-top">
         <img src="/kok/wordmark.svg" alt="KOK" className="land-logo" />
+        {offer?.preview && <span className="top-preview" title="Превью ветки: тестовая база, не прод">ТЕСТ · PR {offer.preview}</span>}
         <nav className="land-nav">
           <a href="#how" onClick={jump('how')}>Как это работает</a>
           <a href="#samples" onClick={jump('samples')}>Образцы</a>
