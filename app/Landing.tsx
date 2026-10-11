@@ -240,7 +240,7 @@ const LiveDemo: React.FC = () => {
   return (
     <div className="land-demo">
       <div className="land-phone">
-        {input ? <Preview input={input} format={fmt} autoPlay /> : <div className="land-phone-empty" />}
+        {input ? <Preview input={input} format={fmt} autoPlay loop /> : <div className="land-phone-empty" />}
       </div>
       <div className="land-demo-controls">
         <span className="land-try">Попробуйте — ролик меняется сразу</span>

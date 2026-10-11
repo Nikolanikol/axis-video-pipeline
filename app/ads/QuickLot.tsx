@@ -12,6 +12,7 @@ import type {LotEntry} from '../api';
 import {BusyModal} from '../BusyModal';
 import {Copy, ExternalLink, Link2, Search, Trash2} from 'lucide-react';
 import {lotIsBlank} from '../../src/shared/lotFromCar';
+import {thumb} from '../thumb';
 
 /** Где сейчас загрузка лота по ссылке: шаг 0 — поиск машины, 1 — лот, 2 — фото */
 export type ImportStage = {step: 0 | 1 | 2; photos?: number} | null;
@@ -136,7 +137,8 @@ export const LotsPanel: React.FC<{
             <div key={l.id} role="button" tabIndex={0} className={`car-card${l.id === current ? ' on' : ''}${busy ? ' pending' : ''}`}
               onClick={() => onOpen(l.id)} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(l.id); }}>
               {l.photos[0]
-                ? <img src={l.photos[0]} alt="" loading="lazy" style={{aspectRatio: '16 / 9', width: 96}} />
+                // Миниатюра, а не фото целиком: полное — до 2000 px и сотни КБ на значок в 96 px
+                ? <img src={thumb(l.photos[0])} alt="" loading="lazy" style={{aspectRatio: '16 / 9', width: 96}} />
                 : <span className="lot-row-empty" style={{width: 96}}>нет фото</span>}
               <div className="car-card-body">
                 <b>{titleOf(l)}</b>

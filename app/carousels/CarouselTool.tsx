@@ -10,6 +10,7 @@
 // кнопкой, а ссылка на уже собранную машину открывает готовую карусель, а не собирает заново.
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {encarAdUrl, sourceName} from '../../src/shared/encarLink.js';
+import {thumb} from '../thumb';
 import {parseCarouselSource} from '../../src/shared/kmotorsLot.js';
 import {QuickLink} from '../ads/QuickLot';
 import {Check, ChevronLeft, ChevronRight, Download, ExternalLink, Images, List, RefreshCw, Trash2, X} from 'lucide-react';
@@ -279,7 +280,8 @@ const CarouselsPanel: React.FC<{
             // div, а не button: внутри свои кнопки, а кнопка в кнопке — недопустимая разметка
             <div key={c.id} role="button" tabIndex={0} className={`car-card${c.id === current ? ' on' : ''}${pending.has(c.id) ? ' pending' : ''}`}
               onClick={() => onOpen(c)} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(c); }}>
-              <img src={`${c.slides[0]}?v=${encodeURIComponent(c.updatedAt)}`} alt=""
+              {/* Миниатюра слайда: PNG 1080×1920 весит 1–3 МБ — на плашку это лишнее */}
+              <img src={thumb(`${c.slides[0]}?v=${encodeURIComponent(c.updatedAt)}`, 160)} alt=""
                 style={{aspectRatio: f ? `${f.width} / ${f.height}` : '9 / 16'}} loading="lazy" />
               <div className="car-card-body">
                 <b>{[c.car.brand, c.car.model].filter(Boolean).join(' ') || `№ ${c.id}`}</b>
@@ -334,7 +336,7 @@ const SlideViewer: React.FC<{entry: CarouselEntry; ratio: string; onZoom: (i: nu
       <div className="slide-thumbs">
         {entry.slides.map((src, i) => (
           <button key={src} className={i === at ? 'slide-thumb on' : 'slide-thumb'} onClick={() => setAt(i)} style={{aspectRatio: ratio}}>
-            <img src={`${src}${v}`} alt={`Слайд ${i + 1}`} loading="lazy" />
+            <img src={thumb(`${src}${v}`, 160)} alt={`Слайд ${i + 1}`} loading="lazy" />
           </button>
         ))}
       </div>

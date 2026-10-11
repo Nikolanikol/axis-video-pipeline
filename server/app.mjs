@@ -37,6 +37,7 @@ import {
   authEnabled, clearSessionCookie, guardData, loginLimiter, readSessionMw, registerLimiter, requireAdmin, requireCredits,
   requireStaff, requireUser, sessionToken, setSessionCookie,
 } from './session.mjs';
+import {thumbsHandler} from './thumbs.mjs';
 
 // Медиа с путями /data/... браузер рендера берёт по полному адресу этого сервера
 const absolute = (origin, url) => (url && url.startsWith('/') ? `${origin}${url}` : url);
@@ -516,6 +517,8 @@ export const createApp = ({photoOrigin}) => {
   });
 
   app.use('/api', api);
+  // Миниатюры для плашек — те же правила доступа, что у /data (server/thumbs.mjs)
+  app.use('/thumbs', guardData, thumbsHandler);
   app.use('/data', guardData, express.static(DATA_DIR, {fallthrough: false}));
   app.use('/api', (err, req, res, _next) => {
     const status = err.status || (err.code === 'LIMIT_FILE_SIZE' ? 413 : 500);
