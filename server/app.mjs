@@ -39,6 +39,9 @@ import {
   requireStaff, requireUser, sessionToken, setSessionCookie,
 } from './session.mjs';
 import {thumbsHandler} from './thumbs.mjs';
+import {
+  checkoutLimiter, handleNotification, kassaHealth, newRequestId, notifyLimiter, paymentEvents, paymentMethods, paymentOf, paymentsOf, publicOrigin, startCheckout,
+} from './payments.mjs';
 
 // Медиа с путями /data/... браузер рендера берёт по полному адресу этого сервера
 const absolute = (origin, url) => (url && url.startsWith('/') ? `${origin}${url}` : url);
@@ -174,6 +177,14 @@ export const createApp = ({photoOrigin}) => {
     });
   })().catch(next));
 
+  // Уведомление кассы об оплате — без сессии: приходит от NOWPayments, подлинность — по подписи
+  // и сверке с самой кассой (server/payments.mjs). Номер операции — в ответ: по нему её видно в логе
+  api.post('/payments/nowpayments/notify', notifyLimiter, (req, res, next) => {
+    const requestId = newRequestId();
+    res.set('X-Request-Id', requestId);
+    handleNotification({body: req.body, signature: req.get('x-nowpayments-sig'), requestId}).then((r) => res.json(r)).catch(next);
+  });
+
   // Всё ниже — только после входа и от имени своей компании
   api.use(requireUser);
   api.use((req, _res, next) => { try { withWorkspace(wsOf(req), next); } catch (e) { next(e); } });
@@ -209,8 +220,17 @@ export const createApp = ({photoOrigin}) => {
     return {
       contacts: whatsapp ? {...contacts, whatsapp} : contacts,
       packs: authEnabled() ? await listPacks() : [],
+      // Какие кассы включены: без ключей кнопки «Оплатить USDT» нет, остаётся менеджер
+      pay: paymentMethods(),
     };
   }));
+  // Оплата тарифа: счёт у кассы → адрес страницы оплаты. Адрес возврата и уведомлений — тот,
+  // с которого пришёл клиент (у превью свой, см. startCheckout)
+  api.post('/payments/checkout', checkoutLimiter, wrap((req) => startCheckout({
+    workspaceId: req.ws, userId: req.user?.id, packId: req.body?.packId, origin: publicOrigin(req),
+  })));
+  account.get('/payments', wrap((req) => paymentsOf(req.ws)));
+  account.get('/payments/:id', wrap((req) => paymentOf(req.ws, req.params.id)));
   // После /account/offer: проверка «нужна база» в роутере иначе закрыла бы и прайс
   api.use('/account', account);
 
@@ -221,6 +241,10 @@ export const createApp = ({photoOrigin}) => {
   admin.get('/clients', wrap((req) => listClients(req.query)));
   admin.get('/clients/:id/ledger', wrap((req) => ledgerOf(checkId(req.params.id))));
   admin.get('/packs', wrap(() => listPacks({all: true})));
+  // Журнал заказа оплаты: все уведомления кассы, сверки, отказы и тревоги — разбор спора и сбоя
+  admin.get('/payments/:id/events', wrap((req) => paymentEvents(req.params.id)));
+  // Жива ли касса и принимает ли ключ — первое, что смотреть, если оплаты не идут
+  admin.get('/payments/health', wrap(() => kassaHealth()));
   admin.post('/clients/:id/packs', wrap((req) => grantPack({
     workspaceId: checkId(req.params.id), packId: String(req.body?.packId ?? ''), note: req.body?.note, createdBy: req.user.id,
   })));

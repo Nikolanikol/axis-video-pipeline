@@ -68,7 +68,15 @@ export type Me =
   | {authRequired: true; user: User; workspace: {id: string; name: string; role: string} | null; balance: Balance | null};
 // kind: plan — подписка на месяц (кредиты сгорают в конце месяца), topup — докупка, сгорает вместе с подпиской
 export type Pack = {id: string; title: string; credits: number; price_krw: number; valid_days: number; active: boolean; sort: number; kind: 'plan' | 'topup'};
-export type Offer = {contacts: {whatsapp?: string; telegram?: string; email?: string}; packs: Pack[]};
+// pay — какие кассы включены на сервере (нет ключей — только менеджер)
+export type Offer = {contacts: {whatsapp?: string; telegram?: string; email?: string}; packs: Pack[]; pay?: {usdt: boolean}};
+// Оплата тарифа через кассу. status — общий для всех касс (cores/PAYMENTS.md): created — счёт выставлен, waiting,
+// confirming, paid, partial, failed, expired, refunded, abandoned; credited — кредиты начислены
+export type Payment = {
+  id: string; status: string; credited: boolean; packId: string; title: string; credits: number | null;
+  priceKrw: number; amount: number; currency: string; payCurrency: string | null; sandbox: boolean;
+  createdAt: string; creditedAt: string | null;
+};
 // Условия для витрины гостя: без входа (GET /api/public/offer)
 export type PublicOffer = Offer & {signup: {credits: number; days: number}; costs: Record<string, number>; preview?: string | null};
 export type LedgerRow = {
@@ -136,6 +144,11 @@ export const api = {
   restore: (token: string) => request<{ok: true}>('POST', '/api/auth/restore', {token}),
   ledger: (page = 1) => request<LedgerPage>('GET', `/api/account/ledger?page=${page}`),
   offer: () => request<Offer>('GET', '/api/account/offer'),
+  pay: {
+    checkout: (packId: string) => request<{id: string; url: string}>('POST', '/api/payments/checkout', {packId}),
+    list: () => request<Payment[]>('GET', '/api/account/payments'),
+    get: (id: string) => request<Payment>('GET', `/api/account/payments/${encodeURIComponent(id)}`),
+  },
   account: {
     profile: () => request<Account>('GET', '/api/account/profile'),
     save: (data: {name: string; company?: string}) => request<Account>('PUT', '/api/account/profile', data),

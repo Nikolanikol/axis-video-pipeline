@@ -8,6 +8,7 @@ import {ROOT} from './store.mjs';
 import {hasDatabase, migrate} from './db/index.mjs';
 import {refundOrphans} from './billing.mjs';
 import {purgeDeleted} from './accounts.mjs';
+import {reconcilePayments} from './payments.mjs';
 import {DEFAULT_WORKSPACE, ensureWorkspace, legacyDataDirs} from './store.mjs';
 
 const PORT = Number(process.env.PORT || 3210);
@@ -40,6 +41,12 @@ if (hasDatabase()) {
   const purge = () => purgeDeleted().catch((e) => console.error('Удаление аккаунтов:', e.message));
   purge();
   setInterval(purge, 60 * 60 * 1000).unref();
+  // Сверка оплат: уведомление кассы могло потеряться (перезапуск, сеть) — переспрашиваем кассу
+  // о зависших заказах сами (server/payments.mjs). Раз в 5 минут и сразу после старта: перезапуск —
+  // как раз тот случай, когда уведомления терялись
+  const reconcile = () => reconcilePayments().catch((e) => console.error('Сверка оплат:', e.message));
+  reconcile();
+  setInterval(reconcile, 5 * 60 * 1000).unref();
 }
 
 // Файлы старой раскладки сервер не видит — история и лоты выглядели бы пропавшими.

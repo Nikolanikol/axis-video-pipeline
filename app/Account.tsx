@@ -9,7 +9,7 @@ import {day, daysLeft, useSession} from './auth';
 import {Field} from './LotForm';
 import {DangerZone, ProfileCard, SecurityCard} from './AccountProfile';
 import {SetupCard} from './Onboarding';
-import {PlansSection} from './AccountPlans';
+import {PaymentReturn, PlansSection} from './AccountPlans';
 import {useConfig} from './config';
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -51,6 +51,8 @@ export const AccountPage: React.FC = () => {
         </div>
         {!isStaff && <button className="btn primary" onClick={toPlans}>{balance?.subscription ? 'Продлить подписку' : 'Оформить подписку'}</button>}
       </header>
+      {/* Вернулись из кассы (#/account/pay-…) — сверху, а не у тарифов: человек ждёт ответа сразу */}
+      <PaymentReturn />
       <SetupCard />
       {/* Две колонки, а не сетка рядами: в ряду короткий баланс тянул за собой пустоту до низа
           профиля. На телефоне колонки растворяются (display: contents), порядок задаёт order */}

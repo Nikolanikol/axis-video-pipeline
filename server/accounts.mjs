@@ -166,7 +166,7 @@ export const readSession = async (token) => {
   };
 };
 
-const inTransaction = async (fn) => {
+export const inTransaction = async (fn) => {
   const client = await db().connect();
   try {
     await client.query('BEGIN');
@@ -765,24 +765,31 @@ export const grantPack = async ({workspaceId, packId, note = '', createdBy}) => 
   if (!pack) throw new HttpError(404, 'Нет такого действующего пакета');
   const {rowCount} = await db().query('SELECT 1 FROM smmaker_workspaces WHERE id = $1', [workspaceId]);
   if (!rowCount) throw new HttpError(404, 'Нет такой компании');
-  const plan = pack.kind === 'plan';
-  await inTransaction(async (client) => {
-    await client.query('SELECT id FROM smmaker_workspaces WHERE id = $1 FOR UPDATE', [workspaceId]);
-    const current = await subscriptionOf(workspaceId, client);
-    let expiresAt = null;
-    if (plan && current) {
-      const {rows: [r]} = await client.query(`SELECT $1::timestamptz + $2 * interval '1 day' AS at`, [current.until, pack.valid_days]);
-      expiresAt = r.at;
-    } else if (!plan && current) {
-      expiresAt = current.until;
-    }
-    await addLot(client, {
-      workspaceId, credits: pack.credits, days: pack.valid_days, expiresAt,
-      source: plan ? 'subscription' : 'pack', packId: pack.id, priceKrw: pack.price_krw,
-      note: [plan ? `подписка «${pack.title}»` : `докупка «${pack.title}»`, String(note).trim()].filter(Boolean).join(' · '), createdBy,
-    });
-  });
+  await inTransaction((client) => grantPackIn(client, {workspaceId, pack, note, createdBy}));
   return balanceOf(workspaceId);
+};
+
+/**
+ * Начисление пакета внутри чужой транзакции — для оплаты: партия и отметка «оплата
+ * начислена» должны лечь вместе (server/payments.mjs). priceKrw — сколько заплачено на самом
+ * деле: цену могли поменять между счётом и оплатой. Возвращает партию {id, expires_at}
+ */
+export const grantPackIn = async (client, {workspaceId, pack, note = '', createdBy = null, priceKrw = pack.price_krw}) => {
+  const plan = pack.kind === 'plan';
+  await client.query('SELECT id FROM smmaker_workspaces WHERE id = $1 FOR UPDATE', [workspaceId]);
+  const current = await subscriptionOf(workspaceId, client);
+  let expiresAt = null;
+  if (plan && current) {
+    const {rows: [r]} = await client.query(`SELECT $1::timestamptz + $2 * interval '1 day' AS at`, [current.until, pack.valid_days]);
+    expiresAt = r.at;
+  } else if (!plan && current) {
+    expiresAt = current.until;
+  }
+  return addLot(client, {
+    workspaceId, credits: pack.credits, days: pack.valid_days, expiresAt,
+    source: plan ? 'subscription' : 'pack', packId: pack.id, priceKrw,
+    note: [plan ? `подписка «${pack.title}»` : `докупка «${pack.title}»`, String(note).trim()].filter(Boolean).join(' · '), createdBy,
+  });
 };
 
 /**
