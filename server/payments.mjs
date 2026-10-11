@@ -27,7 +27,7 @@ import {HttpError} from './store.mjs';
 import {grantPackIn, inTransaction} from './accounts.mjs';
 import {appUrl} from './mailer.mjs';
 import {usdKrw} from './rates.mjs';
-import {notifyPayments} from './telegram.mjs';
+import {esc, notifyPayments} from './telegram.mjs';
 import {PROVIDER, kassa, kassaHttpError, kassaInfo, kassaReady, sandboxForbidden, sandboxMode} from './payKassa.mjs';
 import {toCoreError} from '../cores/kit/errors.mjs';
 import {createLogger, levelFor} from '../cores/kit/log.mjs';
@@ -70,13 +70,15 @@ const event = async (paymentId, kind, {status = null, data = null, requestId = n
 const won = (n) => `₩${Number(n).toLocaleString('ru-RU')}`;
 // Даты — по Сеулу: группа читает их в Корее, а сервер живёт в UTC
 const dayKst = (d) => new Date(d).toLocaleDateString('ru-RU', {timeZone: 'Asia/Seoul'});
-const tag = (o) => (o.sandbox ? ' · 🧪 тест' : '');
+const tag = (o) => (o.sandbox ? ' · 🧪 <i>тест</i>' : '');
+// Разделитель блоков сообщения: на телефоне — во всю ширину пузыря, не переносится
+const LINE = '━━━━━━━━━━━━━━';
 
 /**
  * Кто платит — компания и контакты человека: Дмитрий (общение с клиентами) связывается сразу из
  * сообщения, не открывая админку (владелец 12.10). Человек — тот, кто нажал «Оплатить»; если его
- * нет (заказ без автора) — владелец кабинета, первый по времени вступления. Телефон Telegram сам
- * делает нажимаемым. Сообщение уходит только во внутреннюю группу — клиентов в ней нет
+ * нет (заказ без автора) — владелец кабинета, первый по времени вступления. Телефон и почту
+ * Telegram сам делает нажимаемыми. Сообщение уходит только во внутреннюю группу — клиентов в ней нет
  */
 const whoPays = async (o) => {
   const {rows: [r]} = await db().query(
@@ -89,13 +91,19 @@ const whoPays = async (o) => {
       WHERE w.id = $1`,
     [o.workspace_id, o.created_by ?? null]);
   return [
-    `Компания: ${r?.company ?? o.workspace_id}`,
-    r?.name && `Контакт: ${r.name}`,
-    `Телефон: ${r?.phone ?? 'не указан'}`,
-    `Почта: ${r?.email ?? 'не указана'}`,
+    `🏢 <b>${esc(r?.company ?? o.workspace_id)}</b>`,
+    r?.name && `👤 ${esc(r.name)}`,
+    `📞 ${r?.phone ? esc(r.phone) : '<i>телефон не указан</i>'}`,
+    `✉️ ${r?.email ? esc(r.email) : '<i>почта не указана</i>'}`,
   ].filter(Boolean).join('\n');
 };
-const what = (o) => `${o.kind === 'plan' ? `тариф «${o.title}»` : `докупка «${o.title ?? o.pack_id}»`} · $${Number(o.amount).toFixed(2)} · ${won(o.price_krw)}`;
+// Что купили и за сколько
+const what = (o) => [
+  `💳 ${o.kind === 'plan' ? `Тариф «${esc(o.title)}»` : `Докупка «${esc(o.title ?? o.pack_id)}»`}`,
+  `💵 <b>$${Number(o.amount).toFixed(2)}</b> USDT · ${won(o.price_krw)}`,
+].join('\n');
+// Номер заказа — моноширинным: в Telegram копируется одним нажатием, с ним ищут журнал заказа
+const orderLine = (o) => `🧾 <code>${esc(o.id)}</code>`;
 
 /**
  * Тревога в группу «⚠️ нужен человек» — один раз на заказ и причину: касса повторяет
@@ -109,7 +117,7 @@ const alarm = async (o, reason, requestId) => {
   await event(o.id, 'alarm', {data: {reason}, requestId});
   log.warn('alarm', {order: o.id, reason, requestId});
   void whoPays(o)
-    .then((who) => notifyPayments(`⚠️ Нужен человек${tag(o)}\n${who}\n${what(o)}\nЧто случилось: ${reason}\nЗаказ ${o.id}`))
+    .then((who) => notifyPayments([`⚠️ <b>Нужен человек</b>${tag(o)}`, LINE, `❗️ ${esc(reason)}`, LINE, who, LINE, what(o), orderLine(o)].join('\n')))
     .catch((e) => log.error('alarm.send_failed', {order: o.id, requestId, error: e}));
 };
 
@@ -120,7 +128,7 @@ const crashAlarm = (where, e, requestId) => {
   const key = `${where}:${e?.message}`;
   if (Date.now() - (lastCrash.get(key) ?? 0) < 10 * 60_000) return;
   lastCrash.set(key, Date.now());
-  void notifyPayments(`🔥 Сбой оплаты у нас: ${where}\n${String(e?.message ?? e).slice(0, 300)}\nrequestId ${requestId}`).catch(() => {});
+  void notifyPayments([`🔥 <b>Сбой оплаты у нас</b>`, LINE, esc(where), `<i>${esc(String(e?.message ?? e).slice(0, 300))}</i>`, LINE, `🔎 <code>${esc(requestId)}</code>`].join('\n')).catch(() => {});
 };
 
 // ——— Заказ ———
@@ -294,7 +302,8 @@ const credit = async (o, paymentId, requestId) => {
   rlog.info('credit.ok', {paymentId, pack: done.pack.id, credits: done.pack.credits});
   // Сообщение — после фиксации транзакции: откатившееся начисление не должно успеть «прийти»
   void whoPays(o)
-    .then((who) => notifyPayments(`✅ Оплата пришла${tag(o)}\n${who}\n${what({...o, title: done.pack.title, kind: done.pack.kind})}\n+${done.pack.credits} кр., действуют до ${dayKst(done.lot.expires_at)}\nЗаказ ${o.id}`))
+    .then((who) => notifyPayments([`✅ <b>Оплата пришла</b>${tag(o)}`, LINE, who, LINE, what({...o, title: done.pack.title, kind: done.pack.kind}),
+      `🎟 +${done.pack.credits} кр. до ${dayKst(done.lot.expires_at)}`, LINE, orderLine(o)].join('\n')))
     .catch((e) => rlog.error('notify.send_failed', {error: e}));
   return true;
 };

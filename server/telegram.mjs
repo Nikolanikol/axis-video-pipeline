@@ -22,23 +22,38 @@ let transport = null;
 export const setTelegramTransport = (fn = null) => { transport = fn; };
 
 /**
- * Написать в тему группы. topic — номер темы; пусто — в общую ленту группы.
- * Обычный текст без разметки: имена компаний клиенты пишут как хотят, и звёздочка или
- * угловая скобка в названии иначе сломали бы сообщение
+ * Текст пользователя (название компании, имя) — в безопасный вид для разметки HTML Telegram.
+ * Без этого «<» или «&» в названии сломали бы разметку, и сообщение не ушло бы вовсе
  */
-export const notify = async (text, {topic} = {}) => {
+export const esc = (v) => String(v ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+// Разметку снимаем для запасной отправки простым текстом
+const plain = (html) => html.replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+
+const send = async (token, payload) => {
+  const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload), signal: AbortSignal.timeout(TIMEOUT_MS),
+  });
+  return res.json().catch(() => ({ok: false, description: `HTTP ${res.status}`}));
+};
+
+/**
+ * Написать в тему группы. topic — номер темы; пусто — в общую ленту группы.
+ * Текст — в разметке HTML Telegram (<b>, <i>, <code>); всё, что пришло от людей, — через esc().
+ * Если Telegram всё же не разобрал разметку, отправляем то же простым текстом: сообщение об
+ * оплате важнее красоты
+ */
+export const notify = async (html, {topic} = {}) => {
   const {token, chat} = settings();
   const thread = Number(topic) || undefined;
-  if (transport) return transport({text, topic: thread});
+  if (transport) return transport({text: plain(html), html, topic: thread});
   if (!token || !chat) return;
+  const base = {chat_id: chat, message_thread_id: thread, disable_web_page_preview: true};
   try {
-    const res = await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
-      method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({chat_id: chat, message_thread_id: thread, text, disable_web_page_preview: true}),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!data.ok) console.error(`Telegram не принял сообщение: ${data.description ?? res.status}`);
+    let data = await send(token, {...base, text: html, parse_mode: 'HTML'});
+    if (!data.ok && /parse entities/i.test(data.description ?? '')) data = await send(token, {...base, text: plain(html)});
+    if (!data.ok) console.error(`Telegram не принял сообщение: ${data.description}`);
   } catch (e) {
     console.error(`Telegram недоступен: ${e.message}`);
   }
