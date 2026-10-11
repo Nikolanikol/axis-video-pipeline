@@ -64,6 +64,7 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
         <a href={href()} className="top-home" title="Все пайплайны">
           <img src="/kok/wordmark.svg" alt="KOK" className="top-logo" />
         </a>
+        {config.preview && <span className="top-preview" title="Превью ветки: тестовая база, не прод">ТЕСТ · PR {config.preview}</span>}
         <nav className="crumbs">
           <a href={href()}>Пайплайны</a>
           {pipeline && <><span>›</span><a href={href(pipeline.id)}>{pipeline.title}</a></>}

@@ -27,8 +27,22 @@ export const resolveSchema = (env = process.env, production = PRODUCTION) => {
   if (!SCHEMA_RE.test(schema)) {
     throw new Error(`SMMAKER_DB_SCHEMA=«${schema}»: схема должна начинаться с smmaker (smmaker, smmaker_dev…)`);
   }
+  // Превью PR в боевой схеме прогнало бы свои миграции по данным клиентов. У Coolify есть
+  // открытая ошибка, когда переменные превью подменяются боевыми (#9399), — поэтому лучше
+  // не стартовать вовсе: Coolify оставит превью упавшим, прод не заденет
+  const pr = previewId(env);
+  if (pr && schema === 'smmaker') {
+    throw new Error(`Превью PR #${pr} смотрит в боевую схему smmaker — задайте SMMAKER_DB_SCHEMA=smmaker_preview в переменных Preview Deployments`);
+  }
   return schema;
 };
+
+/**
+ * Номер PR, если это превью в Coolify, иначе null. Признак ставит сам Coolify
+ * (COOLIFY_BRANCH=pull/<номер>/head), а не наши переменные, поэтому подмена боевыми
+ * значениями его не стирает.
+ */
+export const previewId = (env = process.env) => env.COOLIFY_BRANCH?.match(/^pull\/(\d+)\/head$/)?.[1] ?? null;
 
 export const hasDatabase = () => Boolean(process.env.DATABASE_URL);
 

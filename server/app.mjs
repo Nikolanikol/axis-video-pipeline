@@ -15,6 +15,7 @@ import {addPhoto, applyBlur, ownFile, photoInfo, removePhoto, stemOf} from './ph
 import {checkPhotoUrls, downloadPhoto, lookupCar} from './encar.mjs';
 import {usdKrw} from './rates.mjs';
 import {makeZip} from './zip.mjs';
+import {previewId} from './db/index.mjs';
 import {cancelJob, deleteJob, enqueue, getJob, listJobs, retryJob} from './renderer.mjs';
 import {
   UPLOAD_TMP, ambienceReview, createReview, getReview, ingestSource, listReviews, rebuildLines, reprocessSource,
@@ -249,6 +250,8 @@ export const createApp = ({photoOrigin}) => {
     // занял бы полмашины на час рядом с боевым сайтом. Прячет именно клиент, а не сервер:
     // реестр пайплайнов общий для прода и дева, и один флаг честнее двух списков.
     production: PRODUCTION,
+    // Номер PR, если это превью в Coolify: шапка показывает «ТЕСТ», чтобы превью не путали с продом
+    preview: previewId(),
     // Компания, от имени которой работает сервер, и адрес её файлов: интерфейс по нему
     // отличает свои фото лота от чужих ссылок
     workspace: {id: currentWorkspace(), url: workspaceUrl()},
