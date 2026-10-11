@@ -33,9 +33,12 @@ let inflight = null;
 // Курсы валют источников, а не профиля: цена японской машины приходит в иенах (Carsensor, 12.10).
 // В список валют профиля иену не добавляем — это решение о том, что видит клиент
 const SOURCE_CURRENCIES = ['JPY'];
-// Кэш до 11.10 знал только вон — таблицы валют в нём нет, такой считаем несвежим; до 12.10 — без иены
-const fresh = (r) => r && r.usdRates && SOURCE_CURRENCIES.every((c) => r.usdRates[c])
-  && Date.now() - new Date(r.fetchedAt).getTime() < TTL_MS;
+// Версия записи кэша: до 11.10 он знал только вон, до 12.10 — без иены, такие считаем несвежими.
+// Почему версия, а не «есть ли в записи иена»: если источник однажды не пришлёт иену (или пришлёт
+// мусор — его мы отбрасываем), запись без неё была бы несвежей вечно, и каждый запрос курса шёл бы
+// в сеть вместо раза в сутки. Добавили валюту в список — поднять версию
+const CACHE_VERSION = 2;
+const fresh = (r) => r?.v === CACHE_VERSION && Date.now() - new Date(r.fetchedAt).getTime() < TTL_MS;
 
 const load = async () => {
   if (cached) return cached;
@@ -61,7 +64,7 @@ const fetchRate = async () => {
   usdRates.USD = 1;
   usdRates.KRW = krw;
   // Две цифры после запятой — точнее банки и не котируют; в лоте это поле «₩ за $1»
-  return {krwPerUsd: Math.round(krw * 100) / 100, usdRates, fetchedAt: new Date().toISOString(), source: 'open.er-api.com'};
+  return {v: CACHE_VERSION, krwPerUsd: Math.round(krw * 100) / 100, usdRates, fetchedAt: new Date().toISOString(), source: 'open.er-api.com'};
 };
 
 /**
