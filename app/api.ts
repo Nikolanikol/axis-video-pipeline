@@ -68,7 +68,7 @@ export type Me =
 export type Pack = {id: string; title: string; credits: number; price_krw: number; valid_days: number; active: boolean; sort: number; kind: 'plan' | 'topup'};
 export type Offer = {contacts: {whatsapp?: string; telegram?: string; email?: string}; packs: Pack[]};
 // Условия для витрины гостя: без входа (GET /api/public/offer)
-export type PublicOffer = Offer & {signup: {credits: number; days: number}; costs: Record<string, number>};
+export type PublicOffer = Offer & {signup: {credits: number; days: number}; costs: Record<string, number>; preview?: string | null};
 export type LedgerRow = {
   id: number; delta: number; kind: 'grant' | 'charge' | 'refund' | 'adjust'; pipeline: string | null;
   job_id: string | null; note: string; created_at: string;
