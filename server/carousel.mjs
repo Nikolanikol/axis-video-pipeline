@@ -177,8 +177,10 @@ const runKey = (id) => `${currentWorkspace()}:${id}`;
 /**
  * Собрать карусель по ссылке или номеру.
  * @param {string} link — ссылка Encar или голый номер
- * @param {{format?: string, seed?: number}} [opts] — формат из реестра и зерно варианта:
- *   то же зерно — те же компоновка и фразы; нет зерна — случайное («Другой вариант»)
+ * @param {{format?: string, seed?: number, priceOverride?: number | null}} [opts] — формат из
+ *   реестра и зерно варианта: то же зерно — те же компоновка и фразы; нет зерна — случайное
+ *   («Другой вариант»). priceOverride — своя цена клиента на слайде цены; не передана —
+ *   остаётся прежняя из carousel.json: «Другой вариант» не должен сбрасывать цену клиента
  * @returns {Promise<{id: string, car: object, slides: string[], updatedAt: string, format: string, seed: number}>}
  */
 export const buildCarousel = async (link, opts = {}) => {
@@ -198,6 +200,8 @@ export const buildCarousel = async (link, opts = {}) => {
       if (!saved?.lot) throw new HttpError(404, 'Карусель по лоту не найдена — вставь ссылку на лот заново');
       lot = {house: saved.lot.house, id: saved.lot.id};
     }
+    const prev = await readJson(path.join(carouselsDir(), id, 'carousel.json')).catch(() => null);
+    const priceOverride = opts.priceOverride !== undefined ? opts.priceOverride : prev?.priceOverride ?? null;
     let car = lot ? await carFromLink({house: lot.house, lotId: lot.id}) : await fetchCar(id);
     // Карусель — всегда про корейское объявление (источник Encar), но контакты и компанию
     // берём из профиля клиента: бренд и подпись должны быть его.
@@ -217,7 +221,7 @@ export const buildCarousel = async (link, opts = {}) => {
     if (lot) car = await localizePhotos(car, dir, id, origin);
     // У лота нет цены, истории и опций: эти слайды не рисуем, а не заполняем прочерками
     const inputProps = {car, market, theme: {...theme, assets}, includeHistory: INCLUDE_HISTORY, format, seed,
-      skip: lot ? LOT_SKIP_SLIDES : []};
+      skip: lot ? LOT_SKIP_SLIDES : [], priceOverride};
     // Старые кадры убираем перед сборкой: та же машина, пересобранная на проде, даёт шесть
     // слайдов вместо прежних семи, и осиротевший slide-7.png остался бы на диске — со старой
     // историей. Ответ ссылается только на новые шесть, но файл-призрак в томе ни к чему.
@@ -246,6 +250,7 @@ export const buildCarousel = async (link, opts = {}) => {
       slides: Array.from({length: count}, (_, i) => `${workspaceUrl()}/carousels/${id}/slide-${i + 1}.png`),
       updatedAt: new Date().toISOString(),
       format, seed,
+      ...(priceOverride ? {priceOverride} : {}),
       // Откуда лот: «Пересобрать» идёт по нему, кнопка «Открыть лот» — по адресу
       ...(lot ? {lot: {...lot, url: lotPageUrl(lot.house, lot.id)}} : {}),
     };
@@ -267,6 +272,21 @@ export const slideFileName = (car, n) => {
 };
 
 /** Удалить собранную карусель со всеми слайдами. Пересобирать её — тот же buildCarousel по номеру. */
+/**
+ * Пересобрать уже собранную карусель со своей ценой — бесплатно (владелец 11.10): машина,
+ * формат и вариант те же, что были, меняется только цена на слайде. Поэтому формат и зерно
+ * берём из сохранённой карусели, а не из запроса: иначе через бесплатную кнопку собирали бы
+ * новые варианты и форматы, за которые берётся кредит
+ */
+export const repriceCarousel = async (id, price) => {
+  const saved = await readJson(path.join(carouselsDir(), checkId(id), 'carousel.json')).catch(() => null);
+  if (!saved) throw new HttpError(404, 'Карусель не найдена — соберите её по ссылке');
+  const v = price === null || price === '' || price === undefined ? null : Number(price);
+  if (v !== null && (!Number.isFinite(v) || v <= 0 || v > 1e12)) throw new HttpError(400, 'Цена — положительное число');
+  // Папка лота (km-…) сама разбирается как «сохранённый лот», номер Encar — как объявление
+  return buildCarousel(id, {format: saved.format, seed: saved.seed, priceOverride: v ? Math.round(v) : null});
+};
+
 export const deleteCarousel = async (id) => {
   checkId(id);
   if (running.has(runKey(id))) throw new HttpError(409, 'Эта карусель сейчас собирается — дождись');

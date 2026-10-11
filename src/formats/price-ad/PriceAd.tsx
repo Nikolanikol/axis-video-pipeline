@@ -108,6 +108,8 @@ export const Cta: React.FC<{ad: Ad}> = ({ad}) => {
   const c = spring({frame: f - 32, fps, config: {damping: 200}});
   const rise = (v: number) => ({opacity: v, transform: `translateY(${(1 - v) * 50}px)`});
   const row: React.CSSProperties = {display: 'flex', alignItems: 'center', gap: 30};
+  // Хук — до условия: число хуков не должно зависеть от настройки
+  const icon = useAsset('iconHandshake');
   return (
     <AbsoluteFill style={{background: `radial-gradient(ellipse at 50% 18%, ${C.panel} 0%, ${C.bg} 60%)`,
       padding: '190px 150px 360px 80px', alignItems: 'center'}}>
@@ -119,7 +121,9 @@ export const Cta: React.FC<{ad: Ad}> = ({ad}) => {
         </div>
       </div>
       <div style={{...rise(b), ...row, marginTop: 70, alignSelf: 'stretch'}}>
-        <Img src={useAsset('iconHandshake')} style={{width: 100}} />
+        {/* Иконку можно выключить в настройках: у клиента своя графика или она не к месту */}
+        {/* Своя иконка бывает любой формы: высоту держим в 100, чтобы высокая не раздвигала строку */}
+        {ad.benefitIcon !== false && <Img src={icon} style={{width: 100, maxHeight: 100, objectFit: 'contain'}} />}
         <div style={{fontFamily: BODY, fontWeight: 600, fontSize: 46, color: C.white}}>{ad.texts.ctaBenefit}</div>
       </div>
       <div style={{...rise(c), marginTop: 'auto', alignSelf: 'stretch'}}>

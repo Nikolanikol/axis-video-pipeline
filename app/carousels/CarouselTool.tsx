@@ -8,7 +8,7 @@
 // Отличие от ролика: превью ролика живое, и формат там меняется бесплатно, а карусель надо
 // собрать — это кредит. Поэтому клик по формату только выбирает его, пересборка — отдельной
 // кнопкой, а ссылка на уже собранную машину открывает готовую карусель, а не собирает заново.
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {encarAdUrl} from '../../src/shared/encarLink.js';
 import {parseCarouselSource} from '../../src/shared/kmotorsLot.js';
 import {QuickLink} from '../ads/QuickLot';
@@ -20,6 +20,11 @@ import {useConfig} from '../config';
 import {useCost, useSession} from '../auth';
 import {carouselLang} from '../../src/carousel/i18n';
 import {BusyModal} from '../BusyModal';
+import {carouselPrice} from '../../src/carousel/price';
+import {currencySign} from '../../src/shared/currencies';
+import {marketFromProfile} from '../../src/shared/profile';
+import type {Market} from '../../src/shared/types';
+import {useTodayMarket} from '../rates';
 import {canSaveToFolder, canSaveToGallery, saveToFolder, shareFiles, slideName, usePreparedFiles} from '../saveFiles';
 
 const km = (v: number | null) => (v === null ? '—' : `${v.toLocaleString('ru-RU')} км`);
@@ -29,7 +34,7 @@ const CarSummary: React.FC<{entry: CarouselEntry}> = ({entry}) => {
   const c = entry.car;
   const bits = [
     c.year, km(c.mileageKm), c.transmission, c.fuel,
-    c.price?.usd ? `$${c.price.usd.toLocaleString('ru-RU')}` : null,
+    c.price?.krw ? `${c.price.krw.toLocaleString('ru-RU')} ₩ на Encar` : null,
     c.history ? `${c.history.accidentsTotal} ДТП` : 'история недоступна',
     c.history ? `${c.history.ownerChanges} смен владельца` : null,
   ].filter(Boolean);
@@ -40,11 +45,39 @@ const CarSummary: React.FC<{entry: CarouselEntry}> = ({entry}) => {
         <span>№ {entry.id}</span>
       </div>
       <div className="muted">{bits.join(' · ')}</div>
-      {c.price && (
-        <div className="muted">
-          курс {Math.round(1 / c.price.krwToUsd).toLocaleString('ru-RU')} ₩ за $1, котировка {c.price.quotedAt}
-        </div>
-      )}
+    </div>
+  );
+};
+
+/**
+ * Цена на слайде: в валюте профиля по курсу дня, или своя — и «Пересобрать с этой ценой»
+ * бесплатно (владелец 11.10). Своё число — это маржа клиента; пусто — вернуть расчёт.
+ * Пересобирается та же машина в том же формате и варианте, меняется только слайд цены
+ */
+const PriceBox: React.FC<{entry: CarouselEntry; busy: boolean; onReprice: (price: number | null) => void}> = ({entry, busy, onReprice}) => {
+  const {config, profile} = useConfig();
+  const market = useTodayMarket(useMemo(() => marketFromProfile(profile, config.copy) as Market, [profile, config.copy]));
+  const computed = carouselPrice(entry.car, market, null);
+  const [value, setValue] = useState(entry.priceOverride ? String(entry.priceOverride) : '');
+  useEffect(() => setValue(entry.priceOverride ? String(entry.priceOverride) : ''), [entry.id, entry.priceOverride]);
+  const sign = currencySign(market.currency);
+  const typed = value.trim() === '' ? null : Number(value.replace(/[\s,]/g, ''));
+  const bad = typed !== null && (!Number.isFinite(typed) || typed <= 0);
+  const same = (typed ?? null) === (entry.priceOverride ?? null);
+  return (
+    <div className="carousel-price">
+      <label className="field">
+        <span className="label">Цена на слайде, {sign}</span>
+        <input inputMode="decimal" value={value} placeholder={computed === null ? '' : String(computed)} onChange={(e) => setValue(e.target.value)} />
+        <span className="hint">
+          {entry.priceOverride
+            ? <>своя цена · {market.currency === 'KRW' ? 'на Encar' : 'расчёт по курсу дал бы'} {computed === null ? '—' : `${computed.toLocaleString('ru-RU')} ${sign}`}</>
+            : <>пусто — цена с Encar{market.currency === 'KRW' ? '' : ' по курсу дня'}{computed === null ? '' : `: ${computed.toLocaleString('ru-RU')} ${sign}`}; впишите свою — она и будет на слайде</>}
+        </span>
+      </label>
+      <button className="btn" disabled={busy || bad || same} onClick={() => onReprice(typed)}>
+        {typed === null && entry.priceOverride ? 'Вернуть расчёт и пересобрать' : 'Пересобрать с этой ценой'} · бесплатно
+      </button>
     </div>
   );
 };
@@ -369,6 +402,18 @@ export const CarouselTool: React.FC = () => {
     run(link);
   };
 
+  // Своя цена — пересборка без кредита: та же машина, формат и вариант (server/carousel.mjs)
+  const reprice = async (price: number | null) => {
+    if (!entry) return;
+    setBusy(true);
+    try {
+      const made = await api.repriceCarousel(entry.id, price);
+      setEntry(made);
+      setHistory((h) => h.map((x) => (x.id === made.id ? made : x)));
+      toast(price === null ? 'Цена — снова по курсу, слайды пересобраны' : 'Слайды пересобраны с вашей ценой');
+    } catch (e) { report(e); } finally { setBusy(false); }
+  };
+
   const remove = async (id: string) => {
     const c = history.find((h) => h.id === id);
     const name = c ? [c.car.brand, c.car.model].filter(Boolean).join(' ') || `№ ${id}` : `№ ${id}`;
@@ -468,6 +513,7 @@ export const CarouselTool: React.FC = () => {
                 <span className="hint" style={{color: 'var(--ok)'}}>Сохранено {entry.slides.length} слайдов в папку «{savedTo.folder}»</span>
               )}
               {!otherFormat && canSaveToGallery && <span className="hint">В меню выберите «Сохранить изображения» — слайды попадут в «Фото». Там же можно сразу в Instagram.</span>}
+              {!otherFormat && <PriceBox entry={entry} busy={busy} onReprice={reprice} />}
               <div className="btn-row">
                 {!otherFormat && entry.format !== 'classic' && (
                   <button className="btn" onClick={() => run(entry.id)} disabled={busy}

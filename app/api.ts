@@ -38,6 +38,8 @@ export type ReviewEntry = Review & {id: string};
 // Готовая карусель: карточка авто от шлюза и адреса семи картинок
 // format и seed — чем собрана: формат из реестра и зерно варианта (у старых карусель их нет — «Классика»)
 export type CarouselEntry = {id: string; car: CarouselCar; slides: string[]; updatedAt: string; format?: string; seed?: number;
+  // Своя цена клиента на слайде цены (в валюте профиля)
+  priceOverride?: number;
   // Только у каруселей по лотам аукционов: откуда собрана (для «Пересобрать» и кнопки «Открыть лот»)
   lot?: {house: string; id: string; url: string}};
 export type CarouselFormat = {id: string; title: string; note: string; width: number; height: number; slides: string[]};
@@ -81,6 +83,8 @@ export type ClientRow = {
 };
 // Курс ₩ за $1 на сегодня: сервер берёт его раз в сутки. stale — источник не ответил, курс старше суток
 export type UsdKrw = {krwPerUsd: number; fetchedAt: string; source: string; stale: boolean};
+// Все курсы: единиц валюты за $1 (KRW, RUB, KZT…)
+export type Rates = {usdRates: Record<string, number>; fetchedAt: string; source: string; stale: boolean};
 export type StaffRow = {id: string; email: string; name: string | null; platform_role: Exclude<Role, null>};
 export type Registration = {name: string; email: string; phone: string; password: string; company: string};
 
@@ -137,6 +141,7 @@ export const api = {
   lookupCar: (link: string) => request<CarouselCar>('POST', '/api/encar/lookup', {link}),
   importPhotos: (id: string, urls: string[]) => request<LotEntry>('POST', `/api/lots/${id}/photos/import`, {urls}),
   usdKrw: () => request<UsdKrw>('GET', '/api/rates/usd-krw'),
+  rates: () => request<Rates>('GET', '/api/rates'),
   uploadPhotos: (id: string, files: File[]) => {
     const form = new FormData();
     files.forEach((f) => form.append('photos', f));
@@ -171,9 +176,24 @@ export const api = {
   // clean — фон убран, raw — как загружен, none — без логотипа, название компании текстом
   logoVariant: (variant: 'clean' | 'raw' | 'none') =>
     request<{url: string; brand: Theme}>('PUT', '/api/brand/logo/variant', {variant}),
+  // Своя иконка преимущества в CTA — та же обработка, что у логотипа
+  uploadIcon: async (file: File) => {
+    const form = new FormData();
+    form.append('icon', file);
+    const res = await fetch('/api/brand/icon', {method: 'POST', body: form});
+    const body = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(body?.error ?? 'Не удалось загрузить иконку');
+    return body as {url: string; width: number; height: number; bytes: number; brand: Theme;
+      notes: string[]; warnings: string[]; hasRaw: boolean};
+  },
+  // clean — фон убран, raw — как загружена, default — встроенное рукопожатие
+  iconVariant: (variant: 'clean' | 'raw' | 'default') =>
+    request<{url: string; brand: Theme}>('PUT', '/api/brand/icon/variant', {variant}),
   // Карусели: ссылка Encar → слайды формата; seed — зерно варианта (нет — случайное)
   buildCarousel: (link: string, format?: string, seed?: number) => request<CarouselEntry>('POST', '/api/carousels', {link, format, seed}),
   carousels: () => request<CarouselEntry[]>('GET', '/api/carousels'),
+  // Пересобрать со своей ценой — бесплатно: машина, формат и вариант прежние; null — вернуть расчёт
+  repriceCarousel: (id: string, price: number | null) => request<CarouselEntry>('POST', `/api/carousels/${id}/price`, {price}),
   deleteCarousel: (id: string) => request<{id: string; deleted: boolean}>('DELETE', `/api/carousels/${id}`),
   renderReview: (id: string) => request<Job>('POST', `/api/reviews/${id}/render`, {}),
   reprocessVideo: (id: string) => request<ReviewEntry>('POST', `/api/reviews/${id}/reprocess`),

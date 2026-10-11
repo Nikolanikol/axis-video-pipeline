@@ -6,6 +6,7 @@
 // объявления. Поэтому «Новый лот по ссылке» убрана (новый лот — это строка сверху), а
 // предвыбора нет: рекомендованные снимки и так уже в лоте, повторная загрузка дала бы дубли.
 // Данные — через тот же шлюз kmotors, что у каруселей.
+import {currencyCode, isDirect, krwPerUnit} from '../../src/shared/currencies';
 import React, {useEffect, useRef, useState} from 'react';
 import {Check, Link2, Search} from 'lucide-react';
 import {carPhotos, lotFieldsFromCar, lotIsBlank, type CarFields} from '../../src/shared/lotFromCar';
@@ -84,7 +85,11 @@ export const EncarImport: React.FC<Props> = ({lot, onApply, onError}) => {
     // Подзаголовок — в тексты лота (они поверх текстов профиля). Сказать нечего — не трогаем:
     // пустой подзаголовок стёр бы фразу, которую человек мог вписать сам
     const texts = hookTagline ? {texts: {...lot?.texts, hookTagline}} : {};
-    return {...base, ...texts, carPriceUsd: null, krwPerUsd: rate?.krwPerUsd ?? lot?.krwPerUsd ?? null};
+    // Курс валюты компании (₽, ₸…) — в объявление сразу, как и ₩/$; свой курс клиента не трогаем
+    const currency = currencyCode(profile.pricing?.currency);
+    const per = isDirect(currency) || lot?.krwPerUnit ? null : krwPerUnit(currency, (await api.rates().catch(() => null))?.usdRates);
+    const fx = per ? {krwPerUnit: per, fxCurrency: currency} : {};
+    return {...base, ...texts, ...fx, carPriceUsd: null, krwPerUsd: rate?.krwPerUsd ?? lot?.krwPerUsd ?? null};
   };
   const note = (current?: string) => (current?.trim() ? undefined : `Encar ${car!.id}`);
 

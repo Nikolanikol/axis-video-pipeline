@@ -7,6 +7,7 @@ export const TOOLS = {
   'carousels/build': lazy(() => import('./carousels/CarouselTool').then((m) => ({default: m.CarouselTool}))),
   'reviews/edit': lazy(() => import('./reviews/ReviewTool').then((m) => ({default: m.ReviewTool}))),
   'settings/profile': lazy(() => import('./settings/SettingsTool').then((m) => ({default: m.ProfileTool}))),
+  'settings/ads': lazy(() => import('./settings/SettingsTool').then((m) => ({default: m.AdTextsTool}))),
   'settings/brand': lazy(() => import('./settings/SettingsTool').then((m) => ({default: m.BrandTool}))),
 } as const;
 

@@ -5,6 +5,7 @@ import path from 'node:path';
 import {AsyncLocalStorage} from 'node:async_hooks';
 import {fileURLToPath} from 'node:url';
 import {marketFromProfile} from '../src/shared/profile.js';
+import {krwPerUnit} from '../src/shared/currencies.js';
 import {db, hasDatabase} from './db/index.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -229,8 +230,16 @@ export const legacyDataDirs = async () => {
  * Единая точка входа: раньше каждый пайплайн звал getMarket по id из лота, теперь берёт
  * один профиль клиента (MVP — он один). Тексты подставлены, режим цены и валюта уже внутри.
  */
-export const renderMarket = async (id = DEFAULT_PROFILE) =>
-  marketFromProfile(await getProfile(id), await getCopy());
+export const renderMarket = async (id = DEFAULT_PROFILE) => {
+  const market = marketFromProfile(await getProfile(id), await getCopy());
+  // Курс валюты компании на сегодня — им считается цена объявления, где свой курс не вписан.
+  // Источник недоступен — без него: цена тогда заглушка, а не доллары под значком ₽
+  // Для долларов тоже: им считает цену слайд карусели (ролик берёт курс ₩/$ из объявления)
+  if (market.currency === 'KRW') return market;
+  // rates.mjs сам импортирует store.mjs — грузим по месту, без кольца на старте модулей
+  const today = await import('./rates.mjs').then((m) => m.rates()).catch(() => null);
+  return {...market, krwPerUnitToday: krwPerUnit(market.currency, today?.usdRates) ?? undefined};
+};
 
 // Лоты: <папка компании>/lots/<id>/lot.json + photos/
 export const lotDir = (id) => path.join(lotsDir(), checkId(id));

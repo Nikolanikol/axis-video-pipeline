@@ -13,7 +13,7 @@ import {reviewStoryboard} from '../src/shared/timeline.js';
 import {getFormat, listFormats, storyboardFrames} from './formats.mjs';
 import {addPhoto, applyBlur, ownFile, photoInfo, removePhoto, stemOf} from './photos.mjs';
 import {checkPhotoUrls, downloadPhoto, lookupCar} from './encar.mjs';
-import {usdKrw} from './rates.mjs';
+import {rates, usdKrw} from './rates.mjs';
 import {makeZip} from './zip.mjs';
 import {previewId} from './db/index.mjs';
 import {cancelJob, deleteJob, enqueue, getJob, listJobs, retryJob} from './renderer.mjs';
@@ -24,8 +24,8 @@ import {
 import {apiSettings, resolveSpeaker, voiceConfig} from '../src/shared/voices.js';
 import {hasKey, hasVoice, synthesize} from './speech.mjs';
 import {hasSeparator} from './ambience.mjs';
-import {carouselFormats, carouselsDir, buildCarousel, deleteCarousel, listCarousels, slideFileName} from './carousel.mjs';
-import {LOGO_RULES, saveLogo, setLogoVariant} from './brand.mjs';
+import {carouselFormats, carouselsDir, buildCarousel, deleteCarousel, listCarousels, repriceCarousel, slideFileName} from './carousel.mjs';
+import {ICON_RULES, LOGO_RULES, saveIcon, saveLogo, setIconVariant, setLogoVariant} from './brand.mjs';
 import {balanceOf, billed, creditCosts, ledgerOf, signupCredits} from './billing.mjs';
 import {parseCarouselSource} from '../src/shared/kmotorsLot.js';
 import {PALETTE_KEYS, isHex} from '../src/shared/contrast.js';
@@ -287,6 +287,18 @@ export const createApp = ({photoOrigin}) => {
     if (!['clean', 'raw', 'none'].includes(variant)) throw new HttpError(400, 'Вариант — clean, raw или none');
     return {...(await setLogoVariant(variant)), brand: await getBrand()};
   }));
+  // Своя иконка у преимущества в CTA — та же обработка, что у логотипа, свой потолок (ICON_RULES)
+  const iconUpload = multer({storage: multer.memoryStorage(), limits: {fileSize: ICON_RULES.maxBytes, files: 1}});
+  api.post('/brand/icon', iconUpload.single('icon'), wrap(async (req) => {
+    const saved = await saveIcon(req.file?.buffer);
+    return {...saved, brand: await getBrand()};
+  }));
+  // clean — фон убран, raw — как загружена, default — встроенное рукопожатие
+  api.put('/brand/icon/variant', wrap(async (req) => {
+    const variant = String(req.body?.variant ?? '');
+    if (!['clean', 'raw', 'default'].includes(variant)) throw new HttpError(400, 'Вариант — clean, raw или default');
+    return {...(await setIconVariant(variant)), brand: await getBrand()};
+  }));
   // Рынки — платформенный реестр в config/, общий для всех: править может только владелец
   api.put('/markets/:id', requireAdmin, wrap(async (req) => {
     const {id: _ignored, ...market} = req.body;
@@ -306,6 +318,8 @@ export const createApp = ({photoOrigin}) => {
   api.post('/encar/lookup', wrap((req) => lookupCar(req.body?.link)));
   // Курс ₩ за $1 на сегодня (обновляется раз в сутки, см. server/rates.mjs)
   api.get('/rates/usd-krw', wrap(() => usdKrw()));
+  // Все курсы (единиц за $1) — шапка и пересчёт цены в валюту компании
+  api.get('/rates', wrap(() => rates()));
 
   api.get('/lots', wrap(() => listLots()));
   // Удалить лот вместе с фото и готовыми роликами — список лотов копится (владелец 30.09:
@@ -489,6 +503,8 @@ export const createApp = ({photoOrigin}) => {
       jobId: `carousel-${req.ws}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
       note: String(req.body?.link ?? '').slice(0, 120)},
     () => buildCarousel(req.body?.link, {format: req.body?.format, seed: req.body?.seed}))));
+  // Пересобрать со своей ценой — бесплатно: та же машина, формат и вариант (repriceCarousel)
+  api.post('/carousels/:id/price', wrap((req) => repriceCarousel(checkId(req.params.id), req.body?.price)));
   api.get('/carousels', wrap(() => listCarousels()));
   api.delete('/carousels/:id', wrap((req) => deleteCarousel(checkId(req.params.id))));
   api.get('/carousels/:id/slide/:n/download', async (req, res, next) => {

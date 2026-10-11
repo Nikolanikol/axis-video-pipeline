@@ -1,9 +1,13 @@
-// Формы настроек: профиль клиента (компания, язык постов, модель цены, контакты) и бренд
-// (логотип, шрифты, оформление, палитра).
+// Формы настроек: профиль клиента (компания, язык постов, модель цены, контакты), бренд
+// (логотип, шрифты, оформление, палитра) и надписи рекламных роликов.
 import React, {useEffect, useRef, useState} from 'react';
 import {POST_LANGUAGES} from '../src/shared/languages';
 import type {Profile, Theme} from '../src/shared/types';
-import {api, FontPair, Palette, ProfileEntry} from './api';
+import {Lock} from 'lucide-react';
+import {api, Copy, FontPair, Palette, ProfileEntry} from './api';
+import {FORMATS} from '../src/shared/model';
+import {resolveTexts, textsForLanguage} from '../src/shared/profile';
+import {CURRENCIES, currencyCode, currencySign, isKnownCurrency} from '../src/shared/currencies';
 import {contrastIssues, matchPalette} from '../src/shared/contrast.js';
 import {Field} from './LotForm';
 
@@ -307,8 +311,8 @@ const EXPORT_DEFAULTS = {origin: '', originCountry: '', port: '', portCountry: '
 /**
  * Профиль клиента — «пара кнопок»: кто он, на каком языке и по какой модели продаёт.
  *
- * Тексты постов здесь НЕ правятся: они приходят из дефолтов платформы под язык и режим
- * (config/copy.json). Клиент задаёт только своё — в этом смысл «пришёл и работает».
+ * Тексты постов здесь не правятся: они приходят из дефолтов платформы под язык и режим
+ * (config/copy.json), а свои надписи роликов — отдельный раздел «Реклама авто» (AdTextsForm).
  * Переключатель модели цены прячет поля порта и фрахта на внутреннем рынке: там их нет.
  */
 export const ProfileForm: React.FC<ProfileProps> = ({profile, saved, onChange, onSaved, onError}) => {
@@ -330,7 +334,7 @@ export const ProfileForm: React.FC<ProfileProps> = ({profile, saved, onChange, o
   return (
     <div className="form">
       <h2>Профиль <span className="muted">кто вы и как продаёте</span></h2>
-      <p className="note">Тексты постов подставляются сами под язык и модель цены — их править не нужно. Дизайн — в разделе «Бренд».</p>
+      <p className="note">Тексты постов подставляются сами под язык и модель цены; свои надписи роликов — в разделе «Реклама авто». Дизайн — в разделе «Бренд».</p>
 
       <div className="row">
         <Field label="Компания" hint="печатается на постах"><input value={profile.company} onChange={(e) => set({company: e.target.value})} /></Field>
@@ -363,7 +367,16 @@ export const ProfileForm: React.FC<ProfileProps> = ({profile, saved, onChange, o
       </p>
 
       <div className="row">
-        <Field label="Валюта"><input value={profile.pricing.currency} onChange={(e) => setPricing({currency: e.target.value.toUpperCase()})} /></Field>
+        {/* Список со значками, а не свободное поле: вписанное слово («РУБЛЬ») печаталось в
+            ролике как есть и не склонялось. Старое значение узнаём (currencyCode) */}
+        <Field label="Валюта" hint={isKnownCurrency(profile.pricing.currency) ? `в ролике: 10 000 ${currencySign(profile.pricing.currency)}` : undefined}>
+          <select value={currencyCode(profile.pricing.currency)} onChange={(e) => setPricing({currency: e.target.value})}>
+            {CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.sign} — {c.name}</option>)}
+            {!isKnownCurrency(profile.pricing.currency) && (
+              <option value={currencyCode(profile.pricing.currency)}>{profile.pricing.currency} — нет в списке, выберите другую</option>
+            )}
+          </select>
+        </Field>
         {isExport && <Field label="Фрахт, $"><input inputMode="decimal" value={profile.pricing.export?.freight ?? 0}
           onChange={(e) => setExport({freight: Number(e.target.value) || 0})} /></Field>}
       </div>
@@ -403,6 +416,202 @@ export const ProfileForm: React.FC<ProfileProps> = ({profile, saved, onChange, o
       <div className="actions">
         <button className="btn primary" disabled={!dirty || busy} onClick={persist}>Сохранить</button>
         <button className="btn" disabled={!dirty || busy || !saved} onClick={() => saved && onChange(saved)}>Отменить правки</button>
+      </div>
+    </div>
+  );
+};
+
+// Подписи и подсказки полей — из описаний форматов (config/formats.json): ключи у форматов
+// одинаковые, берём по первому вхождению
+const AD_TEXT_FIELDS = new Map(FORMATS.flatMap((f) => f.texts).map((t) => [t.key, t] as const).reverse());
+
+/**
+ * Надписи по сценам ролика — как кнопки под превью (владелец 11.10: «по разделам раздели»).
+ * У каждой сцены — что здесь правится и что нет: «замок» — текст, который ролик берёт из
+ * объявления (Encar), профиля или бренда; здесь его не поменять, и пишем, где можно.
+ * Названия сцен у форматов разные: третья — «Стопка» в «Галерее», «Характеристики» в «Авто
+ * с ценой», «История» в «Цене сразу»; в «Цене сразу» цена — первая сцена, а не четвёртая.
+ * Новый текст в formats.json без места здесь не пропадёт — он попадёт в «Прочее».
+ */
+type Locked = {what: string; where: string};
+const AD_SCENES: {id: string; title: string; also?: string; keys: string[]; hints?: Record<string, string>; locked: Locked[]}[] = [
+  {id: 'hook', title: 'Хук', keys: ['hookTagline'],
+    hints: {hookTagline: 'строка под годом; Encar может подставить в объявлении свою — «один владелец», «без ДТП»'},
+    locked: [{what: 'Марка, модель, год, версия', where: 'из объявления'}, {what: 'Фото', where: 'из объявления'}]},
+  {id: 'gallery', title: 'Галерея', also: 'в «Галерее» и «Цене сразу»', keys: [],
+    locked: [{what: 'Фото', where: 'из объявления'}, {what: 'Марка, модель, год', where: 'из объявления'}]},
+  {id: 'stack', title: 'Стопка', also: 'в «Авто с ценой» — «Характеристики», в «Цене сразу» — «История»', keys: [],
+    locked: [{what: 'Характеристики: пробег, двигатель, коробка…', where: 'из объявления'},
+      {what: 'История: ДТП, владельцы', where: 'из Encar, только «Цена сразу»'}]},
+  {id: 'price', title: 'Цена', keys: ['priceLabel', 'priceNoteIncluded', 'priceNoteExcluded'],
+    hints: {priceLabel: '{port} заменится на порт из профиля', priceNoteIncluded: 'под ценой, первой строкой', priceNoteExcluded: 'серым, второй строкой'},
+    locked: [{what: 'Цена', where: 'в объявлении: расчёт или «Цена в ролике»'}, {what: 'Маршрут: откуда → порт', where: 'Профиль'}]},
+  {id: 'cta', title: 'CTA', keys: ['ctaTitle', 'ctaAccent', 'ctaBenefit', 'whatsappLabel'],
+    hints: {ctaAccent: 'последняя строка заголовка, акцентным цветом', ctaBenefit: 'строка с рукопожатием', whatsappLabel: 'над номером на плашке'},
+    locked: [{what: 'Номер WhatsApp и сайт', where: 'Профиль'}, {what: 'Логотип', where: 'Бренд'}]},
+];
+const PLACED = new Set(AD_SCENES.flatMap((sc) => sc.keys));
+const UNPLACED = [...AD_TEXT_FIELDS.keys()].filter((k) => !PLACED.has(k));
+
+/**
+ * Своя иконка у преимущества в CTA — как логотип (владелец 11.10): сервер убирает ровный фон,
+ * обрезает поля, SVG переводит в PNG; здесь — результат на цвете слайда и откат. Файл
+ * живёт в бренде компании (assets.iconHandshake), поэтому сохраняется сразу, без «Сохранить»
+ */
+const IconField: React.FC<{theme: Theme; onSaved: (t: Theme) => void; onError: (e: unknown) => void}> = ({theme, onSaved, onError}) => {
+  const [busy, setBusy] = useState(false);
+  const [notes, setNotes] = useState<string[]>([]);
+  const [warnings, setWarnings] = useState<string[]>([]);
+  const ref = useRef<HTMLInputElement>(null);
+  const icon = theme.assets?.iconHandshake || 'brand/icon-handshake.png';
+  const isRaw = /-raw\.png$/.test(icon);
+  const isOwn = icon.includes('/brand/icon-');
+  // Вариант «как была» есть, только если фон убирался — спрашиваем сам файл, как у логотипа
+  const [hasRaw, setHasRaw] = useState(isRaw);
+  useEffect(() => {
+    if (!isOwn || isRaw) return;
+    let alive = true;
+    fetch(icon.replace(/\.png$/, '-raw.png'), {method: 'HEAD'}).then((r) => { if (alive) setHasRaw(r.ok); }).catch(() => {});
+    return () => { alive = false; };
+  }, [icon, isOwn, isRaw]);
+
+  const run = async (fn: () => Promise<{brand: Theme}>) => {
+    setBusy(true);
+    try { onSaved((await fn()).brand); } catch (e) { onError(e); } finally { setBusy(false); }
+  };
+  const send = (file?: File) => {
+    if (!file) return;
+    setNotes([]); setWarnings([]);
+    return run(async () => {
+      const res = await api.uploadIcon(file);
+      setNotes([`${res.width}×${res.height}, ${Math.round(res.bytes / 1024)} КБ`, ...res.notes]);
+      setWarnings(res.warnings);
+      setHasRaw(res.hasRaw);
+      return res;
+    }).finally(() => { if (ref.current) ref.current.value = ''; });
+  };
+  const variant = (v: 'clean' | 'raw' | 'default') => run(() => { setNotes([]); setWarnings([]); return api.iconVariant(v); });
+  const shown = icon.startsWith('http') || icon.startsWith('/') ? icon : `/${icon}`;
+
+  return (
+    <div className="icon-field">
+      <div className="icon-shot" style={{background: theme.bg}} title="Так иконка ляжет на слайд">
+        <img src={shown} alt="Иконка преимущества" />
+      </div>
+      <div>
+        <div className="btn-row">
+          <button className="btn" disabled={busy} onClick={() => ref.current?.click()}>{busy ? 'Обрабатываю…' : 'Загрузить свою иконку'}</button>
+          {isOwn && hasRaw && !isRaw && <button className="btn ghost" disabled={busy} onClick={() => variant('raw')}>Оставить фон как был</button>}
+          {isOwn && isRaw && <button className="btn ghost" disabled={busy} onClick={() => variant('clean')}>Убрать фон</button>}
+          {isOwn && <button className="btn ghost" disabled={busy} onClick={() => variant('default')}>Вернуть стандартную</button>}
+        </div>
+        <input ref={ref} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg" hidden onChange={(e) => send(e.target.files?.[0])} />
+        <p className="hint">PNG, JPG, WebP или SVG до 5 МБ, от 96 точек; фон прозрачный или однотонный — однотонный уберём сами, поля обрежем. Сохраняется сразу, общая для всех языков.</p>
+        {notes.length > 0 && <p className="hint">Загружена: {notes.join(' · ')}</p>}
+        {warnings.map((w) => <p key={w} className="auth-error">{w}</p>)}
+      </div>
+    </div>
+  );
+};
+
+type AdTextsProps = ProfileProps & {
+  copy: Copy;
+  // Бренд — ради своей иконки преимущества: она файл бренда, а не текст профиля
+  theme: Theme;
+  onBrandSaved: (t: Theme) => void;
+  language: string;
+  onLanguage: (code: string) => void;
+};
+
+/**
+ * Надписи рекламных роликов по умолчанию — свои у каждого языка (profile.texts[язык]).
+ * Пустое поле — текст платформы (config/copy.json), он виден серым. В ролике поверх этого
+ * ещё и надписи самого объявления («Изменить вручную»).
+ * Язык здесь выбирается свой, а не берётся из профиля: можно заранее подготовить тексты на
+ * другом языке и переключиться, ничего не теряя.
+ */
+export const AdTextsForm: React.FC<AdTextsProps> = ({profile, saved, copy, theme, onBrandSaved, language, onLanguage, onChange, onSaved, onError}) => {
+  const [busy, setBusy] = useState(false);
+  const dirty = profile !== saved;
+  const mode = profile.pricing.mode === 'domestic' ? 'domestic' : 'export';
+  const defaults = resolveTexts(copy, mode, language, {});
+  const own = textsForLanguage(profile.texts, language);
+  const ownCount = (code: string) => Object.values(textsForLanguage(profile.texts, code)).filter((v) => v !== undefined).length;
+
+  const set = (key: string, value: string) => {
+    // Старая плоская пачка — правки языка профиля; раскладываем по языкам при первой правке
+    const byLang = Object.values(profile.texts ?? {}).some((v) => typeof v === 'string')
+      ? {[profile.language]: profile.texts as Record<string, string>}
+      : (profile.texts ?? {}) as Record<string, Record<string, string>>;
+    onChange({...profile, texts: {...byLang, [language]: {...byLang[language], [key]: value === '' ? undefined : value}}} as ProfileEntry);
+  };
+  const reset = () => {
+    const {[language]: _dropped, ...rest} = (profile.texts ?? {}) as Record<string, unknown>;
+    onChange({...profile, texts: rest} as ProfileEntry);
+  };
+  const persist = async () => {
+    setBusy(true);
+    const {id, ...data} = profile;
+    try { onSaved(await api.saveProfile(id, data)); } catch (e) { onError(e); } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="form">
+      <h2>Реклама авто <span className="muted">надписи в роликах</span></h2>
+      <p className="note">
+        Пустое поле — текст по умолчанию (серым). В конкретном ролике любую надпись можно поменять ещё раз — в «Изменить вручную».
+        {mode === 'domestic' ? ' Сейчас режим «Внутренний рынок»' : ' Сейчас режим «Экспорт»'} — тексты по умолчанию под него.
+      </p>
+
+      <div className="btn-row">
+        {POST_LANGUAGES.map((l) => (
+          <button key={l.code} type="button" className={`btn ${l.code === language ? 'primary' : 'ghost'}`} onClick={() => onLanguage(l.code)}>
+            {l.name}{ownCount(l.code) ? ` · ${ownCount(l.code)}` : ''}{l.code === profile.language ? ' (в постах)' : ''}
+          </button>
+        ))}
+      </div>
+      {language !== profile.language && (
+        <p className="hint">Посты сейчас на другом языке — эти тексты включатся, когда в «Профиле» выберете {POST_LANGUAGES.find((l) => l.code === language)?.name}.</p>
+      )}
+
+      {[...AD_SCENES, ...(UNPLACED.length ? [{id: 'other', title: 'Прочее', keys: UNPLACED, locked: []}] : [])].map((sc) => (
+        <section key={sc.id} className="scene-group">
+          <h2>{sc.title}{'also' in sc && sc.also ? <span className="muted">{sc.also}</span> : null}</h2>
+          {sc.keys.map((key) => {
+            const t = AD_TEXT_FIELDS.get(key);
+            const label = t?.label ?? key;
+            const hint = ('hints' in sc ? sc.hints?.[key] : undefined) ?? t?.hint;
+            return (
+              <React.Fragment key={key}>
+                <Field label={label} hint={hint} wide>
+                  {t?.multiline
+                    ? <textarea rows={2} value={own[key] ?? ''} placeholder={defaults[key] ?? ''} onChange={(e) => set(key, e.target.value)} />
+                    : <input value={own[key] ?? ''} placeholder={defaults[key] ?? ''} onChange={(e) => set(key, e.target.value)} />}
+                </Field>
+                {/* Иконка — к своей строке, а не отдельным пунктом: так видно, о какой речь */}
+                {key === 'ctaBenefit' && (
+                  <label className="check scene-check">
+                    <input type="checkbox" checked={profile.ad?.benefitIcon !== false}
+                      onChange={(e) => onChange({...profile, ad: {...profile.ad, benefitIcon: e.target.checked}})} />
+                    Показывать иконку рядом — для всех языков
+                  </label>
+                )}
+                {key === 'ctaBenefit' && profile.ad?.benefitIcon !== false && (
+                  <IconField theme={theme} onSaved={onBrandSaved} onError={onError} />
+                )}
+              </React.Fragment>
+            );
+          })}
+          {sc.locked.map((l) => (
+            <div key={l.what} className="locked-row"><Lock size={13} aria-hidden /> <span>{l.what}</span> <span className="muted">— {l.where}</span></div>
+          ))}
+        </section>
+      ))}
+
+      <div className="actions">
+        <button className="btn primary" disabled={!dirty || busy} onClick={persist}>Сохранить</button>
+        <button className="btn" disabled={!dirty || busy || !saved} onClick={() => saved && onChange(saved)}>Отменить правки</button>
+        <button className="btn ghost" disabled={busy || !ownCount(language)} onClick={reset}>Вернуть тексты по умолчанию</button>
       </div>
     </div>
   );

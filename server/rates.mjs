@@ -1,4 +1,6 @@
-// Курс вона к доллару: берём раз в сутки и сутки держим (решение владельца 29.09).
+// Курсы валют: берём раз в сутки и сутки держим (решение владельца 29.09).
+// С 11.10 — не только вон: тот же ответ источника несёт все валюты, и цена в ролике
+// пересчитывается в валюту компании (₽, ₸, €…), а курсы видны в шапке.
 //
 // Зачем свой, а не из шлюза kmotors: там курс приходит вместе с машиной и только на момент
 // её запроса, а лот без ссылки Encar курса не знал бы вовсе. Раньше курс вбивали руками
@@ -15,6 +17,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {DATA_DIR, HttpError} from './store.mjs';
+import {CURRENCIES} from '../src/shared/currencies.js';
 
 // Источник, срок кэша и таймаут — почему именно они, см. шапку файла
 const SOURCE = 'https://open.er-api.com/v6/latest/USD';
@@ -22,12 +25,13 @@ const TTL_MS = 24 * 60 * 60 * 1000;
 const FETCH_TIMEOUT_MS = 10_000;
 const cacheFile = () => path.join(DATA_DIR, 'rates.json');
 
-/** @type {{krwPerUsd: number, fetchedAt: string, source: string} | null} */
+/** @type {{krwPerUsd: number, usdRates?: Record<string, number>, fetchedAt: string, source: string} | null} */
 let cached = null;
 // Одновременные запросы после истечения суток ждут один поход к источнику, а не шлют каждый свой
 let inflight = null;
 
-const fresh = (r) => r && Date.now() - new Date(r.fetchedAt).getTime() < TTL_MS;
+// Кэш до 11.10 знал только вон — таблицы валют в нём нет, такой считаем несвежим
+const fresh = (r) => r && r.usdRates && Date.now() - new Date(r.fetchedAt).getTime() < TTL_MS;
 
 const load = async () => {
   if (cached) return cached;
@@ -43,8 +47,17 @@ const fetchRate = async () => {
   // Защита от мусора в ответе: курс вона последние десятилетия — сотни-тысячи за доллар.
   // Ноль или 1 (частый вид поломки API) дали бы цену в миллионы долларов в ролике
   if (!Number.isFinite(krw) || krw < 500 || krw > 5000) throw new Error(`странный курс от источника: ${body?.rates?.KRW}`);
+  // Валюты из нашего списка: сколько единиц за $1. Мусор (ноль, не число) отбрасываем —
+  // такая валюта просто останется без курса, а не даст цену в миллиарды
+  const usdRates = {};
+  for (const {code} of CURRENCIES) {
+    const v = Number(body?.rates?.[code]);
+    if (Number.isFinite(v) && v > 0) usdRates[code] = v;
+  }
+  usdRates.USD = 1;
+  usdRates.KRW = krw;
   // Две цифры после запятой — точнее банки и не котируют; в лоте это поле «₩ за $1»
-  return {krwPerUsd: Math.round(krw * 100) / 100, fetchedAt: new Date().toISOString(), source: 'open.er-api.com'};
+  return {krwPerUsd: Math.round(krw * 100) / 100, usdRates, fetchedAt: new Date().toISOString(), source: 'open.er-api.com'};
 };
 
 /**
@@ -68,6 +81,15 @@ export const usdKrw = async () => {
     })
     .finally(() => { inflight = null; });
   return inflight;
+};
+
+/**
+ * Все курсы: {usdRates: {код: единиц за $1}, fetchedAt, source, stale}. Тот же суточный кэш,
+ * что у usdKrw, — к источнику по-прежнему один поход в сутки
+ */
+export const rates = async () => {
+  const r = await usdKrw();
+  return {usdRates: r.usdRates ?? {USD: 1, KRW: r.krwPerUsd}, fetchedAt: r.fetchedAt, source: r.source, stale: r.stale};
 };
 
 /** Для тестов: забыть курс в памяти */

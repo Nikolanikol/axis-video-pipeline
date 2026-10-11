@@ -13,6 +13,7 @@
 //     Цветов в русском словаре kmotors нет — они в COLORS_RU ниже.
 // Слово, которого нет в словаре, остаётся английским: лучше английское слово, чем пустое место.
 import dict from './ru-values.json';
+import {currencySign} from '../../shared/currencies.js';
 
 export type CarouselLang = 'en' | 'ru';
 export const CAROUSEL_LANGS: CarouselLang[] = ['en', 'ru'];
@@ -115,6 +116,12 @@ export const carouselText = (lang: CarouselLang) => {
     km: (v: number | null) => (v === null ? '—' : `${n(v)} ${ru ? 'км' : 'km'}`),
     usd: (v: number | null | undefined) => (v ? `$${n(v)}` : '—'),
     krw: (v: number) => `₩${n(v)}`,
+    /** Цена в валюте компании: $, € и £ — перед числом, как принято; остальные значки — после */
+    money: (v: number | null | undefined, code?: string) => {
+      if (!v) return '—';
+      const sign = currencySign(code);
+      return ['$', '€', '£'].includes(sign) ? `${sign}${n(v)}` : `${n(v)} ${sign}`;
+    },
     liters: (cc: number | null) => (cc ? `${(cc / 1000).toLocaleString(locale, {minimumFractionDigits: 1, maximumFractionDigits: 1})} ${ru ? 'л' : 'L'}` : '—'),
   };
 };

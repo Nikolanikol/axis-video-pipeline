@@ -10,6 +10,8 @@
 //   domestic — продажа на своём рынке: цена как есть, без фрахта, порта и заграницы.
 // Один движок рендера рисует оба — пайплайн смотрит на pricing.mode.
 
+import {currencyCode} from './currencies.js';
+
 /** @typedef {'export'|'domestic'} PricingMode */
 
 /** Обе модели цены. Всё, что не 'domestic', считаем 'export' — так безопаснее для старых данных. */
@@ -33,12 +35,26 @@ export const resolveTexts = (copy, mode, language, overrides) => {
 };
 
 /**
+ * Правки текстов компании для одного языка. В профиле они лежат по языкам —
+ * {ru: {...}, en: {...}}: у клиента со сменой языка не должны оставаться надписи на прежнем,
+ * а вернувшись к нему, он находит свои тексты на месте (решение владельца 11.10).
+ * Старый профиль хранил одну плоскую пачку без языка — её считаем правками текущего языка:
+ * других у неё и не было.
+ */
+export const textsForLanguage = (texts, language) => {
+  if (!texts) return {};
+  const flat = Object.values(texts).some((v) => typeof v === 'string');
+  if (flat) return texts;
+  return texts[language] || {};
+};
+
+/**
  * Профиль с уже подставленными текстами — то, что отдаём пайплайну.
  * Дальше по коду texts уже полные: не нужно помнить про дефолты в каждой вёрстке.
  */
 export const resolveProfile = (profile, copy) => ({
   ...profile,
-  texts: resolveTexts(copy, profile?.pricing?.mode, profile?.language, profile?.texts),
+  texts: resolveTexts(copy, profile?.pricing?.mode, profile?.language, textsForLanguage(profile?.texts, profile?.language)),
 });
 
 /**
@@ -79,10 +95,13 @@ export const marketFromProfile = (profile, copy) => {
     site: p.contacts?.site ?? '',
     telegram: p.contacts?.telegram ?? '',
     contactPrimary: p.contacts?.primary === 'telegram' ? 'telegram' : 'whatsapp',
-    texts: resolveTexts(copy, p.pricing?.mode, p.language, p.texts),
+    texts: resolveTexts(copy, p.pricing?.mode, p.language, textsForLanguage(p.texts, p.language)),
     music: p.music,
     pricingMode: mode,
-    currency: p.pricing?.currency ?? 'USD',
+    // Код из списка; старое «РУБЛЬ» из свободного поля приводится к RUB (currencies.js)
+    currency: currencyCode(p.pricing?.currency),
     language: p.language,
+    // Иконка у строки преимущества в CTA; нет настройки — показываем, как было всегда
+    benefitIcon: p.ad?.benefitIcon !== false,
   };
 };
