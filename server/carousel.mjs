@@ -82,18 +82,16 @@ const PHOTO_HOSTS = new Set([
   'heydealer-api.s3.amazonaws.com', 'img-auction.autobell.co.kr', 'www.kcarauction.com',
   'imgmk.lotteautoauction.net', 'aucmark.skcarrental.com', 'file.ahsellcar.co.kr',
 ]);
-// che168 (Китай): фото на CDN Autohome — поддомены autoimg.cn (2sc2., erscglobal2. …)
-const photoHostOk = (host) => PHOTO_HOSTS.has(host) || /^[a-z0-9-]+\.autoimg\.cn$/.test(host);
 const PHOTO_MAX_BYTES = 15 * 1024 * 1024;
 const PHOTO_TIMEOUT_MS = 20_000;
 
 const downloadLotPhoto = async (url) => {
   const u = new URL(url);
   if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
-  if (!photoHostOk(u.hostname)) return null;
+  if (!PHOTO_HOSTS.has(u.hostname)) return null;
   const res = await fetch(url, {signal: AbortSignal.timeout(PHOTO_TIMEOUT_MS)});
   // Перенаправление уводит на другой хост — на него разрешения не было
-  if (!res.ok || !photoHostOk(new URL(res.url).hostname)) return null;
+  if (!res.ok || !PHOTO_HOSTS.has(new URL(res.url).hostname)) return null;
   if (!(res.headers.get('content-type') || '').startsWith('image/')) return null;
   const buf = Buffer.from(await res.arrayBuffer());
   return buf.length > 0 && buf.length <= PHOTO_MAX_BYTES ? buf : null;
@@ -229,8 +227,10 @@ export const buildCarousel = async (link, opts = {}) => {
       : theme.assets;
     const dir = path.join(carouselsDir(), id);
     await fs.mkdir(dir, {recursive: true});
-    // Фото лотов и машин из Китая — к себе: рендер берёт их с нашего адреса, а не с CDN площадки
-    if (lot || china) car = await localizePhotos(car, dir, id, origin);
+    // Фото лотов — к себе: рендер берёт их с нашего адреса, а не с CDN площадки. Машины из Китая —
+    // как Encar, прямо с CDN Autohome (открыт, исходники «0x0_» без входа): со своего адреса браузер
+    // рендера в превью получал 401 от заслонки Basic Auth (11.10), а ослаблять её — не наше решение
+    if (lot) car = await localizePhotos(car, dir, id, origin);
     // У лота нет цены, истории и опций: эти слайды не рисуем, а не заполняем прочерками.
     // У машины из Китая нет истории: лист осмотра в рекламу не идёт (решение владельца 11.10)
     const inputProps = {car, market, theme: {...theme, assets}, includeHistory: INCLUDE_HISTORY, format, seed,
