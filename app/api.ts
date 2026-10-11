@@ -78,6 +78,16 @@ export type ClientRow = {
   id: string; name: string; created_at: string; person: string | null; email: string | null; phone: string | null;
   platform_role: Role; credits: number; paid_krw: number; generations: number; last_generation: string | null;
   plan_title: string | null; plan_until: string | null;
+  // Активность: когда заходил (null — не заходил с 11.10, когда завели отметку), генераций за 30 дней
+  last_seen_at: string | null; generations_30d: number; verified: boolean; had_plan: boolean;
+};
+// Быстрые фильтры и сортировки админки — те же имена, что CLIENT_FILTERS/CLIENT_SORTS в server/accounts.mjs
+export type ClientFilter = 'all' | 'new' | 'trial' | 'active' | 'renew' | 'lapsed' | 'idle' | 'unverified';
+export type ClientSort = 'new' | 'seen' | 'generated' | 'paid' | 'credits' | 'plan';
+export type ClientQuery = {q: string; filter: ClientFilter; sort: ClientSort; page: number};
+export type ClientList = {
+  rows: ClientRow[]; total: number; page: number; pages: number; pageSize: number;
+  counts: Record<ClientFilter, number>; renew: ClientRow[];
 };
 // Курс ₩ за $1 на сегодня: сервер берёт его раз в сутки. stale — источник не ответил, курс старше суток
 export type UsdKrw = {krwPerUsd: number; fetchedAt: string; source: string; stale: boolean};
@@ -112,7 +122,8 @@ export const api = {
   offer: () => request<Offer>('GET', '/api/account/offer'),
   publicOffer: () => request<PublicOffer>('GET', '/api/public/offer'),
   admin: {
-    clients: () => request<ClientRow[]>('GET', '/api/admin/clients'),
+    clients: (query: ClientQuery) =>
+      request<ClientList>('GET', `/api/admin/clients?${new URLSearchParams({...query, page: String(query.page)})}`),
     clientLedger: (id: string) => request<LedgerRow[]>('GET', `/api/admin/clients/${id}/ledger`),
     packs: () => request<Pack[]>('GET', '/api/admin/packs'),
     savePack: (pack: Pack) => request<Pack>('PUT', `/api/admin/packs/${pack.id}`, pack),
