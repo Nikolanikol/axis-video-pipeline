@@ -1,7 +1,7 @@
 // База SMMAKER без подключения: выбор схемы, порядок миграций и префикс smmaker_.
 import fs from 'node:fs/promises';
 import {describe, expect, it} from 'vitest';
-import {listMigrations, resolveSchema} from '../../server/db/index.mjs';
+import {listMigrations, previewId, resolveSchema} from '../../server/db/index.mjs';
 
 describe('схема SMMAKER', () => {
   it('прод — smmaker, Mac — smmaker_dev', () => {
@@ -14,6 +14,17 @@ describe('схема SMMAKER', () => {
     for (const bad of ['public', 'kmotors', 'smmakerx', 'smmaker;drop', 'SMMAKER']) {
       expect(() => resolveSchema({SMMAKER_DB_SCHEMA: bad}, true)).toThrow(/smmaker/);
     }
+  });
+
+  it('превью PR не стартует на боевой схеме', () => {
+    const pr = {COOLIFY_BRANCH: 'pull/15/head'};
+    expect(previewId(pr)).toBe('15');
+    expect(previewId({COOLIFY_BRANCH: 'main'})).toBe(null);
+    expect(previewId({})).toBe(null);
+    expect(() => resolveSchema(pr, true)).toThrow(/PR #15/);
+    expect(() => resolveSchema({...pr, SMMAKER_DB_SCHEMA: 'smmaker'}, true)).toThrow(/PR #15/);
+    expect(resolveSchema({...pr, SMMAKER_DB_SCHEMA: 'smmaker_preview'}, true)).toBe('smmaker_preview');
+    expect(resolveSchema({COOLIFY_BRANCH: 'main'}, true)).toBe('smmaker');
   });
 });
 

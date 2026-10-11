@@ -249,6 +249,8 @@ input:disabled { opacity: .5; }
 /* Оболочка: пайплайны и инструменты */
 .tool { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .top-home { display: flex; }
+/* Метка превью PR: цвет только в метке, как у состояний */
+.top-preview { font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--warn); background: var(--warn-bg); border: 1px solid var(--warn-line); border-radius: 6px; padding: 3px 8px; white-space: nowrap; }
 .crumbs { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 200px; color: var(--muted); font-size: 13px; }
 .crumbs a { color: var(--muted); text-decoration: none; }
 .crumbs a:hover { color: var(--text); }

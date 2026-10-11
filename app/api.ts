@@ -23,6 +23,8 @@ export type Config = {
   workspace: {id: string; url: string};
   // Боевой запуск (NODE_ENV=production). Интерфейс по нему прячет пайплайн обзоров
   production: boolean;
+  // Номер PR превью в Coolify (null — не превью)
+  preview?: string | null;
   fonts: FontPair[];
   palettes?: Palette[];
   carouselFormats?: CarouselFormat[];
