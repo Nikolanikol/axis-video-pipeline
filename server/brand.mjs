@@ -23,6 +23,31 @@ import {HttpError, getBrand, saveBrand, workspaceDir, workspaceUrl} from './stor
 // папке новый логотип одного клиента стёр бы логотипы всех остальных
 export const brandDir = () => path.join(workspaceDir(), 'brand');
 
+const LOGO_KEYS = ['logoStacked', 'logoHorizontal', 'sign'];
+
+/**
+ * Бренд для рендера: файлы, которых нет на диске, убираем из темы.
+ *
+ * В настройках может остаться ссылка на файл, которого уже нет: превью на копии прода
+ * получает базу без файлов, том мог пропасть. Remotion на ненайденной картинке роняет
+ * весь рендер («Error loading image with src…»). Пропавший логотип становится пустой
+ * строкой — на слайде название компании текстом; прочие файлы (иконка) — встроенными.
+ */
+export const brandForRender = async (theme) => {
+  if (!theme?.assets) return theme;
+  const own = `${workspaceUrl()}/brand/`;
+  const dir = brandDir();
+  const entries = await Promise.all(Object.entries(theme.assets).map(async ([k, v]) => {
+    if (typeof v !== 'string' || !v.startsWith(own)) return [k, v];
+    const file = path.resolve(dir, v.slice(own.length));
+    const exists = file.startsWith(dir + path.sep) && await fs.access(file).then(() => true, () => false);
+    if (exists) return [k, v];
+    console.warn(`Файл бренда «${k}» не найден (${v}) — рендер без него`);
+    return LOGO_KEYS.includes(k) ? [k, ''] : null;
+  }));
+  return {...theme, assets: Object.fromEntries(entries.filter(Boolean))};
+};
+
 /** Условия — одним объектом: интерфейс показывает эти же числа, разойтись они не могут */
 export const LOGO_RULES = {
   formats: ['png', 'jpeg', 'webp', 'svg'],
