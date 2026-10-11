@@ -76,12 +76,16 @@ export type LedgerRow = {
   job_id: string | null; note: string; created_at: string;
   expires_at: string | null; source: CreditLot['source'] | null; price_krw: number | null;
 };
+// Страница истории кредитов в кабинете
+export type LedgerPage = {rows: LedgerRow[]; total: number; page: number; pages: number; pageSize: number};
 export type ClientRow = {
   id: string; name: string; created_at: string; person: string | null; email: string | null; phone: string | null;
   platform_role: Role; credits: number; paid_krw: number; generations: number; last_generation: string | null;
   plan_title: string | null; plan_until: string | null;
   // Активность: когда заходил (null — не заходил с 11.10, когда завели отметку), генераций за 30 дней
   last_seen_at: string | null; generations_30d: number; verified: boolean; had_plan: boolean;
+  // Клиент поставил аккаунт на удаление: окончательно — в эту дату (null — живой)
+  delete_after: string | null;
 };
 // Быстрые фильтры и сортировки админки — те же имена, что CLIENT_FILTERS/CLIENT_SORTS в server/accounts.mjs
 export type ClientFilter = 'all' | 'new' | 'trial' | 'active' | 'renew' | 'lapsed' | 'idle' | 'unverified';
@@ -97,6 +101,13 @@ export type UsdKrw = {krwPerUsd: number; fetchedAt: string; source: string; stal
 export type Rates = {usdRates: Record<string, number>; fetchedAt: string; source: string; stale: boolean};
 export type StaffRow = {id: string; email: string; name: string | null; platform_role: Exclude<Role, null>};
 export type Registration = {name: string; email: string; phone: string; password: string; company: string};
+// Профиль в кабинете: человек и кабинет. pendingEmail — новая почта ждёт кода из письма
+export type Account = {
+  name: string; email: string; phone: string; emailVerified: boolean; createdAt: string;
+  company: string; canEditCompany: boolean; pendingEmail: string | null;
+};
+// Вход на устройстве: device — «Chrome · Mac», current — тот, с которого смотрят
+export type SessionRow = {id: string; device: string; ip: string; createdAt: string; seenAt: string; current: boolean};
 
 const request = async <T,>(method: string, url: string, body?: unknown): Promise<T> => {
   const isForm = body instanceof FormData;
@@ -122,8 +133,24 @@ export const api = {
   verifyLink: (token: string) => request<{ok: true}>('POST', '/api/auth/verify/link', {token}),
   forgot: (email: string) => request<{ok: true}>('POST', '/api/auth/forgot', {email}),
   reset: (token: string, password: string) => request<{ok: true}>('POST', '/api/auth/reset', {token, password}),
-  ledger: () => request<LedgerRow[]>('GET', '/api/account/ledger'),
+  restore: (token: string) => request<{ok: true}>('POST', '/api/auth/restore', {token}),
+  ledger: (page = 1) => request<LedgerPage>('GET', `/api/account/ledger?page=${page}`),
   offer: () => request<Offer>('GET', '/api/account/offer'),
+  account: {
+    profile: () => request<Account>('GET', '/api/account/profile'),
+    save: (data: {name: string; company?: string}) => request<Account>('PUT', '/api/account/profile', data),
+    changePassword: (current: string, password: string) =>
+      request<{ok: true; closed: number}>('POST', '/api/account/password', {current, password}),
+    changeEmail: (email: string, password: string) =>
+      request<{sent: boolean; pendingEmail: string}>('POST', '/api/account/email', {email, password}),
+    confirmEmail: (code: string) => request<{ok: true; email: string}>('POST', '/api/account/email/confirm', {code}),
+    cancelEmail: () => request<{ok: true}>('DELETE', '/api/account/email'),
+    sessions: () => request<SessionRow[]>('GET', '/api/account/sessions'),
+    closeSession: (id: string) => request<SessionRow[]>('DELETE', `/api/account/sessions/${id}`),
+    closeOthers: () => request<SessionRow[]>('POST', '/api/account/sessions/close-others'),
+    // Удалить аккаунт: пароль и название компании руками. Окончательно — через 14 дней
+    remove: (password: string, confirm: string) => request<{ok: true; until: string}>('POST', '/api/account/delete', {password, confirm}),
+  },
   publicOffer: () => request<PublicOffer>('GET', '/api/public/offer'),
   admin: {
     clients: (query: ClientQuery) =>

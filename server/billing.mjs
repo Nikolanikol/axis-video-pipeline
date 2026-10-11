@@ -214,9 +214,28 @@ export const refundOrphans = async ({log = console.log} = {}) => {
   return rows.length;
 };
 
-/** Журнал кредитов компании — для кабинета: что, когда и за сколько; у начислений — срок партии */
+/** Журнал кредитов компании — для админки: что, когда и за сколько; у начислений — срок партии */
 export const ledgerOf = async (workspaceId, limit = 200) => (await db().query(
   `SELECT l.id, l.delta, l.kind, l.pipeline, l.job_id, l.note, l.created_at, t.expires_at, t.source, t.price_krw
      FROM smmaker_credit_ledger l LEFT JOIN smmaker_credit_lots t ON t.id = l.lot_id
     WHERE l.workspace_id = $1 ORDER BY l.created_at DESC, l.id DESC LIMIT $2`,
   [workspaceId, limit])).rows;
+
+// Строк на страницу истории в кабинете: экран-полтора, дальше — «Вперёд»
+const LEDGER_PAGE = 20;
+
+/**
+ * Журнал кредитов страницами — для кабинета (владелец 12.10: строк будет много). Каждая
+ * генерация — строка, у активного клиента это сотни за месяц: целиком не отдаём
+ */
+export const ledgerPage = async (workspaceId, page = 1) => {
+  const {rows: [c]} = await db().query('SELECT count(*)::int AS n FROM smmaker_credit_ledger WHERE workspace_id = $1', [workspaceId]);
+  const pages = Math.max(1, Math.ceil(c.n / LEDGER_PAGE));
+  const at = Math.min(Math.max(1, Math.floor(Number(page)) || 1), pages);
+  const {rows} = await db().query(
+    `SELECT l.id, l.delta, l.kind, l.pipeline, l.job_id, l.note, l.created_at, t.expires_at, t.source, t.price_krw
+       FROM smmaker_credit_ledger l LEFT JOIN smmaker_credit_lots t ON t.id = l.lot_id
+      WHERE l.workspace_id = $1 ORDER BY l.created_at DESC, l.id DESC LIMIT $2 OFFSET $3`,
+    [workspaceId, LEDGER_PAGE, (at - 1) * LEDGER_PAGE]);
+  return {rows, total: c.n, page: at, pages, pageSize: LEDGER_PAGE};
+};

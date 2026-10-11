@@ -55,6 +55,19 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
   }, []);
 
   useEffect(() => {
+    // Ссылка «восстановить» из письма об удалении: сервер снимает удаление и сразу впускает
+    if (link?.kind === 'restore') {
+      api.restore(link.token)
+        .then(() => setNotice('Аккаунт восстановлен — всё на месте'))
+        .catch((e) => setNotice(e.message))
+        .finally(() => { window.history.replaceState(null, '', '#/account'); load(); });
+      return;
+    }
+    // Только что удалили аккаунт — витрина откроет окно входа с этой строкой
+    if (window.location.hash.startsWith('#/deleted')) {
+      setNotice('Аккаунт закрыт и будет удалён через 14 дней. Передумаете — восстановите по ссылке из письма.');
+      window.history.replaceState(null, '', window.location.pathname);
+    }
     if (link?.kind !== 'verify') { load(); return; }
     // Подтверждаем и убираем ключ из адреса: в истории браузера и при пересылке ссылки
     // ему делать нечего
@@ -91,9 +104,9 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
   );
 };
 
-type EmailLink = {kind: 'verify' | 'reset'; token: string};
+type EmailLink = {kind: 'verify' | 'reset' | 'restore'; token: string};
 const readEmailLink = (): EmailLink | null => {
-  const m = /^#\/(verify|reset)\?t=([\w-]+)/.exec(window.location.hash);
+  const m = /^#\/(verify|reset|restore)\?t=([\w-]+)/.exec(window.location.hash);
   return m ? {kind: m[1] as EmailLink['kind'], token: m[2]} : null;
 };
 

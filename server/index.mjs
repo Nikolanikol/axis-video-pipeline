@@ -7,6 +7,7 @@ import {createApp} from './app.mjs';
 import {ROOT} from './store.mjs';
 import {hasDatabase, migrate} from './db/index.mjs';
 import {refundOrphans} from './billing.mjs';
+import {purgeDeleted} from './accounts.mjs';
 import {DEFAULT_WORKSPACE, ensureWorkspace, legacyDataDirs} from './store.mjs';
 
 const PORT = Number(process.env.PORT || 3210);
@@ -34,6 +35,11 @@ if (hasDatabase()) {
     console.error(`База SMMAKER недоступна: ${e.message}`);
     process.exit(1);
   });
+  // Окончательное удаление аккаунтов, чей срок (14 дней) вышел: при старте и раз в час.
+  // Точность до часа достаточна — в письме обещана дата, а не минута
+  const purge = () => purgeDeleted().catch((e) => console.error('Удаление аккаунтов:', e.message));
+  purge();
+  setInterval(purge, 60 * 60 * 1000).unref();
 }
 
 // Файлы старой раскладки сервер не видит — история и лоты выглядели бы пропавшими.

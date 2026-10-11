@@ -150,6 +150,50 @@ export const StartCard: React.FC = () => {
   );
 };
 
+// Подписи плиток в кабинете — короче, чем заголовки страницы: плитка узкая
+const SHORT: Record<StepId, string> = {email: 'Почта', company: 'О компании', brand: 'Бренд', first: 'Первый ролик'};
+
+/**
+ * «Настройка кабинета» вверху «Моего кабинета» (владелец 12.10: первые шаги — и в кабинете).
+ * Четыре плитки в ряд с прогрессом: что сделано и куда нажать дальше. Видна, пока список не
+ * пройден, — даже если на главной его скрыли: кабинет и есть место, где к нему возвращаются.
+ * Пройден — карточки нет, кабинет не загромождаем
+ */
+export const SetupCard: React.FC = () => {
+  const o = useOnboarding();
+  if (!o.relevant || o.allDone) return null;
+  const next = o.steps.find((s) => !s.done && !s.skipped);
+  return (
+    <section className="setup">
+      <div className="setup-head">
+        <h2>Настройка кабинета</h2>
+        <span className="muted">{o.passed} из {o.total}</span>
+      </div>
+      <div className="start-bar"><div style={{width: `${(o.passed / o.total) * 100}%`}} /></div>
+      <ol className="setup-steps">
+        {o.steps.map((s, i) => {
+          const t = TEXT[s.id];
+          // Почта вводится крупными клетками на «Первых шагах» — туда и ведём. Плитка нажимается
+          // целиком: в ней одно действие, и узкая ссылка внутри была бы мелкой целью на телефоне.
+          // Сделанные почта и первый ролик никуда не ведут — плитка не двигается при наведении
+          const link = s.id === 'email' ? href('start') : t.link;
+          const clickable = !!link && !(s.done && (s.id === 'email' || s.id === 'first'));
+          const action = s.done ? (clickable ? 'готово · изменить' : 'готово')
+            : s.id === 'email' ? 'Ввести код' : s.skipped ? 'Пропущено — вернуться' : t.go;
+          const body = (
+            <>
+              <span className="start-mark">{s.done ? <Check size={16} /> : i + 1}</span>
+              <div><b>{SHORT[s.id]}</b><span className="muted">{action}</span></div>
+            </>
+          );
+          const cls = `setup-step${s.done ? ' done' : ''}${s.id === next?.id ? ' next' : ''}${clickable ? ' lift' : ''}`;
+          return <li key={s.id}>{clickable ? <a className={cls} href={link}>{body}</a> : <div className={cls}>{body}</div>}</li>;
+        })}
+      </ol>
+    </section>
+  );
+};
+
 /**
  * Подтверждение почты крупно: адрес, шесть клеток под код, «отправить ещё раз» с паузой.
  * Код вводится и вставкой целиком (из темы письма — «Код подтверждения KOK: 123456»),

@@ -7,12 +7,13 @@
 // Прежние коды активации и месячные периоды убраны: выдавать ключ каждому, кто хочет
 // попробовать, — лишняя работа для продаж. Доступ принадлежит компании, а не человеку.
 import crypto from 'node:crypto';
+import fs from 'node:fs/promises';
 import path from 'node:path';
 import {promisify} from 'node:util';
 import {db} from './db/index.mjs';
-import {CONFIG_DIR, HttpError, readJson} from './store.mjs';
+import {CONFIG_DIR, HttpError, readJson, workspaceDir} from './store.mjs';
 import {addLot, balanceOf, signupCredits, subscriptionOf} from './billing.mjs';
-import {appUrl, resetMail, verifyMail} from './mailer.mjs';
+import {appUrl, deletionMail, emailChangeMail, noticeMail, resetMail, verifyMail} from './mailer.mjs';
 
 const scrypt = promisify(crypto.scrypt);
 
@@ -96,13 +97,24 @@ export const SESSION_DAYS = 30;
 // В базе — хеш токена, не сам токен: утёкший дамп не даёт войти чужой сессией
 const tokenHash = (token) => crypto.createHash('sha256').update(token).digest('hex');
 
-export const createSession = async (userId, client = db()) => {
+/**
+ * Новая сессия. meta — браузер и адрес входа ({userAgent, ip}): по ним человек узнаёт свой
+ * вход в списке «где выполнен вход» и замечает чужой. Обрезаем — строку браузера присылает
+ * клиент, и длина у неё любая
+ */
+export const createSession = async (userId, client = db(), meta = {}) => {
   const token = crypto.randomBytes(32).toString('base64url');
   await client.query(
-    `INSERT INTO smmaker_sessions (token_hash, user_id, expires_at) VALUES ($1, $2, now() + $3 * interval '1 day')`,
-    [tokenHash(token), userId, SESSION_DAYS]);
+    `INSERT INTO smmaker_sessions (token_hash, user_id, expires_at, user_agent, ip, seen_at)
+     VALUES ($1, $2, now() + $3 * interval '1 day', $4, $5, now())`,
+    [tokenHash(token), userId, SESSION_DAYS, String(meta.userAgent ?? '').slice(0, 400), String(meta.ip ?? '').slice(0, 64)]);
   return token;
 };
+
+// Номер сессии для списка входов — начало хеша токена. Сам хеш наружу не отдаём: он ключ
+// таблицы, а для «закрыть этот вход» шестнадцати знаков хватает с запасом
+const SID_LEN = 16;
+const sidOf = (hash) => hash.slice(0, SID_LEN);
 
 export const dropSession = (token) => (token
   ? db().query('DELETE FROM smmaker_sessions WHERE token_hash = $1', [tokenHash(token)])
@@ -114,11 +126,16 @@ export const dropSession = (token) => (token
  * Не ждём и не роняем запрос: отметка — подсказка менеджеру, а не данные клиента.
  */
 const SEEN_EVERY_MIN = 5;
-const touchSeen = (userId) => {
+const touchSeen = (userId, hash) => {
   db().query(
     `UPDATE smmaker_users SET last_seen_at = now()
       WHERE id = $1 AND (last_seen_at IS NULL OR last_seen_at < now() - $2 * interval '1 minute')`,
     [userId, SEEN_EVERY_MIN]).catch((e) => console.warn('last_seen_at:', e.message));
+  // То же для самой сессии — «был активен» в списке входов кабинета
+  db().query(
+    `UPDATE smmaker_sessions SET seen_at = now()
+      WHERE token_hash = $1 AND (seen_at IS NULL OR seen_at < now() - $2 * interval '1 minute')`,
+    [hash, SEEN_EVERY_MIN]).catch((e) => console.warn('sessions.seen_at:', e.message));
 };
 
 /** Роль на платформе → права. admin — всё; manager — лиды и начисление пакетов */
@@ -130,18 +147,20 @@ const rights = (role) => ({role: role ?? null, isAdmin: role === 'admin', isStaf
  */
 export const readSession = async (token) => {
   if (!token) return null;
+  const hash = tokenHash(token);
   const {rows} = await db().query(
     `SELECT u.id, u.email, u.name, u.platform_role, u.email_verified_at, m.workspace_id, m.role, w.name AS workspace_name
        FROM smmaker_sessions s
        JOIN smmaker_users u ON u.id = s.user_id
        LEFT JOIN LATERAL (SELECT * FROM smmaker_memberships WHERE user_id = u.id ORDER BY created_at LIMIT 1) m ON true
        LEFT JOIN smmaker_workspaces w ON w.id = m.workspace_id
-      WHERE s.token_hash = $1 AND s.expires_at > now()`,
-    [tokenHash(token)]);
+      WHERE s.token_hash = $1 AND s.expires_at > now() AND u.delete_after IS NULL`,
+    [hash]);
   const r = rows[0];
   if (!r) return null;
-  touchSeen(r.id);
+  touchSeen(r.id, hash);
   return {
+    sessionId: sidOf(hash),
     user: {id: r.id, email: r.email, name: r.name, emailVerified: Boolean(r.email_verified_at), ...rights(r.platform_role)},
     workspace: r.workspace_id ? {id: r.workspace_id, name: r.workspace_name, role: r.role} : null,
   };
@@ -179,7 +198,7 @@ const starterProfile = (company) => ({
  * адреса. Письмо с кодом уходит после записи; не ушло — человек запросит ещё раз из кабинета.
  * Компания необязательна: не указана — берём имя человека (его можно поменять в профиле).
  */
-export const register = async ({name, email, phone, password, company}) => {
+export const register = async ({name, email, phone, password, company}, meta = {}) => {
   const person = checkName(name);
   const mail = normEmail(email);
   const key = emailKey(mail);
@@ -207,7 +226,7 @@ export const register = async ({name, email, phone, password, company}) => {
       [workspaceId, title, brand, starterProfile(title)]);
     await client.query(
       `INSERT INTO smmaker_memberships (workspace_id, user_id, role) VALUES ($1, $2, 'owner')`, [workspaceId, user.id]);
-    return {userId: user.id, token: await createSession(user.id, client)};
+    return {userId: user.id, token: await createSession(user.id, client, meta)};
   });
   await sendVerification(out.userId, {force: true}).catch((e) => console.error('Письмо с кодом не ушло:', e.message));
   return out;
@@ -225,14 +244,15 @@ const RESEND_PAUSE_SEC = 60;
  * Новый ключ письма. Прежние неиспользованные того же вида гасим: в ходу всегда один код,
  * и старое письмо, пришедшее с опозданием, не сработает
  */
-const issueToken = async (client, userId, kind, minutes) => {
+const issueToken = async (client, userId, kind, minutes, newEmail = null) => {
   await client.query('UPDATE smmaker_email_tokens SET used_at = now() WHERE user_id = $1 AND kind = $2 AND used_at IS NULL', [userId, kind]);
-  const code = kind === 'verify' ? String(crypto.randomInt(0, 1_000_000)).padStart(6, '0') : null;
+  // Код — у подтверждения почты и смены почты (вводят в кабинете); у сброса только ссылка
+  const code = kind === 'reset' ? null : String(crypto.randomInt(0, 1_000_000)).padStart(6, '0');
   const link = crypto.randomBytes(32).toString('base64url');
   await client.query(
-    `INSERT INTO smmaker_email_tokens (user_id, kind, code_hash, link_hash, expires_at)
-     VALUES ($1, $2, $3, $4, now() + $5 * interval '1 minute')`,
-    [userId, kind, code && tokenHash(`${userId}:${code}`), tokenHash(link), minutes]);
+    `INSERT INTO smmaker_email_tokens (user_id, kind, code_hash, link_hash, expires_at, new_email)
+     VALUES ($1, $2, $3, $4, now() + $5 * interval '1 minute', $6)`,
+    [userId, kind, code && tokenHash(`${userId}:${code}`), tokenHash(link), minutes, newEmail]);
   return {code, link};
 };
 
@@ -252,7 +272,8 @@ export const sendVerification = async (userId, {force = false} = {}) => {
   const left = force ? 0 : await pauseLeft(userId, 'verify');
   if (left > 0) throw new HttpError(429, `Письмо уже отправлено — повторить можно через ${left} с`);
   const {code, link} = await inTransaction((client) => issueToken(client, userId, 'verify', VERIFY_HOURS * 60));
-  const {credits} = await signupCredits();
+  // Удалявшемуся подарка не будет (confirmEmail) — и письмо его не обещает
+  const credits = (await wasDeleted(db(), userId)) ? 0 : (await signupCredits()).credits;
   await verifyMail({to: u.email, name: u.name, code, link: `${appUrl()}/#/verify?t=${link}`, credits});
   return {sent: true};
 };
@@ -269,7 +290,7 @@ const confirmEmail = async (client, userId) => {
   const {rows: [m]} = await client.query(
     `SELECT workspace_id FROM smmaker_memberships WHERE user_id = $1 AND role = 'owner' ORDER BY created_at LIMIT 1`, [userId]);
   const trial = await signupCredits();
-  if (m && trial.credits > 0) {
+  if (m && trial.credits > 0 && !(await wasDeleted(client, userId))) {
     const {rowCount: had} = await client.query(
       `SELECT 1 FROM smmaker_credit_lots WHERE workspace_id = $1 AND source = 'signup'`, [m.workspace_id]);
     if (!had) await addLot(client, {workspaceId: m.workspace_id, credits: trial.credits, days: trial.days, source: 'signup', note: 'бесплатные кредиты на пробу'});
@@ -277,14 +298,17 @@ const confirmEmail = async (client, userId) => {
   return true;
 };
 
-/** Код из письма, введённый в кабинете. Пять неверных — код сгорает */
-export const verifyCode = async ({userId, code}) => {
+/**
+ * Код из письма, введённый в кабинете: подтверждение почты (verify) или смена почты (email).
+ * Пять неверных — код сгорает. Верный — ключ погашен, дальше onValid в той же транзакции
+ */
+const takeCode = async ({userId, code, kind, onValid}) => {
   const c = String(code ?? '').replace(/\D/g, '');
   return inTransaction(async (client) => {
     const {rows: [t]} = await client.query(
-      `SELECT id, code_hash, attempts FROM smmaker_email_tokens
-        WHERE user_id = $1 AND kind = 'verify' AND used_at IS NULL AND expires_at > now()
-        ORDER BY created_at DESC LIMIT 1 FOR UPDATE`, [userId]);
+      `SELECT id, code_hash, attempts, new_email FROM smmaker_email_tokens
+        WHERE user_id = $1 AND kind = $2 AND used_at IS NULL AND expires_at > now()
+        ORDER BY created_at DESC LIMIT 1 FOR UPDATE`, [userId, kind]);
     if (!t) throw new HttpError(410, 'Код устарел — отправьте новый');
     if (t.attempts >= MAX_CODE_ATTEMPTS) throw new HttpError(429, 'Слишком много неверных попыток — отправьте новый код');
     if (c.length !== 6 || tokenHash(`${userId}:${c}`) !== t.code_hash) {
@@ -293,13 +317,16 @@ export const verifyCode = async ({userId, code}) => {
       return {ok: false};
     }
     await client.query('UPDATE smmaker_email_tokens SET used_at = now() WHERE id = $1', [t.id]);
-    await confirmEmail(client, userId);
-    return {ok: true};
+    return {ok: true, ...(await onValid(client, t))};
   }).then((r) => {
     if (!r.ok) throw new HttpError(400, 'Неверный код — проверьте письмо');
     return r;
   });
 };
+
+export const verifyCode = ({userId, code}) => takeCode({
+  userId, code, kind: 'verify', onValid: async (client) => { await confirmEmail(client, userId); },
+});
 
 /** Ссылка из письма. Сессия не нужна: письмо могли открыть на другом устройстве */
 export const verifyLink = async ({token}) => inTransaction(async (client) => {
@@ -319,7 +346,9 @@ export const verifyLink = async ({token}) => inTransaction(async (client) => {
 export const requestReset = async ({email}) => {
   let mail;
   try { mail = normEmail(email); } catch { return {ok: true}; }
-  const {rows: [u]} = await db().query('SELECT id, email FROM smmaker_users WHERE lower(email) = $1 OR email_key = $2 LIMIT 1', [mail, emailKey(mail)]);
+  // Удаляемый аккаунт сбросом не открыть: возвращают его ссылкой «восстановить» из письма
+  const {rows: [u]} = await db().query(
+    'SELECT id, email FROM smmaker_users WHERE (lower(email) = $1 OR email_key = $2) AND delete_after IS NULL LIMIT 1', [mail, emailKey(mail)]);
   if (!u || await pauseLeft(u.id, 'reset') > 0) return {ok: true};
   const {link} = await inTransaction((client) => issueToken(client, u.id, 'reset', RESET_MINUTES));
   await resetMail({to: u.email, link: `${appUrl()}/#/reset?t=${link}`}).catch((e) => console.error('Письмо сброса не ушло:', e.message));
@@ -331,7 +360,7 @@ export const requestReset = async ({email}) => {
  * тот, кто вошёл чужим паролем, должен вылететь. Ссылка пришла на почту — значит, почта
  * заодно подтверждена
  */
-export const resetPassword = async ({token, password}) => {
+export const resetPassword = async ({token, password}, meta = {}) => {
   const hash = await hashPassword(checkPassword(password));
   return inTransaction(async (client) => {
     const {rows: [t]} = await client.query(
@@ -342,16 +371,20 @@ export const resetPassword = async ({token, password}) => {
     await client.query('UPDATE smmaker_users SET password_hash = $2 WHERE id = $1', [t.user_id, hash]);
     await client.query('DELETE FROM smmaker_sessions WHERE user_id = $1', [t.user_id]);
     await confirmEmail(client, t.user_id);
-    return {userId: t.user_id, token: await createSession(t.user_id, client)};
+    return {userId: t.user_id, token: await createSession(t.user_id, client, meta)};
   });
 };
 
-export const login = async ({email, password}) => {
+export const login = async ({email, password}, meta = {}) => {
   const mail = normEmail(email);
-  const {rows: [u]} = await db().query('SELECT id, password_hash FROM smmaker_users WHERE lower(email) = $1', [mail]);
+  const {rows: [u]} = await db().query('SELECT id, password_hash, delete_after FROM smmaker_users WHERE lower(email) = $1', [mail]);
   const ok = await verifyPassword(String(password ?? ''), u ? u.password_hash : await DUMMY_HASH);
   if (!u || !ok) throw new HttpError(401, 'Неверная почта или пароль');
-  return {userId: u.id, token: await createSession(u.id)};
+  // Говорим только после верного пароля: чужому, кто подбирает почты, это ничего не раскрывает
+  if (u.delete_after) {
+    throw new HttpError(403, `Аккаунт удаляется. До ${new Date(u.delete_after).toLocaleDateString('ru-RU')} его можно восстановить по ссылке из письма`);
+  }
+  return {userId: u.id, token: await createSession(u.id, db(), meta)};
 };
 
 /**
@@ -374,6 +407,305 @@ export const upsertAdmin = async ({email, password, workspaceId}) => {
       [workspaceId, u.id]);
     return u.id;
   });
+};
+
+// ——— Профиль и безопасность в кабинете ———
+// Решение владельца 12.10: человек сам меняет свои данные и пароль, видит, где открыт вход.
+// Всё, что даёт доступ к аккаунту (почта, пароль), требует текущий пароль: оставленный
+// открытым ноутбук не должен позволить увести аккаунт за минуту
+
+/** Пароль вошедшего человека верен — иначе 403 (не 401: 401 интерфейс понимает как «вход слетел») */
+const checkCurrentPassword = async (userId, password) => {
+  const {rows: [u]} = await db().query('SELECT password_hash FROM smmaker_users WHERE id = $1', [userId]);
+  if (!u || !(await verifyPassword(String(password ?? ''), u.password_hash))) throw new HttpError(403, 'Неверный текущий пароль');
+};
+
+/** Профиль для кабинета: человек и компания. Компанию меняет только владелец кабинета */
+export const accountOf = async (userId, workspaceId) => {
+  const {rows: [u]} = await db().query(
+    `SELECT u.name, u.email, u.phone, u.email_verified_at, u.created_at,
+            COALESCE(NULLIF(w.profile->>'company', ''), w.name) AS company, m.role
+       FROM smmaker_users u
+       LEFT JOIN smmaker_memberships m ON m.user_id = u.id AND m.workspace_id = $2
+       LEFT JOIN smmaker_workspaces w ON w.id = m.workspace_id
+      WHERE u.id = $1`, [userId, workspaceId]);
+  if (!u) throw new HttpError(404, 'Нет такого пользователя');
+  // Смена почты в процессе: новый адрес ждёт кода — кабинет показывает поле для кода и после перезагрузки
+  const {rows: [pending]} = await db().query(
+    `SELECT new_email FROM smmaker_email_tokens
+      WHERE user_id = $1 AND kind = 'email' AND used_at IS NULL AND expires_at > now()
+      ORDER BY created_at DESC LIMIT 1`, [userId]);
+  return {
+    name: u.name, email: u.email, phone: u.phone ?? '', emailVerified: Boolean(u.email_verified_at),
+    createdAt: u.created_at, company: u.company ?? '', canEditCompany: u.role === 'owner',
+    pendingEmail: pending?.new_email ?? null,
+  };
+};
+
+/**
+ * Имя и компания. Телефон здесь НЕ меняется (владелец 12.10): он уникален и держит бесплатные
+ * кредиты — смена номера освобождала бы его под новую регистрацию с новыми подарками.
+ * Сменить номер — через менеджера.
+ * Компания — одна на всё (владелец 12.10): profile.company, то же поле, что в Настройках →
+ * Профиль и на постах; название кабинета (smmaker_workspaces.name) идёт за ним
+ */
+export const updateAccount = async ({userId, workspaceId, name, company}) => {
+  const person = checkName(name);
+  const title = company === undefined ? undefined : String(company ?? '').trim().slice(0, 120);
+  if (title === '') throw new HttpError(400, 'Название компании не может быть пустым');
+  await db().query('UPDATE smmaker_users SET name = $2 WHERE id = $1', [userId, person]);
+  if (title !== undefined) {
+    const {rowCount} = await db().query(
+      `UPDATE smmaker_workspaces w SET name = $3, profile = jsonb_set(w.profile, '{company}', to_jsonb($3::text)), updated_at = now()
+        FROM smmaker_memberships m
+       WHERE w.id = $2 AND m.workspace_id = w.id AND m.user_id = $1 AND m.role = 'owner'`, [userId, workspaceId, title]);
+    if (!rowCount) throw new HttpError(403, 'Название компании меняет владелец кабинета');
+  }
+  return accountOf(userId, workspaceId);
+};
+
+/**
+ * Новый пароль из кабинета. Остальные входы закрываются, этот остаётся: пароль чаще всего
+ * меняют, заподозрив чужой вход, и тот должен вылететь, а сам человек — нет.
+ * На почту — уведомление: если менял не он, он узнает сразу
+ */
+export const changePassword = async ({userId, sessionId, current, password}) => {
+  const pass = checkPassword(password);
+  await checkCurrentPassword(userId, current);
+  if (pass === String(current)) throw new HttpError(400, 'Новый пароль совпадает с текущим');
+  const hash = await hashPassword(pass);
+  const {rows: [u]} = await db().query('UPDATE smmaker_users SET password_hash = $2 WHERE id = $1 RETURNING email', [userId, hash]);
+  const {rowCount: closed} = await db().query(
+    'DELETE FROM smmaker_sessions WHERE user_id = $1 AND left(token_hash, $3) <> $2', [userId, sessionId, SID_LEN]);
+  await noticeMail({to: u.email, title: 'Пароль изменён',
+    text: 'Пароль от KOK только что изменили в кабинете. Остальные устройства вышли из аккаунта.\n\nЕсли это были не вы — сбросьте пароль через «Забыли пароль?» на странице входа и напишите нам.'})
+    .catch((e) => console.error('Уведомление о пароле не ушло:', e.message));
+  return {ok: true, closed};
+};
+
+const EMAIL_CHANGE_HOURS = 1;
+
+/**
+ * Смена почты, шаг 1: проверить пароль и новый адрес, выслать код НА НОВЫЙ адрес. Почта
+ * в аккаунте пока прежняя — до ввода кода. Иначе опечатка закрыла бы и вход, и сброс пароля
+ */
+export const requestEmailChange = async ({userId, password, email}) => {
+  await checkCurrentPassword(userId, password);
+  const mail = normEmail(email);
+  const key = emailKey(mail);
+  const {rows: [u]} = await db().query('SELECT name, email, email_key FROM smmaker_users WHERE id = $1', [userId]);
+  if (u.email_key === key) throw new HttpError(400, 'Это и есть ваша почта');
+  if (await isDisposable(mail)) throw new HttpError(400, 'Одноразовая почта не подойдёт — укажите рабочую');
+  const {rows: [taken]} = await db().query(
+    'SELECT 1 FROM smmaker_users WHERE (lower(email) = $1 OR email_key = $2) AND id <> $3', [mail, key, userId]);
+  if (taken) throw new HttpError(409, 'Эта почта уже занята другим аккаунтом');
+  const left = await pauseLeft(userId, 'email');
+  if (left > 0) throw new HttpError(429, `Письмо уже отправлено — повторить можно через ${left} с`);
+  const {code} = await inTransaction((client) => issueToken(client, userId, 'email', EMAIL_CHANGE_HOURS * 60, mail));
+  await emailChangeMail({to: mail, name: u.name, code});
+  return {sent: true, pendingEmail: mail};
+};
+
+/**
+ * Смена почты, шаг 2: код с нового адреса. Адрес меняется, и раз ящик доказан — почта
+ * считается подтверждённой (бесплатные кредиты, если их ещё не было, — как при обычном
+ * подтверждении). Старому адресу — уведомление: увести аккаунт молча не выйдет
+ */
+export const confirmEmailChange = async ({userId, code}) => {
+  const out = await takeCode({
+    userId, code, kind: 'email', onValid: async (client, t) => {
+      const {rows: [old]} = await client.query('SELECT email FROM smmaker_users WHERE id = $1', [userId]);
+      await client.query('UPDATE smmaker_users SET email = $2, email_key = $3 WHERE id = $1', [userId, t.new_email, emailKey(t.new_email)]);
+      await confirmEmail(client, userId);
+      return {email: t.new_email, oldEmail: old.email};
+    },
+  });
+  await noticeMail({to: out.oldEmail, title: 'Почта аккаунта изменена',
+    text: `Почту для входа в KOK сменили на ${out.email}. Если это были не вы — срочно напишите нам.`})
+    .catch((e) => console.error('Уведомление о смене почты не ушло:', e.message));
+  return {ok: true, email: out.email};
+};
+
+/** Отменить смену почты: погасить код, адрес остаётся прежним */
+export const cancelEmailChange = async ({userId}) => {
+  await db().query(`UPDATE smmaker_email_tokens SET used_at = now() WHERE user_id = $1 AND kind = 'email' AND used_at IS NULL`, [userId]);
+  return {ok: true};
+};
+
+/**
+ * Устройство по строке браузера — для людей: «Chrome · Mac». Точность не нужна: задача —
+ * узнать свой вход и заметить чужой. Порядок проверок важен: Edge, Яндекс и Samsung
+ * называют себя ещё и Chrome, Chrome на iPhone — ещё и Safari
+ */
+export const deviceOf = (ua = '') => {
+  const browser = /Edg\//.test(ua) ? 'Edge' : /YaBrowser/.test(ua) ? 'Яндекс Браузер' : /SamsungBrowser/.test(ua) ? 'Samsung Internet'
+    : /OPR\//.test(ua) ? 'Opera' : /Firefox|FxiOS/.test(ua) ? 'Firefox' : /Chrome|CriOS/.test(ua) ? 'Chrome'
+      : /Safari/.test(ua) ? 'Safari' : '';
+  const os = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android'
+    : /Mac OS X|Macintosh/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : '';
+  return [browser, os].filter(Boolean).join(' · ') || 'Неизвестное устройство';
+};
+
+/** Где выполнен вход: действующие сессии человека, текущая — первой */
+export const listSessions = async ({userId, sessionId}) => {
+  const {rows} = await db().query(
+    `SELECT left(token_hash, $2) AS id, user_agent, ip, created_at, COALESCE(seen_at, created_at) AS seen_at
+       FROM smmaker_sessions WHERE user_id = $1 AND expires_at > now()
+      ORDER BY left(token_hash, $2) = $3 DESC, COALESCE(seen_at, created_at) DESC`, [userId, SID_LEN, sessionId]);
+  return rows.map((r) => ({
+    id: r.id, device: deviceOf(r.user_agent), ip: r.ip, createdAt: r.created_at, seenAt: r.seen_at, current: r.id === sessionId,
+  }));
+};
+
+/** Закрыть один чужой вход. Свой закрывается кнопкой «Выйти» — она ещё и чистит cookie */
+export const closeSession = async ({userId, sessionId, id}) => {
+  if (String(id) === sessionId) throw new HttpError(409, 'Это текущий вход — для него есть кнопка «Выйти»');
+  const {rowCount} = await db().query(
+    'DELETE FROM smmaker_sessions WHERE user_id = $1 AND left(token_hash, $3) = $2', [userId, String(id).slice(0, SID_LEN), SID_LEN]);
+  if (!rowCount) throw new HttpError(404, 'Такого входа уже нет');
+  return listSessions({userId, sessionId});
+};
+
+/** Выйти на всех устройствах, кроме этого */
+export const closeOtherSessions = async ({userId, sessionId}) => {
+  await db().query('DELETE FROM smmaker_sessions WHERE user_id = $1 AND left(token_hash, $3) <> $2', [userId, sessionId, SID_LEN]);
+  return listSessions({userId, sessionId});
+};
+
+// ——— Удаление аккаунта ———
+// Решение владельца 12.10: отложенное на 14 дней, как у GitHub и Google. По запросу аккаунт сразу
+// закрывается — входы сброшены, войти нельзя, — и на почту уходит ссылка «восстановить». Через
+// 14 дней purgeDeleted стирает файлы и личные данные. Кредиты сгорают без возврата денег.
+// Подтверждение — пароль и название компании, набранное руками (как у GitHub): удаление нельзя
+// сделать одним случайным нажатием
+
+export const DELETE_DAYS = 14;
+
+// Хеши почтового ящика и телефона удалённых — чтобы не дарить бесплатные кредиты по второму
+// кругу. Приставка разводит виды: хеш почты не совпадёт с хешем телефона из тех же цифр
+const identityHash = (kind, value) => crypto.createHash('sha256').update(`smmaker:${kind}:${value}`).digest('hex');
+
+/** Удалялся ли раньше человек с этим ящиком или телефоном */
+const wasDeleted = async (client, userId) => {
+  const {rows: [u]} = await client.query('SELECT email_key, phone FROM smmaker_users WHERE id = $1', [userId]);
+  if (!u) return false;
+  const {rowCount} = await client.query(
+    'SELECT 1 FROM smmaker_deleted_identities WHERE email_hash = $1 OR (phone_hash IS NOT NULL AND phone_hash = $2) LIMIT 1',
+    [identityHash('email', u.email_key), u.phone ? identityHash('phone', u.phone) : null]);
+  return rowCount > 0;
+};
+
+/** Название компании для подтверждения: то, что человек видит в кабинете */
+const companyOf = async (workspaceId) => {
+  const {rows: [w]} = await db().query(
+    `SELECT COALESCE(NULLIF(profile->>'company', ''), name) AS company FROM smmaker_workspaces WHERE id = $1`, [workspaceId]);
+  return w?.company ?? '';
+};
+// Сравнение без регистра и лишних пробелов: смысл проверки — «набрал руками, не промахнулся
+// кнопкой», а не экзамен на заглавные буквы
+const sameName = (a, b) => String(a ?? '').trim().replace(/\s+/g, ' ').toLowerCase() === String(b ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+
+/** Запрос на удаление: аккаунт закрыт сразу, окончательно — через DELETE_DAYS дней */
+export const requestDeletion = async ({userId, workspaceId, password, confirm}) => {
+  await checkCurrentPassword(userId, password);
+  const {rows: [u]} = await db().query(
+    `SELECT u.email, u.name, u.platform_role, m.role FROM smmaker_users u
+       LEFT JOIN smmaker_memberships m ON m.user_id = u.id AND m.workspace_id = $2 WHERE u.id = $1`, [userId, workspaceId]);
+  // Сотрудник платформы удалением себя оставил бы платформу без админа или менеджера
+  if (u.platform_role) throw new HttpError(409, 'Аккаунт сотрудника платформы так не удалить — сначала снимите роль в админке');
+  if (u.role !== 'owner') throw new HttpError(403, 'Удалить кабинет может только его владелец');
+  if (!sameName(confirm, await companyOf(workspaceId))) throw new HttpError(400, 'Название компании набрано не так — проверьте');
+  const {link, until} = await inTransaction(async (client) => {
+    const {rows: [r]} = await client.query(
+      `UPDATE smmaker_users SET delete_after = now() + $2 * interval '1 day' WHERE id = $1 RETURNING delete_after`, [userId, DELETE_DAYS]);
+    await client.query('DELETE FROM smmaker_sessions WHERE user_id = $1', [userId]);
+    const t = await issueToken(client, userId, 'restore', DELETE_DAYS * 24 * 60);
+    return {link: t.link, until: r.delete_after};
+  });
+  await deletionMail({to: u.email, name: u.name, link: `${appUrl()}/#/restore?t=${link}`, until})
+    .catch((e) => console.error('Письмо об удалении не ушло:', e.message));
+  return {ok: true, until};
+};
+
+/** Ссылка «восстановить» из письма: аккаунт снова открыт, и человек сразу входит */
+export const restoreAccount = async ({token}, meta = {}) => {
+  const out = await inTransaction(async (client) => {
+    const {rows: [t]} = await client.query(
+      `UPDATE smmaker_email_tokens SET used_at = now()
+        WHERE link_hash = $1 AND kind = 'restore' AND used_at IS NULL AND expires_at > now() RETURNING user_id`,
+      [tokenHash(String(token ?? ''))]);
+    if (!t) throw new HttpError(410, 'Ссылка устарела или уже использована');
+    const {rows: [u]} = await client.query(
+      'UPDATE smmaker_users SET delete_after = NULL WHERE id = $1 AND delete_after > now() RETURNING email', [t.user_id]);
+    if (!u) throw new HttpError(410, 'Аккаунт уже удалён окончательно — восстановить нельзя');
+    return {email: u.email, token: await createSession(t.user_id, client, meta)};
+  });
+  await noticeMail({to: out.email, title: 'Аккаунт восстановлен', text: 'Удаление аккаунта KOK отменено: всё на месте, можно работать дальше.'})
+    .catch((e) => console.error('Письмо о восстановлении не ушло:', e.message));
+  return out;
+};
+
+/**
+ * Окончательное удаление тех, чей срок вышел. Зовётся по таймеру сервера (server/index.mjs).
+ * Стираются файлы компании и личные данные; строки компании, партий и журнала остаются
+ * обезличенными — это расчёты, их хранят 5 лет. Остаток кредитов сгорает строкой журнала.
+ * Каждый — своей транзакцией: сбой на одном не держит остальных
+ */
+export const purgeDeleted = async ({log = console.log} = {}) => {
+  const {rows} = await db().query('SELECT id FROM smmaker_users WHERE delete_after <= now()');
+  for (const {id} of rows) {
+    try {
+      const done = await inTransaction(async (client) => {
+        const {rows: [u]} = await client.query(
+          'SELECT email, name, email_key, phone FROM smmaker_users WHERE id = $1 AND delete_after <= now() FOR UPDATE', [id]);
+        if (!u) return null;
+        await client.query('INSERT INTO smmaker_deleted_identities (email_hash, phone_hash) VALUES ($1, $2)',
+          [identityHash('email', u.email_key), u.phone ? identityHash('phone', u.phone) : null]);
+        // Компании, где он владелец и единственный участник. С командой (позже) компания
+        // остаётся остальным — уходит только человек
+        const {rows: wss} = await client.query(
+          `SELECT m.workspace_id AS id FROM smmaker_memberships m
+            WHERE m.user_id = $1 AND m.role = 'owner'
+              AND NOT EXISTS (SELECT 1 FROM smmaker_memberships o WHERE o.workspace_id = m.workspace_id AND o.user_id <> $1)`, [id]);
+        for (const w of wss) {
+          // Остаток сгорает строкой журнала: по истории видно, куда делись кредиты
+          const {rows: [b]} = await client.query(
+            `SELECT COALESCE(sum(remaining), 0)::int AS n FROM smmaker_credit_lots WHERE workspace_id = $1 AND expires_at > now()`, [w.id]);
+          await client.query('UPDATE smmaker_credit_lots SET remaining = 0 WHERE workspace_id = $1 AND remaining > 0', [w.id]);
+          if (b.n > 0) {
+            await client.query(
+              `INSERT INTO smmaker_credit_ledger (workspace_id, delta, kind, note) VALUES ($1, $2, 'adjust', 'аккаунт удалён — кредиты сгорели')`,
+              [w.id, -b.n]);
+          }
+          await client.query(
+            `UPDATE smmaker_workspaces SET name = 'Удалённый клиент', brand = '{}'::jsonb, profile = '{}'::jsonb, deleted_at = now(), updated_at = now()
+              WHERE id = $1`, [w.id]);
+        }
+        await client.query('DELETE FROM smmaker_memberships WHERE user_id = $1', [id]);
+        await client.query('DELETE FROM smmaker_sessions WHERE user_id = $1', [id]);
+        await client.query('DELETE FROM smmaker_email_tokens WHERE user_id = $1', [id]);
+        // Строку человека не удаляем: на неё ссылаются «кто начислил» в журнале и партиях.
+        // Пароль-заглушка не проходит проверку scrypt — войти нельзя
+        const gone = `deleted-${id}@deleted.invalid`;
+        await client.query(
+          `UPDATE smmaker_users SET email = $2, email_key = $2, name = '', phone = NULL, password_hash = 'deleted',
+             email_verified_at = NULL, platform_role = NULL, last_seen_at = NULL, delete_after = NULL WHERE id = $1`, [id, gone]);
+        return {email: u.email, workspaces: wss.map((w) => w.id)};
+      });
+      if (!done) continue;
+      // Файлы — после записи в базу: упадёт удаление файлов — данные всё равно обезличены,
+      // а папку без хозяина видно в data/ и можно убрать руками
+      for (const ws of done.workspaces) {
+        await fs.rm(workspaceDir(ws), {recursive: true, force: true}).catch((e) => console.error(`Файлы ${ws} не удалены:`, e.message));
+      }
+      await noticeMail({to: done.email, title: 'Аккаунт удалён',
+        text: 'Аккаунт KOK удалён окончательно: файлы и личные данные стёрты. Спасибо, что были с нами.'})
+        .catch((e) => console.error('Письмо об окончательном удалении не ушло:', e.message));
+      log(`Удалён аккаунт ${id} (компаний: ${done.workspaces.length})`);
+    } catch (e) {
+      console.error(`Удаление аккаунта ${id} не прошло:`, e.message);
+    }
+  }
 };
 
 // ——— Пакеты ———
@@ -489,7 +821,8 @@ const CLIENTS_CTE = `WITH c AS (
          -- Подписка: тариф и конец оплаченного — менеджеру видно, кому пора продлевать
          sub.title AS plan_title, sub.expires_at AS plan_until,
          EXISTS (SELECT 1 FROM smmaker_credit_lots t WHERE t.workspace_id = w.id AND t.source = 'subscription') AS had_plan,
-         g.generations, g.generations_30d, g.last_generation
+         g.generations, g.generations_30d, g.last_generation,
+         u.delete_after
     FROM smmaker_workspaces w
     LEFT JOIN LATERAL (SELECT user_id FROM smmaker_memberships m WHERE m.workspace_id = w.id ORDER BY created_at LIMIT 1) m ON true
     LEFT JOIN smmaker_users u ON u.id = m.user_id
@@ -503,6 +836,8 @@ const CLIENTS_CTE = `WITH c AS (
              (count(*) FILTER (WHERE l.created_at > now() - interval '30 days'))::int AS generations_30d,
              max(l.created_at) AS last_generation
         FROM smmaker_credit_ledger l WHERE l.workspace_id = w.id AND l.kind = 'charge') g ON true
+   -- Окончательно удалённые — обезличенные расчёты, не клиенты: в списке им не место
+   WHERE w.deleted_at IS NULL
 )`;
 
 /**

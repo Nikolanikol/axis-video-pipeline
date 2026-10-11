@@ -25,13 +25,14 @@ import {hasKey, hasVoice, synthesize} from './speech.mjs';
 import {hasSeparator} from './ambience.mjs';
 import {carouselFormats, carouselsDir, buildCarousel, deleteCarousel, listCarousels, repriceCarousel, slideFileName} from './carousel.mjs';
 import {ICON_RULES, LOGO_RULES, brandForRender, saveIcon, saveLogo, setIconVariant, setLogoVariant} from './brand.mjs';
-import {balanceOf, billed, creditCosts, ledgerOf, signupCredits} from './billing.mjs';
+import {balanceOf, billed, creditCosts, ledgerOf, ledgerPage, signupCredits} from './billing.mjs';
 import {parseCarouselSource} from '../src/shared/kmotorsLot.js';
 import {PALETTE_KEYS, isHex} from '../src/shared/contrast.js';
 import {withoutMusic} from '../src/shared/nomusic.js';
 import {
-  dropSession, grantBonus, grantPack, listClients, listPacks, listStaff, login, register, requestReset, resetPassword,
-  savePack, sendVerification, setRole, verifyCode, verifyLink,
+  accountOf, cancelEmailChange, requestDeletion, restoreAccount, changePassword, closeOtherSessions, closeSession, confirmEmailChange, dropSession,
+  grantBonus, grantPack, listClients, listPacks, listSessions, listStaff, login, register, requestEmailChange,
+  requestReset, resetPassword, savePack, sendVerification, setRole, updateAccount, verifyCode, verifyLink,
 } from './accounts.mjs';
 import {
   authEnabled, clearSessionCookie, guardData, loginLimiter, readSessionMw, registerLimiter, requireAdmin, requireCredits,
@@ -55,6 +56,10 @@ const themeForRender = (origin, theme) => (theme?.assets
     Object.entries(theme.assets).map(([k, v]) => [k, absolute(origin, v)]))}
   : theme);
 const withAbsolutePhotos = (lot, origin) => lot && {...lot, photos: lot.photos.map((p) => absolute(origin, p))};
+
+// Откуда вход: браузер и адрес — для списка «где выполнен вход» в кабинете.
+// req.ip — с учётом trust proxy ниже, то есть адрес человека, а не Traefik
+const clientMeta = (req) => ({userAgent: req.get('user-agent') ?? '', ip: req.ip ?? ''});
 
 // Обработчик выполняется от имени компании из сессии. Контекст ставим заново здесь, а не
 // полагаемся на общий: приёмник файлов (multer) зовёт следующий шаг из событий потока,
@@ -123,9 +128,9 @@ export const createApp = ({photoOrigin}) => {
       balance: req.ws ? await balanceOf(req.ws) : null,
     });
   })().catch(next));
-  api.post('/auth/login', loginLimiter, (req, res, next) => login(req.body ?? {})
+  api.post('/auth/login', loginLimiter, (req, res, next) => login(req.body ?? {}, clientMeta(req))
     .then(({token}) => { setSessionCookie(req, res, token); res.json({ok: true}); }).catch(next));
-  api.post('/auth/register', registerLimiter, (req, res, next) => register(req.body ?? {})
+  api.post('/auth/register', registerLimiter, (req, res, next) => register(req.body ?? {}, clientMeta(req))
     .then(({token}) => { setSessionCookie(req, res, token); res.json({ok: true}); }).catch(next));
   // Подтверждение почты: код — из кабинета (нужна сессия), ссылка — с любого устройства.
   // Ссылка из письма открывает страницу приложения, а та шлёт POST: GET-ссылку почтовые
@@ -143,7 +148,10 @@ export const createApp = ({photoOrigin}) => {
   // Сброс пароля: письмо со ссылкой; по ссылке — новый пароль и сразу вход
   api.post('/auth/forgot', loginLimiter, (req, res, next) => requestReset({email: req.body?.email})
     .then((r) => res.json(r)).catch(next));
-  api.post('/auth/reset', loginLimiter, (req, res, next) => resetPassword({token: req.body?.token, password: req.body?.password})
+  api.post('/auth/reset', loginLimiter, (req, res, next) => resetPassword({token: req.body?.token, password: req.body?.password}, clientMeta(req))
+    .then(({token}) => { setSessionCookie(req, res, token); res.json({ok: true}); }).catch(next));
+  // Ссылка «восстановить» из письма об удалении: аккаунт снова открыт, и сразу вход
+  api.post('/auth/restore', loginLimiter, (req, res, next) => restoreAccount({token: req.body?.token}, clientMeta(req))
     .then(({token}) => { setSessionCookie(req, res, token); res.json({ok: true}); }).catch(next));
   api.post('/auth/logout', (req, res, next) => Promise.resolve(authEnabled() ? dropSession(sessionToken(req)) : null)
     .then(() => { clearSessionCookie(res); res.json({ok: true}); }).catch(next));
@@ -171,7 +179,27 @@ export const createApp = ({photoOrigin}) => {
   api.use((req, _res, next) => { try { withWorkspace(wsOf(req), next); } catch (e) { next(e); } });
 
   // ——— Кабинет компании ———
-  api.get('/account/ledger', wrap((req) => (authEnabled() ? ledgerOf(req.ws) : [])));
+  api.get('/account/ledger', wrap((req) => (authEnabled() ? ledgerPage(req.ws, req.query.page)
+    : {rows: [], total: 0, page: 1, pages: 1, pageSize: 20})));
+  // Профиль и безопасность: только с базой — без неё нет ни людей, ни паролей
+  const account = express.Router();
+  account.use((req, _res, next) => next(authEnabled() ? undefined : new HttpError(400, 'Профиль работает только с базой')));
+  const who = (req) => ({userId: req.user.id, workspaceId: req.ws, sessionId: req.sessionId});
+  account.get('/profile', wrap((req) => accountOf(req.user.id, req.ws)));
+  account.put('/profile', wrap((req) => updateAccount({...who(req), name: req.body?.name, company: req.body?.company})));
+  // Всё, где проверяется текущий пароль, — под ограничением попыток: иначе вошедший на
+  // чужом ноутбуке перебирал бы пароль владельца, чтобы сменить почту
+  account.post('/password', loginLimiter, wrap((req) => changePassword({...who(req), current: req.body?.current, password: req.body?.password})));
+  account.post('/email', loginLimiter, wrap((req) => requestEmailChange({...who(req), password: req.body?.password, email: req.body?.email})));
+  account.post('/email/confirm', loginLimiter, wrap((req) => confirmEmailChange({...who(req), code: req.body?.code})));
+  account.delete('/email', wrap((req) => cancelEmailChange(who(req))));
+  account.get('/sessions', wrap((req) => listSessions(who(req))));
+  account.delete('/sessions/:id', wrap((req) => closeSession({...who(req), id: req.params.id})));
+  account.post('/sessions/close-others', wrap((req) => closeOtherSessions(who(req))));
+  // Удаление: пароль и название компании руками. Входы сброшены сервером — cookie тоже чистим
+  account.post('/delete', loginLimiter, (req, res, next) => requestDeletion({
+    ...who(req), password: req.body?.password, confirm: req.body?.confirm,
+  }).then((r) => { clearSessionCookie(res); res.json(r); }).catch(next));
   // Куда писать за пакетом и что в прайсе — на экран «кредиты закончились» и в кабинет.
   // WhatsApp продаж — из SMMAKER_SALES_WHATSAPP, если задан: номер менеджера меняется без
   // пересборки образа. Не задан — номер из config/platform.json
@@ -183,6 +211,8 @@ export const createApp = ({photoOrigin}) => {
       packs: authEnabled() ? await listPacks() : [],
     };
   }));
+  // После /account/offer: проверка «нужна база» в роутере иначе закрыла бы и прайс
+  api.use('/account', account);
 
   // ——— Админка: лиды и пакеты — сотрудникам, прайс и роли — только владельцу ———
   const admin = express.Router();

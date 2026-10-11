@@ -184,6 +184,11 @@ export const saveProfile = async (id, profile) => {
   if (!hasDatabase()) return writeJson(path.join(PROFILES_DIR, `${checkId(id)}.json`), profile);
   ownProfile(id);
   await updateWorkspace('profile', profile);
+  // Название кабинета — это название компании из профиля (владелец 12.10: одно название, а не
+  // два). Админка и шапка читают smmaker_workspaces.name — держим его вровень. Пустое не пишем:
+  // кабинет без имени в списке клиентов не найти
+  const company = String(profile?.company ?? '').trim().slice(0, 120);
+  if (company) await updateWorkspace('name', company);
 };
 export const listProfiles = async () => {
   if (hasDatabase()) return [{id: DEFAULT_PROFILE, ...(await getProfile(DEFAULT_PROFILE))}];

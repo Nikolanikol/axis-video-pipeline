@@ -28,6 +28,8 @@ export const readSessionMw = async (req, _res, next) => {
     req.user = s?.user ?? null;
     req.ws = s?.workspace?.id ?? null;
     req.workspace = s?.workspace ?? null;
+    // Номер этой сессии: кабинет помечает её в списке входов и не даёт закрыть «чужой» кнопкой
+    req.sessionId = s?.sessionId ?? null;
     next();
   } catch (e) { next(e); }
 };

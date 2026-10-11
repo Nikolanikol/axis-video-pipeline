@@ -319,10 +319,11 @@ suite('вход и кабинеты SMMAKER', () => {
       expect(saved.body).toMatchObject({price_krw: 45000, active: false});
       expect((await a.call('GET', '/api/account/offer')).body.packs.map((p) => p.id)).not.toContain('start');
       expect((await owner.call('POST', `/api/admin/clients/${wsA}/packs`, {packId: 'start'})).status).toBe(404);
-      const clients = (await owner.call('GET', '/api/admin/clients')).body;
+      // Список клиентов с 11.10 — страницами (listClients): строки в .rows
+      const clients = (await owner.call('GET', '/api/admin/clients')).body.rows;
       expect(clients.find((c) => c.id === wsA).paid_krw).toBe(19000 + 69000 + 49000 + 44000);
       // Проданная докупка осталась по цене продажи, а не по новой
-      const rows = (await a.call('GET', '/api/account/ledger')).body;
+      const rows = (await a.call('GET', '/api/account/ledger')).body.rows;
       const sold = rows.find((r) => r.note.includes('перевод 123'));
       expect(sold).toMatchObject({kind: 'grant', delta: 10, source: 'pack', price_krw: 19000});
       expect(sold.note).toMatch(/\+10 кредитов.*перевод 123/);
@@ -421,12 +422,13 @@ suite('вход и кабинеты SMMAKER', () => {
     });
 
     it('журнал в кабинете — построчно, новые сверху, у начислений срок', async () => {
-      const rows = (await b.call('GET', '/api/account/ledger')).body;
+      // С 12.10 журнал в кабинете — страницами (ledgerPage): строки в .rows
+      const rows = (await b.call('GET', '/api/account/ledger')).body.rows;
       expect(rows[0].kind).toBe('refund');
       expect(rows.at(-1)).toMatchObject({kind: 'grant', delta: 7, source: 'signup'});
       expect(rows.at(-1).expires_at).toBeTruthy();
       // Чужой журнал не виден: у владельца своя компания
-      expect((await owner.call('GET', '/api/account/ledger')).body.some((r) => r.job_id === 'job-1')).toBe(false);
+      expect((await owner.call('GET', '/api/account/ledger')).body.rows.some((r) => r.job_id === 'job-1')).toBe(false);
     });
   });
 
