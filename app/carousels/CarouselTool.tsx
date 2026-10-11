@@ -36,9 +36,11 @@ const CarSummary: React.FC<{entry: CarouselEntry}> = ({entry}) => {
   const bits = [
     c.year, km(c.mileageKm), c.transmission, c.fuel,
     c.price?.krw ? `${c.price.krw.toLocaleString('ru-RU')} ₩ на Encar`
-      : c.price?.usd ? `$${c.price.usd.toLocaleString('ru-RU')} на ${sourceName(c.id)}` : null,
-    // У машины из Китая истории нет вовсе (в рекламу не идёт) — и строку о ней не пишем
-    c.origin === 'CN' ? null : c.history ? `${c.history.accidentsTotal} ДТП` : 'история недоступна',
+      // У японской — иены, как на Carsensor: доллары из них посчитаны нами по курсу дня
+      : c.price?.jpy ? `${c.price.jpy.toLocaleString('ru-RU')} ¥ на ${sourceName(c.id)}`
+        : c.price?.usd ? `$${c.price.usd.toLocaleString('ru-RU')} на ${sourceName(c.id)}` : null,
+    // У машин из Китая и Японии истории нет вовсе (в рекламу не идёт) — и строку о ней не пишем
+    c.origin === 'CN' || c.origin === 'JP' ? null : c.history ? `${c.history.accidentsTotal} ДТП` : 'история недоступна',
     c.history ? `${c.history.ownerChanges} смен владельца` : null,
   ].filter(Boolean);
   return (
@@ -467,7 +469,7 @@ export const CarouselTool: React.FC = () => {
       {/* quick-screen — один экран, как у «Ролика по лоту»: колонки прокручиваются внутри */}
       <div className="quick-screen">
       <QuickLink onLink={fromLink} error={linkError} busy={busy} parse={parseCarouselSource}
-        placeholder={`Вставьте ссылку на объявление Encar или che168 — карусель соберётся сама (слайды на ${slidesLang})`} />
+        placeholder={`Вставьте ссылку на объявление Encar, che168 или Carsensor — карусель соберётся сама (слайды на ${slidesLang})`} />
       {/* Сборка — 10–20 секунд (замер 30.09: 13 с на 9 слайдов); экран закрыт окном, как у лота по ссылке */}
       <BusyModal step={busy ? 0 : null} steps={['Собираю карусель: данные и слайды']} label="Сборка карусели"
         note="Обычно 10–20 секунд. Не закрывайте страницу" />
@@ -481,7 +483,7 @@ export const CarouselTool: React.FC = () => {
         <section className="quick-preview">
           {entry
             ? <SlideViewer entry={entry} ratio={ratio} onZoom={setOpen} />
-            : <div className="empty">Вставьте ссылку на объявление Encar или che168 — слайды появятся здесь.</div>}
+            : <div className="empty">Вставьте ссылку на объявление Encar, che168 или Carsensor — слайды появятся здесь.</div>}
         </section>
 
         <section className="quick-side">

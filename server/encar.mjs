@@ -5,13 +5,14 @@
 // а ещё у своих копий работают размытие номера и порядок сцен, как у загруженных руками.
 import {fetchCar} from './carousel.mjs';
 import {fetchChe168Car} from './che168.mjs';
+import {fetchCarsensorCar} from './carsensor.mjs';
 import {HttpError, renderMarket} from './store.mjs';
 import {parseCarLink} from '../src/shared/encarLink.js';
 
-// Только картинки Encar и che168 (CDN Autohome — *.autoimg.cn). Адрес приходит из браузера, и без
-// этой проверки через кнопку «добавить фото» можно было бы заставить сервер сходить куда
-// угодно — в том числе на внутренние адреса машины
-const PHOTO_URL_RE = /^https:\/\/(ci\.encar\.com|[a-z0-9-]+\.autoimg\.cn)\/[^\s]+$/;
+// Только картинки Encar, che168 (CDN Autohome — *.autoimg.cn) и Carsensor (ccsrpcma — главное фото,
+// ccsrpcml — галерея). Адрес приходит из браузера, и без этой проверки через кнопку «добавить фото»
+// можно было бы заставить сервер сходить куда угодно — в том числе на внутренние адреса машины
+const PHOTO_URL_RE = /^https:\/\/(ci\.encar\.com|[a-z0-9-]+\.autoimg\.cn|ccsrpcm[al]\.carsensor\.net)\/[^\s]+$/;
 // Сколько фото за раз: в объявлении Encar их обычно 20–25, в ролике нужно 3–8
 export const MAX_IMPORT = 25;
 // Оригинал Encar — 0,4–1,3 МБ; 15 МБ — с запасом, но не даст забить память, если адрес
@@ -25,6 +26,8 @@ export const lookupCar = async (link) => {
   try { parsed = parseCarLink(link); } catch (e) { throw new HttpError(400, e.message); }
   // Машина из Китая — через ядро che168; названия опций — на языке постов профиля
   if (parsed.source === 'che168') return fetchChe168Car(parsed.ref, (await renderMarket()).language);
+  // Машина из Японии — через ядро carsensor (цена в ¥ → $ по курсу дня)
+  if (parsed.source === 'carsensor') return fetchCarsensorCar(parsed.ref, (await renderMarket()).language);
   return fetchCar(parsed.id);
 };
 
@@ -34,7 +37,7 @@ export const checkPhotoUrls = (urls) => {
   const list = [...new Set(urls.map(String))];
   if (list.length > MAX_IMPORT) throw new HttpError(400, `За раз — не больше ${MAX_IMPORT} фото`);
   const bad = list.find((u) => !PHOTO_URL_RE.test(u));
-  if (bad) throw new HttpError(400, 'Добавлять можно только фото из объявления Encar или che168');
+  if (bad) throw new HttpError(400, 'Добавлять можно только фото из объявления Encar, che168 или Carsensor');
   return list;
 };
 

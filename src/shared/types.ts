@@ -230,9 +230,9 @@ export type CarouselCar = {
   id: string;
   source: string;
   // Откуда машина: от этого зависят «Цена в Корее / в Китае», «Импорт из …» на слайдах.
-  // Нет поля — Корея (Encar, лоты аукционов)
-  origin?: 'KR' | 'CN';
-  // Город машины (che168): точка отправления в маршруте ролика
+  // Нет поля — Корея (Encar, лоты аукционов); CN — che168, JP — Carsensor
+  origin?: 'KR' | 'CN' | 'JP';
+  // Город машины (che168), префектура (Carsensor): точка отправления в маршруте ролика
   city?: string;
   brand: string; model: string; grade: string; trim: string;
   year: number | null;
@@ -244,8 +244,9 @@ export type CarouselCar = {
   vin: string | null; plate: string | null;
   // Цена в Корее: воны, доллары и курс с отметкой времени — без неё цифры в постах
   // расходятся между днями, и объяснить расхождение нечем
-  // У машины из Китая вон нет (krw: null) — только доллары международной версии che168
-  price: {krw: number | null; usd: number | null; krwToUsd: number | null; quotedAt: string | null; rateSource: string} | null;
+  // У машины из Китая вон нет (krw: null) — только доллары международной версии che168.
+  // У японской (Carsensor) — иены (jpy) и доллары, пересчитанные из них по курсу дня на сборке
+  price: {krw: number | null; usd: number | null; krwToUsd: number | null; quotedAt: string | null; rateSource: string; jpy?: number | null} | null;
   // null — история недоступна. Это НЕ то же самое, что «происшествий не было»
   history: {
     accidentsOwn: number; accidentsOther: number; accidentsTotal: number;

@@ -16,7 +16,9 @@ import {LOT_SKIP_SLIDES, carFromLot, lotPageUrl, missingForCarousel, parseCarous
 import {brandForRender} from './brand.mjs';
 import {fetchLot} from './kmotorsLot.mjs';
 import {fetchChe168Car} from './che168.mjs';
+import {fetchCarsensorCar} from './carsensor.mjs';
 import {CHE168_SKIP_SLIDES} from '../src/shared/che168Car.js';
+import {CARSENSOR_SKIP_SLIDES} from '../src/shared/carsensorCar.js';
 import {
   HttpError, PRODUCTION, ROOT, checkId, currentWorkspace, workspaceDir, workspaceUrl, getBrand, readJson, renderMarket, writeJson,
 } from './store.mjs';
@@ -179,7 +181,7 @@ const runKey = (id) => `${currentWorkspace()}:${id}`;
 
 /**
  * Собрать карусель по ссылке или номеру.
- * @param {string} link — ссылка Encar / che168, голый номер Encar или наш id («ch-60154824», «km-…»)
+ * @param {string} link — ссылка Encar / che168 / Carsensor, голый номер Encar или наш id («ch-60154824», «cs-au…», «km-…»)
  * @param {{format?: string, seed?: number, priceOverride?: number | null}} [opts] — формат из
  *   реестра и зерно варианта: то же зерно — те же компоновка и фразы; нет зерна — случайное
  *   («Другой вариант»). priceOverride — своя цена клиента на слайде цены; не передана —
@@ -209,12 +211,15 @@ export const buildCarousel = async (link, opts = {}) => {
     // до машины: по его языку ядро che168 отдаёт названия опций
     const [profileMarket, brand] = await Promise.all([renderMarket(), getBrand().then(brandForRender)]);
     // Машина из Китая — через модуль-ядро che168 (cores/che168, граница — server/che168.mjs)
+    // Машина из Японии — через ядро carsensor (cores/carsensor, граница — server/carsensor.mjs)
     const china = src.source === 'che168';
+    const japan = src.source === 'carsensor';
     let car = lot ? await carFromLink({house: lot.house, lotId: lot.id})
-      : china ? await fetchChe168Car(src.ref, profileMarket.language) : await fetchCar(id);
+      : china ? await fetchChe168Car(src.ref, profileMarket.language)
+        : japan ? await fetchCarsensorCar(src.ref, profileMarket.language) : await fetchCar(id);
     // Нет фото вовсе — так и говорим, а не «площадка не отдаёт» (это про сбой скачивания); до
     // создания папки — пустая папка карусели не нужна
-    if (china && !car.photos.hero) throw new HttpError(422, 'У этого объявления нет фото — карусель по нему не собрать');
+    if ((china || japan) && !car.photos.hero) throw new HttpError(422, 'У этого объявления нет фото — карусель по нему не собрать');
     const theme = {...brand, name: profileMarket.name};
     const market = profileMarket;
     // Логотип из настроек лежит на нашем сервере, а рендер грузит сборку с адреса Remotion:
@@ -234,7 +239,7 @@ export const buildCarousel = async (link, opts = {}) => {
     // У лота нет цены, истории и опций: эти слайды не рисуем, а не заполняем прочерками.
     // У машины из Китая нет истории: лист осмотра в рекламу не идёт (решение владельца 11.10)
     const inputProps = {car, market, theme: {...theme, assets}, includeHistory: INCLUDE_HISTORY, format, seed,
-      skip: lot ? LOT_SKIP_SLIDES : china ? CHE168_SKIP_SLIDES : [], priceOverride};
+      skip: lot ? LOT_SKIP_SLIDES : china ? CHE168_SKIP_SLIDES : japan ? CARSENSOR_SKIP_SLIDES : [], priceOverride};
     // Старые кадры убираем перед сборкой: та же машина, пересобранная на проде, даёт шесть
     // слайдов вместо прежних семи, и осиротевший slide-7.png остался бы на диске — со старой
     // историей. Ответ ссылается только на новые шесть, но файл-призрак в томе ни к чему.

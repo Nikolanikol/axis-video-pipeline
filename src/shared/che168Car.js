@@ -104,6 +104,8 @@ const rank = (en) => {
   const i = NOTABLE.findIndex((re) => re.test(en));
   return i < 0 ? NOTABLE.length : i;
 };
+/** Важность опции по английскому названию (меньше — важнее) — ею же сортирует Carsensor (carsensorCar.js) */
+export const optionRank = rank;
 const optionsOf = (groupsLocal, groupsEn) => {
   const bins = {comfort: [], safety: [], other: []};
   const list = Array.isArray(groupsLocal) ? groupsLocal : [];

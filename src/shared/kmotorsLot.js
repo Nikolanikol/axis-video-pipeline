@@ -264,7 +264,7 @@ export const parseCarouselSource = (raw) => {
   try { return parseCarLink(text); } catch (e) {
     // Чужой сайт — подскажем, какие ссылки берём; своя площадка без номера — её же текст
     const foreign = String(e?.message).startsWith('Пока умею');
-    throw new Error(text && host && foreign ? `Беру ссылки Encar, che168 и лоты аукционов kmotors.shop, а это ${host}` : e.message);
+    throw new Error(text && host && foreign ? `Беру ссылки Encar, che168, Carsensor и лоты аукционов kmotors.shop, а это ${host}` : e.message);
   }
 };
 

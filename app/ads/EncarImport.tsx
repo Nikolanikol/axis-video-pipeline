@@ -29,7 +29,8 @@ type Props = {
 // Превью в сетке — тот же снимок без параметров: так Encar отдаёт 640×360 (~50 КБ), а с
 // «?impolicy=heightRate&rh=1080» — оригинал 2200×1237 (~450 КБ). Проверено замером 29.09:
 // сам параметр rh размер не меняет. Два десятка оригиналов грузили бы сетку секундами.
-// В лот идёт исходный адрес — полный размер для ролика
+// В лот идёт исходный адрес — полный размер для ролика. У Carsensor так же: без параметров
+// галерея отдаёт 640×480 (~60 КБ), с «?impolicy=car_002» — 2560×1920 (~600 КБ), проверено 12.10
 const thumb = (url: string) => url.split('?')[0];
 // Картинка для сетки. У che168 (CDN Autohome) адрес — оригинал дилера, до 2048 px и 600 КБ;
 // приставка размера «480x0_c42_» перед именем отдаёт 480 px (~40 КБ, проверено 11.10). Своя
@@ -133,8 +134,8 @@ export const EncarImport: React.FC<Props> = ({lot, onApply, onError}) => {
     <section className="encar">
       <form className="link-bar encar-bar" onSubmit={lookup}>
         <Link2 className="link-bar-icon" size={20} aria-hidden />
-        <input ref={input} value={link} onChange={(e) => setLink(e.target.value)} placeholder="Ссылка на объявление Encar или che168"
-          aria-label="Ссылка на объявление Encar или che168" disabled={!!busy} />
+        <input ref={input} value={link} onChange={(e) => setLink(e.target.value)} placeholder="Ссылка на объявление Encar, che168 или Carsensor"
+          aria-label="Ссылка на объявление Encar, che168 или Carsensor" disabled={!!busy} />
         <button className="btn primary link-go" disabled={!!busy}>
           <Search size={17} aria-hidden />{busy === 'lookup' ? 'Ищу…' : 'Подтянуть по ссылке'}
         </button>

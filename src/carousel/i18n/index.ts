@@ -102,7 +102,7 @@ export type CarouselText = ReturnType<typeof carouselText>;
 /**
  * Всё языковое для слайдов: подписи, тексты, перевод данных и числа по правилам языка.
  * origin — страна машины (CarouselCar.origin): у машины из Китая «Цена в Китае» и «Импорт из
- * Китая» вместо Кореи (copy.ts, copyFor). Нет — Корея, как было
+ * Китая» вместо Кореи, у японской — «Япония» (copy.ts, copyFor). Нет — Корея, как было
  */
 export const carouselText = (lang: CarouselLang, origin?: string) => {
   const locale = lang === 'ru' ? 'ru-RU' : 'en-US';
@@ -112,7 +112,7 @@ export const carouselText = (lang: CarouselLang, origin?: string) => {
   const ru = lang === 'ru';
   return {
     lang,
-    origin: origin === 'CN' ? 'CN' : 'KR',
+    origin: origin === 'CN' || origin === 'JP' ? origin : 'KR',
     s: forOrigin(STRINGS[lang], lang, origin),
     // Тексты слайдов новых форматов (Deck) — уже для страны машины
     copy: copyFor(lang, origin),

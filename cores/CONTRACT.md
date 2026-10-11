@@ -76,6 +76,8 @@ photos[]      { url — оригинал, category, angle?, ad?, source }
               category: exterior | interior | engine | detail | underbody | document | unknown
               ad: false — в рекламу не брать (наклейки, ключи, шины…); source — откуда роль:
               studio (точно по порядку съёмки) | position (догадка по положению) | model (распознавание)
+              | listing (подпись ракурса из самого объявления — Carsensor, 12.10; значение добавлено
+              без смены версии: старые ядра его просто не выдают)
 byLang.<язык> { car: { title, brand, series, trim, … }, …свои разделы }
 ```
 

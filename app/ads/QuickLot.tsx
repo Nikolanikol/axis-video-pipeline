@@ -17,7 +17,7 @@ import {thumb} from '../thumb';
 /** Где сейчас загрузка лота по ссылке: шаг 0 — поиск машины, 1 — лот, 2 — фото */
 export type ImportStage = {step: 0 | 1 | 2; photos?: number} | null;
 
-/** Окно загрузки машины по ссылке (Encar, che168) — общее окно BusyModal с тремя шагами */
+/** Окно загрузки машины по ссылке (Encar, che168, Carsensor) — общее окно BusyModal с тремя шагами */
 export const ImportModal: React.FC<{stage: ImportStage}> = ({stage}) => (
   <BusyModal step={stage?.step ?? null} label="Загрузка машины по ссылке" note="Обычно 10–15 секунд. Не закрывайте страницу"
     steps={['Ищу машину', 'Создаю объявление', stage?.photos ? `Загружаю ${stage.photos} фото` : 'Загружаю фото']} />
@@ -32,7 +32,7 @@ export const QuickLink: React.FC<{
   // Какие ссылки принимает экран: по умолчанию — Encar; карусели добавляют лоты аукционов
   parse?: (link: string) => unknown;
 }> = (
-  {onLink, error, busy, placeholder = 'Вставьте ссылку на объявление Encar или che168 — остальное сделается само', parse = parseCarLink},
+  {onLink, error, busy, placeholder = 'Вставьте ссылку на объявление Encar, che168 или Carsensor — остальное сделается само', parse = parseCarLink},
 ) => {
   const [value, setValue] = useState('');
   const ref = useRef<HTMLInputElement>(null);
@@ -49,7 +49,7 @@ export const QuickLink: React.FC<{
       <form className="link-bar" onSubmit={(e) => { e.preventDefault(); if (!value.trim()) ref.current?.focus(); else go(value); }}>
         <Link2 className="link-bar-icon" size={20} aria-hidden />
         <input ref={ref} value={value} disabled={busy} autoFocus
-          placeholder={placeholder} aria-label="Ссылка на объявление Encar или che168"
+          placeholder={placeholder} aria-label="Ссылка на объявление Encar, che168 или Carsensor"
           onChange={(e) => setValue(e.target.value)}
           onPaste={(e) => {
             // Вставили ссылку — сразу в работу; не ссылку — пусть ляжет в поле как текст
@@ -84,7 +84,7 @@ const titleOf = (l: LotEntry) => [l.brand, l.model].filter(Boolean).join(' ') ||
 // «сохранённая ссылка» лота: номер машины уже лежит в пометке, отдельное поле не нужно,
 // и работает это для лотов, созданных до 01.10
 export const encarUrl = (l: LotEntry) => {
-  // «Encar 41630924» или «che168 60154824» (машина из Китая)
+  // «Encar 41630924», «che168 60154824» (Китай) или «carsensor AU7375484964» (Япония)
   const id = idFromNote(l.note);
   return id ? encarAdUrl(id) : null;
 };

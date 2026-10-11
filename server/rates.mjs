@@ -30,8 +30,12 @@ let cached = null;
 // Одновременные запросы после истечения суток ждут один поход к источнику, а не шлют каждый свой
 let inflight = null;
 
-// Кэш до 11.10 знал только вон — таблицы валют в нём нет, такой считаем несвежим
-const fresh = (r) => r && r.usdRates && Date.now() - new Date(r.fetchedAt).getTime() < TTL_MS;
+// Курсы валют источников, а не профиля: цена японской машины приходит в иенах (Carsensor, 12.10).
+// В список валют профиля иену не добавляем — это решение о том, что видит клиент
+const SOURCE_CURRENCIES = ['JPY'];
+// Кэш до 11.10 знал только вон — таблицы валют в нём нет, такой считаем несвежим; до 12.10 — без иены
+const fresh = (r) => r && r.usdRates && SOURCE_CURRENCIES.every((c) => r.usdRates[c])
+  && Date.now() - new Date(r.fetchedAt).getTime() < TTL_MS;
 
 const load = async () => {
   if (cached) return cached;
@@ -50,7 +54,7 @@ const fetchRate = async () => {
   // Валюты из нашего списка: сколько единиц за $1. Мусор (ноль, не число) отбрасываем —
   // такая валюта просто останется без курса, а не даст цену в миллиарды
   const usdRates = {};
-  for (const {code} of CURRENCIES) {
+  for (const code of [...CURRENCIES.map((c) => c.code), ...SOURCE_CURRENCIES]) {
     const v = Number(body?.rates?.[code]);
     if (Number.isFinite(v) && v > 0) usdRates[code] = v;
   }
