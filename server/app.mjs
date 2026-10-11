@@ -1,5 +1,4 @@
 // API сервера (без Vite и без запуска) — отдельно, чтобы тестировать
-import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import express from 'express';
@@ -94,54 +93,15 @@ const checkBrand = (theme) => {
 };
 
 // photoOrigin — адрес этого сервера: браузер рендера берёт по нему фото лотов (/data/...)
-/**
- * Сравнение секретов за постоянное время: обычное === на строках подсказывает длину и
- * первые совпавшие символы по времени ответа. Для пароля это ни к чему.
- */
-const sameSecret = (a, b) => {
-  const ab = Buffer.from(String(a));
-  const bb = Buffer.from(String(b));
-  return ab.length === bb.length && crypto.timingSafeEqual(ab, bb);
-};
-
-/**
- * Вход по паролю (HTTP Basic Auth), включается переменными окружения.
- *
- * Заданы BASIC_AUTH_USER и BASIC_AUTH_PASS — сервер требует вход на всё, кроме проверки
- * живости. Не заданы — работает без пароля: так удобно на Mac, где инструмент и так слушает
- * только localhost. На сервере их задали, когда у инструмента появился публичный домен, а
- * своего входа ещё не было: без заслонки любой мог бы запускать рендеры — дорогие и рядом
- * с боевым сайтом.
- *
- * Со входом SMMAKER (включается с DATABASE_URL, см. session.mjs) заслонка лишняя: она
- * независима от него и снимается, когда вход выложен на прод. Обе сразу — браузер спросит
- * пароль дважды: сначала своё окно Basic Auth, потом экран входа.
- *
- * Сделано в приложении, а не в прокси: Coolify этой версии не даёт удобно править метки
- * Traefik, а так защита в нашем коде и переживает любой передеплой.
- */
-const basicAuth = (user, pass) => (req, res, next) => {
-  // Проверка живости ходит изнутри контейнера без заголовков — её пропускаем, иначе
-  // health-check вечно получал бы 401 и Coolify считал бы контейнер мёртвым
-  if (req.path === '/healthz') return next();
-  const [scheme, encoded] = (req.headers.authorization || '').split(' ');
-  if (scheme === 'Basic' && encoded) {
-    const [u, p] = Buffer.from(encoded, 'base64').toString().split(':');
-    if (sameSecret(u, user) && sameSecret(p ?? '', pass)) return next();
-  }
-  res.set('WWW-Authenticate', 'Basic realm="KOK", charset="UTF-8"').status(401).send('Нужен вход');
-};
-
 export const createApp = ({photoOrigin}) => {
   const app = express();
 
-  // Заслонку ставим самой первой: до разбора тела и до любого маршрута, чтобы неавторизованный
-  // запрос не дошёл ни до API, ни до статики
-  const authUser = process.env.BASIC_AUTH_USER;
-  const authPass = process.env.BASIC_AUTH_PASS;
-  if (authUser && authPass) app.use(basicAuth(authUser, authPass));
+  // Заслонки Basic Auth больше нет (снята по слову владельца 11.10): её заменил свой вход —
+  // API требует сессию, файлы /data видит только своя компания (guardData). Она ещё и отвечала
+  // 401 браузеру рендера на его же запросы к /data по 127.0.0.1 — фото и логотип не грузились.
+  // BASIC_AUTH_USER/PASS в окружении теперь ни на что не влияют
 
-  // Живость: без пароля и без разбора тела, отвечает раньше заслонки по пути выше
+  // Живость: без разбора тела
   app.get('/healthz', (_req, res) => res.json({ok: true}));
 
   // За Traefik на сервере: верим его X-Forwarded-Proto (для Secure у cookie) и адресу клиента
