@@ -282,7 +282,8 @@ const Cta: React.FC<SlideProps> = ({car, market, brandName, index, total, tx}) =
       {/* Номер объявления внизу: по нему машину находят в каталоге и в переписке */}
       <div style={{position: 'absolute', left: 0, right: 0, bottom: 56, textAlign: 'center',
         fontFamily: BODY, fontWeight: 500, fontSize: 26, letterSpacing: 4, color: C.line}}>
-        № {car.id}
+        {/* Номер объявления у источника: у машины из Китая наш id с приставкой «ch-» — её не показываем */}
+        № {String(car.id).replace(/^ch-/, '')}
       </div>
     </Slide>
   );
@@ -298,7 +299,7 @@ export const Carousel: React.FC<CarouselProps> = (props) => {
   // и нумерация «NN / 06» считается от фактического списка, а не от максимума в семь.
   const withHistory = props.includeHistory !== false;
   // Язык слайдов — из профиля клиента; не английский и не русский → английский
-  const tx = carouselText(carouselLang(props.market?.language));
+  const tx = carouselText(carouselLang(props.market?.language), props.car?.origin);
   // Новые форматы («Витрина», «Разворот», «Полная») собираются из библиотеки слайдов
   // (./deck); «Классика» — прежняя вёрстка ниже, как была
   if (carouselFormat(props.format).id !== 'classic') {

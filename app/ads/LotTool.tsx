@@ -5,6 +5,7 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Loading} from '../Loading';
 import {currencySign} from '../../src/shared/blocks';
 import {autoPickPhotos, lotFieldsFromCar} from '../../src/shared/lotFromCar';
+import {sourceNote} from '../../src/shared/encarLink.js';
 import {FORMATS, fmt, getFormat, lotTotal} from '../../src/shared/model';
 import {marketFromProfile} from '../../src/shared/profile';
 import {useTodayMarket} from '../rates';
@@ -187,7 +188,7 @@ export const LotTool: React.FC = () => {
       setStage({step: 0});
       const car = await api.lookupCar(link);
       // Эта машина уже есть — открываем её, а не плодим второй лот с теми же фото
-      const known = lots.find((l) => l.note?.trim() === `Encar ${car.id}`);
+      const known = lots.find((l) => l.note?.trim() === sourceNote(car.id));
       if (known) { await selectLot(known.id); setStage(null); return; }
       const {hookTagline, ...fields} = lotFieldsFromCar(car, profile.language);
       const rate = await api.usdKrw().catch(() => null);
@@ -197,7 +198,8 @@ export const LotTool: React.FC = () => {
       // Лот появляется сразу с полями, фото догружаются следом: превью и название видны,
       // пока фото качаются, — человек видит, что дело идёт
       const created = await createFromCar({
-        ...fields, format, note: `Encar ${car.id}`, carPriceUsd: null, krwPerUsd: rate?.krwPerUsd ?? null,
+        // carPriceUsd — из fields: у Encar null (цена в вонах), у машины из Китая — доллары che168
+        ...fields, format, note: sourceNote(car.id), krwPerUsd: rate?.krwPerUsd ?? null,
         // Курс валюты компании (₽, ₸…) — сразу в объявление: дальше клиент правит его сам,
         // закладывая маржу, и цена ролика не поплывёт на следующий день вместе с биржей
         ...(market.krwPerUnitToday ? {krwPerUnit: market.krwPerUnitToday, fxCurrency: market.currency} : {}),

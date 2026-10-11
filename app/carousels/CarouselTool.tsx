@@ -9,7 +9,7 @@
 // собрать — это кредит. Поэтому клик по формату только выбирает его, пересборка — отдельной
 // кнопкой, а ссылка на уже собранную машину открывает готовую карусель, а не собирает заново.
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {encarAdUrl} from '../../src/shared/encarLink.js';
+import {encarAdUrl, sourceName} from '../../src/shared/encarLink.js';
 import {parseCarouselSource} from '../../src/shared/kmotorsLot.js';
 import {QuickLink} from '../ads/QuickLot';
 import {Check, ChevronLeft, ChevronRight, Download, ExternalLink, Images, List, RefreshCw, Trash2, X} from 'lucide-react';
@@ -34,8 +34,10 @@ const CarSummary: React.FC<{entry: CarouselEntry}> = ({entry}) => {
   const c = entry.car;
   const bits = [
     c.year, km(c.mileageKm), c.transmission, c.fuel,
-    c.price?.krw ? `${c.price.krw.toLocaleString('ru-RU')} ₩ на Encar` : null,
-    c.history ? `${c.history.accidentsTotal} ДТП` : 'история недоступна',
+    c.price?.krw ? `${c.price.krw.toLocaleString('ru-RU')} ₩ на Encar`
+      : c.price?.usd ? `$${c.price.usd.toLocaleString('ru-RU')} на ${sourceName(c.id)}` : null,
+    // У машины из Китая истории нет вовсе (в рекламу не идёт) — и строку о ней не пишем
+    c.origin === 'CN' ? null : c.history ? `${c.history.accidentsTotal} ДТП` : 'история недоступна',
     c.history ? `${c.history.ownerChanges} смен владельца` : null,
   ].filter(Boolean);
   return (
@@ -71,8 +73,8 @@ const PriceBox: React.FC<{entry: CarouselEntry; busy: boolean; onReprice: (price
         <input inputMode="decimal" value={value} placeholder={computed === null ? '' : String(computed)} onChange={(e) => setValue(e.target.value)} />
         <span className="hint">
           {entry.priceOverride
-            ? <>своя цена · {market.currency === 'KRW' ? 'на Encar' : 'расчёт по курсу дал бы'} {computed === null ? '—' : `${computed.toLocaleString('ru-RU')} ${sign}`}</>
-            : <>пусто — цена с Encar{market.currency === 'KRW' ? '' : ' по курсу дня'}{computed === null ? '' : `: ${computed.toLocaleString('ru-RU')} ${sign}`}; впишите свою — она и будет на слайде</>}
+            ? <>своя цена · {market.currency === 'KRW' && entry.car.price?.krw ? `на ${sourceName(entry.id)}` : 'расчёт по курсу дал бы'} {computed === null ? '—' : `${computed.toLocaleString('ru-RU')} ${sign}`}</>
+            : <>пусто — цена с {sourceName(entry.id)}{market.currency === 'KRW' && entry.car.price?.krw ? '' : ' по курсу дня'}{computed === null ? '' : `: ${computed.toLocaleString('ru-RU')} ${sign}`}; впишите свою — она и будет на слайде</>}
         </span>
       </label>
       <button className="btn" disabled={busy || bad || same} onClick={() => onReprice(typed)}>
@@ -287,8 +289,8 @@ const CarouselsPanel: React.FC<{
                   <button className="icon-btn" title={`Пересобрать в формате «${f?.title ?? ''}»${cost}`} aria-label="Пересобрать"
                     disabled={busy} onClick={stop(() => onRebuild(c))}><RefreshCw size={16} /></button>
                   <a className="icon-btn" href={c.lot?.url ?? encarAdUrl(c.id)} target="_blank" rel="noreferrer"
-                    title={c.lot ? 'Открыть лот на kmotors' : 'Открыть объявление на Encar'}
-                    aria-label={c.lot ? 'Открыть лот' : 'Открыть на Encar'} onClick={(e) => e.stopPropagation()}><ExternalLink size={16} /></a>
+                    title={c.lot ? 'Открыть лот на kmotors' : `Открыть объявление на ${sourceName(c.id)}`}
+                    aria-label={c.lot ? 'Открыть лот' : `Открыть на ${sourceName(c.id)}`} onClick={(e) => e.stopPropagation()}><ExternalLink size={16} /></a>
                   <button className="icon-btn danger" title="Удалить" aria-label="Удалить" disabled={busy}
                     onClick={stop(() => onDelete(c))}><Trash2 size={16} /></button>
                 </div>}
@@ -463,7 +465,7 @@ export const CarouselTool: React.FC = () => {
       {/* quick-screen — один экран, как у «Ролика по лоту»: колонки прокручиваются внутри */}
       <div className="quick-screen">
       <QuickLink onLink={fromLink} error={linkError} busy={busy} parse={parseCarouselSource}
-        placeholder={`Вставьте ссылку на объявление Encar — карусель соберётся сама (слайды на ${slidesLang})`} />
+        placeholder={`Вставьте ссылку на объявление Encar или che168 — карусель соберётся сама (слайды на ${slidesLang})`} />
       {/* Сборка — 10–20 секунд (замер 30.09: 13 с на 9 слайдов); экран закрыт окном, как у лота по ссылке */}
       <BusyModal step={busy ? 0 : null} steps={['Собираю карусель: данные и слайды']} label="Сборка карусели"
         note="Обычно 10–20 секунд. Не закрывайте страницу" />
@@ -477,7 +479,7 @@ export const CarouselTool: React.FC = () => {
         <section className="quick-preview">
           {entry
             ? <SlideViewer entry={entry} ratio={ratio} onZoom={setOpen} />
-            : <div className="empty">Вставьте ссылку на объявление Encar — слайды появятся здесь.</div>}
+            : <div className="empty">Вставьте ссылку на объявление Encar или che168 — слайды появятся здесь.</div>}
         </section>
 
         <section className="quick-side">
@@ -523,7 +525,7 @@ export const CarouselTool: React.FC = () => {
                   <button className="btn ghost" onClick={() => run(entry.id, entry.seed)} disabled={busy}
                     title="Те же компоновка и фразы, свежие данные и текущий бренд">Пересобрать{cost}</button>
                 )}
-                <a className="btn ghost" href={entry.lot?.url ?? encarAdUrl(entry.id)} target="_blank" rel="noreferrer">{entry.lot ? 'Открыть лот' : 'На Encar'}</a>
+                <a className="btn ghost" href={entry.lot?.url ?? encarAdUrl(entry.id)} target="_blank" rel="noreferrer">{entry.lot ? 'Открыть лот' : `На ${sourceName(entry.id)}`}</a>
                 <button className="btn ghost" onClick={() => remove(entry.id)} disabled={busy}>Удалить</button>
               </div>
             </div>

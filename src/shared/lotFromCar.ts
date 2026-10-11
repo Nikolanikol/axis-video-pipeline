@@ -10,7 +10,8 @@ import type {CarouselCar, Lot} from './types';
 export const SPEC_MAX = 26;
 
 // hookTagline — не поле лота: интерфейс кладёт его в lot.texts, если есть что сказать
-export type CarFields = Pick<Lot, 'brand' | 'model' | 'trim' | 'year' | 'specs' | 'carPriceKrw' | 'history'> & {hookTagline: string};
+export type CarFields = Pick<Lot, 'brand' | 'model' | 'trim' | 'year' | 'specs' | 'carPriceKrw' | 'carPriceUsd' | 'history'
+  | 'origin' | 'originCountry'> & {hookTagline: string};
 
 // Подзаголовок хука длиннее — не влезает в строку под годом (кегль 64, заглавные)
 export const TAGLINE_MAX = 28;
@@ -36,8 +37,18 @@ export const taglineFromCar = (car: CarouselCar, language?: string): string => {
   }
   // Два факта, если вместе влезают; иначе первый — он и сильнее
   const two = facts.slice(0, 2).join(' · ');
-  return two.length <= TAGLINE_MAX ? two : (facts[0] ?? '');
+  const said = two.length <= TAGLINE_MAX ? two : (facts[0] ?? '');
+  // Машине из Китая нельзя отдать фразу профиля — там «Из Кореи». Сказать нечего — страна
+  if (!said && car.origin === 'CN') return ru ? 'Из Китая' : 'From China';
+  return said;
 };
+
+// Маршрут ролика (сцена цены в «Авто с ценой»): у машины из Китая отправление — её город и
+// Китай, а не порт и страна из профиля, настроенные под Корею. Город у Autohome латиницей
+// строчными («guangzhou») — с заглавной. Страна — заглавными, как в профиле («KOREA»)
+const capital = (s: string) => s.replace(/(^|[\s-])\p{L}/gu, (m) => m.toUpperCase());
+const originOf = (car: CarouselCar, ru: boolean): Pick<Lot, 'origin' | 'originCountry'> =>
+  car.origin === 'CN' ? {origin: capital(car.city ?? ''), originCountry: ru ? 'КИТАЙ' : 'CHINA'} : {};
 
 /** Поля лота из карточки. Пустые строки характеристик выбрасываем: «—» в ролике хуже пустоты */
 export const lotFieldsFromCar = (car: CarouselCar, language?: string): CarFields => {
@@ -58,6 +69,9 @@ export const lotFieldsFromCar = (car: CarouselCar, language?: string): CarFields
     year: car.year ?? new Date().getFullYear(),
     specs: specs.length ? specs : ['', '', ''],
     carPriceKrw: car.price?.krw ?? null,
+    // Вон нет (машина из Китая) — цена в долларах; ролик сам пересчитает в валюту профиля
+    carPriceUsd: car.price?.krw ? null : car.price?.usd ?? null,
+    ...originOf(car, carouselLang(language) === 'ru'),
     history: car.history ? {
       accidentsTotal: car.history.accidentsTotal, accidentsOwn: car.history.accidentsOwn,
       accidentsOther: car.history.accidentsOther, ownerChanges: car.history.ownerChanges,

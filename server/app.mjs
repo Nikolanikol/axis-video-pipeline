@@ -347,7 +347,7 @@ export const createApp = ({photoOrigin}) => {
     await fs.cp(lotPhotosDir(src.id), lotPhotosDir(created.id), {recursive: true});
     const from = `/lots/${src.id}/photos/`;
     const to = `/lots/${created.id}/photos/`;
-    const note = (data.note ?? '').replace(/^Encar (\d+)/, 'копия Encar $1') || 'копия';
+    const note = (data.note ?? '').replace(/^(Encar|che168) (\d+)/, 'копия $1 $2') || 'копия';
     return saveLot(created.id, {...data, photos: data.photos.map((p) => p.replace(from, to)), note});
   }));
   api.post('/lots', wrap((req) => createLot(req.body?.market ? {market: checkId(req.body.market)} : {})));
@@ -492,8 +492,9 @@ export const createApp = ({photoOrigin}) => {
     try {
       const src = parseCarouselSource(req.body?.link);
       // Лоты аукциона — источник владельца (решение 06.10): страницы kmotors разбираем для его
-      // каруселей, не как услугу клиентам. Без входа (локально) проверять некого
-      if (src.source !== 'encar' && req.user && !req.user.isStaff) {
+      // каруселей, не как услугу клиентам. Без входа (локально) проверять некого.
+      // Encar и che168 (Китай) — для всех
+      if (src.source !== 'encar' && src.source !== 'che168' && req.user && !req.user.isStaff) {
         return next(new HttpError(403, 'Карусели по лотам аукционов пока доступны только сотрудникам'));
       }
       next();

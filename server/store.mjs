@@ -235,10 +235,12 @@ export const renderMarket = async (id = DEFAULT_PROFILE) => {
   // Курс валюты компании на сегодня — им считается цена объявления, где свой курс не вписан.
   // Источник недоступен — без него: цена тогда заглушка, а не доллары под значком ₽
   // Для долларов тоже: им считает цену слайд карусели (ролик берёт курс ₩/$ из объявления)
-  if (market.currency === 'KRW') return market;
   // rates.mjs сам импортирует store.mjs — грузим по месту, без кольца на старте модулей
   const today = await import('./rates.mjs').then((m) => m.rates()).catch(() => null);
-  return {...market, krwPerUnitToday: krwPerUnit(market.currency, today?.usdRates) ?? undefined};
+  // ₩ за $1 — для машин из Китая: их цена в долларах, и слайд переводит её через вону
+  const krwPerUsdToday = krwPerUnit('USD', today?.usdRates) ?? undefined;
+  if (market.currency === 'KRW') return {...market, krwPerUsdToday};
+  return {...market, krwPerUnitToday: krwPerUnit(market.currency, today?.usdRates) ?? undefined, krwPerUsdToday};
 };
 
 // Лоты: <папка компании>/lots/<id>/lot.json + photos/

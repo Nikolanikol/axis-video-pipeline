@@ -14,7 +14,7 @@ import {AbsoluteFill} from 'remotion';
 import {TbBolt, TbGauge, TbManualGearbox} from 'react-icons/tb';
 import type {CarouselProps} from '../../shared/types';
 import {BODY, HEAD, radius, useTheme} from '../../shared/ui';
-import {COPY, fill, pick} from '../i18n/copy';
+import {fill, pick} from '../i18n/copy';
 import type {CarouselText} from '../i18n';
 import {
   BOTTOM, CONTACT_ICONS, Fade, Frame, Grid2, Headline, Icon, IconCard, IconRow, Lead, PAD, Shot, Stat, TOP,
@@ -82,7 +82,7 @@ const optionItems = (names: string[], tx: CarouselText, n: number) => {
 const Cover: React.FC<Ctx> = (c) => {
   const C = useTheme();
   const tall = useTall();
-  const copy = COPY[c.tx.lang].cover;
+  const copy = c.tx.copy.cover;
   const {car, tx} = c;
   const sub = [car.grade, car.trim, tx.value(car.fuel), car.year].filter(Boolean).join(' ');
   const variant = pick(['side', 'full'], c.seed, 'cover');
@@ -110,7 +110,7 @@ const Cover: React.FC<Ctx> = (c) => {
 /** Раздел с фото и опциями: экстерьер и салон устроены одинаково, различаются набором */
 const Section: React.FC<Ctx & {kind: 'exterior' | 'interior'}> = (c) => {
   const tall = useTall();
-  const copy = COPY[c.tx.lang][c.kind];
+  const copy = c.tx.copy[c.kind];
   const comfort = c.car.options.comfort;
   const all = [...comfort, ...c.car.options.safety, ...c.car.options.other];
   const exteriorOpts = all.filter((o) => EXTERIOR_CODES.has(OPTION_CODE[o]));
@@ -140,7 +140,7 @@ const Section: React.FC<Ctx & {kind: 'exterior' | 'interior'}> = (c) => {
 
 const Details: React.FC<Ctx> = (c) => {
   const C = useTheme();
-  const copy = COPY[c.tx.lang].details;
+  const copy = c.tx.copy.details;
   const opts = optionItems([...c.car.options.comfort, ...c.car.options.safety], c.tx, 4).map((o) => o.text);
   const shots = c.photos.details;
   return (
@@ -167,7 +167,7 @@ const Details: React.FC<Ctx> = (c) => {
 const Engine: React.FC<Ctx> = (c) => {
   const C = useTheme();
   const tall = useTall();
-  const copy = COPY[c.tx.lang];
+  const copy = c.tx.copy;
   const {car, tx} = c;
   const rows: {icon: IconType; value: string; label: string}[] = [
     {icon: TbBolt as IconType, value: tx.liters(car.displacementCc), label: tx.value(car.fuel) || copy.engineRows.fuel},
@@ -198,7 +198,7 @@ const Engine: React.FC<Ctx> = (c) => {
 };
 
 const Safety: React.FC<Ctx> = (c) => {
-  const copy = COPY[c.tx.lang].safety;
+  const copy = c.tx.copy.safety;
   const items = optionItems(c.car.options.safety, c.tx, 4);
   return (
     <Frame section={pick(copy.kicker, c.seed, 'saf-k')} index={c.index} total={c.total}>
@@ -219,7 +219,7 @@ const History: React.FC<Ctx> = (c) => {
   const C = useTheme();
   const tall = useTall();
   const h = c.car.history;
-  const all = COPY[c.tx.lang];
+  const all = c.tx.copy;
   const copy = !h ? all.historyNone : h.accidentsTotal ? all.historyClaims : all.historyClean;
   const s = c.tx.s;
   return (
@@ -249,7 +249,7 @@ const History: React.FC<Ctx> = (c) => {
 
 const Rear: React.FC<Ctx> = (c) => {
   const C = useTheme();
-  const copy = COPY[c.tx.lang].rear;
+  const copy = c.tx.copy.rear;
   return (
     <Frame section={pick(copy.kicker, c.seed, 'rear-k')} index={c.index} total={c.total}>
       <Shot src={c.photos.rear} style={{position: 'absolute', left: 0, right: 0, top: 330, bottom: 0}} sink={0.9} />
@@ -264,7 +264,7 @@ const Rear: React.FC<Ctx> = (c) => {
 const Gallery: React.FC<Ctx> = (c) => {
   const g = c.photos.gallery;
   return (
-    <Frame section={pick(COPY[c.tx.lang].gallery.kicker, c.seed, 'gal-k')} index={c.index} total={c.total}>
+    <Frame section={pick(c.tx.copy.gallery.kicker, c.seed, 'gal-k')} index={c.index} total={c.total}>
       <div style={{position: 'absolute', top: TOP, bottom: BOTTOM, left: PAD, right: PAD, display: 'flex', gap: 16}}>
         <Shot src={g[0]} round={14} veil={0.75} style={{flex: 1.6, height: '100%'}} />
         <div style={{flex: 1, display: 'flex', flexDirection: 'column', gap: 16}}>
@@ -278,7 +278,7 @@ const Gallery: React.FC<Ctx> = (c) => {
 const Price: React.FC<Ctx> = (c) => {
   const C = useTheme();
   const tall = useTall();
-  const copy = COPY[c.tx.lang].price;
+  const copy = c.tx.copy.price;
   const {car, tx} = c;
   const label = tx.money(carouselPrice(car, c.market, c.priceOverride), c.market.currency);
   // Кегль по длине (внутри рамки ~860 px: 1080 − 2×PAD − 2×40); цифра Oswald ≈0,5 кегля
@@ -306,7 +306,7 @@ const Price: React.FC<Ctx> = (c) => {
 };
 
 const Why: React.FC<Ctx> = (c) => {
-  const copy = COPY[c.tx.lang].why;
+  const copy = c.tx.copy.why;
   const items = pick(copy.benefits, c.seed, 'why-b');
   return (
     <Frame section={fill(pick(copy.kicker, c.seed, 'why-k'), c.vars)} index={c.index} total={c.total}>
@@ -323,7 +323,7 @@ const Why: React.FC<Ctx> = (c) => {
 const Cta: React.FC<Ctx> = (c) => {
   const C = useTheme();
   const tall = useTall();
-  const copy = COPY[c.tx.lang].cta;
+  const copy = c.tx.copy.cta;
   const m = c.market;
   // Кнопка — тем мессенджером, который клиент отметил главным; нет его контакта — другим
   const telegram = m.telegram?.trim();

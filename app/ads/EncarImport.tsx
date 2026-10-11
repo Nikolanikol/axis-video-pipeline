@@ -14,6 +14,7 @@ import type {CarouselCar} from '../../src/shared/types';
 import {api, LotEntry} from '../api';
 import {useConfig} from '../config';
 import {encarUrl} from './QuickLot';
+import {sourceName, sourceNote} from '../../src/shared/encarLink.js';
 
 /** Тип данных при перетаскивании снимков из палитры в галерею лота: JSON-массив адресов */
 export const ENCAR_PHOTO_DRAG = 'application/x-kok-encar-photos';
@@ -30,6 +31,10 @@ type Props = {
 // сам параметр rh размер не меняет. Два десятка оригиналов грузили бы сетку секундами.
 // В лот идёт исходный адрес — полный размер для ролика
 const thumb = (url: string) => url.split('?')[0];
+// Картинка для сетки. У che168 (CDN Autohome) адрес — оригинал дилера, до 2048 px и 600 КБ;
+// приставка размера «480x0_c42_» перед именем отдаёт 480 px (~40 КБ, проверено 11.10). Своя
+// приставка у оригинала («0x0_» — исходник без пережатия) заменяется
+const preview = (url: string) => thumb(url).replace(/(\.autoimg\.cn\/.*\/)(\d+x\d+_[^/]*?)?(autohomecar__)/, '$1480x0_c42_$3');
 
 // Основной путь — вставка ссылки в QuickLink (сама всё выбирает), а здесь человек сам
 // добирает фото — под «Изменить вручную»
@@ -89,9 +94,10 @@ export const EncarImport: React.FC<Props> = ({lot, onApply, onError}) => {
     const currency = currencyCode(profile.pricing?.currency);
     const per = isDirect(currency) || lot?.krwPerUnit ? null : krwPerUnit(currency, (await api.rates().catch(() => null))?.usdRates);
     const fx = per ? {krwPerUnit: per, fxCurrency: currency} : {};
-    return {...base, ...texts, ...fx, carPriceUsd: null, krwPerUsd: rate?.krwPerUsd ?? lot?.krwPerUsd ?? null};
+    // carPriceUsd — из base: у Encar там null (цена в вонах главнее), у машины из Китая — доллары
+    return {...base, ...texts, ...fx, krwPerUsd: rate?.krwPerUsd ?? lot?.krwPerUsd ?? null};
   };
-  const note = (current?: string) => (current?.trim() ? undefined : `Encar ${car!.id}`);
+  const note = (current?: string) => (current?.trim() ? undefined : sourceNote(car!.id));
 
   // Пустой лот («+ Новый лот») заполняем из объявления целиком; в заполненном поля не
   // трогаем вовсе — сюда приходят за фото. Раньше здесь был вопрос «заменить данные?»,
@@ -127,10 +133,10 @@ export const EncarImport: React.FC<Props> = ({lot, onApply, onError}) => {
     <section className="encar">
       <form className="link-bar encar-bar" onSubmit={lookup}>
         <Link2 className="link-bar-icon" size={20} aria-hidden />
-        <input ref={input} value={link} onChange={(e) => setLink(e.target.value)} placeholder="Ссылка на объявление Encar"
-          aria-label="Ссылка на объявление Encar" disabled={!!busy} />
+        <input ref={input} value={link} onChange={(e) => setLink(e.target.value)} placeholder="Ссылка на объявление Encar или che168"
+          aria-label="Ссылка на объявление Encar или che168" disabled={!!busy} />
         <button className="btn primary link-go" disabled={!!busy}>
-          <Search size={17} aria-hidden />{busy === 'lookup' ? 'Ищу…' : 'Подтянуть из Encar'}
+          <Search size={17} aria-hidden />{busy === 'lookup' ? 'Ищу…' : 'Подтянуть по ссылке'}
         </button>
         {car && <button type="button" className="btn ghost" onClick={reset} disabled={!!busy}>Закрыть</button>}
       </form>
@@ -141,7 +147,8 @@ export const EncarImport: React.FC<Props> = ({lot, onApply, onError}) => {
             <b>{[car.brand, car.model, car.grade].filter(Boolean).join(' ')}</b>
             <span className="muted">
               {[car.year, car.mileageKm !== null ? `${car.mileageKm.toLocaleString('ru-RU')} км` : '',
-                car.price ? `₩${car.price.krw.toLocaleString('ru-RU')}` : 'без цены'].filter(Boolean).join(' · ')}
+                car.price?.krw ? `₩${car.price.krw.toLocaleString('ru-RU')}`
+                  : car.price?.usd ? `$${car.price.usd.toLocaleString('ru-RU')}` : 'без цены'].filter(Boolean).join(' · ')}
             </span>
           </div>
           <div className="encar-tools">
@@ -155,7 +162,7 @@ export const EncarImport: React.FC<Props> = ({lot, onApply, onError}) => {
               const n = picked.indexOf(p.url);
               if (loaded(p.url)) return (
                 <div key={p.url} className="encar-photo loaded" title="Это фото уже загружено">
-                  <img src={thumb(p.url)} alt={p.label} loading="lazy" draggable={false} />
+                  <img src={preview(p.url)} alt={p.label} loading="lazy" draggable={false} />
                   <span className="encar-label">{p.label}</span>
                   <span className="encar-in-lot"><Check size={13} aria-hidden />загружено</span>
                 </div>
@@ -164,7 +171,7 @@ export const EncarImport: React.FC<Props> = ({lot, onApply, onError}) => {
                 <button type="button" key={p.url} className={n >= 0 ? 'encar-photo on' : 'encar-photo'} onClick={() => toggle(p.url)}
                   title={n >= 0 ? 'Убрать' : 'Добавить'}>
                   {/* Тянется картинка, а не кнопка: Firefox кнопки не перетаскивает */}
-                  <img src={thumb(p.url)} alt={p.label} loading="lazy" draggable
+                  <img src={preview(p.url)} alt={p.label} loading="lazy" draggable
                     onDragStart={(e) => dragStart(e, p.url)} onDragEnd={dragEnd} />
                   <span className="encar-label">{p.label}</span>
                   {n >= 0 && <span className="encar-num">{n + 1}</span>}
@@ -176,11 +183,11 @@ export const EncarImport: React.FC<Props> = ({lot, onApply, onError}) => {
             {lot && (
               <button className="btn primary encar-load" onClick={apply} disabled={!!busy || (!blank && !picked.length)}>
                 {busy === 'apply' ? 'Загружаю…'
-                  : blank ? (picked.length ? `Заполнить из Encar и подгрузить фотографии (${picked.length})` : 'Заполнить из Encar')
+                  : blank ? (picked.length ? `Заполнить из ${sourceName(car.id)} и подгрузить фотографии (${picked.length})` : `Заполнить из ${sourceName(car.id)}`)
                   : `Подгрузить фотографии${picked.length ? ` (${picked.length})` : ''}`}
               </button>
             )}
-            <span className="hint">Фото добавятся в конец галереи. Они копируются к нам: ролик не сломается, если объявление на Encar снимут. Бесплатно — кредиты только за сборку ролика.</span>
+            <span className="hint">Фото добавятся в конец галереи. Они копируются к нам: ролик не сломается, если объявление снимут. Бесплатно — кредиты только за сборку ролика.</span>
           </div>
         </div>
       )}

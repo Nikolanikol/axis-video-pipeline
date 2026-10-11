@@ -27,8 +27,10 @@ export const useTodayMarket = <M extends Market>(market: M): M => {
   const rates = useRates();
   return useMemo(() => {
     // Как renderMarket: курс дня и для долларов — им считает цену слайд карусели
-    if (market.currency === 'KRW') return market;
+    // ₩ за $1 — для долларовой цены машин из Китая (как в renderMarket)
+    const usd = krwPerUnit('USD', rates?.usdRates) ?? undefined;
+    if (market.currency === 'KRW') return usd ? {...market, krwPerUsdToday: usd} : market;
     const per = krwPerUnit(market.currency ?? 'USD', rates?.usdRates);
-    return per ? {...market, krwPerUnitToday: per} : market;
+    return per ? {...market, krwPerUnitToday: per, krwPerUsdToday: usd} : {...market, krwPerUsdToday: usd};
   }, [market, rates]);
 };

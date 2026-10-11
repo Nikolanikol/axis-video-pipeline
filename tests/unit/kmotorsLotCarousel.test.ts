@@ -43,7 +43,7 @@ describe('что дали в строку карусели', () => {
   });
 
   it('чужой сайт и пустая строка — с понятным текстом', () => {
-    expect(() => parseCarouselSource('https://example.com/x')).toThrow(/Encar и лоты/);
+    expect(() => parseCarouselSource('https://example.com/x')).toThrow(/Encar, che168 и лоты/);
     expect(() => parseCarouselSource('')).toThrow(/ссылку/);
     expect(() => parseCarouselSource('https://www.kmotors.shop/en/auction')).toThrow(/нет лота/);
   });

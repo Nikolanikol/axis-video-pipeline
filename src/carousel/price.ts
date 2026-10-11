@@ -6,11 +6,21 @@
 import type {CarouselCar, Market} from '../shared/types';
 
 /** Число для слайда в валюте market.currency; null — цены нет (прочерк) */
-export const carouselPrice = (car: CarouselCar, market: Pick<Market, 'currency' | 'krwPerUnitToday'>, priceOverride?: number | null): number | null => {
+export const carouselPrice = (car: CarouselCar, market: Pick<Market, 'currency' | 'krwPerUnitToday' | 'krwPerUsdToday'>, priceOverride?: number | null): number | null => {
   if (priceOverride) return priceOverride;
+  const currency = market.currency || 'USD';
+  const usd = car.price?.usd ?? null;
+  // Машина из Китая: цены в вонах нет, только доллары che168. Доллары — как есть; прочие
+  // валюты — через вону курсом дня (₩/$ и ₩ за единицу валюты — оба из одного ответа курсов)
+  if (!car.price?.krw && usd) {
+    if (currency === 'USD') return usd;
+    if (!market.krwPerUsdToday) return null;
+    const krwOfUsd = usd * market.krwPerUsdToday;
+    if (currency === 'KRW') return Math.round(krwOfUsd);
+    return market.krwPerUnitToday ? Math.round(krwOfUsd / market.krwPerUnitToday) : null;
+  }
   const krw = car.price?.krw ?? null;
   if (!krw) return null;
-  const currency = market.currency || 'USD';
   if (currency === 'KRW') return krw;
   if (market.krwPerUnitToday) return Math.round(krw / market.krwPerUnitToday);
   // Курсов нет (источник ни разу не ответил) — для долларов есть курс шлюза, для прочих

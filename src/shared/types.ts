@@ -36,6 +36,9 @@ export type Market = {
   // Вон за единицу валюты компании на сегодня (₽, ₸, €…) — сервер и интерфейс кладут его из
   // курсов дня; им считается цена объявления, где свой курс не вписан. У ₩ и $ не нужен
   krwPerUnitToday?: number;
+  // Вон за $1 на сегодня — им слайд карусели переводит в валюту профиля долларовую цену
+  // машины из Китая (у неё нет цены в вонах). Кладут renderMarket и useTodayMarket
+  krwPerUsdToday?: number;
 };
 
 // Профиль клиента: config/profiles/<id>.json. Приходит на смену «рынку» — см. src/shared/profile.js.
@@ -226,6 +229,11 @@ export type Review = {
 export type CarouselCar = {
   id: string;
   source: string;
+  // Откуда машина: от этого зависят «Цена в Корее / в Китае», «Импорт из …» на слайдах.
+  // Нет поля — Корея (Encar, лоты аукционов)
+  origin?: 'KR' | 'CN';
+  // Город машины (che168): точка отправления в маршруте ролика
+  city?: string;
   brand: string; model: string; grade: string; trim: string;
   year: number | null;
   firstRegistered: string | null;
@@ -236,7 +244,8 @@ export type CarouselCar = {
   vin: string | null; plate: string | null;
   // Цена в Корее: воны, доллары и курс с отметкой времени — без неё цифры в постах
   // расходятся между днями, и объяснить расхождение нечем
-  price: {krw: number; usd: number | null; krwToUsd: number; quotedAt: string; rateSource: string} | null;
+  // У машины из Китая вон нет (krw: null) — только доллары международной версии che168
+  price: {krw: number | null; usd: number | null; krwToUsd: number | null; quotedAt: string | null; rateSource: string} | null;
   // null — история недоступна. Это НЕ то же самое, что «происшествий не было»
   history: {
     accidentsOwn: number; accidentsOther: number; accidentsTotal: number;

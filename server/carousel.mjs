@@ -15,6 +15,8 @@ import {openBrowser, renderStill, selectComposition} from '@remotion/renderer';
 import {LOT_SKIP_SLIDES, carFromLot, lotPageUrl, missingForCarousel, parseCarouselSource} from '../src/shared/kmotorsLot.js';
 import {brandForRender} from './brand.mjs';
 import {fetchLot} from './kmotorsLot.mjs';
+import {fetchChe168Car} from './che168.mjs';
+import {CHE168_SKIP_SLIDES} from '../src/shared/che168Car.js';
 import {
   HttpError, PRODUCTION, ROOT, checkId, currentWorkspace, workspaceDir, workspaceUrl, getBrand, readJson, renderMarket, writeJson,
 } from './store.mjs';
@@ -80,16 +82,18 @@ const PHOTO_HOSTS = new Set([
   'heydealer-api.s3.amazonaws.com', 'img-auction.autobell.co.kr', 'www.kcarauction.com',
   'imgmk.lotteautoauction.net', 'aucmark.skcarrental.com', 'file.ahsellcar.co.kr',
 ]);
+// che168 (Китай): фото на CDN Autohome — поддомены autoimg.cn (2sc2., erscglobal2. …)
+const photoHostOk = (host) => PHOTO_HOSTS.has(host) || /^[a-z0-9-]+\.autoimg\.cn$/.test(host);
 const PHOTO_MAX_BYTES = 15 * 1024 * 1024;
 const PHOTO_TIMEOUT_MS = 20_000;
 
 const downloadLotPhoto = async (url) => {
   const u = new URL(url);
   if (u.protocol !== 'https:' && u.protocol !== 'http:') return null;
-  if (!PHOTO_HOSTS.has(u.hostname)) return null;
+  if (!photoHostOk(u.hostname)) return null;
   const res = await fetch(url, {signal: AbortSignal.timeout(PHOTO_TIMEOUT_MS)});
   // Перенаправление уводит на другой хост — на него разрешения не было
-  if (!res.ok || !PHOTO_HOSTS.has(new URL(res.url).hostname)) return null;
+  if (!res.ok || !photoHostOk(new URL(res.url).hostname)) return null;
   if (!(res.headers.get('content-type') || '').startsWith('image/')) return null;
   const buf = Buffer.from(await res.arrayBuffer());
   return buf.length > 0 && buf.length <= PHOTO_MAX_BYTES ? buf : null;
@@ -119,7 +123,7 @@ const localizePhotos = async (car, dir, id, origin) => {
   await Promise.all(Array.from({length: 4}, worker));
   const to = (u) => mapped.get(u) ?? null;
   const p = car.photos;
-  if (!to(p.hero)) throw new HttpError(502, 'Не удалось скачать фото лота — площадка не отдаёт их с сервера. Попробуйте позже');
+  if (!to(p.hero)) throw new HttpError(502, 'Не удалось скачать фото машины — площадка не отдаёт их с сервера. Попробуйте позже');
   return {
     ...car,
     photos: {
@@ -177,7 +181,7 @@ const runKey = (id) => `${currentWorkspace()}:${id}`;
 
 /**
  * Собрать карусель по ссылке или номеру.
- * @param {string} link — ссылка Encar или голый номер
+ * @param {string} link — ссылка Encar / che168, голый номер Encar или наш id («ch-60154824», «km-…»)
  * @param {{format?: string, seed?: number, priceOverride?: number | null}} [opts] — формат из
  *   реестра и зерно варианта: то же зерно — те же компоновка и фразы; нет зерна — случайное
  *   («Другой вариант»). priceOverride — своя цена клиента на слайде цены; не передана —
@@ -203,10 +207,16 @@ export const buildCarousel = async (link, opts = {}) => {
     }
     const prev = await readJson(path.join(carouselsDir(), id, 'carousel.json')).catch(() => null);
     const priceOverride = opts.priceOverride !== undefined ? opts.priceOverride : prev?.priceOverride ?? null;
-    let car = lot ? await carFromLink({house: lot.house, lotId: lot.id}) : await fetchCar(id);
-    // Карусель — всегда про корейское объявление (источник Encar), но контакты и компанию
-    // берём из профиля клиента: бренд и подпись должны быть его.
+    // Контакты и компанию берём из профиля клиента: бренд и подпись должны быть его. Профиль —
+    // до машины: по его языку ядро che168 отдаёт названия опций
     const [profileMarket, brand] = await Promise.all([renderMarket(), getBrand().then(brandForRender)]);
+    // Машина из Китая — через ядро che168 (отдельный процесс; упало — падает только «Китай»)
+    const china = src.source === 'che168';
+    let car = lot ? await carFromLink({house: lot.house, lotId: lot.id})
+      : china ? await fetchChe168Car(src.ref, profileMarket.language) : await fetchCar(id);
+    // Нет фото вовсе — так и говорим, а не «площадка не отдаёт» (это про сбой скачивания); до
+    // создания папки — пустая папка карусели не нужна
+    if (china && !car.photos.hero) throw new HttpError(422, 'У этого объявления нет фото — карусель по нему не собрать');
     const theme = {...brand, name: profileMarket.name};
     const market = profileMarket;
     // Логотип из настроек лежит на нашем сервере, а рендер грузит сборку с адреса Remotion:
@@ -219,10 +229,12 @@ export const buildCarousel = async (link, opts = {}) => {
       : theme.assets;
     const dir = path.join(carouselsDir(), id);
     await fs.mkdir(dir, {recursive: true});
-    if (lot) car = await localizePhotos(car, dir, id, origin);
-    // У лота нет цены, истории и опций: эти слайды не рисуем, а не заполняем прочерками
+    // Фото лотов и машин из Китая — к себе: рендер берёт их с нашего адреса, а не с CDN площадки
+    if (lot || china) car = await localizePhotos(car, dir, id, origin);
+    // У лота нет цены, истории и опций: эти слайды не рисуем, а не заполняем прочерками.
+    // У машины из Китая нет истории: лист осмотра в рекламу не идёт (решение владельца 11.10)
     const inputProps = {car, market, theme: {...theme, assets}, includeHistory: INCLUDE_HISTORY, format, seed,
-      skip: lot ? LOT_SKIP_SLIDES : [], priceOverride};
+      skip: lot ? LOT_SKIP_SLIDES : china ? CHE168_SKIP_SLIDES : [], priceOverride};
     // Старые кадры убираем перед сборкой: та же машина, пересобранная на проде, даёт шесть
     // слайдов вместо прежних семи, и осиротевший slide-7.png остался бы на диске — со старой
     // историей. Ответ ссылается только на новые шесть, но файл-призрак в томе ни к чему.
