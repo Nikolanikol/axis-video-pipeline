@@ -210,7 +210,7 @@ export const buildCarousel = async (link, opts = {}) => {
     // Контакты и компанию берём из профиля клиента: бренд и подпись должны быть его. Профиль —
     // до машины: по его языку ядро che168 отдаёт названия опций
     const [profileMarket, brand] = await Promise.all([renderMarket(), getBrand().then(brandForRender)]);
-    // Машина из Китая — через ядро che168 (отдельный процесс; упало — падает только «Китай»)
+    // Машина из Китая — через модуль-ядро che168 (cores/che168, граница — server/che168.mjs)
     const china = src.source === 'che168';
     let car = lot ? await carFromLink({house: lot.house, lotId: lot.id})
       : china ? await fetchChe168Car(src.ref, profileMarket.language) : await fetchCar(id);

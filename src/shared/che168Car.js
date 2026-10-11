@@ -169,6 +169,7 @@ export const che168PhotoRoles = (photos, photoSet) => {
  * @param {Record<string, any>} data — data из ответа ядра GET /v1/car (с byLang.en и языком профиля)
  * @param {string} [language] — язык постов профиля: названия опций берём на нём (ядро отдаёт их
  *   переведёнными самим Autohome), остальное — английскими словами словаря слайдов
+ * @returns {import('./types').CarouselCar}
  */
 export const carFromChe168 = (data, language = 'en') => {
   const en = data?.byLang?.en ?? {};
