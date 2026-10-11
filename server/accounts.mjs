@@ -108,6 +108,19 @@ export const dropSession = (token) => (token
   ? db().query('DELETE FROM smmaker_sessions WHERE token_hash = $1', [tokenHash(token)])
   : null);
 
+/**
+ * Отметка «был в KOK» для админки. readSession зовётся на каждый запрос, поэтому пишем не
+ * чаще раза в SEEN_EVERY_MIN минут — иначе каждая картинка превью была бы записью в базу.
+ * Не ждём и не роняем запрос: отметка — подсказка менеджеру, а не данные клиента.
+ */
+const SEEN_EVERY_MIN = 5;
+const touchSeen = (userId) => {
+  db().query(
+    `UPDATE smmaker_users SET last_seen_at = now()
+      WHERE id = $1 AND (last_seen_at IS NULL OR last_seen_at < now() - $2 * interval '1 minute')`,
+    [userId, SEEN_EVERY_MIN]).catch((e) => console.warn('last_seen_at:', e.message));
+};
+
 /** Роль на платформе → права. admin — всё; manager — лиды и начисление пакетов */
 const rights = (role) => ({role: role ?? null, isAdmin: role === 'admin', isStaff: role === 'admin' || role === 'manager'});
 
@@ -127,6 +140,7 @@ export const readSession = async (token) => {
     [tokenHash(token)]);
   const r = rows[0];
   if (!r) return null;
+  touchSeen(r.id);
   return {
     user: {id: r.id, email: r.email, name: r.name, emailVerified: Boolean(r.email_verified_at), ...rights(r.platform_role)},
     workspace: r.workspace_id ? {id: r.workspace_id, name: r.workspace_name, role: r.role} : null,
@@ -439,10 +453,15 @@ export const grantPack = async ({workspaceId, packId, note = '', createdBy}) => 
   return balanceOf(workspaceId);
 };
 
-/** Бонус (компенсация, подарок): партия на заданный срок, по умолчанию год */
+/**
+ * Бонус (компенсация, подарок): партия на заданный срок, по умолчанию год, без цены — в
+ * «Оплачено» не попадает. Причина обязательна (владелец 11.10): без неё через месяц в истории
+ * клиента не понять, откуда бесплатные кредиты
+ */
 export const grantBonus = async ({workspaceId, credits, days = 365, note = '', createdBy}) => {
   const c = Number(credits);
   if (!Number.isInteger(c) || c < 1 || c > 100000) throw new HttpError(400, 'Бонус — целое число кредитов от 1');
+  if (!String(note ?? '').trim()) throw new HttpError(400, 'Напиши, за что подарок: компенсация, акция…');
   await inTransaction((client) => addLot(client, {
     workspaceId, credits: c, days: Number(days) || 365, source: 'bonus', note: ['бонус', String(note).trim()].filter(Boolean).join(' · '), createdBy,
   }));
@@ -451,30 +470,115 @@ export const grantBonus = async ({workspaceId, credits, days = 365, note = '', c
 
 // ——— Лиды и сотрудники ———
 
+// Столько дней до конца подписки — «пора продлевать». То же число в app/Account.tsx (RENEW_DAYS)
+const RENEW_DAYS = 5;
+// Без генераций столько дней — «затих»: повод позвонить, пока клиент не ушёл совсем
+const IDLE_DAYS = 14;
+const CLIENTS_PAGE = 25;
+
 /**
- * Компании с контактами владельца: для продаж это список лидов. Новые сверху; видно остаток,
- * сколько куплено и когда последний раз генерировали — «потестировал и выдохся» ищется глазами.
+ * Строка клиента со всеми посчитанными полями — общая часть для списка, счётчиков и
+ * «пора продлевать». Фильтры и сортировка ниже пишутся по её колонкам (c.…).
  */
-export const listClients = async () => {
+const CLIENTS_CTE = `WITH c AS (
+  SELECT w.id, w.name, w.created_at,
+         u.name AS person, u.email, u.phone, u.platform_role, u.last_seen_at,
+         u.email_verified_at IS NOT NULL AS verified,
+         COALESCE((SELECT sum(remaining) FROM smmaker_credit_lots t WHERE t.workspace_id = w.id AND t.expires_at > now()), 0)::int AS credits,
+         COALESCE((SELECT sum(price_krw) FROM smmaker_credit_lots t WHERE t.workspace_id = w.id AND t.source IN ('pack', 'subscription')), 0)::int AS paid_krw,
+         -- Подписка: тариф и конец оплаченного — менеджеру видно, кому пора продлевать
+         sub.title AS plan_title, sub.expires_at AS plan_until,
+         EXISTS (SELECT 1 FROM smmaker_credit_lots t WHERE t.workspace_id = w.id AND t.source = 'subscription') AS had_plan,
+         g.generations, g.generations_30d, g.last_generation
+    FROM smmaker_workspaces w
+    LEFT JOIN LATERAL (SELECT user_id FROM smmaker_memberships m WHERE m.workspace_id = w.id ORDER BY created_at LIMIT 1) m ON true
+    LEFT JOIN smmaker_users u ON u.id = m.user_id
+    LEFT JOIN LATERAL (
+      SELECT l.expires_at, COALESCE(p.title, l.pack_id) AS title FROM smmaker_credit_lots l
+        LEFT JOIN smmaker_packs p ON p.id = l.pack_id
+       WHERE l.workspace_id = w.id AND l.source = 'subscription' AND l.expires_at > now()
+       ORDER BY l.expires_at DESC LIMIT 1) sub ON true
+    LEFT JOIN LATERAL (
+      SELECT count(*)::int AS generations,
+             (count(*) FILTER (WHERE l.created_at > now() - interval '30 days'))::int AS generations_30d,
+             max(l.created_at) AS last_generation
+        FROM smmaker_credit_ledger l WHERE l.workspace_id = w.id AND l.kind = 'charge') g ON true
+)`;
+
+/**
+ * Быстрые фильтры админки: имя → условие над строкой c. Порядок здесь — порядок кнопок.
+ * «Без оплат» — лид, который ещё ни разу не платил; «подписка кончилась» — платил и не продлил:
+ * это разные разговоры, поэтому разные фильтры.
+ */
+const CLIENT_FILTERS = {
+  all: 'true',
+  new: `c.created_at > now() - interval '7 days'`,
+  trial: 'c.paid_krw = 0',
+  active: 'c.plan_until IS NOT NULL',
+  renew: `c.plan_until < now() + interval '${RENEW_DAYS} days'`,
+  lapsed: 'c.plan_until IS NULL AND c.had_plan',
+  idle: `(c.last_generation IS NULL OR c.last_generation < now() - interval '${IDLE_DAYS} days')`,
+  unverified: 'NOT c.verified',
+};
+// Сортировки. Вторым ключом всегда дата регистрации — иначе строки с равным значением
+// (у всех новых кредитов 7) прыгали бы между страницами
+const CLIENT_SORTS = {
+  new: 'c.created_at DESC',
+  seen: 'c.last_seen_at DESC NULLS LAST, c.created_at DESC',
+  generated: 'c.last_generation DESC NULLS LAST, c.created_at DESC',
+  paid: 'c.paid_krw DESC, c.created_at DESC',
+  credits: 'c.credits DESC, c.created_at DESC',
+  plan: 'c.plan_until ASC NULLS LAST, c.created_at DESC',
+};
+
+/**
+ * Поиск по компании, имени, почте и телефону. Телефон в базе — цифры с «+» (normPhone),
+ * а менеджер вводит его как попало: «010-5865-4344», «+82 10 5865». Поэтому по телефону
+ * ищем одними цифрами, а ведущий 0 (так набирают внутри страны: 010… вместо +8210…)
+ * пробуем и без него.
+ */
+const clientSearch = (query, params) => {
+  const q = String(query ?? '').trim().slice(0, 100);
+  if (!q) return 'true';
+  params.push(`%${q.replace(/[\\%_]/g, (ch) => `\\${ch}`)}%`);
+  const text = `$${params.length}`;
+  const parts = [`c.name ILIKE ${text}`, `c.person ILIKE ${text}`, `c.email ILIKE ${text}`];
+  const digits = q.replace(/\D/g, '');
+  // Меньше трёх цифр — совпадёт почти с каждым номером, это не поиск
+  if (digits.length >= 3) {
+    for (const d of new Set([digits, digits.replace(/^0+/, '')])) {
+      if (d.length < 3) continue;
+      params.push(`%${d}%`);
+      parts.push(`c.phone LIKE $${params.length}`);
+    }
+  }
+  return `(${parts.join(' OR ')})`;
+};
+
+/**
+ * Компании с контактами владельца: для продаж это список лидов. Поиск, фильтр и страницы
+ * считает база — список растёт, и отдавать его целиком в браузер на каждый ввод не годится.
+ * Кроме страницы отдаём: счётчики по фильтрам (с учётом поиска — видно, где нашлось) и
+ * «пора продлевать» без фильтров — этот блок должен быть виден всегда.
+ */
+export const listClients = async ({q, filter, sort, page} = {}) => {
+  const where = CLIENT_FILTERS[filter] ?? CLIENT_FILTERS.all;
+  const order = CLIENT_SORTS[sort] ?? CLIENT_SORTS.new;
+  const params = [];
+  const search = clientSearch(q, params);
+  const counts = Object.entries(CLIENT_FILTERS)
+    .map(([id, cond]) => `count(*) FILTER (WHERE ${cond})::int AS "${id}"`).join(', ');
+  const [{rows: [count]}, {rows: renew}] = await Promise.all([
+    db().query(`${CLIENTS_CTE} SELECT ${counts} FROM c WHERE ${search}`, params),
+    db().query(`${CLIENTS_CTE} SELECT * FROM c WHERE ${CLIENT_FILTERS.renew} ORDER BY c.plan_until`),
+  ]);
+  const total = count[filter in CLIENT_FILTERS ? filter : 'all'];
+  const pages = Math.max(1, Math.ceil(total / CLIENTS_PAGE));
+  const at = Math.min(Math.max(1, Math.floor(Number(page)) || 1), pages);
   const {rows} = await db().query(
-    `SELECT w.id, w.name, w.created_at,
-            u.name AS person, u.email, u.phone, u.platform_role,
-            COALESCE((SELECT sum(remaining) FROM smmaker_credit_lots t WHERE t.workspace_id = w.id AND t.expires_at > now()), 0)::int AS credits,
-            COALESCE((SELECT sum(price_krw) FROM smmaker_credit_lots t WHERE t.workspace_id = w.id AND t.source IN ('pack', 'subscription')), 0)::int AS paid_krw,
-            -- Подписка: тариф и конец оплаченного — менеджеру видно, кому пора продлевать
-            sub.title AS plan_title, sub.expires_at AS plan_until,
-            (SELECT count(*) FROM smmaker_credit_ledger l WHERE l.workspace_id = w.id AND l.kind = 'charge')::int AS generations,
-            (SELECT max(created_at) FROM smmaker_credit_ledger l WHERE l.workspace_id = w.id AND l.kind = 'charge') AS last_generation
-       FROM smmaker_workspaces w
-       LEFT JOIN LATERAL (SELECT user_id FROM smmaker_memberships m WHERE m.workspace_id = w.id ORDER BY created_at LIMIT 1) m ON true
-       LEFT JOIN smmaker_users u ON u.id = m.user_id
-       LEFT JOIN LATERAL (
-         SELECT l.expires_at, COALESCE(p.title, l.pack_id) AS title FROM smmaker_credit_lots l
-           LEFT JOIN smmaker_packs p ON p.id = l.pack_id
-          WHERE l.workspace_id = w.id AND l.source = 'subscription' AND l.expires_at > now()
-          ORDER BY l.expires_at DESC LIMIT 1) sub ON true
-      ORDER BY w.created_at DESC`);
-  return rows;
+    `${CLIENTS_CTE} SELECT * FROM c WHERE ${search} AND ${where} ORDER BY ${order} LIMIT ${CLIENTS_PAGE} OFFSET ${(at - 1) * CLIENTS_PAGE}`,
+    params);
+  return {rows, total, page: at, pages, pageSize: CLIENTS_PAGE, counts: count, renew};
 };
 
 /** Сотрудники платформы: у кого есть роль */

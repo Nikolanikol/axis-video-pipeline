@@ -227,7 +227,7 @@ export const createApp = ({photoOrigin}) => {
   const admin = express.Router();
   admin.use((req, _res, next) => next(authEnabled() ? undefined : new HttpError(400, 'Админка работает только с базой')));
   admin.use(requireStaff);
-  admin.get('/clients', wrap(() => listClients()));
+  admin.get('/clients', wrap((req) => listClients(req.query)));
   admin.get('/clients/:id/ledger', wrap((req) => ledgerOf(checkId(req.params.id))));
   admin.get('/packs', wrap(() => listPacks({all: true})));
   admin.post('/clients/:id/packs', wrap((req) => grantPack({
