@@ -76,6 +76,10 @@ export const ProfileTool: React.FC = () => {
   );
 };
 
+/**
+ * Настройки → «Реклама авто»: надписи роликов компании по сценам и языкам, иконка
+ * преимущества. Язык правки свой (переключатель в форме), превью — на нём же
+ */
 export const AdTextsTool: React.FC = () => {
   const {config, profile, setProfile, profileSaved, brand, brandSaved, report} = useConfig();
   const lot = usePreviewLot();

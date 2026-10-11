@@ -177,6 +177,8 @@ const visibleLuma = (data) => {
  * Файл → готовый логотип. Возвращает два PNG: clean (фон убран, поля обрезаны) и raw
  * (только обрезан и уменьшен — на случай, если автоматика ошиблась и человек хочет
  * оставить фон как был), и что было сделано — для подписи в интерфейсе.
+ * RULES и W — пороги и слова для сообщений: та же обработка готовит и свою иконку
+ * преимущества (ICON_RULES, ICON_WORDS), а человек должен читать «иконка», не «логотип».
  */
 export const processLogo = async (buffer, RULES = LOGO_RULES, W = LOGO_WORDS) => {
   if (!buffer?.length) throw new HttpError(400, 'Файл не пришёл');
@@ -310,6 +312,7 @@ export const setLogoVariant = async (variant) => {
 
 // ——— Иконка преимущества ———
 
+// Иконка — один файл бренда (assets.iconHandshake); логотип и прочие файлы не трогаем
 const setIcon = async (url) => {
   const brand = await getBrand();
   await saveBrand({...brand, assets: {...brand.assets, iconHandshake: url}});

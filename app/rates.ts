@@ -5,8 +5,11 @@ import {krwPerUnit} from '../src/shared/currencies';
 import type {Market} from '../src/shared/types';
 import {api, Rates} from './api';
 
+// Промис общий на всю страницу: шапка, форма и превью не шлют каждый свой запрос.
+// Ошибка — null: без курсов экраны показывают заглушку цены, а не падают
 let today: Promise<Rates | null> | null = null;
 
+/** Курсы на сегодня (единиц за $1); до ответа сервера — null */
 export const useRates = () => {
   const [rates, setRates] = useState<Rates | null>(null);
   useEffect(() => {

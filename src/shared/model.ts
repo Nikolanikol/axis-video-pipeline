@@ -37,13 +37,7 @@ export const totalUsd = (ad: Pick<Ad, 'carPriceUsd' | 'carPriceKrw' | 'krwPerUsd
   return car === null ? null : car + ad.freightUsd;
 };
 
-/**
- * Цена к показу в валюте профиля. KRW — в вонах: цена авто как на Encar плюс фрахт,
- * пересчитанный по курсу лота. Любая другая валюта — прежняя цена в долларах.
- * Раньше ролик всегда считал в долларах, а значок брал из профиля: у профиля с KRW выходило
- * «18 646 ₩» при цене машины 25 340 000 ₩ (нашли на раскадровке 30.09).
- * Конвертации в евро и прочее нет: там дилер вводит своё число, и считаем его долларами.
- */
+// Поля объявления и рынка, из которых складывается цена ролика
 type PriceInput = Pick<Ad, 'carPriceUsd' | 'carPriceKrw' | 'krwPerUsd' | 'freightUsd' | 'currency' | 'priceOverride'
   | 'krwPerUnit' | 'fxCurrency' | 'krwPerUnitToday'>;
 
@@ -51,6 +45,18 @@ type PriceInput = Pick<Ad, 'carPriceUsd' | 'carPriceKrw' | 'krwPerUsd' | 'freigh
 export const unitRate = (ad: Pick<Ad, 'currency' | 'krwPerUnit' | 'fxCurrency' | 'krwPerUnitToday'>): number | null =>
   (ad.krwPerUnit && ad.fxCurrency === ad.currency ? ad.krwPerUnit : null) ?? ad.krwPerUnitToday ?? null;
 
+/**
+ * Цена к показу в валюте профиля, по порядку:
+ *   • «Цена в ролике» руками (priceOverride) — как есть: так клиент закладывает маржу (11.10);
+ *   • $ — цена авто в долларах по курсу ₩/$ объявления плюс фрахт;
+ *   • ₩ — цена авто как на Encar плюс фрахт, пересчитанный по курсу объявления;
+ *   • ₽, ₸, € и прочие (с 11.10) — из вон по курсу «₩ за единицу» (unitRate); без курса —
+ *     черновик null, а не доллары под чужим значком. До 11.10 здесь были доллары со значком
+ *     валюты, и «9 868 ₽» выдавало себя за рубли.
+ * Раньше ролик всегда считал в долларах, а значок брал из профиля: у профиля с KRW выходило
+ * «18 646 ₩» при цене машины 25 340 000 ₩ (нашли на раскадровке 30.09).
+ * Экраны интерфейса зовут не её, а lotTotal ниже — он подмешивает поля рынка, как рендер.
+ */
 export const totalInCurrency = (ad: PriceInput): number | null => {
   // Цена, вписанная руками, — ровно то, что покажем: без фрахта и пересчёта по курсу
   if (ad.priceOverride) return ad.priceOverride;
