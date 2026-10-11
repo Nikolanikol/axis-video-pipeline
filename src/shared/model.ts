@@ -44,7 +44,9 @@ export const totalUsd = (ad: Pick<Ad, 'carPriceUsd' | 'carPriceKrw' | 'krwPerUsd
  * «18 646 ₩» при цене машины 25 340 000 ₩ (нашли на раскадровке 30.09).
  * Конвертации в евро и прочее нет: там дилер вводит своё число, и считаем его долларами.
  */
-export const totalInCurrency = (ad: Pick<Ad, 'carPriceUsd' | 'carPriceKrw' | 'krwPerUsd' | 'freightUsd' | 'currency'>): number | null => {
+export const totalInCurrency = (ad: Pick<Ad, 'carPriceUsd' | 'carPriceKrw' | 'krwPerUsd' | 'freightUsd' | 'currency' | 'priceOverride'>): number | null => {
+  // Цена, вписанная руками, — ровно то, что покажем: без фрахта и пересчёта по курсу
+  if (ad.priceOverride) return ad.priceOverride;
   if (ad.currency !== 'KRW') return totalUsd(ad);
   const rate = ad.krwPerUsd ?? null;
   // Цена в вонах: из лота, иначе из долларовой по курсу
@@ -65,4 +67,4 @@ export const missing = (lot: Lot, format: FormatMeta): Requirement[] =>
   format.requires.filter((r) =>
     r === 'photos' ? lot.photos.length === 0
       : r === 'specs' ? lot.specs.filter(Boolean).length === 0
-        : priceUsd(lot) === null);
+        : priceUsd(lot) === null && !lot.priceOverride);

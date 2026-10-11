@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {describe, expect, it} from 'vitest';
-import {PRICING_MODES, marketFromProfile, priceView, resolveProfile, resolveTexts} from '../../src/shared/profile.js';
+import {PRICING_MODES, marketFromProfile, priceView, resolveProfile, resolveTexts, textsForLanguage} from '../../src/shared/profile.js';
 import type {Profile} from '../../src/shared/types';
 
 const ROOT = path.resolve(__dirname, '../..');
@@ -154,5 +154,29 @@ describe('marketFromProfile — мост под старые пайплайны'
     for (const k of ['name', 'origin', 'originCountry', 'port', 'portCountry', 'freightUsd', 'whatsapp', 'site', 'texts', 'music']) {
       expect(m, `нет поля ${k}`).toHaveProperty(k);
     }
+  });
+});
+
+describe('тексты компании по языкам', () => {
+  const ru = {...exportProfile(), language: 'ru'};
+
+  it('берутся правки своего языка, чужие не просачиваются', () => {
+    const p = {...ru, texts: {ru: {ctaBenefit: 'Без предоплаты'}, en: {ctaBenefit: 'No prepayment'}}};
+    expect(marketFromProfile(p, copy).texts.ctaBenefit).toBe('Без предоплаты');
+    expect(marketFromProfile({...p, language: 'en'}, copy).texts.ctaBenefit).toBe('No prepayment');
+    // остальное — из дефолтов своего языка
+    expect(marketFromProfile(p, copy).texts.ctaTitle).toBe('Полный расчёт');
+  });
+
+  it('у языка без своих текстов — чистые дефолты, а не надписи с другого языка', () => {
+    const p = {...ru, texts: {en: {ctaBenefit: 'No prepayment'}}};
+    expect(marketFromProfile(p, copy).texts.ctaBenefit).toBe('Работаем без комиссии');
+  });
+
+  it('старая плоская пачка без языка читается как правки текущего языка', () => {
+    expect(textsForLanguage({hookTagline: 'Своя'}, 'ru')).toEqual({hookTagline: 'Своя'});
+    expect(resolveProfile({...ru, texts: {hookTagline: 'Своя'}}, copy).texts.hookTagline).toBe('Своя');
+    expect(textsForLanguage({}, 'ru')).toEqual({});
+    expect(textsForLanguage(undefined, 'ru')).toEqual({});
   });
 });

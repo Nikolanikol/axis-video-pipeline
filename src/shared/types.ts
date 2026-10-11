@@ -49,8 +49,9 @@ export type Profile = {
   // telegram — @имя или ссылка; primary — чем подписана кнопка связи на финале карусели
   contacts: {whatsapp: string | null; site: string; telegram?: string; primary?: 'whatsapp' | 'telegram'};
   pricing: Pricing;
-  // Правки текстов поверх дефолтов платформы; пусто — всё из дефолтов
-  texts?: Partial<Texts>;
+  // Правки текстов поверх дефолтов платформы, по языкам: {ru: {...}, en: {...}}; пусто — всё
+  // из дефолтов. Старые профили хранили плоскую пачку — её читает textsForLanguage
+  texts?: Record<string, Partial<Texts>> | Partial<Texts>;
 };
 
 // Лот — данные об авто. Любое поле рынка можно переопределить (например, whatsapp: null — скрыть номер).
@@ -61,6 +62,9 @@ export type Lot = Partial<Omit<Market, 'texts'>> & {
   brand: string; model: string; trim?: string; year: number; specs: string[];
   // Цена авто: либо сразу в $, либо в ₩ + курс (₩ за $1). Без цены ролик — черновик с заглушкой.
   carPriceUsd?: number | null; carPriceKrw?: number | null; krwPerUsd?: number | null;
+  // Итог в ролике, вписанный руками, — в валюте профиля, как есть: перебивает расчёт
+  // «авто + фрахт». Клиенты ставят свою цену с наценкой, а не закупочную с Encar (11.10)
+  priceOverride?: number | null;
   // Путь в public/, абсолютный путь сервера (/data/...) или http-ссылка
   photos: string[];
   // История машины из Encar (без списка выплат — ролику нужны только счётчики).

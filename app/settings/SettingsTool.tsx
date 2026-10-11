@@ -1,4 +1,4 @@
-// Раздел «Настройки»: профиль и бренд. Справа — живое превью последнего открытого лота.
+// Раздел «Настройки»: профиль, бренд и надписи рекламы. Справа — живое превью последнего открытого лота.
 import React, {useEffect, useState} from 'react';
 import {getFormat} from '../../src/shared/model';
 import {marketFromProfile} from '../../src/shared/profile';
@@ -12,7 +12,7 @@ import {MobileTabs, useIsPhone} from '../MobileTabs';
 import {BrandPreview} from '../../src/brand/BrandPreview';
 import {Preview} from '../Preview';
 import {href, lastLot} from '../router';
-import {BrandForm, ProfileForm} from '../SettingsForms';
+import {AdTextsForm, BrandForm, ProfileForm} from '../SettingsForms';
 
 const usePreviewLot = () => {
   const {report} = useConfig();
@@ -70,6 +70,22 @@ export const ProfileTool: React.FC = () => {
     <SettingsLayout
       editor={<ProfileForm profile={profile} saved={savedProfile} onChange={setProfile} onSaved={profileSaved} onError={report} />}
       preview={<PreviewPanel lot={lot} market={{...market, id: profile.id}} />} />
+  );
+};
+
+export const AdTextsTool: React.FC = () => {
+  const {config, profile, setProfile, profileSaved, report} = useConfig();
+  const lot = usePreviewLot();
+  const [language, setLanguage] = useState(profile.language);
+  const savedProfile = config.profiles.find((p) => p.id === profile.id);
+  // Превью — на том языке, чьи тексты сейчас правят: иначе правка английских при постах на
+  // русском была бы не видна вовсе
+  const market = {...(marketFromProfile({...profile, language}, config.copy) as Market), id: profile.id};
+  return (
+    <SettingsLayout
+      editor={<AdTextsForm profile={profile} saved={savedProfile} copy={config.copy} language={language} onLanguage={setLanguage}
+        onChange={setProfile} onSaved={profileSaved} onError={report} />}
+      preview={<PreviewPanel lot={lot} market={market} />} />
   );
 };
 

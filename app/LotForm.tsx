@@ -54,6 +54,9 @@ const useTodayRate = () => {
 export const LotForm: React.FC<Props> = ({lot, market, format, onChange, onPhotos, onError}) => {
   const car = priceUsd(lot);
   const total = totalInCurrency({...lot, freightUsd: lot.freightUsd ?? market.freightUsd, currency: market.currency});
+  // Расчёт без ручной цены — подсказка у поля «Цена в ролике»: видно, от чего человек уходит
+  const computed = totalInCurrency({...lot, priceOverride: null, freightUsd: lot.freightUsd ?? market.freightUsd, currency: market.currency});
+  const manual = !!lot.priceOverride;
   const sign = currencySign(market.currency);
   const rate = useTodayRate();
   // Курс в лоте отличается от сегодняшнего больше чем на полпроцента — предлагаем обновить.
@@ -121,16 +124,29 @@ export const LotForm: React.FC<Props> = ({lot, market, format, onChange, onPhoto
       {/* Итог — ровно то число и та валюта, что будут в ролике (totalInCurrency). Раньше здесь
           всегда были доллары, а ролик при валюте профиля KRW показывал воны — экран и ролик
           говорили разное (30.09) */}
+      {/* Своя цена — итог как есть, в валюте профиля. Клиенты продают со своей наценкой, и
+          закупочная с Encar + фрахт им не годится (11.10). Пусто — считаем, как раньше */}
+      <Field label={`Цена в ролике, ${sign}`} wide
+        hint={manual
+          ? <>задана вручную · расчёт дал бы {computed === null ? '—' : `${fmt(computed)} ${sign}`} · <button type="button" className="link" onClick={() => onChange({priceOverride: null})}>вернуть расчёт</button></>
+          : 'пусто — авто + фрахт по курсу; впишите своё число, и в ролике будет ровно оно'}>
+        <input inputMode="decimal" value={lot.priceOverride ?? ''} placeholder={computed === null ? '' : String(computed)}
+          onChange={(e) => { const v = num(e.target.value); onChange({priceOverride: v === null || Number.isNaN(v) ? null : v}); }} />
+      </Field>
       <div className={total === null ? 'total warn' : 'total'}>
         {total === null
           ? `Цены нет — в ролике будет заглушка «XX XXX ${sign}»`
-          : <>В ролике: <b>{fmt(total)} {sign}</b>{freight > 0 && car !== null ? <span className="muted"> · с фрахтом {fmt(freight)} $</span> : null}{port ? <span className="muted"> · до {port}</span> : null}</>}
+          : manual
+            ? <>В ролике: <b>{fmt(total)} {sign}</b><span className="muted"> · вписано вручную</span>{port ? <span className="muted"> · до {port}</span> : null}</>
+            : <>В ролике: <b>{fmt(total)} {sign}</b>{freight > 0 && car !== null ? <span className="muted"> · с фрахтом {fmt(freight)} $</span> : null}{port ? <span className="muted"> · до {port}</span> : null}</>}
       </div>
 
       <Field label="Заметка" hint="в ролик не попадает" wide>
         <textarea rows={2} value={lot.note ?? ''} placeholder="источник, пометки: аукцион, номер лота, «демо»…"
           onChange={(e) => onChange({note: e.target.value})} />
       </Field>
+
+      <LotTexts key={lot.id} lot={lot} market={market} format={format} onChange={onChange} />
 
       <details className="overrides">
         <summary>Переопределить для этого объявления</summary>
@@ -156,6 +172,38 @@ export const LotForm: React.FC<Props> = ({lot, market, format, onChange, onPhoto
       <Photos lot={lot} roles={format.photoRoles} rest={format.photoRest ?? 'запас'} slots={!!format.photoSlots} onChange={onChange} onPhotos={onPhotos} onError={onError} />
       </div>
     </div>
+  );
+};
+
+/**
+ * Надписи одного ролика поверх текстов компании (Настройки → «Реклама авто»). Пусто —
+ * берём оттуда, подсказка серым показывает, что именно. Подзаголовок хука здесь не
+ * повторяем: он выше, у года, — туда его подставляет и Encar.
+ * Раскрыт сам, если в ролике уже есть свои надписи: иначе их не видно и легко забыть.
+ */
+const LotTexts: React.FC<Pick<Props, 'lot' | 'market' | 'format' | 'onChange'>> = ({lot, market, format, onChange}) => {
+  const fields = format.texts.filter((t) => t.key !== 'hookTagline');
+  const own = fields.filter((t) => lot.texts?.[t.key] !== undefined).length;
+  // Раскрытость — только на открытии: иначе, стерев последнюю свою надпись, человек видел бы,
+  // как блок схлопывается у него под руками
+  const [openAtStart] = useState(own > 0);
+  const set = (key: string, value: string) => onChange({texts: {...lot.texts, [key]: value === '' ? undefined : value}});
+  return (
+    <details className="overrides" open={openAtStart}>
+      <summary>Надписи этого ролика{own ? ` · своих: ${own}` : ''}</summary>
+      <p className="hint">Пусто — как в Настройках → «Реклама авто».</p>
+      {fields.map((t) => {
+        const value = lot.texts?.[t.key] ?? '';
+        const fallback = market.texts[t.key] ?? '';
+        return (
+          <Field key={t.key} label={t.label} hint={t.hint} wide>
+            {t.multiline
+              ? <textarea rows={2} value={value} placeholder={fallback} onChange={(e) => set(t.key, e.target.value)} />
+              : <input value={value} placeholder={fallback} onChange={(e) => set(t.key, e.target.value)} />}
+          </Field>
+        );
+      })}
+    </details>
   );
 };
 

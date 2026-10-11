@@ -51,6 +51,14 @@ describe('цена в валюте профиля', () => {
     expect(totalInCurrency({carPriceUsd: 10000, carPriceKrw: null, krwPerUsd: 1400, freightUsd: 0, currency: 'KRW'})).toBe(14000000);
     expect(totalInCurrency({carPriceUsd: 10000, carPriceKrw: null, krwPerUsd: null, freightUsd: 0, currency: 'KRW'})).toBeNull();
   });
+  it('цена, вписанная руками, идёт в ролик как есть — без фрахта и пересчёта', () => {
+    expect(totalInCurrency({...bmw, freightUsd: 1500, currency: 'USD', priceOverride: 21990})).toBe(21990);
+    expect(totalInCurrency({...bmw, freightUsd: 1500, currency: 'KRW', priceOverride: 29900000})).toBe(29900000);
+    // и без цены авто: свою цену вписали — ролик уже не черновик
+    expect(totalInCurrency({carPriceUsd: null, carPriceKrw: null, krwPerUsd: null, freightUsd: 0, currency: 'USD', priceOverride: 15000})).toBe(15000);
+    // пустая ручная цена — обычный расчёт
+    expect(totalInCurrency({...bmw, currency: 'USD', priceOverride: null})).toBe(18646);
+  });
 });
 
 describe('лот поверх настроек рынка', () => {
@@ -87,5 +95,6 @@ describe('форматы', () => {
     const f = getFormat('price-ad');
     expect(missing(lot(), f)).toEqual([]);
     expect(missing(lot({photos: [], specs: ['', ''], krwPerUsd: null}), f)).toEqual(['photos', 'specs', 'price']);
+    expect(missing(lot({krwPerUsd: null, priceOverride: 15000}), f)).toEqual([]);
   });
 });

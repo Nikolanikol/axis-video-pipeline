@@ -1,9 +1,11 @@
-// Формы настроек: профиль клиента (компания, язык постов, модель цены, контакты) и бренд
-// (логотип, шрифты, оформление, палитра).
+// Формы настроек: профиль клиента (компания, язык постов, модель цены, контакты), бренд
+// (логотип, шрифты, оформление, палитра) и надписи рекламных роликов.
 import React, {useEffect, useRef, useState} from 'react';
 import {POST_LANGUAGES} from '../src/shared/languages';
 import type {Profile, Theme} from '../src/shared/types';
-import {api, FontPair, Palette, ProfileEntry} from './api';
+import {api, Copy, FontPair, Palette, ProfileEntry} from './api';
+import {FORMATS} from '../src/shared/model';
+import {resolveTexts, textsForLanguage} from '../src/shared/profile';
 import {contrastIssues, matchPalette} from '../src/shared/contrast.js';
 import {Field} from './LotForm';
 
@@ -307,8 +309,8 @@ const EXPORT_DEFAULTS = {origin: '', originCountry: '', port: '', portCountry: '
 /**
  * Профиль клиента — «пара кнопок»: кто он, на каком языке и по какой модели продаёт.
  *
- * Тексты постов здесь НЕ правятся: они приходят из дефолтов платформы под язык и режим
- * (config/copy.json). Клиент задаёт только своё — в этом смысл «пришёл и работает».
+ * Тексты постов здесь не правятся: они приходят из дефолтов платформы под язык и режим
+ * (config/copy.json), а свои надписи роликов — отдельный раздел «Реклама авто» (AdTextsForm).
  * Переключатель модели цены прячет поля порта и фрахта на внутреннем рынке: там их нет.
  */
 export const ProfileForm: React.FC<ProfileProps> = ({profile, saved, onChange, onSaved, onError}) => {
@@ -330,7 +332,7 @@ export const ProfileForm: React.FC<ProfileProps> = ({profile, saved, onChange, o
   return (
     <div className="form">
       <h2>Профиль <span className="muted">кто вы и как продаёте</span></h2>
-      <p className="note">Тексты постов подставляются сами под язык и модель цены — их править не нужно. Дизайн — в разделе «Бренд».</p>
+      <p className="note">Тексты постов подставляются сами под язык и модель цены; свои надписи роликов — в разделе «Реклама авто». Дизайн — в разделе «Бренд».</p>
 
       <div className="row">
         <Field label="Компания" hint="печатается на постах"><input value={profile.company} onChange={(e) => set({company: e.target.value})} /></Field>
@@ -403,6 +405,85 @@ export const ProfileForm: React.FC<ProfileProps> = ({profile, saved, onChange, o
       <div className="actions">
         <button className="btn primary" disabled={!dirty || busy} onClick={persist}>Сохранить</button>
         <button className="btn" disabled={!dirty || busy || !saved} onClick={() => saved && onChange(saved)}>Отменить правки</button>
+      </div>
+    </div>
+  );
+};
+
+// Поля надписей — из описаний форматов (config/formats.json): подписи и подсказки к ним уже
+// есть там, и новый текст формата появится здесь сам. Ключи у форматов одинаковые — берём
+// по первому вхождению, чтобы порядок шёл по сценам ролика
+const AD_TEXT_FIELDS = FORMATS.flatMap((f) => f.texts).filter((t, i, all) => all.findIndex((x) => x.key === t.key) === i);
+
+type AdTextsProps = ProfileProps & {
+  copy: Copy;
+  language: string;
+  onLanguage: (code: string) => void;
+};
+
+/**
+ * Надписи рекламных роликов по умолчанию — свои у каждого языка (profile.texts[язык]).
+ * Пустое поле — текст платформы (config/copy.json), он виден серым. В ролике поверх этого
+ * ещё и надписи самого объявления («Изменить вручную»).
+ * Язык здесь выбирается свой, а не берётся из профиля: можно заранее подготовить тексты на
+ * другом языке и переключиться, ничего не теряя.
+ */
+export const AdTextsForm: React.FC<AdTextsProps> = ({profile, saved, copy, language, onLanguage, onChange, onSaved, onError}) => {
+  const [busy, setBusy] = useState(false);
+  const dirty = profile !== saved;
+  const mode = profile.pricing.mode === 'domestic' ? 'domestic' : 'export';
+  const defaults = resolveTexts(copy, mode, language, {});
+  const own = textsForLanguage(profile.texts, language);
+  const ownCount = (code: string) => Object.values(textsForLanguage(profile.texts, code)).filter((v) => v !== undefined).length;
+
+  const set = (key: string, value: string) => {
+    // Старая плоская пачка — правки языка профиля; раскладываем по языкам при первой правке
+    const byLang = Object.values(profile.texts ?? {}).some((v) => typeof v === 'string')
+      ? {[profile.language]: profile.texts as Record<string, string>}
+      : (profile.texts ?? {}) as Record<string, Record<string, string>>;
+    onChange({...profile, texts: {...byLang, [language]: {...byLang[language], [key]: value === '' ? undefined : value}}} as ProfileEntry);
+  };
+  const reset = () => {
+    const {[language]: _dropped, ...rest} = (profile.texts ?? {}) as Record<string, unknown>;
+    onChange({...profile, texts: rest} as ProfileEntry);
+  };
+  const persist = async () => {
+    setBusy(true);
+    const {id, ...data} = profile;
+    try { onSaved(await api.saveProfile(id, data)); } catch (e) { onError(e); } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="form">
+      <h2>Реклама авто <span className="muted">надписи в роликах</span></h2>
+      <p className="note">
+        Пустое поле — текст по умолчанию (серым). В конкретном ролике любую надпись можно поменять ещё раз — в «Изменить вручную».
+        {mode === 'domestic' ? ' Сейчас режим «Внутренний рынок»' : ' Сейчас режим «Экспорт»'} — тексты по умолчанию под него.
+      </p>
+
+      <div className="btn-row">
+        {POST_LANGUAGES.map((l) => (
+          <button key={l.code} type="button" className={`btn ${l.code === language ? 'primary' : 'ghost'}`} onClick={() => onLanguage(l.code)}>
+            {l.name}{ownCount(l.code) ? ` · ${ownCount(l.code)}` : ''}{l.code === profile.language ? ' (в постах)' : ''}
+          </button>
+        ))}
+      </div>
+      {language !== profile.language && (
+        <p className="hint">Посты сейчас на другом языке — эти тексты включатся, когда в «Профиле» выберете {POST_LANGUAGES.find((l) => l.code === language)?.name}.</p>
+      )}
+
+      {AD_TEXT_FIELDS.map((t) => (
+        <Field key={t.key} label={t.label} hint={t.hint} wide>
+          {t.multiline
+            ? <textarea rows={2} value={own[t.key] ?? ''} placeholder={defaults[t.key] ?? ''} onChange={(e) => set(t.key, e.target.value)} />
+            : <input value={own[t.key] ?? ''} placeholder={defaults[t.key] ?? ''} onChange={(e) => set(t.key, e.target.value)} />}
+        </Field>
+      ))}
+
+      <div className="actions">
+        <button className="btn primary" disabled={!dirty || busy} onClick={persist}>Сохранить</button>
+        <button className="btn" disabled={!dirty || busy || !saved} onClick={() => saved && onChange(saved)}>Отменить правки</button>
+        <button className="btn ghost" disabled={busy || !ownCount(language)} onClick={reset}>Вернуть тексты по умолчанию</button>
       </div>
     </div>
   );
