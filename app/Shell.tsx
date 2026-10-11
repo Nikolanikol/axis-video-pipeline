@@ -9,6 +9,8 @@ import {Home, PipelinePage} from './Home';
 import {StartPage} from './Onboarding';
 import {Pipeline, ToolMeta, findPipeline, isClosed, toolKey, visiblePipelines} from './pipelines';
 import {href, useRoute} from './router';
+import {currencyCode, currencySign, isDirect, krwPerUnit} from '../src/shared/currencies';
+import {useRates} from './rates';
 import {TOOLS, hasTool} from './tools';
 import {Toasts} from './Toast';
 
@@ -64,6 +66,7 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
         <a href={href()} className="top-home" title="Все пайплайны">
           <img src="/kok/wordmark.svg" alt="KOK" className="top-logo" />
         </a>
+        <RatesChip />
         {config.preview && <span className="top-preview" title="Превью ветки: тестовая база, не прод">ТЕСТ · PR {config.preview}</span>}
         <nav className="crumbs">
           <a href={href()}>Пайплайны</a>
@@ -87,6 +90,8 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
             {navItems.map((i) => <a key={i.key} href={i.to} className={i.active ? 'menu-link active' : 'menu-link'}>{i.label}</a>)}
           </nav>
           {session.enabled && <AccountChip />}
+          {/* На телефоне курсы — в меню: в шапке рядом с логотипом им нет места */}
+          <RatesChip />
         </div>
       </header>
 
@@ -146,6 +151,30 @@ const RenewBanner: React.FC = () => {
       {burning > 0 && <>, вместе с ней сгорят {burning} кр.</>}.{' '}
       <a href={href('account')}>Продлить</a>
     </div>
+  );
+};
+
+/**
+ * Курсы на сегодня рядом с логотипом (владелец 11.10): доллар и валюта компании к воне —
+ * цены на Encar в вонах, и дилер сверяется с курсом, не уходя со страницы. Справочно: цены
+ * объявлений считаются по курсу, записанному в объявлении, — его клиент правит сам
+ */
+const RatesChip: React.FC = () => {
+  const {profile} = useConfig();
+  const rates = useRates();
+  if (!rates) return null;
+  const currency = currencyCode(profile.pricing?.currency);
+  const krwUsd = rates.usdRates.KRW;
+  const own = isDirect(currency) ? null : krwPerUnit(currency, rates.usdRates);
+  const n = (v: number) => v.toLocaleString('ru-RU', {maximumFractionDigits: 2});
+  const day = new Date(rates.fetchedAt).toLocaleDateString('ru-RU', {day: 'numeric', month: 'long'});
+  return (
+    <span className={rates.stale ? 'top-rates stale' : 'top-rates'}
+      title={`${rates.stale ? 'Курс не обновился, последний известный' : 'Курс'} на ${day} · ${rates.source}`}>
+      {krwUsd ? <span>1 $ = <b>{n(krwUsd)} ₩</b></span> : null}
+      {own ? <span>1 {currencySign(currency)} = <b>{n(own)} ₩</b></span> : null}
+      {rates.stale && <span className="muted">на {day}</span>}
+    </span>
   );
 };
 

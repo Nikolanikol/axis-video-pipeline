@@ -10,6 +10,8 @@
 //   domestic — продажа на своём рынке: цена как есть, без фрахта, порта и заграницы.
 // Один движок рендера рисует оба — пайплайн смотрит на pricing.mode.
 
+import {currencyCode} from './currencies.js';
+
 /** @typedef {'export'|'domestic'} PricingMode */
 
 /** Обе модели цены. Всё, что не 'domestic', считаем 'export' — так безопаснее для старых данных. */
@@ -96,7 +98,10 @@ export const marketFromProfile = (profile, copy) => {
     texts: resolveTexts(copy, p.pricing?.mode, p.language, textsForLanguage(p.texts, p.language)),
     music: p.music,
     pricingMode: mode,
-    currency: p.pricing?.currency ?? 'USD',
+    // Код из списка; старое «РУБЛЬ» из свободного поля приводится к RUB (currencies.js)
+    currency: currencyCode(p.pricing?.currency),
     language: p.language,
+    // Иконка у строки преимущества в CTA; нет настройки — показываем, как было всегда
+    benefitIcon: p.ad?.benefitIcon !== false,
   };
 };

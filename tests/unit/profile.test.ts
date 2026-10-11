@@ -180,3 +180,10 @@ describe('тексты компании по языкам', () => {
     expect(textsForLanguage(undefined, 'ru')).toEqual({});
   });
 });
+
+describe('иконка у преимущества в CTA', () => {
+  it('по умолчанию показывается, выключается настройкой профиля', () => {
+    expect(marketFromProfile(exportProfile(), copy).benefitIcon).toBe(true);
+    expect(marketFromProfile({...exportProfile(), ad: {benefitIcon: false}}, copy).benefitIcon).toBe(false);
+  });
+});

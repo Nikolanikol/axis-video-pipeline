@@ -1,9 +1,10 @@
-// Форма лота: авто, характеристики, цена, фото. Автосохранение — в LotTool.
+// Форма лота по сценам ролика (Хук, Галерея, Стопка, Цена, CTA) и фото. Автосохранение — в LotTool.
 // Поле Field отсюда переиспользуют остальные формы.
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {GALLERY_CUTS} from '../src/formats/gallery-ad/GalleryAd';
 import {currencySign} from '../src/shared/blocks';
-import {fmt, priceUsd, totalInCurrency} from '../src/shared/model';
+import {isDirect} from '../src/shared/currencies';
+import {fmt, lotTotal, priceUsd} from '../src/shared/model';
 import {SLOT_TITLES, photoKey, photoLayout, type Slot} from '../src/shared/photoSlots';
 import type {FormatMeta, Market} from '../src/shared/types';
 import {api, LotEntry, UsdKrw} from './api';
@@ -53,15 +54,29 @@ const useTodayRate = () => {
 
 export const LotForm: React.FC<Props> = ({lot, market, format, onChange, onPhotos, onError}) => {
   const car = priceUsd(lot);
-  const total = totalInCurrency({...lot, freightUsd: lot.freightUsd ?? market.freightUsd, currency: market.currency});
+  const total = lotTotal(lot, market);
   // Расчёт без ручной цены — подсказка у поля «Цена в ролике»: видно, от чего человек уходит
-  const computed = totalInCurrency({...lot, priceOverride: null, freightUsd: lot.freightUsd ?? market.freightUsd, currency: market.currency});
+  const computed = lotTotal(lot, market, {priceOverride: null});
   const manual = !!lot.priceOverride;
+  // Валюта компании не ₩ и не $ (₽, ₸, €…): цена считается из вон по курсу валюты. Курс в
+  // объявлении клиент правит свободно — так закладывается маржа (11.10); пусто — сегодняшний
+  const fx = !isDirect(market.currency);
+  const fxToday = market.krwPerUnitToday ?? null;
+  const fxOwn = lot.krwPerUnit && lot.fxCurrency === market.currency ? lot.krwPerUnit : null;
+  const fxOff = fxToday && fxOwn && Math.abs(fxOwn - fxToday) / fxToday > 0.005;
   const sign = currencySign(market.currency);
   const rate = useTodayRate();
   // Курс в лоте отличается от сегодняшнего больше чем на полпроцента — предлагаем обновить.
   // Мелкие колебания не дёргаем: подсказка на каждой копейке приучила бы её не замечать
   const rateOff = rate && lot.krwPerUsd && Math.abs(lot.krwPerUsd - rate.krwPerUsd) / rate.krwPerUsd > 0.005;
+  // ₩/$ нужен цене, только когда она в долларах или к ней едет фрахт в долларах
+  const usdMatters = market.currency === 'USD' || (market.pricingMode !== 'domestic' && (lot.freightUsd ?? market.freightUsd) > 0) || (!lot.carPriceKrw && !!lot.carPriceUsd);
+  // Курс в объявлении ушёл от сегодняшнего больше чем на полпроцента — предлагаем обновить
+  const stale = Boolean((usdMatters && (rateOff || (!lot.krwPerUsd && rate))) || (fx && fxOwn && fxOff));
+  const refreshRates = () => onChange({
+    ...(rate ? {krwPerUsd: rate.krwPerUsd} : {}),
+    ...(fx && fxToday ? {krwPerUnit: fxToday, fxCurrency: market.currency} : {}),
+  });
   const freight = lot.freightUsd ?? market.freightUsd;
   const port = lot.port ?? market.port;
   const setSpec = (i: number, value: string) => onChange({specs: lot.specs.map((s, j) => (j === i ? value : s))});
@@ -72,7 +87,10 @@ export const LotForm: React.FC<Props> = ({lot, market, format, onChange, onPhoto
     // форму, а цену и фото нельзя было видеть разом
     <div className="form lot-form">
       <div className="lot-form-fields">
-      <h2>Авто</h2>
+      {/* Разделы — по сценам ролика, как кнопки под превью и как в Настройках → «Реклама
+          авто» (владелец 11.10: «чтобы сразу было понятно, без путаницы»). Своя надпись у
+          сцены — поле прямо в ней; пусто — текст из настроек, он виден серым */}
+      <SceneHead title="Хук" note={sceneNote(format.id, 'hook')} />
       <div className="row">
         <Field label="Марка"><input value={lot.brand} placeholder="Audi" onChange={(e) => onChange({brand: e.target.value})} /></Field>
         <Field label="Модель"><input value={lot.model} placeholder="A6" onChange={(e) => onChange({model: e.target.value})} /></Field>
@@ -81,14 +99,19 @@ export const LotForm: React.FC<Props> = ({lot, market, format, onChange, onPhoto
         <Field label="Версия"><input value={lot.trim ?? ''} placeholder="35 TDI" onChange={(e) => onChange({trim: e.target.value})} /></Field>
         <Field label="Год"><input type="number" value={lot.year ?? ''} onChange={(e) => onChange({year: Number(e.target.value)})} /></Field>
       </div>
-      {/* Подзаголовок под годом в первом кадре. Пусто — фраза из профиля («Из Кореи»);
+      {/* Подзаголовок под годом в первом кадре. Пусто — фраза из настроек («Из Кореи»);
           из Encar подставляется по фактам: без страховых случаев, один владелец, малый пробег */}
-      <Field label="Подзаголовок" hint={`пусто — «${market.texts.hookTagline ?? ''}» из профиля`}>
+      <Field label="Подзаголовок" hint="строка под годом; пусто — из Настроек → «Реклама авто»">
         <input value={lot.texts?.hookTagline ?? ''} placeholder={market.texts.hookTagline ?? ''} maxLength={40}
           onChange={(e) => onChange({texts: {...lot.texts, hookTagline: e.target.value || undefined}})} />
       </Field>
+      <PhotoHint />
 
-      <h2>Характеристики <span className="muted">на языке постов</span></h2>
+      <SceneHead title="Галерея" note={sceneNote(format.id, 'gallery')} />
+      <p className="hint scene-hint">Фото — {COARSE ? 'ниже' : 'справа'}: у каждого подписано место в ролике. Марка, модель и год — из «Хука».</p>
+
+      <SceneHead title="Стопка" note={sceneNote(format.id, 'stack')} />
+      <div className="label scene-label">Характеристики <span className="muted">на языке постов</span></div>
       {lot.specs.map((s, i) => (
         <div className="spec" key={i}>
           <input value={s} placeholder={['78 498 км', 'Дизел · автоматик', 'Кожен ентериер', 'Шибер · навигација'][i] ?? ''}
@@ -99,31 +122,29 @@ export const LotForm: React.FC<Props> = ({lot, market, format, onChange, onPhoto
       ))}
       {lot.specs.length < 5 && <button className="btn ghost" onClick={() => onChange({specs: [...lot.specs, '']})}>+ строка</button>}
 
-      <h2>Цена</h2>
-      <div className="row">
-        <Field label="Цена авто, 만원" hint={lot.carPriceKrw ? `${fmt(lot.carPriceKrw)} ₩` : 'как на Encar и в аукционном листе'}>
-          <input inputMode="decimal" value={lot.carPriceKrw ? String(lot.carPriceKrw / 10000) : ''}
-            onChange={(e) => { const v = num(e.target.value); onChange({carPriceKrw: v === null || Number.isNaN(v) ? null : Math.round(v * 10000)}); }} />
-        </Field>
-        <Field label="Курс, ₩ за $1" hint={rate && (
-          <>
-            {rate.stale ? 'курс не обновился, последний: ' : 'сегодня '}{rate.krwPerUsd.toLocaleString('ru-RU')}
-            {(!lot.krwPerUsd || rateOff) && (
-              <> · <button type="button" className="link" onClick={() => onChange({krwPerUsd: rate.krwPerUsd})}>подставить</button></>
-            )}
+      <SceneHead title="Цена" note={sceneNote(format.id, 'price')} />
+      {/* Цена авто и курс — не поля, а справка (владелец 11.10: «эту плашку убери»): цена
+          приходит с Encar, курс — сам, по валюте из профиля. Свою цену человек вписывает
+          в «Цену в ролике» — так он и закладывает маржу. Курс фиксируется в объявлении на день
+          создания (цена ролика не плывёт вместе с биржей), обновить — кнопкой */}
+      <div className="price-source">
+        {lot.carPriceKrw || lot.carPriceUsd
+          ? <>
+            {lot.carPriceKrw ? <>Цена на Encar: <b>{fmt(lot.carPriceKrw)} ₩</b></> : <>Цена авто: <b>{fmt(lot.carPriceUsd!)} $</b></>}
+            {usdMatters && lot.krwPerUsd ? <span className="muted"> · 1 $ = {lot.krwPerUsd.toLocaleString('ru-RU')} ₩</span> : null}
+            {fx && (fxOwn ?? fxToday) ? <span className="muted"> · 1 {sign} = {(fxOwn ?? fxToday)!.toLocaleString('ru-RU', {maximumFractionDigits: 2})} ₩{fxOwn ? '' : ' (сегодня)'}</span> : null}
+            {stale && <> · <button type="button" className="link" onClick={refreshRates}>обновить курс до сегодняшнего</button></>}
           </>
-        )}>
-          <input inputMode="decimal" value={lot.krwPerUsd ?? ''} placeholder={rate ? String(rate.krwPerUsd) : 'спросить'}
-            onChange={(e) => { const v = num(e.target.value); onChange({krwPerUsd: v === null || Number.isNaN(v) ? null : v}); }} />
-        </Field>
-        <Field label="или сразу, $" hint="если заполнено — главнее ₩">
-          <input inputMode="decimal" value={lot.carPriceUsd ?? ''}
-            onChange={(e) => { const v = num(e.target.value); onChange({carPriceUsd: v === null || Number.isNaN(v) ? null : v}); }} />
-        </Field>
+          : <>Цены с Encar нет — подтяните объявление по ссылке выше или впишите «Цену в ролике».</>}
       </div>
-      {/* Итог — ровно то число и та валюта, что будут в ролике (totalInCurrency). Раньше здесь
-          всегда были доллары, а ролик при валюте профиля KRW показывал воны — экран и ролик
-          говорили разное (30.09) */}
+      {/* Фрахт — к цене: он и есть разница между ценой авто и итогом. Раньше прятался в
+          «Переопределить для этого объявления» вместе с WhatsApp */}
+      {market.pricingMode !== 'domestic' && (
+        <Field label="Фрахт, $" hint={`пусто — из профиля: ${fmt(market.freightUsd)} $`}>
+          <input inputMode="decimal" value={lot.freightUsd ?? ''} placeholder={String(market.freightUsd)}
+            onChange={(e) => { const v = num(e.target.value); onChange({freightUsd: v === null || Number.isNaN(v) ? undefined : v}); }} />
+        </Field>
+      )}
       {/* Своя цена — итог как есть, в валюте профиля. Клиенты продают со своей наценкой, и
           закупочная с Encar + фрахт им не годится (11.10). Пусто — считаем, как раньше */}
       <Field label={`Цена в ролике, ${sign}`} wide
@@ -133,38 +154,44 @@ export const LotForm: React.FC<Props> = ({lot, market, format, onChange, onPhoto
         <input inputMode="decimal" value={lot.priceOverride ?? ''} placeholder={computed === null ? '' : String(computed)}
           onChange={(e) => { const v = num(e.target.value); onChange({priceOverride: v === null || Number.isNaN(v) ? null : v}); }} />
       </Field>
+      {/* Итог — ровно то число и та валюта, что будут в ролике (totalInCurrency). Раньше здесь
+          всегда были доллары, а ролик при валюте профиля KRW показывал воны — экран и ролик
+          говорили разное (30.09) */}
       <div className={total === null ? 'total warn' : 'total'}>
         {total === null
-          ? `Цены нет — в ролике будет заглушка «XX XXX ${sign}»`
+          ? (fx && !fxOwn && !fxToday && car !== null
+            ? `Курс ₩ → ${sign} пока недоступен — впишите «Цену в ролике», иначе в ролике будет заглушка «XX XXX ${sign}»`
+            : `Цены нет — в ролике будет заглушка «XX XXX ${sign}»`)
           : manual
             ? <>В ролике: <b>{fmt(total)} {sign}</b><span className="muted"> · вписано вручную</span>{port ? <span className="muted"> · до {port}</span> : null}</>
             : <>В ролике: <b>{fmt(total)} {sign}</b>{freight > 0 && car !== null ? <span className="muted"> · с фрахтом {fmt(freight)} $</span> : null}{port ? <span className="muted"> · до {port}</span> : null}</>}
       </div>
+      <TextsHint />
+      <LotText k="priceLabel" lot={lot} market={market} format={format} onChange={onChange} />
+      {/* В «Цене сразу» строк под ценой нет — не даём править то, чего в ролике не будет */}
+      {format.id !== 'price-first' && <>
+        <LotText k="priceNoteIncluded" lot={lot} market={market} format={format} onChange={onChange} />
+        <LotText k="priceNoteExcluded" lot={lot} market={market} format={format} onChange={onChange} />
+      </>}
 
-      <Field label="Заметка" hint="в ролик не попадает" wide>
-        <textarea rows={2} value={lot.note ?? ''} placeholder="источник, пометки: аукцион, номер лота, «демо»…"
-          onChange={(e) => onChange({note: e.target.value})} />
+      <SceneHead title="CTA" note={sceneNote(format.id, 'cta')} />
+      <TextsHint />
+      <LotText k="ctaTitle" lot={lot} market={market} format={format} onChange={onChange} />
+      <LotText k="ctaAccent" lot={lot} market={market} format={format} onChange={onChange} />
+      <LotText k="ctaBenefit" lot={lot} market={market} format={format} onChange={onChange} />
+      <LotText k="whatsappLabel" lot={lot} market={market} format={format} onChange={onChange} />
+      <Field label="WhatsApp" hint={lot.whatsapp === null ? 'номер скрыт' : `пусто — из профиля: ${market.whatsapp ?? '—'}`}>
+        <input value={lot.whatsapp ?? ''} placeholder={market.whatsapp ?? ''} disabled={lot.whatsapp === null}
+          onChange={(e) => onChange({whatsapp: e.target.value || undefined})} />
       </Field>
+      <label className="check scene-check">
+        <input type="checkbox" checked={lot.whatsapp === null} onChange={(e) => onChange({whatsapp: e.target.checked ? null : undefined})} />
+        Не показывать WhatsApp в этом ролике
+      </label>
 
-      <LotTexts key={lot.id} lot={lot} market={market} format={format} onChange={onChange} />
-
-      <details className="overrides">
-        <summary>Переопределить для этого объявления</summary>
-        <div className="row">
-          <Field label="Фрахт, $" hint={`по профилю: ${fmt(market.freightUsd)}`}>
-            <input inputMode="decimal" value={lot.freightUsd ?? ''} placeholder={String(market.freightUsd)}
-              onChange={(e) => { const v = num(e.target.value); onChange({freightUsd: v === null || Number.isNaN(v) ? undefined : v}); }} />
-          </Field>
-          <Field label="WhatsApp" hint={lot.whatsapp === null ? 'номер скрыт' : `по профилю: ${market.whatsapp ?? '—'}`}>
-            <input value={lot.whatsapp ?? ''} placeholder={market.whatsapp ?? ''} disabled={lot.whatsapp === null}
-              onChange={(e) => onChange({whatsapp: e.target.value || undefined})} />
-          </Field>
-        </div>
-        <label className="check">
-          <input type="checkbox" checked={lot.whatsapp === null} onChange={(e) => onChange({whatsapp: e.target.checked ? null : undefined})} />
-          Не показывать WhatsApp в этом ролике
-        </label>
-      </details>
+      <SceneHead title="Заметка" note="в ролик не попадает" />
+      <textarea rows={2} value={lot.note ?? ''} placeholder="источник, пометки: аукцион, номер лота, «демо»…"
+        onChange={(e) => onChange({note: e.target.value})} />
       </div>
 
       <div className="lot-form-photos">
@@ -175,35 +202,47 @@ export const LotForm: React.FC<Props> = ({lot, market, format, onChange, onPhoto
   );
 };
 
+// Заголовок сцены в форме объявления; note — чем сцена отличается в выбранном формате
+const SceneHead: React.FC<{title: string; note?: string}> = ({title, note}) => (
+  <h2 className="scene-head">{title}{note && <span className="muted">{note}</span>}</h2>
+);
+
+// Сцены у форматов разные: в «Авто с ценой» нет галереи, а третья сцена — «Характеристики»;
+// в «Цене сразу» цена — первая сцена вместе с хуком, а третья — «История». Говорим об этом
+// у раздела, иначе человек правит то, чего в его ролике нет, и не понимает, почему не видно
+const SCENE_NOTES: Record<string, Partial<Record<string, string>>> = {
+  'price-ad': {gallery: 'в формате «Авто с ценой» её нет', stack: 'в этом формате — «Характеристики»'},
+  'price-first': {hook: 'в этом формате вместе с ценой — первая сцена', stack: 'в этом формате — «История»: история Encar и характеристики',
+    price: 'в этом формате — первая сцена, без строк «включено / не включено»'},
+};
+const sceneNote = (format: string, scene: string) => SCENE_NOTES[format]?.[scene];
+
+// Подсказка про фото в «Хуке»: первое фото — его, места остальных подписаны в галерее
+const PhotoHint: React.FC = () => (
+  <p className="hint scene-hint">Фото хука — первое {COARSE ? 'в фото ниже' : 'в фото справа'} (или отмеченное «Хук»).</p>
+);
+
+// Одна строка на сцену вместо подсказки под каждой надписью: повторённая шесть раз, она шумела
+const TextsHint: React.FC = () => (
+  <p className="hint scene-hint">Серым — надписи из Настроек → «Реклама авто». Впишите своё — поменяется только в этом ролике.</p>
+);
+
 /**
- * Надписи одного ролика поверх текстов компании (Настройки → «Реклама авто»). Пусто —
- * берём оттуда, подсказка серым показывает, что именно. Подзаголовок хука здесь не
- * повторяем: он выше, у года, — туда его подставляет и Encar.
- * Раскрыт сам, если в ролике уже есть свои надписи: иначе их не видно и легко забыть.
+ * Надпись этого ролика поверх текстов компании (Настройки → «Реклама авто»). Пусто — берём
+ * оттуда, она видна серым. Подпись и подсказка — из описания формата (config/formats.json)
  */
-const LotTexts: React.FC<Pick<Props, 'lot' | 'market' | 'format' | 'onChange'>> = ({lot, market, format, onChange}) => {
-  const fields = format.texts.filter((t) => t.key !== 'hookTagline');
-  const own = fields.filter((t) => lot.texts?.[t.key] !== undefined).length;
-  // Раскрытость — только на открытии: иначе, стерев последнюю свою надпись, человек видел бы,
-  // как блок схлопывается у него под руками
-  const [openAtStart] = useState(own > 0);
-  const set = (key: string, value: string) => onChange({texts: {...lot.texts, [key]: value === '' ? undefined : value}});
+const LotText: React.FC<Pick<Props, 'lot' | 'market' | 'format' | 'onChange'> & {k: string}> = ({k, lot, market, format, onChange}) => {
+  const t = format.texts.find((x) => x.key === k);
+  if (!t) return null;
+  const value = lot.texts?.[k] ?? '';
+  const fallback = market.texts[k] ?? '';
+  const set = (v: string) => onChange({texts: {...lot.texts, [k]: v === '' ? undefined : v}});
   return (
-    <details className="overrides" open={openAtStart}>
-      <summary>Надписи этого ролика{own ? ` · своих: ${own}` : ''}</summary>
-      <p className="hint">Пусто — как в Настройках → «Реклама авто».</p>
-      {fields.map((t) => {
-        const value = lot.texts?.[t.key] ?? '';
-        const fallback = market.texts[t.key] ?? '';
-        return (
-          <Field key={t.key} label={t.label} hint={t.hint} wide>
-            {t.multiline
-              ? <textarea rows={2} value={value} placeholder={fallback} onChange={(e) => set(t.key, e.target.value)} />
-              : <input value={value} placeholder={fallback} onChange={(e) => set(t.key, e.target.value)} />}
-          </Field>
-        );
-      })}
-    </details>
+    <Field label={t.label} hint={value ? 'своя для этого ролика · сотрите — вернётся из настроек' : undefined} wide>
+      {t.multiline
+        ? <textarea rows={2} value={value} placeholder={fallback} onChange={(e) => set(e.target.value)} />
+        : <input value={value} placeholder={fallback} onChange={(e) => set(e.target.value)} />}
+    </Field>
   );
 };
 

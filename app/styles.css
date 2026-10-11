@@ -105,6 +105,25 @@ h2 {
 h2:first-child { margin-top: 0; }
 h2 .muted { font: 500 12px var(--font); letter-spacing: 0; text-transform: none; margin-left: 6px; }
 .note { color: var(--muted); font-size: 12px; margin: -4px 0 14px; }
+/* Сцена ролика в «Реклама авто»: поля сцены и строки «с замком» — что берётся не отсюда */
+.scene-group { border-top: 1px solid var(--line); padding-top: 4px; margin-top: 14px; }
+.scene-group h2 { margin-top: 12px; }
+.locked-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12px; color: var(--text); opacity: .75; margin: 0 0 6px; }
+.locked-row svg { color: var(--muted); flex: none; }
+.scene-check { margin: -2px 0 12px; }
+/* Форма объявления по сценам: заголовок сцены с чертой сверху, как в «Реклама авто» */
+.lot-form-fields .scene-head { border-top: 1px solid var(--line); padding-top: 14px; }
+.lot-form-fields .scene-head:first-child { border-top: 0; padding-top: 0; }
+.scene-hint { margin: -2px 0 8px; }
+/* Справка о цене с Encar и курсе — не поле: правится только «Цена в ролике» */
+.price-source { font-size: 13px; margin: 0 0 12px; line-height: 1.5; }
+.price-source b { font-weight: 600; }
+.scene-label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+/* Своя иконка преимущества: квадрат цвета слайда с иконкой — как она ляжет в ролик */
+.icon-field { display: flex; gap: 12px; align-items: flex-start; margin: 0 0 14px; }
+.icon-shot { flex: none; width: 72px; height: 72px; border-radius: 8px; border: 1px solid var(--line); display: grid; place-items: center; }
+.icon-shot img { width: 52px; height: 52px; object-fit: contain; }
+.icon-field .btn-row { margin-bottom: 4px; }
 
 .form .row { display: flex; gap: 10px; }
 .form .row > * { flex: 1; min-width: 0; }
@@ -249,6 +268,11 @@ input:disabled { opacity: .5; }
 /* Оболочка: пайплайны и инструменты */
 .tool { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .top-home { display: flex; }
+/* Курсы на сегодня рядом с логотипом: мелко, справочно — не спорят с навигацией */
+.top-rates { display: inline-flex; align-items: center; gap: 12px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.top-rates b { color: var(--text); font-weight: 600; }
+.top-rates.stale b { color: var(--warn); }
+.menu-sheet .top-rates { padding: 10px 4px 0; flex-wrap: wrap; }
 /* Метка превью PR: цвет только в метке, как у состояний */
 .top-preview { font-size: 11px; font-weight: 700; letter-spacing: .06em; color: var(--warn); background: var(--warn-bg); border: 1px solid var(--warn-line); border-radius: 6px; padding: 3px 8px; white-space: nowrap; }
 .crumbs { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 200px; color: var(--muted); font-size: 13px; }
@@ -265,6 +289,15 @@ a.tab { text-decoration: none; }
 .toolbar select { width: auto; min-width: 240px; max-width: 360px; }
 .toolbar .label { color: var(--muted); font-size: 12px; }
 .grid-settings { grid-template-columns: minmax(380px, 560px) minmax(300px, 1fr); }
+/* Превью настроек — во всю высоту панели, кнопки сцен под ним всегда на экране (владелец 11.10).
+   Плеер растёт по высоте сколько осталось после строки формата и кнопок, ширина — из 9:16.
+   Раньше высота была «окно минус 170 px», а шапка, вкладки и две строки над плеером съедали
+   больше — кнопки сцен уезжали под край */
+@media (min-width: 1101px) {
+  .grid-settings .preview { overflow: hidden; }
+  .grid-settings .preview > .player-wrap { flex: 1 1 0; min-height: 0; }
+  .grid-settings .player-box { flex: 1 1 0; min-height: 0; height: auto; width: auto; }
+}
 
 .page { flex: 1; overflow: auto; padding: 28px 20px 40px; max-width: 1100px; width: 100%; margin: 0 auto; }
 .page-title { font: 800 30px var(--font); letter-spacing: -.01em; margin: 0 0 18px; }
@@ -901,7 +934,7 @@ a.tab { text-decoration: none; }
 @media (max-width: 900px) {
   /* z-index 40 — шапка и её меню выше выдвижных панелей (20) и затемнения (39) */
   .top { position: relative; z-index: 40; flex-wrap: nowrap; gap: 10px; padding: 8px 12px; }
-  .top > .tabs, .top > .crumbs, .top > .account-chip { display: none; }
+  .top > .tabs, .top > .crumbs, .top > .account-chip, .top > .top-rates { display: none; }
   .top-credits { display: inline-flex; align-items: center; margin-left: auto; padding: 6px 11px; border-radius: 999px; background: var(--panel-2);
     border: 1px solid var(--line); color: var(--text); font-size: 13px; font-weight: 700; text-decoration: none; white-space: nowrap; }
   .burger { display: grid; place-items: center; flex: none; width: 40px; height: 40px; padding: 0; border-radius: 10px; cursor: pointer;
@@ -940,6 +973,9 @@ a.tab { text-decoration: none; }
   /* Превью — на всю ширину, но кадр целиком на экране: 57 шапка + ~45 вкладки инструментов + 60
      панель разделов + ~110 строка «Образец / Ролик» и отступы */
   .grid-settings .player-box { height: auto !important; width: min(100%, calc((100dvh - 290px) * 9 / 16)); margin: 0 auto; }
+  /* У «Бренда» над плеером ещё строка «Образец / Ролик» (~50 px): без поправки на iPhone SE
+     кнопки сцен уходили под панель разделов (замер 11.10: низ кнопок 630 при верхе панели 614) */
+  .grid-settings .preview:has(.format-bar .btn-row) .player-box { width: min(100%, calc((100dvh - 340px) * 9 / 16)); }
   .grid-settings .preview { align-items: stretch; }
   /* Логотип: снимок сверху во всю ширину, кнопки и условия под ним — рядом они не помещались */
   .logo-field { flex-direction: column; align-items: stretch; gap: 12px; }

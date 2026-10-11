@@ -2,7 +2,7 @@
 import brandTheme from '../../config/brand.json';
 import formats from '../../config/formats.json';
 import musicLibrary from '../../config/music.json';
-import type {Ad, AdProps, FormatMeta, Lot, Requirement, Texts, Theme, Track} from './types';
+import type {Ad, AdProps, FormatMeta, Lot, Market, Requirement, Texts, Theme, Track} from './types';
 
 export const BRAND: Theme = brandTheme;
 export const TRACKS: Track[] = musicLibrary;
@@ -44,10 +44,27 @@ export const totalUsd = (ad: Pick<Ad, 'carPriceUsd' | 'carPriceKrw' | 'krwPerUsd
  * «18 646 ₩» при цене машины 25 340 000 ₩ (нашли на раскадровке 30.09).
  * Конвертации в евро и прочее нет: там дилер вводит своё число, и считаем его долларами.
  */
-export const totalInCurrency = (ad: Pick<Ad, 'carPriceUsd' | 'carPriceKrw' | 'krwPerUsd' | 'freightUsd' | 'currency' | 'priceOverride'>): number | null => {
+type PriceInput = Pick<Ad, 'carPriceUsd' | 'carPriceKrw' | 'krwPerUsd' | 'freightUsd' | 'currency' | 'priceOverride'
+  | 'krwPerUnit' | 'fxCurrency' | 'krwPerUnitToday'>;
+
+/** Курс, по которому считаем цену в валюте компании: свой из объявления, иначе сегодняшний */
+export const unitRate = (ad: Pick<Ad, 'currency' | 'krwPerUnit' | 'fxCurrency' | 'krwPerUnitToday'>): number | null =>
+  (ad.krwPerUnit && ad.fxCurrency === ad.currency ? ad.krwPerUnit : null) ?? ad.krwPerUnitToday ?? null;
+
+export const totalInCurrency = (ad: PriceInput): number | null => {
   // Цена, вписанная руками, — ровно то, что покажем: без фрахта и пересчёта по курсу
   if (ad.priceOverride) return ad.priceOverride;
-  if (ad.currency !== 'KRW') return totalUsd(ad);
+  if (ad.currency === 'USD' || !ad.currency) return totalUsd(ad);
+  if (ad.currency !== 'KRW') {
+    // Другая валюта (₽, ₸, €…): вона → валюта по курсу объявления. Фрахт задан в долларах —
+    // переводим через вону курсом ₩/$. Без курса валюты — черновик, а не доллары под ₽
+    const per = unitRate(ad);
+    if (!per) return null;
+    const rate = ad.krwPerUsd ?? null;
+    const krw = ad.carPriceKrw ?? (ad.carPriceUsd && rate ? ad.carPriceUsd * rate : null);
+    if (krw === null) return null;
+    return Math.round((krw + (ad.freightUsd && rate ? ad.freightUsd * rate : 0)) / per);
+  }
   const rate = ad.krwPerUsd ?? null;
   // Цена в вонах: из лота, иначе из долларовой по курсу
   const car = ad.carPriceKrw ?? (ad.carPriceUsd && rate ? Math.round(ad.carPriceUsd * rate) : null);
@@ -56,6 +73,15 @@ export const totalInCurrency = (ad: Pick<Ad, 'carPriceUsd' | 'carPriceKrw' | 'kr
   // а не падаем: курс в лоте теперь подставляется сам, пустым он бывает редко
   return car + (ad.freightUsd && rate ? Math.round(ad.freightUsd * rate) : 0);
 };
+
+/**
+ * Цена объявления в ролике для экранов интерфейса (форма, карточка): те же поля рынка, что
+ * подмешивает resolveAd в рендере, — фрахт, валюта, курс дня. Раньше каждый экран собирал их
+ * сам и забыл курс дня: при ₽ форма писала «цены нет», а ролик цену считал
+ */
+export const lotTotal = (lot: Lot, market: Pick<Market, 'freightUsd' | 'currency' | 'krwPerUnitToday'>, patch: Partial<Lot> = {}): number | null =>
+  totalInCurrency({...lot, ...patch, freightUsd: patch.freightUsd ?? lot.freightUsd ?? market.freightUsd,
+    currency: market.currency, krwPerUnitToday: market.krwPerUnitToday} as PriceInput);
 
 // 12345 → «12 345» (Chrome ставит неразрывные пробелы — меняем на обычные)
 export const fmt = (n: number) => n.toLocaleString('ru-RU').replace(/[\u00a0\u202f]/g, ' ');

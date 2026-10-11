@@ -5,8 +5,9 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Loading} from '../Loading';
 import {currencySign} from '../../src/shared/blocks';
 import {autoPickPhotos, lotFieldsFromCar} from '../../src/shared/lotFromCar';
-import {FORMATS, fmt, getFormat, totalInCurrency} from '../../src/shared/model';
+import {FORMATS, fmt, getFormat, lotTotal} from '../../src/shared/model';
 import {marketFromProfile} from '../../src/shared/profile';
+import {useTodayMarket} from '../rates';
 import type {Market} from '../../src/shared/types';
 import {api, LotEntry} from '../api';
 import {useConfig} from '../config';
@@ -197,6 +198,9 @@ export const LotTool: React.FC = () => {
       // пока фото качаются, — человек видит, что дело идёт
       const created = await createFromCar({
         ...fields, format, note: `Encar ${car.id}`, carPriceUsd: null, krwPerUsd: rate?.krwPerUsd ?? null,
+        // Курс валюты компании (₽, ₸…) — сразу в объявление: дальше клиент правит его сам,
+        // закладывая маржу, и цена ролика не поплывёт на следующий день вместе с биржей
+        ...(market.krwPerUnitToday ? {krwPerUnit: market.krwPerUnitToday, fxCurrency: market.currency} : {}),
         ...(hookTagline ? {texts: {hookTagline}} : {}),
       }, []);
       if (urls.length) {
@@ -259,7 +263,8 @@ export const LotTool: React.FC = () => {
   };
 
   // Данные для превью — из профиля клиента (тот же мост, что и рендер), а не из рынка лота
-  const market = useMemo(() => marketFromProfile(profile, config.copy) as Market, [profile, config.copy]);
+  // С курсом валюты компании на сегодня — как у рендера: цена в карточке и превью та же, что в ролике
+  const market = useTodayMarket(useMemo(() => marketFromProfile(profile, config.copy) as Market, [profile, config.copy]));
   const format = getFormat(lot?.format);
   const input = useMemo(() => (lot ? {lot, market, theme: brand} : null), [lot, market, brand]);
   const savedProfile = config.profiles.find((p) => p.id === profile.id);
@@ -267,7 +272,7 @@ export const LotTool: React.FC = () => {
 
   // Цена в карточке — та же, что в ролике: валюта профиля, фрахт
   const priceOf = (l: LotEntry) => {
-    const total = totalInCurrency({...l, freightUsd: l.freightUsd ?? market.freightUsd, currency: market.currency});
+    const total = lotTotal(l, market);
     return total === null ? '' : `${fmt(total)} ${currencySign(market.currency)}`;
   };
 

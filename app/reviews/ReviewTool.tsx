@@ -5,6 +5,7 @@ import {Player, PlayerRef} from '@remotion/player';
 import {withoutMusic} from '../../src/shared/nomusic.js';
 import {ReviewShort} from '../../src/reviews/ReviewShort';
 import {marketFromProfile} from '../../src/shared/profile';
+import {useTodayMarket} from '../rates';
 import {
   MAX_REVIEW_SEC, REVIEW_FPS, buildTimeline, reviewFrames, sanitizeSegments, wholeReview,
 } from '../../src/shared/timeline.js';
@@ -145,7 +146,8 @@ export const ReviewTool: React.FC = () => {
   const ambienceOn = Boolean(review?.ambience?.enabled && review.ambience.file);
   const lot = lots.find((l) => l.id === review?.lotId) ?? null;
   // Превью и озвучка берут данные из профиля клиента (тот же мост, что и рендер)
-  const market = marketFromProfile(profile, config.copy) as Market;
+  // С курсом валюты компании на сегодня — цена на плашке та же, что в готовом ролике
+  const market = useTodayMarket(useMemo(() => marketFromProfile(profile, config.copy) as Market, [profile, config.copy]));
   const source = review?.source?.status === 'ready' ? review.source : null;
   // Видео из мессенджера приходит сильно меньше 1080p — никакой обработкой резкость не вернуть
   const smallSource = Boolean(source?.original?.width && Math.max(source.original.width, source.original.height ?? 0) < 1280);

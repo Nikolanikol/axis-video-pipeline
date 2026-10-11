@@ -6,6 +6,7 @@ import type {Market} from '../../src/shared/types';
 import {lotTitle} from '../ads/LotTool';
 import {api, LotEntry, MarketEntry} from '../api';
 import {useConfig} from '../config';
+import {useTodayMarket} from '../rates';
 import {Player} from '@remotion/player';
 import {Eye, SlidersHorizontal} from 'lucide-react';
 import {MobileTabs, useIsPhone} from '../MobileTabs';
@@ -23,8 +24,10 @@ const usePreviewLot = () => {
   return lot;
 };
 
-const PreviewPanel: React.FC<{lot: LotEntry | null | undefined; market: MarketEntry}> = ({lot, market}) => {
+const PreviewPanel: React.FC<{lot: LotEntry | null | undefined; market: MarketEntry}> = ({lot, market: base}) => {
   const {brand} = useConfig();
+  // Курс валюты компании на сегодня — цена в превью та же, что в ролике
+  const market = useTodayMarket(base as Market & MarketEntry);
   if (lot === undefined) return <div className="empty">Загрузка превью…</div>;
   if (lot === null) return <div className="empty">Превью появится, когда будет хотя бы одно объявление</div>;
   const format = getFormat(lot.format);
@@ -74,7 +77,7 @@ export const ProfileTool: React.FC = () => {
 };
 
 export const AdTextsTool: React.FC = () => {
-  const {config, profile, setProfile, profileSaved, report} = useConfig();
+  const {config, profile, setProfile, profileSaved, brand, brandSaved, report} = useConfig();
   const lot = usePreviewLot();
   const [language, setLanguage] = useState(profile.language);
   const savedProfile = config.profiles.find((p) => p.id === profile.id);
@@ -83,7 +86,8 @@ export const AdTextsTool: React.FC = () => {
   const market = {...(marketFromProfile({...profile, language}, config.copy) as Market), id: profile.id};
   return (
     <SettingsLayout
-      editor={<AdTextsForm profile={profile} saved={savedProfile} copy={config.copy} language={language} onLanguage={setLanguage}
+      editor={<AdTextsForm profile={profile} saved={savedProfile} copy={config.copy} theme={brand} onBrandSaved={brandSaved}
+        language={language} onLanguage={setLanguage}
         onChange={setProfile} onSaved={profileSaved} onError={report} />}
       preview={<PreviewPanel lot={lot} market={market} />} />
   );

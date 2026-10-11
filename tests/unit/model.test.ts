@@ -51,6 +51,16 @@ describe('цена в валюте профиля', () => {
     expect(totalInCurrency({carPriceUsd: 10000, carPriceKrw: null, krwPerUsd: 1400, freightUsd: 0, currency: 'KRW'})).toBe(14000000);
     expect(totalInCurrency({carPriceUsd: 10000, carPriceKrw: null, krwPerUsd: null, freightUsd: 0, currency: 'KRW'})).toBeNull();
   });
+  it('₽ и прочие валюты — из вон по курсу объявления; без своего — по сегодняшнему', () => {
+    const base = {...bmw, freightUsd: 1500, currency: 'RUB'};
+    // (25 340 000 + 1500 × 1358,97) / 16 = 1 711 153,9…
+    expect(totalInCurrency({...base, krwPerUnit: 16, fxCurrency: 'RUB', krwPerUnitToday: 17})).toBe(Math.round((25340000 + 1500 * 1358.97) / 16));
+    expect(totalInCurrency({...base, krwPerUnitToday: 17})).toBe(Math.round((25340000 + 1500 * 1358.97) / 17));
+    // свой курс записан к другой валюте (сменили валюту в профиле) — не применяем
+    expect(totalInCurrency({...base, krwPerUnit: 16, fxCurrency: 'KZT', krwPerUnitToday: 17})).toBe(Math.round((25340000 + 1500 * 1358.97) / 17));
+    // курса нет вовсе — черновик, а не доллары под значком ₽
+    expect(totalInCurrency(base)).toBeNull();
+  });
   it('цена, вписанная руками, идёт в ролик как есть — без фрахта и пересчёта', () => {
     expect(totalInCurrency({...bmw, freightUsd: 1500, currency: 'USD', priceOverride: 21990})).toBe(21990);
     expect(totalInCurrency({...bmw, freightUsd: 1500, currency: 'KRW', priceOverride: 29900000})).toBe(29900000);
