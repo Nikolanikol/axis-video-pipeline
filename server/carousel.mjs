@@ -13,6 +13,7 @@ import path from 'node:path';
 import {bundle} from '@remotion/bundler';
 import {openBrowser, renderStill, selectComposition} from '@remotion/renderer';
 import {LOT_SKIP_SLIDES, carFromLot, lotPageUrl, missingForCarousel, parseCarouselSource} from '../src/shared/kmotorsLot.js';
+import {brandForRender} from './brand.mjs';
 import {fetchLot} from './kmotorsLot.mjs';
 import {
   HttpError, PRODUCTION, ROOT, checkId, currentWorkspace, workspaceDir, workspaceUrl, getBrand, readJson, renderMarket, writeJson,
@@ -201,7 +202,7 @@ export const buildCarousel = async (link, opts = {}) => {
     let car = lot ? await carFromLink({house: lot.house, lotId: lot.id}) : await fetchCar(id);
     // Карусель — всегда про корейское объявление (источник Encar), но контакты и компанию
     // берём из профиля клиента: бренд и подпись должны быть его.
-    const [profileMarket, brand] = await Promise.all([renderMarket(), getBrand()]);
+    const [profileMarket, brand] = await Promise.all([renderMarket(), getBrand().then(brandForRender)]);
     const theme = {...brand, name: profileMarket.name};
     const market = profileMarket;
     // Логотип из настроек лежит на нашем сервере, а рендер грузит сборку с адреса Remotion:

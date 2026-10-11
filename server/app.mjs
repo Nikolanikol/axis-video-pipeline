@@ -25,7 +25,7 @@ import {apiSettings, resolveSpeaker, voiceConfig} from '../src/shared/voices.js'
 import {hasKey, hasVoice, synthesize} from './speech.mjs';
 import {hasSeparator} from './ambience.mjs';
 import {carouselFormats, carouselsDir, buildCarousel, deleteCarousel, listCarousels, slideFileName} from './carousel.mjs';
-import {LOGO_RULES, saveLogo, setLogoVariant} from './brand.mjs';
+import {LOGO_RULES, brandForRender, saveLogo, setLogoVariant} from './brand.mjs';
 import {balanceOf, billed, creditCosts, ledgerOf, signupCredits} from './billing.mjs';
 import {parseCarouselSource} from '../src/shared/kmotorsLot.js';
 import {PALETTE_KEYS, isHex} from '../src/shared/contrast.js';
@@ -391,7 +391,7 @@ export const createApp = ({photoOrigin}) => {
     const lot = await getLot(req.params.id);
     const format = await getFormat(req.body?.format || lot.format);
     if (format.requires.includes('photos') && !lot.photos.length) throw new HttpError(400, 'Добавь хотя бы одно фото');
-    const [market, brand] = await Promise.all([renderMarket(), getBrand()]);
+    const [market, brand] = await Promise.all([renderMarket(), getBrand().then(brandForRender)]);
     const theme = {...brand, name: market.name};
     const title = [lot.brand, lot.model, lot.year].filter(Boolean).join(' ') || lot.id;
     // Музыка убрана из продукта: сохранённый в лоте трек в ролик не идёт (src/shared/nomusic.js)
@@ -445,7 +445,7 @@ export const createApp = ({photoOrigin}) => {
     if (review.source?.status !== 'ready') throw new HttpError(400, 'Видео ещё не готово');
     if (!review.segments.length) throw new HttpError(400, 'Добавь хотя бы один фрагмент');
     const lot = review.lotId ? await getLot(review.lotId).catch(() => null) : null;
-    const [market, brand] = await Promise.all([renderMarket(), getBrand()]);
+    const [market, brand] = await Promise.all([renderMarket(), getBrand().then(brandForRender)]);
     const theme = {...brand, name: market.name};
     const inputProps = {
       review: {
