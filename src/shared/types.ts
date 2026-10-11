@@ -261,6 +261,8 @@ export type CarouselCar = {
 // skip — слайды, которые не рисуем вовсе (лот аукциона без цены, истории и опций).
 // format — id из config/carousel-formats.json (нет — «Классика»); seed — зерно варианта:
 // то же зерно даёт те же компоновку и фразы, «Другой вариант» — новое зерно
-export type CarouselProps = {car: CarouselCar; market: Market; theme?: Partial<Theme>; includeHistory?: boolean; skip?: string[]; format?: string; seed?: number};
+export type CarouselProps = {car: CarouselCar; market: Market; theme?: Partial<Theme>; includeHistory?: boolean; skip?: string[]; format?: string; seed?: number;
+  // Своя цена клиента на слайде цены, в валюте профиля (src/carousel/price.ts)
+  priceOverride?: number | null};
 
 export type ReviewProps = {review: Review; lot?: Lot | null; market: Market; theme?: Partial<Theme>};

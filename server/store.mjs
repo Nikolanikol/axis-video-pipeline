@@ -5,7 +5,7 @@ import path from 'node:path';
 import {AsyncLocalStorage} from 'node:async_hooks';
 import {fileURLToPath} from 'node:url';
 import {marketFromProfile} from '../src/shared/profile.js';
-import {isDirect, krwPerUnit} from '../src/shared/currencies.js';
+import {krwPerUnit} from '../src/shared/currencies.js';
 import {db, hasDatabase} from './db/index.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -234,7 +234,8 @@ export const renderMarket = async (id = DEFAULT_PROFILE) => {
   const market = marketFromProfile(await getProfile(id), await getCopy());
   // Курс валюты компании на сегодня — им считается цена объявления, где свой курс не вписан.
   // Источник недоступен — без него: цена тогда заглушка, а не доллары под значком ₽
-  if (isDirect(market.currency)) return market;
+  // Для долларов тоже: им считает цену слайд карусели (ролик берёт курс ₩/$ из объявления)
+  if (market.currency === 'KRW') return market;
   // rates.mjs сам импортирует store.mjs — грузим по месту, без кольца на старте модулей
   const today = await import('./rates.mjs').then((m) => m.rates()).catch(() => null);
   return {...market, krwPerUnitToday: krwPerUnit(market.currency, today?.usdRates) ?? undefined};

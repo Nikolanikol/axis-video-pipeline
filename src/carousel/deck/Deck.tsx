@@ -8,6 +8,7 @@
 // Фото — только реальные снимки Encar. Сгенерированные «студийные» кадры из образцов не
 // делаем намеренно: покупатель приехал бы за другой машиной. Опции на слайдах — только
 // из данных этой машины, с иконками как на kmotors.shop.
+import {carouselPrice} from '../price';
 import React from 'react';
 import {AbsoluteFill} from 'remotion';
 import {TbBolt, TbGauge, TbManualGearbox} from 'react-icons/tb';
@@ -279,14 +280,17 @@ const Price: React.FC<Ctx> = (c) => {
   const tall = useTall();
   const copy = COPY[c.tx.lang].price;
   const {car, tx} = c;
+  const label = tx.money(carouselPrice(car, c.market, c.priceOverride), c.market.currency);
+  // Кегль по длине (внутри рамки ~860 px: 1080 − 2×PAD − 2×40); цифра Oswald ≈0,5 кегля
+  const size = Math.min(tall ? 150 : 132, Math.floor(860 / (label.length * 0.5)));
   return (
     <Frame section={pick(copy.kicker, c.seed, 'pr-k')} index={c.index} total={c.total}>
       <div style={{position: 'absolute', top: TOP, left: PAD, right: PAD}}>
         <Headline text={copy.title[0]} />
         <div style={{marginTop: tall ? 60 : 40, border: `3px solid ${C.copper}`, borderRadius: radius(C, 22),
           padding: tall ? '60px 40px' : '44px 40px', textAlign: 'center'}}>
-          <div style={{fontFamily: HEAD, fontWeight: 700, fontSize: tall ? 150 : 132, lineHeight: 1, color: C.white}}>{tx.usd(car.price?.usd)}</div>
-          {car.price && <div style={{fontFamily: BODY, fontWeight: 500, fontSize: 30, color: C.grey, marginTop: 14}}>{tx.krw(car.price.krw)}</div>}
+          {/* Валюта компании по курсу дня или своя цена клиента; вон на слайде нет (владелец 11.10) */}
+          <div style={{fontFamily: HEAD, fontWeight: 700, fontSize: size, lineHeight: 1, color: C.white, whiteSpace: 'nowrap'}}>{label}</div>
         </div>
       </div>
       <div style={{position: 'absolute', left: PAD, right: PAD, bottom: BOTTOM + 10}}>

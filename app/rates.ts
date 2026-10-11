@@ -1,7 +1,7 @@
 // Курсы валют на сегодня (сервер берёт их раз в сутки, server/rates.mjs): один запрос на
 // страницу, общий для шапки, формы объявления и превью.
 import {useEffect, useMemo, useState} from 'react';
-import {isDirect, krwPerUnit} from '../src/shared/currencies';
+import {krwPerUnit} from '../src/shared/currencies';
 import type {Market} from '../src/shared/types';
 import {api, Rates} from './api';
 
@@ -23,7 +23,8 @@ export const useRates = () => {
 export const useTodayMarket = <M extends Market>(market: M): M => {
   const rates = useRates();
   return useMemo(() => {
-    if (isDirect(market.currency)) return market;
+    // Как renderMarket: курс дня и для долларов — им считает цену слайд карусели
+    if (market.currency === 'KRW') return market;
     const per = krwPerUnit(market.currency ?? 'USD', rates?.usdRates);
     return per ? {...market, krwPerUnitToday: per} : market;
   }, [market, rates]);
