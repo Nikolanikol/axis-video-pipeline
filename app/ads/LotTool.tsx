@@ -268,7 +268,10 @@ export const LotTool: React.FC = () => {
   // С курсом валюты компании на сегодня — как у рендера: цена в карточке и превью та же, что в ролике
   const market = useTodayMarket(useMemo(() => marketFromProfile(profile, config.copy) as Market, [profile, config.copy]));
   const format = getFormat(lot?.format);
-  const input = useMemo(() => (lot ? {lot, market, theme: brand} : null), [lot, market, brand]);
+  // Название компании — из профиля, как у рендера (theme.name = market.name в server/store.mjs).
+  // В бренде лежит своё старое name, и превью показывало его (на превью PR 13 — «QWEDSAZXC»),
+  // хотя в готовом ролике всё верно
+  const input = useMemo(() => (lot ? {lot, market, theme: {...brand, name: market.name}} : null), [lot, market, brand]);
   const savedProfile = config.profiles.find((p) => p.id === profile.id);
   const unsavedSettings = profile !== savedProfile || brand !== config.brand;
 

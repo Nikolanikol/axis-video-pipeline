@@ -35,6 +35,14 @@ const INCLUDE_HISTORY = !PRODUCTION;
 
 /** Форматы карусели. Незнакомый id — отказ: иначе молча вышла бы «Классика» */
 export const carouselFormats = () => readJson(path.join(ROOT, 'config', 'carousel-formats.json'));
+/**
+ * Форматы для интерфейса — с тем числом слайдов, что реально выйдет. Без истории (на сервере)
+ * слайдов на один меньше, а карточка формата обещала полное число: Дмитрий на превью PR 13
+ * получил 6 вместо 7, 8 вместо 9, 11 вместо 12 (решение владельца 12.10 — честное число).
+ * Поэтому и в note числа нет: его пишет интерфейс по slides.length
+ */
+export const clientCarouselFormats = async () => (await carouselFormats())
+  .map((f) => ({...f, slides: f.slides.filter((s) => INCLUDE_HISTORY || s !== 'history')}));
 const checkFormat = async (id) => {
   const list = await carouselFormats();
   const found = list.find((f) => f.id === (id || 'classic'));

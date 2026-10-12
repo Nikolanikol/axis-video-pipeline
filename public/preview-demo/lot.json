@@ -1,0 +1,28 @@
+{
+  "brand": "Ford",
+  "model": "F150",
+  "trim": "5.0L",
+  "year": 2018,
+  "specs": [
+    "67 842 км",
+    "5,0 л · бензин",
+    "Автомат · красный"
+  ],
+  "carPriceKrw": 43440000,
+  "carPriceUsd": null,
+  "texts": {
+    "hookTagline": "Без страховых случаев"
+  },
+  "photos": [
+    "/preview-demo/photo-1.jpg",
+    "/preview-demo/photo-2.jpg",
+    "/preview-demo/photo-3.jpg",
+    "/preview-demo/photo-4.jpg",
+    "/preview-demo/photo-5.jpg",
+    "/preview-demo/photo-6.jpg",
+    "/preview-demo/photo-7.jpg",
+    "/preview-demo/photo-8.jpg",
+    "/preview-demo/photo-9.jpg"
+  ],
+  "market": "demo"
+}

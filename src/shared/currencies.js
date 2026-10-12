@@ -42,8 +42,15 @@ export const currencyCode = (raw) => {
   const v = String(raw ?? '').trim().toUpperCase();
   if (!v) return 'USD';
   if (CURRENCIES.some((c) => c.code === v)) return v;
-  return ALIASES[v] ?? v;
+  return ALIASES[v] ?? STEMS.find(([re]) => re.test(v))?.[1] ?? v;
 };
+
+// Слово в любой форме: в профиле нашлось «РУБЛИ» — его не было в ALIASES, курс не находился,
+// и на слайде вместо цены стоял прочерк (12.10). Склонений много — узнаём по основе
+const STEMS = [
+  [/^РУБЛ/, 'RUB'], [/^ДОЛЛАР/, 'USD'], [/^ЕВРО/, 'EUR'], [/^ВОН/, 'KRW'],
+  [/^ТЕНГЕ/, 'KZT'], [/^ГРИВН/, 'UAH'], [/^ДИРХАМ/, 'AED'], [/^ДЕНАР/, 'MKD'],
+];
 
 /** Значок валюты для цены в ролике; незнакомый код — сам код */
 export const currencySign = (raw) => {

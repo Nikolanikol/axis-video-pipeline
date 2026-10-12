@@ -23,7 +23,7 @@ import {
 import {apiSettings, resolveSpeaker, voiceConfig} from '../src/shared/voices.js';
 import {hasKey, hasVoice, synthesize} from './speech.mjs';
 import {hasSeparator} from './ambience.mjs';
-import {carouselFormats, carouselsDir, buildCarousel, deleteCarousel, listCarousels, repriceCarousel, slideFileName} from './carousel.mjs';
+import {clientCarouselFormats, carouselsDir, buildCarousel, deleteCarousel, listCarousels, repriceCarousel, slideFileName} from './carousel.mjs';
 import {ICON_RULES, LOGO_RULES, brandForRender, saveIcon, saveLogo, setIconVariant, setLogoVariant} from './brand.mjs';
 import {balanceOf, billed, creditCosts, ledgerOf, ledgerPage, signupCredits} from './billing.mjs';
 import {parseCarouselSource} from '../src/shared/kmotorsLot.js';
@@ -314,7 +314,7 @@ export const createApp = ({photoOrigin}) => {
     // (tests/unit/palettes.test.ts). Клиент выбирает палитру, а не восемь цветов по одному
     palettes: await readJson(path.join(CONFIG_DIR, 'palettes.json')),
     // Форматы карусели: размер кадра и список слайдов
-    carouselFormats: await carouselFormats(),
+    carouselFormats: await clientCarouselFormats(),
     // Спикеры озвучки: интерфейс показывает только тех, кто умеет выбранный язык
     voices: await voiceRegistry(),
     // Что доступно: распознавание речи включается ключом ElevenLabs в .env

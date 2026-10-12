@@ -450,7 +450,11 @@ export const CarouselTool: React.FC = () => {
     try {
       const folder = await saveToFolder(files, setSaving);
       if (folder) setSavedTo({id: entry.id, folder});
-    } catch (e) { report(e); } finally { setSaving(null); }
+    } catch {
+      // Выбор папки запрещён (облачный браузер, политика компании, системная папка) — не пугаем
+      // технической ошибкой, а отдаём тот же комплект архивом (тест Дмитрия, PR 13)
+      window.location.href = `/api/carousels/${entry.id}/zip`;
+    } finally { setSaving(null); }
   };
   const slideFiles = usePreparedFiles(entry?.id ?? null, (entry?.slides ?? []).map((_, i) => ({
     url: `/api/carousels/${entry!.id}/slide/${i + 1}/download`,
@@ -515,6 +519,10 @@ export const CarouselTool: React.FC = () => {
                 <a className="btn primary big" href={`/api/carousels/${entry.id}/zip`}>Скачать все {entry.slides.length} · ZIP</a>
               )}
               {otherFormat && <span className="hint">Сейчас открыта «{entryFormat?.title}» — выбран другой формат. Карусель у машины одна: новая заменит прежнюю.</span>}
+              {/* Запасной путь рядом с папкой: архив работает в любом браузере */}
+              {!otherFormat && canSaveToFolder && !canSaveToGallery && (
+                <a className="hint" href={`/api/carousels/${entry.id}/zip`}>или одним архивом · ZIP</a>
+              )}
               {!otherFormat && savedTo?.id === entry.id && saving === null && (
                 <span className="hint" style={{color: 'var(--ok)'}}>Сохранено {entry.slides.length} слайдов в папку «{savedTo.folder}»</span>
               )}

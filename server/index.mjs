@@ -6,7 +6,7 @@ import {spawn} from 'node:child_process';
 import {createApp} from './app.mjs';
 import {ROOT} from './store.mjs';
 import {hasDatabase, migrate} from './db/index.mjs';
-import {refundOrphans} from './billing.mjs';
+import {refundOrphans, sweepCharges} from './billing.mjs';
 import {purgeDeleted} from './accounts.mjs';
 import {reconcilePayments} from './payments.mjs';
 import {startSupport} from './support.mjs';
@@ -37,6 +37,10 @@ if (hasDatabase()) {
     console.error(`База SMMAKER недоступна: ${e.message}`);
     process.exit(1);
   });
+  // Сторож кредитов: исходы, которые база не приняла при обрыве, и списания-сироты (billing.mjs).
+  // Две минуты — клиент видит возврат почти сразу, а база не чувствует лишнего запроса
+  const sweep = () => sweepCharges().catch((e) => console.error('Сторож кредитов:', e.message));
+  setInterval(sweep, 2 * 60 * 1000).unref();
   // Окончательное удаление аккаунтов, чей срок (14 дней) вышел: при старте и раз в час.
   // Точность до часа достаточна — в письме обещана дата, а не минута
   const purge = () => purgeDeleted().catch((e) => console.error('Удаление аккаунтов:', e.message));

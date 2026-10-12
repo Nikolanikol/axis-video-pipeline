@@ -15,11 +15,22 @@ import {Preview} from '../Preview';
 import {href, lastLot} from '../router';
 import {AdTextsForm, BrandForm, ProfileForm} from '../SettingsForms';
 
+const DEMO_LOT = '/preview-demo/lot.json';
+const DEMO_ID = 'demo';
+
 const usePreviewLot = () => {
   const {report} = useConfig();
   const [lot, setLot] = useState<LotEntry | null | undefined>(undefined);
   useEffect(() => {
-    api.lots().then((list) => setLot(list.find((l) => l.id === lastLot.get()) ?? list[0] ?? null)).catch(report);
+    api.lots().then(async (list) => {
+      const own = list.find((l) => l.id === lastLot.get()) ?? list[0];
+      if (own) return setLot(own);
+      // Новый клиент без объявлений: превью иначе пустое, и настройкам не на чем показать себя.
+      // Берём демо-объявление кабинета (public/preview-demo, Ford F-150 с Encar 40303537 — выбор
+      // владельца 12.10; витрина гостя держит свою Kona). Своё объявление появится — превью перейдёт на него
+      const demo = await fetch(DEMO_LOT).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      setLot(demo ? {...demo, id: DEMO_ID} as LotEntry : null);
+    }).catch(report);
   }, [report]);
   return lot;
 };
@@ -34,9 +45,13 @@ const PreviewPanel: React.FC<{lot: LotEntry | null | undefined; market: MarketEn
   return (
     <>
       <div className="format-bar">
-        <span className="muted">Превью: <a href={href('ads', 'lot')}>{lotTitle(lot)}</a> · {format.title}</span>
+        <span className="muted">
+          {lot.id === DEMO_ID
+            ? <>Превью на примере: {lotTitle(lot)} · {format.title}. Добавьте своё объявление — превью перейдёт на него</>
+            : <>Превью: <a href={href('ads', 'lot')}>{lotTitle(lot)}</a> · {format.title}</>}
+        </span>
       </div>
-      <Preview input={{lot: {...lot, market: market.id}, market: market as Market, theme: brand}} format={format} />
+      <Preview input={{lot: {...lot, market: market.id}, market: market as Market, theme: {...brand, name: market.name}}} format={format} />
     </>
   );
 };

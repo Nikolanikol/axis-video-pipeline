@@ -12,7 +12,7 @@ import path from 'node:path';
 import {promisify} from 'node:util';
 import {db} from './db/index.mjs';
 import {CONFIG_DIR, HttpError, readJson, workspaceDir} from './store.mjs';
-import {addLot, balanceOf, signupCredits, subscriptionOf} from './billing.mjs';
+import {addLot, balanceOf, plural, signupCredits, subscriptionOf} from './billing.mjs';
 import {appUrl, deletionMail, emailChangeMail, noticeMail, resetMail, verifyMail} from './mailer.mjs';
 
 const scrypt = promisify(crypto.scrypt);
@@ -740,12 +740,17 @@ export const savePack = async ({id, title, credits, price_krw: price, valid_days
   // Вид не указан — у нового пакета докупка, у существующего прежний: правка цены без вида
   // не должна молча превращать подписку в докупку
   if (kind !== undefined && !PACK_KINDS.has(kind)) throw new HttpError(400, 'Вид пакета — подписка (plan) или докупка (topup)');
+  // Название докупки вида «+25 кредитов» — это и есть её число. Поменяли кредиты, а название
+  // забыли — клиент платил за «+25», а получал +50 (тест Дмитрия, PR 13). Такое название
+  // переписываем по числу; своё, не числовое («Запас на месяц») не трогаем
+  let name = String(title).trim();
+  if (/^\+\s*\d+\s+кредит/i.test(name)) name = `+${c} ${plural(c)}`;
   const {rows: [pack]} = await db().query(
     `INSERT INTO smmaker_packs (id, title, credits, price_krw, valid_days, active, sort, kind) VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, 'topup'))
      ON CONFLICT (id) DO UPDATE SET title = $2, credits = $3, price_krw = $4, valid_days = $5, active = $6, sort = $7,
        kind = COALESCE($8, smmaker_packs.kind)
      RETURNING id, title, credits, price_krw, valid_days, active, sort, kind`,
-    [id, String(title).trim(), c, p, d, Boolean(active), Number(sort) || 0, kind ?? null]);
+    [id, name, c, p, d, Boolean(active), Number(sort) || 0, kind ?? null]);
   return pack;
 };
 

@@ -10,6 +10,7 @@ import {resolveTexts, textsForLanguage} from '../src/shared/profile';
 import {CURRENCIES, currencyCode, currencySign, isKnownCurrency} from '../src/shared/currencies';
 import {contrastIssues, matchPalette} from '../src/shared/contrast.js';
 import {Field} from './LotForm';
+import {useConfig} from './config';
 
 
 // Только цветовые поля темы: в ней теперь есть ещё имя, шрифты и файлы бренда,
@@ -93,6 +94,8 @@ const FineColors: React.FC<{theme: Theme; custom: boolean; onChange: (t: Theme) 
  */
 const LogoField: React.FC<{theme: Theme; onSaved: (t: Theme) => void; onError: (e: unknown) => void}> =
   ({theme, onSaved, onError}) => {
+    // Без логотипа ролик пишет название компании из профиля, а не name из бренда — его и показываем
+    const company = useConfig().profile.company?.trim();
     const [busy, setBusy] = useState(false);
     const [notes, setNotes] = useState<string[]>([]);
     const [warnings, setWarnings] = useState<string[]>([]);
@@ -135,7 +138,7 @@ const LogoField: React.FC<{theme: Theme; onSaved: (t: Theme) => void; onError: (
         <div className="logo-shot" style={{background: theme.bg}} title="Так логотип ляжет на тёмный слайд">
           {logo
             ? <img src={shown} alt="Логотип" />
-            : <span className="logo-text" style={{fontFamily: theme.fonts?.head, color: theme.copper}}>{theme.name || 'Компания'}</span>}
+            : <span className="logo-text" style={{fontFamily: theme.fonts?.head, color: theme.copper}}>{company || 'Компания'}</span>}
         </div>
         <div>
           <div className="btn-row">

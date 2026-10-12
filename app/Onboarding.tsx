@@ -34,7 +34,21 @@ export const useOnboarding = () => {
   const key = (k: string) => `kok:start:${ws}:${k}`;
   const [lots, setLots] = useState<number | null>(null);
   const [, bump] = useState(0);
-  useEffect(() => { api.lots().then((l) => setLots(l.length)).catch(() => setLots(null)); }, []);
+  // Готовые работы: объявления роликов и собранные карусели. Считаем не один раз при открытии, а и
+  // при возврате на страницу: шапка с «3 из 4» живёт всё время, и после первого ролика она
+  // продолжала звать «соберите первый ролик» до перезагрузки (тест Дмитрия, PR 13)
+  useEffect(() => {
+    const count = () => Promise.all([api.lots(), api.carousels().catch(() => [])])
+      .then(([l, c]) => setLots(l.length + c.length)).catch(() => setLots(null));
+    count();
+    const onVisible = () => { if (document.visibilityState === 'visible') count(); };
+    window.addEventListener('hashchange', count);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('hashchange', count);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
 
   const preview = !session.enabled && window.location.hash.includes('unverified');
   const c = profile.contacts ?? {whatsapp: null, site: ''};
@@ -67,7 +81,7 @@ const TEXT: Record<StepId, {title: string; why: string; go?: string; link?: stri
     go: 'Заполнить профиль', link: href('settings', 'profile')},
   brand: {title: 'Настройте бренд', why: 'Логотип, цвета и шрифты. Можно позже: без логотипа на роликах будет название компании текстом.',
     go: 'Открыть бренд', link: href('settings', 'brand')},
-  first: {title: 'Соберите первый ролик', why: 'Вставьте ссылку на объявление Encar — фото, характеристики и цена подтянутся сами.',
+  first: {title: 'Соберите первый ролик или карусель', why: 'Вставьте ссылку на объявление Encar, che168 или Carsensor — фото, характеристики и цена подтянутся сами.',
     go: 'Вставить ссылку', link: href('ads', 'lot')},
 };
 
