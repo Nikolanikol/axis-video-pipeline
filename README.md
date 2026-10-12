@@ -94,7 +94,7 @@ KOK: что умеет и подарок за регистрацию (креди
   блок «Пора продлевать»; начисление подписки или докупки (менеджер и админ); «Подарить кредиты» —
   бесплатно, на год, с обязательной причиной; прайс подписок и докупки (у админа — закреплённая колонка справа) и назначение
   менеджеров (только админ). Контакты для покупки — `config/platform.json`,
-  номер WhatsApp можно задать переменной `SMMAKER_SALES_WHATSAPP`.
+  номер WhatsApp можно задать переменной `SMMAKER_SALES_WHATSAPP`, Telegram, почту и Instagram — `SMMAKER_CONTACT_TELEGRAM`, `SMMAKER_CONTACT_EMAIL`, `SMMAKER_CONTACT_INSTAGRAM` (перекрывают `config/platform.json`).
 
 ## Бренд
 

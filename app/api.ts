@@ -69,7 +69,7 @@ export type Me =
 // kind: plan — подписка на месяц (кредиты сгорают в конце месяца), topup — докупка, сгорает вместе с подпиской
 export type Pack = {id: string; title: string; credits: number; price_krw: number; valid_days: number; active: boolean; sort: number; kind: 'plan' | 'topup'};
 // pay — какие кассы включены на сервере (нет ключей — только менеджер)
-export type Offer = {contacts: {whatsapp?: string; telegram?: string; email?: string}; packs: Pack[]; pay?: {usdt: boolean}};
+export type Offer = {contacts: {whatsapp?: string; telegram?: string; email?: string; instagram?: string}; packs: Pack[]; pay?: {usdt: boolean}};
 // Оплата тарифа через кассу. status — общий для всех касс (cores/PAYMENTS.md): created — счёт выставлен, waiting,
 // confirming, paid, partial, failed, expired, refunded, abandoned; credited — кредиты начислены
 export type Payment = {
@@ -78,7 +78,9 @@ export type Payment = {
   createdAt: string; creditedAt: string | null;
 };
 // Условия для витрины гостя: без входа (GET /api/public/offer)
-export type PublicOffer = Offer & {signup: {credits: number; days: number}; costs: Record<string, number>; preview?: string | null};
+// Продавец для оферты и политики (config/platform.json → legal). Пустое поле — ещё не заполнено
+export type Legal = {seller?: string; regNo?: string; country?: string; address?: string; law?: string; site?: string};
+export type PublicOffer = Offer & {signup: {credits: number; days: number}; costs: Record<string, number>; legal?: Legal; preview?: string | null};
 export type LedgerRow = {
   id: number; delta: number; kind: 'grant' | 'charge' | 'refund' | 'adjust'; pipeline: string | null;
   job_id: string | null; note: string; created_at: string;

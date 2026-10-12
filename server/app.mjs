@@ -102,6 +102,25 @@ const checkBrand = (theme) => {
 };
 
 // photoOrigin — адрес этого сервера: браузер рендера берёт по нему фото лотов (/data/...)
+
+// Контакты платформы и продавец (витрина, оферта, кабинет). Основа — config/platform.json, а каналы
+// связи перекрываются переменными окружения: номер или ник меняется в Coolify без правки кода и PR
+// (владелец 12.10: «чтобы я мог быстро»). Пустая переменная не перекрывает — значит «не задана»
+const CONTACT_ENV = {
+  whatsapp: 'SMMAKER_SALES_WHATSAPP',
+  telegram: 'SMMAKER_CONTACT_TELEGRAM',
+  email: 'SMMAKER_CONTACT_EMAIL',
+  instagram: 'SMMAKER_CONTACT_INSTAGRAM',
+};
+const platformInfo = async () => {
+  const {_note, legal = {}, ...contacts} = await readJson(path.join(CONFIG_DIR, 'platform.json'));
+  for (const [key, name] of Object.entries(CONTACT_ENV)) {
+    const v = process.env[name]?.trim();
+    if (v) contacts[key] = v;
+  }
+  return {contacts, legal};
+};
+
 export const createApp = ({photoOrigin}) => {
   const app = express();
 
@@ -164,13 +183,13 @@ export const createApp = ({photoOrigin}) => {
   // сколько стоит ролик и карусель и сколько стоят тарифы. Контакты продаж — для «написать
   // нам». Из пакетов отдаём только то, что и так показывает кабинет: название, кредиты, цену
   api.get('/public/offer', (_req, res, next) => (async () => {
-    const {_note, ...contacts} = await readJson(path.join(CONFIG_DIR, 'platform.json'));
-    const whatsapp = process.env.SMMAKER_SALES_WHATSAPP?.trim();
+    const {contacts, legal} = await platformInfo();
     const packs = authEnabled() ? await listPacks() : [];
     res.json({
       signup: await signupCredits(),
       costs: await creditCosts(),
-      contacts: whatsapp ? {...contacts, whatsapp} : contacts,
+      contacts,
+      legal,
       packs: packs.map(({id, title, credits, price_krw, valid_days, kind, sort}) => ({id, title, credits, price_krw, valid_days, kind, sort})),
       // Номер PR превью: метка «ТЕСТ» нужна и гостю — витрина открывается до входа, /config ещё закрыт
       preview: previewId(),
@@ -215,10 +234,9 @@ export const createApp = ({photoOrigin}) => {
   // WhatsApp продаж — из SMMAKER_SALES_WHATSAPP, если задан: номер менеджера меняется без
   // пересборки образа. Не задан — номер из config/platform.json
   api.get('/account/offer', wrap(async () => {
-    const {_note, ...contacts} = await readJson(path.join(CONFIG_DIR, 'platform.json'));
-    const whatsapp = process.env.SMMAKER_SALES_WHATSAPP?.trim();
+    const {contacts} = await platformInfo();
     return {
-      contacts: whatsapp ? {...contacts, whatsapp} : contacts,
+      contacts,
       packs: authEnabled() ? await listPacks() : [],
       // Какие кассы включены: без ключей кнопки «Оплатить USDT» нет, остаётся менеджер
       pay: paymentMethods(),

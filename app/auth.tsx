@@ -11,6 +11,9 @@ import {useRoute} from './router';
 
 // Витрина — отдельным куском сборки: в ней плеер и композиции роликов, вошедшему они не нужны
 const Landing = lazy(() => import('./Landing').then((m) => ({default: m.Landing})));
+// Оферта и политика — открыты всем, и гостю, и вошедшему: их открывают по прямой ссылке
+// модератор платёжного сервиса и клиент из окна оплаты
+const LegalPage = lazy(() => import('./Legal').then((m) => ({default: m.LegalPage})));
 
 type Session = {
   enabled: boolean;
@@ -82,6 +85,10 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
   }, []);
 
   if (link?.kind === 'reset') return <ResetScreen token={link.token} />;
+  // До проверки входа: документ не зависит от сессии и должен открываться, даже если сервер вход не отдал
+  if (route.pipeline === 'offer' || route.pipeline === 'privacy') {
+    return <Suspense fallback={<Loading />}><LegalPage kind={route.pipeline} anchor={route.tool} /></Suspense>;
+  }
   if (error) return <div className="boot">Сервер не отвечает: {error}</div>;
   if (!me) return <Loading />;
   // Гость — витрина KOK с образцами, условиями и формой (владелец 01.10: «зазвать людей»).
@@ -245,6 +252,11 @@ export const AuthCard: React.FC<{signup: {credits: number; days: number}; notice
           {mode === 'login' ? 'Войти' : mode === 'register' ? 'Создать кабинет' : 'Прислать ссылку'}
         </button>
         {mode === 'login' && <p className="hint"><button type="button" className="link" onClick={() => { setMode('forgot'); setSent(false); }}>Забыли пароль?</button></p>}
+        {/* Акцепт оферты — регистрацией (Legal.tsx): клиент должен видеть, с чем соглашается */}
+        {mode === 'register' && (
+          <p className="hint">Создавая кабинет, вы принимаете <a href="#/offer" target="_blank" rel="noreferrer">оферту</a> и{' '}
+            <a href="#/privacy" target="_blank" rel="noreferrer">политику персональных данных</a>.</p>
+        )}
         {mode === 'forgot' && <p className="hint"><button type="button" className="link" onClick={() => setMode('login')}>Вернуться ко входу</button></p>}
       </form>
   );

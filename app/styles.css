@@ -1212,7 +1212,6 @@ a.tab { text-decoration: none; }
 @keyframes land-fade { from { opacity: 0; } to { opacity: 1; } }
 @keyframes land-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 .auth-gift { padding: 10px 12px; border-radius: 10px; background: #8e0d2c26; border: 1px solid #c8304f40; color: var(--text); }
-.land-foot { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 30px 20px 40px; border-top: 1px solid var(--line); }
 
 @media (max-width: 900px) {
   .land-nav, .land-cta-sm { display: none; }
@@ -1486,4 +1485,59 @@ a.tab { text-decoration: none; }
 @media (prefers-reduced-motion: reduce) {
   .account-page *, .account-page *::before { animation: none !important; transition: none !important; }
   .lift:hover, .lift:focus-visible, .account-page .btn:hover { transform: none !important; }
+}
+
+/* Контакты и подвал витрины, документы (#/offer, #/privacy — app/Legal.tsx) */
+.land-foot { border-top: 1px solid var(--line); background: #ffffff05; }
+.land-foot-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(0, 1fr)); gap: 32px;
+  max-width: 1160px; margin: 0 auto; padding: 44px 20px 32px; }
+.land-foot-brand p { margin: 14px 0 16px; max-width: 320px; line-height: 1.5; }
+.land-socials { display: flex; gap: 10px; }
+.land-socials a { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; color: var(--text);
+  background: var(--panel-2); border: 1px solid var(--line); }
+.land-socials a:hover { border-color: var(--accent-line); color: var(--accent-text); }
+.land-foot-col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.land-foot-col b { margin-bottom: 4px; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.land-foot-col a { color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
+.land-foot-col a:hover { color: var(--accent-text); }
+.land-foot-col .muted { font-size: 13px; }
+.land-foot-col .nowrap { white-space: nowrap; }
+.land-foot-legal { display: flex; flex-wrap: wrap; gap: 6px 22px; max-width: 1160px; margin: 0 auto; padding: 18px 20px 28px;
+  border-top: 1px solid #ffffff0d; color: var(--muted); font-size: 13px; }
+@media (max-width: 900px) {
+  .land-foot-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 28px 20px; padding: 32px 14px 24px; }
+  .land-foot-brand { grid-column: 1 / -1; }
+  .land-foot-legal { padding: 16px 14px 24px; flex-direction: column; }
+}
+.legal-tabs { display: flex; gap: 6px; margin: 0 auto; }
+.legal-tabs a { padding: 7px 12px; border-radius: 999px; color: var(--muted); text-decoration: none; font-weight: 600; }
+.legal-tabs a.on { color: var(--text); background: var(--panel-2); }
+.legal-tabs a { white-space: nowrap; }
+.legal-short { display: none; }
+.legal .land-top > .btn { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.legal-body { max-width: 780px; margin: 0 auto; padding: 36px 20px 64px; line-height: 1.6; }
+.legal-body h1 { margin: 0 0 6px; font: 800 34px/1.15 var(--font); letter-spacing: -.01em; }
+.legal-body h2 { margin: 30px 0 10px; font: 700 21px/1.3 var(--font); text-transform: none; letter-spacing: normal; }
+.legal-body ul { padding-left: 20px; margin: 0; }
+.legal-body li { margin: 6px 0; }
+.legal-body a { color: var(--accent-text); }
+.legal-fill { padding: 1px 6px; border-radius: 6px; background: #c8304f40; color: var(--text); }
+.legal-req { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 20px; margin: 0; }
+.legal-req dt { color: var(--muted); }
+.legal-req dd { margin: 0; overflow-wrap: anywhere; }
+.legal-prices { width: 100%; border-collapse: collapse; margin: 12px 0; }
+.legal-prices th, .legal-prices td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+.legal-prices th { color: var(--muted); font-weight: 600; }
+@media (max-width: 900px) {
+  /* Телефон: вкладки остаются (между документами иначе не перейти), «На главную» — одной стрелкой */
+  .legal-tabs { margin: 0 0 0 auto; gap: 2px; }
+  .legal-tabs a { padding: 6px 9px; font-size: 14px; }
+  .legal-back { display: none; }
+  /* «Персональные данные» в шапку телефона не влезает рядом с «Офертой» — короткое имя */
+  .legal-long { display: none; }
+  .legal-short { display: inline; }
+  .legal-body { padding: 22px 14px 48px; }
+  .legal-body h1 { font-size: 26px; }
+  .legal-req { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .legal-req dd { margin-bottom: 10px; }
 }
