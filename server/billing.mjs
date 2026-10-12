@@ -18,7 +18,7 @@
 // Владелец платформы и сервер без базы (вход выключен) не платят.
 import path from 'node:path';
 import {db, hasDatabase} from './db/index.mjs';
-import {CONFIG_DIR, HttpError, readJson} from './store.mjs';
+import {CONFIG_DIR, HttpError, clientMessage, readJson} from './store.mjs';
 import {serverLog} from './log.mjs';
 
 const journal = serverLog('billing');
@@ -229,7 +229,8 @@ export const billed = async (params, work) => {
   try {
     out = await work();
   } catch (e) {
-    await refund(receipt, `ошибка: ${String(e?.message || e).slice(0, 150)}`).catch((err) => journal.error('refund.failed', {note: 'кредит за упавшую работу не вернулся — дожмёт сторож', error: err}));
+    // Примечание видно клиенту в «Истории кредитов» — только текст для человека, не исключение
+    await refund(receipt, `ошибка: ${clientMessage(e, 'сбой сборки').slice(0, 150)}`).catch((err) => journal.error('refund.failed', {note: 'кредит за упавшую работу не вернулся — дожмёт сторож', error: err}));
     throw e;
   }
   // Работа сделана — результат клиенту отдаём, даже если база не приняла закрытие:

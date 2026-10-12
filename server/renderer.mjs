@@ -7,7 +7,7 @@ import {makeCancelSignal, openBrowser, renderMedia, renderStill, selectCompositi
 import sharp from 'sharp';
 import {charge, refund, settle} from './billing.mjs';
 import {authEnabled} from './session.mjs';
-import {HttpError, ROOT, checkId, skipUnreadable, currentWorkspace, readJson, rendersDir, withWorkspace, workspaceUrl, writeJson} from './store.mjs';
+import {HttpError, ROOT, checkId, clientMessage, skipUnreadable, currentWorkspace, readJson, rendersDir, withWorkspace, workspaceUrl, writeJson} from './store.mjs';
 import {serverLog} from './log.mjs';
 
 const log = serverLog('renderer');
@@ -142,7 +142,7 @@ const pump = async () => {
     } else {
       job.status = 'error';
       job.stage = 'Ошибка';
-      job.error = String(e?.message || e);
+      job.error = clientMessage(e, 'Ролик не собрался, кредиты вернулись. Нажмите «Пересобрать»; повторится — напишите в поддержку');
       log.error('render.failed', {job: job.id, format: job.format, error: e});
     }
   } finally {

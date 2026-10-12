@@ -12,7 +12,7 @@
 // от имени демо-компании «Ваша компания» (src/shared/landingDemo.js): на публичной странице
 // не светим работы настоящего клиента.
 import React, {useEffect, useMemo, useRef, useState} from 'react';
-import {ArrowRight, Check, ChevronLeft, ChevronRight, Download, Instagram, Link2, Mail, MessageCircle, Palette, Send, Sparkles, X} from 'lucide-react';
+import {ArrowRight, Check, ChevronLeft, ChevronRight, Download, Link2, Palette, Sparkles, X} from 'lucide-react';
 import brand from '../config/brand.json';
 import copy from '../config/copy.json';
 import palettes from '../config/palettes.json';
@@ -22,8 +22,8 @@ import {marketFromProfile} from '../src/shared/profile';
 import type {AdProps, Lot, Market, Theme} from '../src/shared/types';
 import {api, PublicOffer} from './api';
 import {AuthCard, AuthMode} from './auth';
-import {contactLinks} from './Legal';
 import {Preview} from './Preview';
+import {SiteFooter} from './SiteFooter';
 
 type Samples = {
   videos: {title: string; year: number; format: string; palette: string; video: string; poster: string}[];
@@ -176,7 +176,12 @@ export const Landing: React.FC<{signup: {credits: number; days: number}; notice:
         <AuthCard signup={gift} notice={notice} mode={mode} setMode={setMode} />
       </AuthModal>}
 
-      <Footer offer={offer} />
+      <SiteFooter offer={offer} service={[
+        {label: 'Как это работает', href: '#how', onClick: jump('how')},
+        {label: 'Образцы', href: '#samples', onClick: jump('samples')},
+        {label: 'Цены', href: '#pricing', onClick: jump('pricing')},
+        {label: 'Вопросы', href: '#faq', onClick: jump('faq')},
+      ]} />
     </div>
   );
 };
@@ -313,66 +318,6 @@ const Carousels: React.FC<{items: Samples['carousels']}> = ({items}) => {
       </div>
       <p className="land-sub">{c.slides.length} слайдов · {c.palette} · листайте вбок</p>
     </div>
-  );
-};
-
-// Подвал витрины (владелец 12.10: вместо отдельного блока «Контакты» на главной — полноценный
-// подвал): о сервисе и каналы связи, навигация по странице, документы, реквизиты продавца внизу.
-// Модерации платёжного сервиса нужны контакты и оферта на виду — здесь они на каждой прокрутке до
-// конца. Каналы и продавец — из config/platform.json через /api/public/offer
-const Footer: React.FC<{offer: PublicOffer | null}> = ({offer}) => {
-  const links = contactLinks(offer?.contacts);
-  const tg = links.find((c) => c.label === 'Telegram');
-  const l = offer?.legal;
-  const icon = (label: string) => label === 'WhatsApp' ? <MessageCircle size={18} aria-hidden />
-    : label === 'Telegram' ? <Send size={18} aria-hidden />
-    : label === 'Instagram' ? <Instagram size={18} aria-hidden /> : <Mail size={18} aria-hidden />;
-  return (
-    <footer className="land-foot" id="contacts">
-      <div className="land-foot-grid">
-        <div className="land-foot-brand">
-          <img src="/kok/wordmark.svg" alt="KOK" className="land-logo" />
-          <p className="muted">Контент одной кнопкой: рекламные ролики и карусели для автодилеров по объявлениям Encar.</p>
-          {links.length > 0 && (
-            <div className="land-socials">
-              {links.map((c) => (
-                <a key={c.label} href={c.href} target="_blank" rel="noreferrer" aria-label={c.label} title={c.label}>{icon(c.label)}</a>
-              ))}
-            </div>
-          )}
-        </div>
-        <nav className="land-foot-col" aria-label="Разделы">
-          <b>Сервис</b>
-          <a href="#how" onClick={jump('how')}>Как это работает</a>
-          <a href="#samples" onClick={jump('samples')}>Образцы</a>
-          <a href="#pricing" onClick={jump('pricing')}>Цены</a>
-          <a href="#faq" onClick={jump('faq')}>Вопросы</a>
-        </nav>
-        <nav className="land-foot-col" aria-label="Документы">
-          <b>Документы</b>
-          <a href="#/offer">Публичная оферта</a>
-          <a href="#/offer/refunds">Возврат денег</a>
-          <a href="#/privacy">Персональные данные</a>
-        </nav>
-        <div className="land-foot-col">
-          <b>Связаться</b>
-          {/* Telegram — главный канал (владелец 12.10): там бот поддержки и тема на клиента у команды.
-              Остальные каналы — строками ниже, тише */}
-          {tg && (
-            <a className="btn primary land-foot-tg" href={tg.href} target="_blank" rel="noreferrer">
-              <Send size={17} aria-hidden /> Написать в Telegram
-            </a>
-          )}
-          {links.filter((c) => c !== tg).map((c) => <a key={c.label} href={c.href} target="_blank" rel="noreferrer">{c.label}: <span className="nowrap">{c.value}</span></a>)}
-          <span className="muted">Оплата, возвраты, помощь с кабинетом</span>
-        </div>
-      </div>
-      <div className="land-foot-legal">
-        <span>© {new Date().getFullYear()} {l?.seller || 'KOK'}</span>
-        {l?.regNo && <span>Рег. № {l.regNo.replace(/\s*\(.*\)$/, '')}</span>}
-        {l?.country && <span>{l.country}</span>}
-      </div>
-    </footer>
   );
 };
 

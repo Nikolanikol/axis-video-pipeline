@@ -6,13 +6,13 @@
 // иначе закрыла бы и вход, и сброс пароля.
 import React, {useEffect, useState} from 'react';
 import {createPortal} from 'react-dom';
-import {Account, SessionRow, api} from './api';
+import {Account, SessionRow, api, errorText} from './api';
 import {day, useSession} from './auth';
 import {useConfig} from './config';
 import {Field} from './LotForm';
 import {toast} from './Toast';
 
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const message = errorText;
 const when = (iso: string) => new Date(iso).toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'});
 
 // ——— Профиль ———

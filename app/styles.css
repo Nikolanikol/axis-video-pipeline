@@ -63,7 +63,13 @@ code { font-size: 12px; color: var(--accent-text); }
 @keyframes rec-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .35; transform: scale(.82); } }
 @media (prefers-reduced-motion: reduce) { .rec-dot { animation: none; } }
 
-.app { display: flex; flex-direction: column; height: 100%; }
+/* .shell — вся страница: рабочая зона и под ней подвал (SiteFooter). Прокручивается документ.
+   .app — рабочая зона ровно в высоту экрана: шапка и инструмент сверху, как раньше, а подвал
+   начинается сразу за нижним краем — до него надо прокрутить (владелец 12.10). dvh — чтобы на
+   телефоне адресная строка не съедала низ; vh — запас для старых браузеров */
+.shell { height: 100%; }
+.app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+@media (max-width: 900px) { .land-foot.foot-no-phone { display: none; } }
 
 .top {
   display: flex; align-items: center; gap: 24px; flex-wrap: wrap;

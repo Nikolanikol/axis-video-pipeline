@@ -11,7 +11,7 @@ import {buildScript, lineTimes} from '../src/shared/narration.js';
 import {extractAudio, hasKey, hasVoice, synthesizeScript, transcribe, voiceHash} from './speech.mjs';
 import {hasSeparator, separateAmbience} from './ambience.mjs';
 import {refineCuts} from './voiceCuts.mjs';
-import {skipUnreadable, 
+import {clientMessage, skipUnreadable, 
   CONFIG_DIR, DATA_DIR, DEFAULT_MARKET, HttpError, checkId, workspaceDir, workspaceUrl, getLot, readJson, withLock, writeJson,
 } from './store.mjs';
 import {serverLog} from './log.mjs';
@@ -252,7 +252,7 @@ const processVideo = (id, file, duration, sourceColour = {}) => {
     } catch (e) {
       log.error('source.failed', {note: 'обработка видео обзора', review: id, error: e});
       const current = (await read(id).catch(() => ({}))).source ?? {};
-      await setSource(id, {...current, status: 'error', error: String(e?.message || e)}).catch(statusLost('видео', id));
+      await setSource(id, {...current, status: 'error', error: clientMessage(e, 'видео не обработалось — нажмите «Пересобрать видео» или загрузите его заново')}).catch(statusLost('видео', id));
     } finally {
       progress.delete(id);
     }
@@ -300,7 +300,7 @@ export const transcribeReview = async (id) => {
       });
     } catch (e) {
       log.error('speech.failed', {note: 'распознавание речи', review: id, error: e});
-      await saveSpeech({...(await read(id).catch(() => ({}))).speech, status: 'error', error: String(e?.message || e)}).catch(statusLost('распознавание', id));
+      await saveSpeech({...(await read(id).catch(() => ({}))).speech, status: 'error', error: clientMessage(e, 'Распознать речь не удалось — попробуйте ещё раз')}).catch(statusLost('распознавание', id));
     } finally {
       transcribing.delete(id);
     }
@@ -368,7 +368,7 @@ export const voiceReview = async (id, {language, market} = {}) => {
       });
     } catch (e) {
       log.error('voice.failed', {note: 'озвучка обзора', review: id, error: e});
-      await saveVoice({status: 'error', error: String(e?.message || e)}).catch(statusLost('озвучка', id));
+      await saveVoice({status: 'error', error: clientMessage(e, 'Озвучить не удалось — попробуйте ещё раз')}).catch(statusLost('озвучка', id));
     } finally {
       voicing.delete(id);
     }
@@ -411,7 +411,7 @@ export const ambienceReview = async (id) => {
       });
     } catch (e) {
       log.error('ambience.failed', {note: 'звуки машины без голоса', review: id, error: e});
-      await save({status: 'error', error: String(e?.message || e)}).catch(statusLost('звуки машины', id));
+      await save({status: 'error', error: clientMessage(e, 'Выделить звуки машины не удалось — попробуйте ещё раз')}).catch(statusLost('звуки машины', id));
     } finally {
       separating.delete(id);
     }

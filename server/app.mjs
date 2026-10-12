@@ -623,6 +623,9 @@ export const createApp = ({photoOrigin}) => {
   // Раньше клиент видел сырой текст исключения — вплоть до ошибки SQL
   app.use('/api', (err, req, res, _next) => {
     if (err.code === 'LIMIT_FILE_SIZE') err = Object.assign(new HttpError(413, 'Файл слишком большой для загрузки'), {cause: err});
+    // Тело запроса не разобралось — текст парсера английский («Expected property name…»). Наш
+    // интерфейс так не шлёт: это оборванный запрос или чужой клиент
+    if (err.type === 'entity.parse.failed') err = Object.assign(new HttpError(400, 'Запрос пришёл повреждённым — обновите страницу и попробуйте ещё раз'), {cause: err});
     // expose — признак ошибок самого Express (разбор тела, слишком большой запрос): их текст безопасен
     const ours = err instanceof HttpError || (isCoreError(err) && err.code !== 'INTERNAL') || err.expose === true;
     const status = ours ? (err.status || err.statusCode || 500) : 500;

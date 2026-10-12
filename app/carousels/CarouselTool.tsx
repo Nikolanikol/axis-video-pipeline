@@ -16,7 +16,7 @@ import {QuickLink} from '../ads/QuickLot';
 import {Check, ChevronLeft, ChevronRight, Download, ExternalLink, Images, List, RefreshCw, Trash2, X} from 'lucide-react';
 import {MobileTabs, usePanelSwipes} from '../MobileTabs';
 import {toast} from '../Toast';
-import {api, CarouselEntry, CarouselFormat} from '../api';
+import {api, CarouselEntry, CarouselFormat, errorText} from '../api';
 import {useConfig} from '../config';
 import {useCost, useSession} from '../auth';
 import {carouselLang} from '../../src/carousel/i18n';
@@ -394,7 +394,7 @@ export const CarouselTool: React.FC = () => {
       setHistory((h) => [made, ...h.filter((x) => x.id !== made.id)]);
     } catch (e) {
       // Ошибку сборки по ссылке — под строкой ссылки: человек смотрит туда
-      setLinkError(e instanceof Error ? e.message : String(e));
+      setLinkError(errorText(e));
     } finally { setBusy(false); refreshAccess(); }
   };
 

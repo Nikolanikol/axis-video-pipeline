@@ -1,6 +1,6 @@
 // Панель рендера: кнопка, предупреждения, история роликов с прогрессом и скачиванием
-import React, {useCallback, useEffect, useState} from 'react';
-import {api, Job, JobQuery} from './api';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {api, ApiError, Job, JobQuery} from './api';
 import {useCost, useSession} from './auth';
 import {useConfig} from './config';
 import {canSaveToGallery, shareFiles, usePreparedFiles} from './saveFiles';
@@ -31,8 +31,17 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
   const [showAll, setShowAll] = useState(false);
   const key = JSON.stringify(query);
 
-  const refresh = useCallback(() => api.jobs(JSON.parse(key)).then(setJobs).catch(onError), [key, onError]);
-  useEffect(() => { setJobs([]); refresh(); }, [refresh]);
+  // Идущие задания живут в памяти сервера, на диск ролик пишется только в конце. Сервер
+  // перезапустился посреди сборки (выкладка, падение) — ролик просто исчезал из списка, и
+  // человек не понимал, куда он делся. Кредит за него вернёт сторож (server/billing.mjs)
+  const activeIds = useRef<string[]>([]);
+  const refresh = useCallback(() => api.jobs(JSON.parse(key)).then((list) => {
+    const lost = activeIds.current.filter((id) => !list.some((j) => j.id === id));
+    activeIds.current = list.filter(active).map((j) => j.id);
+    if (lost.length) onError(new ApiError('Сборка прервалась: сервер перезапускался. Кредиты вернутся сами в течение 10–15 минут — запустите сборку ещё раз', 0));
+    setJobs(list);
+  }).catch(onError), [key, onError]);
+  useEffect(() => { activeIds.current = []; setJobs([]); refresh(); }, [refresh]);
 
   // Пока что-то рендерится — опрашиваем раз в секунду
   const running = jobs.some(active);
@@ -54,6 +63,7 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
     setStarting(true);
     try {
       const job = await start();
+      activeIds.current.push(job.id);
       setJobs((js) => [job, ...js]);
       refreshAccess();
     } catch (e) { onError(e); } finally { setStarting(false); }
@@ -64,7 +74,7 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
     try { await api.cancelRender(id); refresh(); refreshAccess(); } catch (e) { onError(e); }
   };
   const retry = async (id: string) => {
-    try { const job = await api.retryRender(id); setJobs((js) => [job, ...js]); refreshAccess(); } catch (e) { onError(e); }
+    try { const job = await api.retryRender(id); activeIds.current.push(job.id); setJobs((js) => [job, ...js]); refreshAccess(); } catch (e) { onError(e); }
   };
   const remove = async (id: string) => {
     try { await api.deleteRender(id); setJobs((js) => js.filter((j) => j.id !== id)); } catch (e) { onError(e); }

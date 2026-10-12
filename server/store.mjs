@@ -94,6 +94,14 @@ export class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
 
+/**
+ * Текст ошибки фоновой задачи (рендер, видео, речь, озвучка) для экрана клиента. У задачи нет
+ * ответа сервера, где сырое исключение спряталось бы за «внутренней ошибкой», — её текст пишется
+ * в запись и показывается как есть. Раньше клиент видел там английские сообщения Remotion и ffmpeg.
+ * HttpError написан для человека — его оставляем, всё прочее — общая фраза, подробности в журнале
+ */
+export const clientMessage = (e, fallback) => (e instanceof HttpError ? e.message : fallback);
+
 const ID_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
 export const checkId = (id) => {
   if (!ID_RE.test(String(id))) throw new HttpError(400, `Некорректный id «${id}»: только латиница, цифры и дефис`);
@@ -112,7 +120,8 @@ export const readJson = async (file) => {
   try {
     return JSON.parse(await fs.readFile(file, 'utf8'));
   } catch (e) {
-    if (e.code === 'ENOENT') throw new HttpError(404, `Не найдено: ${path.relative(ROOT, file)}`);
+    // Путь к файлу клиенту не показываем: в нём папки компании, а человеку он ничего не скажет
+    if (e.code === 'ENOENT') throw new HttpError(404, 'Не найдено — возможно, это уже удалили. Обновите страницу');
     throw e;
   }
 };

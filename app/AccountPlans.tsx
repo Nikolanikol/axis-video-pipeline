@@ -10,7 +10,7 @@
 import React, {useEffect, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {Check} from 'lucide-react';
-import {Offer, Pack, Payment, api} from './api';
+import {Offer, Pack, Payment, api, errorText} from './api';
 import {day, useSession} from './auth';
 import {useConfig} from './config';
 import {useRoute} from './router';
@@ -85,7 +85,7 @@ const PayDialog: React.FC<{pack: Pack; offer: Offer; text: string; onClose: () =
     try {
       const {url} = await api.pay.checkout(pack.id);
       window.location.assign(url);
-    } catch (e) { setError(e instanceof Error ? e.message : String(e)); setBusy(false); }
+    } catch (e) { setError(errorText(e)); setBusy(false); }
   };
 
   // Порталом в body: у предков анимация появления оставляет transform, и fixed внутри них
@@ -148,7 +148,7 @@ export const PaymentReturn: React.FC = () => {
       setP(r);
       if (r.credited) refresh();
       if (!settled(r) && Date.now() < until) timer = window.setTimeout(tick, 5000);
-    }).catch((e) => !stop && setError(e.message));
+    }).catch((e) => !stop && setError(errorText(e)));
     tick();
     return () => { stop = true; window.clearTimeout(timer); };
   }, [id, refresh]);

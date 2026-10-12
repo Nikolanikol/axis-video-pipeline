@@ -5,7 +5,7 @@
 // входа и регистрации (app/Landing.tsx).
 import React, {Suspense, createContext, lazy, useCallback, useContext, useEffect, useState} from 'react';
 import {Loading} from './Loading';
-import {Balance, Me, Registration, User, api} from './api';
+import {Balance, Me, Registration, User, api, errorText} from './api';
 import {Field} from './LotForm';
 import {useRoute} from './router';
 
@@ -54,7 +54,7 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
   // Перечитать, кто вошёл: после подтверждения почты меняются и признак, и баланс
   const load = useCallback(() => {
     api.me().then((m) => { setMe(m); if (signedIn(m)) setBalance(m.balance); })
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(errorText(e)));
   }, []);
 
   // Баланс меняется и в других вкладках (собрали там ролик, оплатили тариф). Раньше он читался
@@ -80,7 +80,7 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
     if (link?.kind === 'restore') {
       api.restore(link.token)
         .then(() => setNotice('Аккаунт восстановлен — всё на месте'))
-        .catch((e) => setNotice(e.message))
+        .catch((e) => setNotice(errorText(e)))
         .finally(() => { window.history.replaceState(null, '', '#/account'); load(); });
       return;
     }
@@ -94,7 +94,7 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
     // ему делать нечего
     api.verifyLink(link.token)
       .then(() => setNotice('Почта подтверждена — бесплатные кредиты на счёте'))
-      .catch((e) => setNotice(e.message))
+      .catch((e) => setNotice(errorText(e)))
       .finally(() => { window.history.replaceState(null, '', '#/account'); load(); });
   }, [link, load]);
 
@@ -107,7 +107,12 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
   if (route.pipeline === 'offer' || route.pipeline === 'privacy') {
     return <Suspense fallback={<Loading />}><LegalPage kind={route.pipeline} anchor={route.tool} /></Suspense>;
   }
-  if (error) return <div className="boot">Сервер не отвечает: {error}</div>;
+  if (error) return (
+    <div className="boot">
+      <p>{error}</p>
+      <button className="btn" onClick={() => window.location.reload()}>Обновить страницу</button>
+    </div>
+  );
   if (!me) return <Loading />;
   // Гость — витрина KOK с образцами, условиями и формой (владелец 01.10: «зазвать людей»).
   // #/welcome показывает её и без базы — посмотреть витрину на копии сервера без входа
@@ -149,7 +154,7 @@ const ResetScreen: React.FC<{token: string}> = ({token}) => {
       // Сервер уже впустил с новым паролем — на главную, ключ сброса из адреса убираем
       window.location.replace(window.location.pathname);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorText(err));
       setBusy(false);
     }
   };
@@ -227,7 +232,7 @@ export const AuthCard: React.FC<{signup: {credits: number; days: number}; notice
       // от имени вошедшей компании, с нуля
       window.location.reload();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorText(err));
       setBusy(false);
     }
   };

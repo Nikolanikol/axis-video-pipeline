@@ -11,7 +11,7 @@
 // #/start/unverified показывает его неподтверждённым, чтобы посмотреть карточку кода.
 import React, {useEffect, useRef, useState} from 'react';
 import {Check, ChevronRight, Mail} from 'lucide-react';
-import {api} from './api';
+import {api, errorText} from './api';
 import {useSession} from './auth';
 import {useConfig} from './config';
 import platformBrand from '../config/brand.json';
@@ -232,7 +232,7 @@ const VerifyEmailCard: React.FC = () => {
   const submit = async (code: string) => {
     setBusy(true); setError(''); setNote('');
     try { await api.verify(code); refresh(); } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
       setDigits(Array(6).fill(''));
     } finally { setBusy(false); }
   };
@@ -251,7 +251,7 @@ const VerifyEmailCard: React.FC = () => {
   };
   const resend = async () => {
     setError(''); setNote('');
-    try { await api.resendVerify(); setNote('Отправили новый код.'); setWait(RESEND_PAUSE); } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    try { await api.resendVerify(); setNote('Отправили новый код.'); setWait(RESEND_PAUSE); } catch (e) { setError(errorText(e)); }
   };
 
   return (

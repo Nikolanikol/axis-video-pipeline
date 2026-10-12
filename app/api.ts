@@ -124,18 +124,49 @@ export class ApiError extends Error {
   constructor(message: string, public status: number) { super(message); this.name = 'ApiError'; }
 }
 
+// Ответ без нашего JSON: сервер не дошёл до своего обработчика. Так отвечает прокси Coolify, пока
+// контейнер перезапускается после выкладки (502/503), или когда долгая сборка не уложилась в его
+// ожидание (504). Раньше человек видел «502 Bad Gateway» или голое «504» — и не понимал, что делать
+const PROXY_TEXT: Record<number, string> = {
+  413: 'Файл слишком большой для загрузки',
+  502: 'Сервер перезапускается — подождите минуту и попробуйте ещё раз',
+  503: 'Сервер перезапускается — подождите минуту и попробуйте ещё раз',
+  504: 'Сервер не дождался ответа — попробуйте ещё раз. Если повторится — напишите в поддержку',
+};
+const failure = (status: number, body: {error?: string} | null, fallback?: string) => new ApiError(
+  body?.error || fallback || PROXY_TEXT[status] || `Сервер ответил ошибкой (${status}) — попробуйте ещё раз`, status);
+
+// Запрос не ушёл вовсе: нет интернета или сервер недоступен. fetch бросает TypeError с текстом
+// браузера («Failed to fetch», в Safari «Load failed») — его человеку не показываем
+export const OFFLINE = 'Нет связи с сервером — проверьте интернет и попробуйте ещё раз';
+const send = (url: string, init?: RequestInit) => fetch(url, init).catch(() => { throw new ApiError(OFFLINE, 0); });
+
+/**
+ * Текст ошибки для экрана. ApiError уже написан для человека. Всё прочее — поломка самого
+ * интерфейса (TypeError из кода): её текст английский и ничего не скажет клиенту, поэтому
+ * показываем общую фразу, а саму ошибку отправляем нам (errorReport → тревога в «Сбои»)
+ */
+export const errorText = (e: unknown): string => {
+  if (e instanceof ApiError) return e.message;
+  void import('./errorReport').then((m) => m.reportError('error', e));
+  return 'Что-то пошло не так на странице — обновите её и попробуйте ещё раз. Мы уже получили отчёт о сбое';
+};
+
 const request = async <T,>(method: string, url: string, body?: unknown): Promise<T> => {
   const isForm = body instanceof FormData;
-  const res = await fetch(url, {
+  const res = await send(url, {
     method,
     headers: body !== undefined && !isForm ? {'Content-Type': 'application/json'} : undefined,
     body: body === undefined ? undefined : isForm ? body : JSON.stringify(body),
   });
-  const data = await res.json().catch(() => ({}));
+  const data = await res.json().catch(() => null);
   // Сессия кончилась или вход сброшен на другом устройстве — перезагрузка покажет экран входа
   if (res.status === 401 && !url.startsWith('/api/auth/')) window.location.reload();
-  if (!res.ok) throw new ApiError(data.error || `${res.status} ${res.statusText}`, res.status);
-  return data as T;
+  if (!res.ok) throw failure(res.status, data);
+  // 200 и не JSON — не наш ответ (так отвечает зависший прокси или страница-заглушка): пустые
+  // данные уронили бы экран дальше по коду. Пустой JSON-ответ (обработчик ничего не вернул) — норма
+  if (data === null && !res.headers.get('content-type')?.includes('json')) throw new ApiError('Сервер ответил непонятно — обновите страницу и попробуйте ещё раз', res.status);
+  return (data ?? {}) as T;
 };
 
 export const api = {
@@ -227,9 +258,9 @@ export const api = {
   uploadLogo: async (file: File) => {
     const form = new FormData();
     form.append('logo', file);
-    const res = await fetch('/api/brand/logo', {method: 'POST', body: form});
+    const res = await send('/api/brand/logo', {method: 'POST', body: form});
     const body = await res.json().catch(() => null);
-    if (!res.ok) throw new ApiError(body?.error ?? 'Не удалось загрузить логотип', res.status);
+    if (!res.ok) throw failure(res.status, body, res.status < 500 ? 'Не удалось загрузить логотип' : undefined);
     return body as {url: string; width: number; height: number; bytes: number; brand: Theme;
       notes: string[]; warnings: string[]; hasRaw: boolean};
   },
@@ -240,9 +271,9 @@ export const api = {
   uploadIcon: async (file: File) => {
     const form = new FormData();
     form.append('icon', file);
-    const res = await fetch('/api/brand/icon', {method: 'POST', body: form});
+    const res = await send('/api/brand/icon', {method: 'POST', body: form});
     const body = await res.json().catch(() => null);
-    if (!res.ok) throw new ApiError(body?.error ?? 'Не удалось загрузить иконку', res.status);
+    if (!res.ok) throw failure(res.status, body, res.status < 500 ? 'Не удалось загрузить иконку' : undefined);
     return body as {url: string; width: number; height: number; bytes: number; brand: Theme;
       notes: string[]; warnings: string[]; hasRaw: boolean};
   },
@@ -264,8 +295,8 @@ export const api = {
   voiceReview: (id: string) => request<ReviewEntry>('POST', `/api/reviews/${id}/voice`),
   // Прослушать спикера: сервер отдаёт mp3, играем его сразу
   previewVoice: async (speaker: string, language: string, text: string) => {
-    const res = await fetch('/api/voices/preview', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({speaker, language, text})});
-    if (!res.ok) throw new ApiError((await res.json().catch(() => null))?.error ?? 'Не удалось озвучить', res.status);
+    const res = await send('/api/voices/preview', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({speaker, language, text})});
+    if (!res.ok) throw failure(res.status, await res.json().catch(() => null), res.status < 500 ? 'Не удалось озвучить' : undefined);
     return URL.createObjectURL(await res.blob());
   },
   // Загрузка видео с прогрессом (fetch его не умеет)
@@ -274,12 +305,12 @@ export const api = {
     xhr.open('POST', `/api/reviews/${id}/source`);
     xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProgress(e.loaded / e.total); };
     xhr.onload = () => {
-      let data: {error?: string} = {};
-      try { data = JSON.parse(xhr.responseText); } catch { /* не JSON */ }
+      let data: {error?: string} | null = null;
+      try { data = JSON.parse(xhr.responseText); } catch { /* не JSON — ответ прокси */ }
       if (xhr.status >= 200 && xhr.status < 300) resolve(data as ReviewEntry);
-      else reject(new Error(data.error || `${xhr.status} ${xhr.statusText}`));
+      else reject(failure(xhr.status, data));
     };
-    xhr.onerror = () => reject(new Error('Загрузка прервалась'));
+    xhr.onerror = () => reject(new ApiError('Загрузка прервалась — проверьте интернет и загрузите видео ещё раз', 0));
     const form = new FormData();
     form.append('video', file);
     xhr.send(form);

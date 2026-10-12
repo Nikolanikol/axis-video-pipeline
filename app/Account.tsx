@@ -4,7 +4,7 @@
 // месяц или докупку. Поэтому кабинет — это остаток, подписка, прайс и кнопка «написать»,
 // а админка — лиды, кому пора продлевать, и начисление.
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {Balance, LedgerPage, ClientFilter, ClientList, ClientQuery, ClientRow, ClientSort, CreditLot, LedgerRow, Offer, Pack, Role, StaffRow, api} from './api';
+import {Balance, LedgerPage, ClientFilter, ClientList, ClientQuery, ClientRow, ClientSort, CreditLot, LedgerRow, Offer, Pack, Role, StaffRow, api, errorText} from './api';
 import {day, daysLeft, useSession} from './auth';
 import {Field} from './LotForm';
 import {DangerZone, ProfileCard, SecurityCard} from './AccountProfile';
@@ -12,7 +12,7 @@ import {SetupCard} from './Onboarding';
 import {PaymentReturn, PlansSection} from './AccountPlans';
 import {useConfig} from './config';
 
-const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
+const message = errorText;
 const won = (n: number) => `₩${n.toLocaleString('ru-RU')}`;
 const when = (iso: string) => new Date(iso).toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
 // Откуда партия кредитов — подпись в кабинете. «pack» с 29.09 — докупка: пакеты на год

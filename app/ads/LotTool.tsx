@@ -10,7 +10,7 @@ import {FORMATS, fmt, getFormat, lotTotal} from '../../src/shared/model';
 import {marketFromProfile} from '../../src/shared/profile';
 import {useTodayMarket} from '../rates';
 import type {Market} from '../../src/shared/types';
-import {api, LotEntry} from '../api';
+import {api, errorText, LotEntry} from '../api';
 import {useConfig} from '../config';
 import {LotForm} from '../LotForm';
 import {EncarImport} from './EncarImport';
@@ -211,7 +211,7 @@ export const LotTool: React.FC = () => {
       }
     } catch (e) {
       // Ошибку показываем здесь же, под ссылкой: человек смотрит сюда, а не в шапку
-      setQuickError(e instanceof Error ? e.message : String(e));
+      setQuickError(errorText(e));
     } finally { setStage(null); }
   };
   const chooseFormat = (id: string) => { lastFormat.set(id); editLot({format: id}); };

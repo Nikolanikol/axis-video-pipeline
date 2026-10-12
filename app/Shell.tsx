@@ -14,12 +14,14 @@ import {useRates} from './rates';
 import {TOOLS, hasTool} from './tools';
 import {Toasts} from './Toast';
 import {reportError} from './errorReport';
+import {errorText} from './api';
+import {SiteFooter} from './SiteFooter';
 
 export const Shell: React.FC = () => {
   const [error, setError] = useState('');
-  const report = useCallback((e: unknown) => setError(e instanceof Error ? e.message : String(e)), []);
+  const report = useCallback((e: unknown) => setError(errorText(e)), []);
   return (
-    <div className="app">
+    <div className="shell">
       <AuthGate>
         <ConfigProvider report={report}>
           <Frame error={error} clearError={() => setError('')} />
@@ -60,8 +62,19 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
     return () => window.removeEventListener('keydown', onKey);
   }, [menuOpen]);
 
+  // Подвал — под рабочей зоной высотой в экран (владелец 12.10): виден всегда, но до него надо
+  // чуть прокрутить. Исключение — телефон на экранах с выдвижными панелями (MobileTabs.tsx): там
+  // панели, нижние вкладки и кнопка сборки закреплены поверх экрана и закрывали бы подвал, а верх
+  // панелей (--mtop) меряется без учёта прокрутки страницы
+  const fixedPanels = !!pipeline && !!tool && PHONE_PANEL_TOOLS.has(toolKey(pipeline.id, tool.id)) && !isClosed(pipeline.id, config.production);
+  const service = [
+    ...main.map((p) => ({label: p.title, href: href(p.id, firstReady(p)?.id)})),
+    ...(session.enabled && !session.isStaff ? [{label: 'Кабинет и тарифы', href: href('account')}] : []),
+  ];
+
   return (
     <>
+    <div className="app">
       <div className={menuOpen ? 'menu-scrim open' : 'menu-scrim'} onClick={() => setMenuOpen(false)} aria-hidden="true" />
       <header className="top">
         <a href={href()} className="top-home" title="Все пайплайны">
@@ -127,9 +140,14 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
               : !tool ? <NotFound />
                 : <ToolScreen pipeline={pipeline} tool={tool} />}
       </div>
+    </div>
+    <SiteFooter service={service} className={fixedPanels ? 'foot-no-phone' : undefined} />
     </>
   );
 };
+
+// Инструменты с выдвижными панелями на телефоне (usePanelSwipes) — там подвала на телефоне нет
+const PHONE_PANEL_TOOLS = new Set(['ads/lot', 'carousels/build', 'settings/profile', 'settings/brand', 'settings/ads']);
 
 /**
  * Подписка скоро кончится: за RENEW_DAYS дней до конца. Кредиты подписки сгорают, поэтому
@@ -211,7 +229,12 @@ const ToolScreen: React.FC<{pipeline: Pipeline; tool: ToolMeta}> = ({pipeline, t
   );
 };
 
-// Ошибка внутри инструмента не роняет всё приложение
+// Ошибка внутри инструмента не роняет всё приложение. Текст исключения человеку не показываем:
+// он английский и про код («Cannot read properties of undefined»), — отчёт уже ушёл нам.
+// Отдельный случай — после выкладки старая вкладка просит кусок сборки, которого больше нет:
+// это лечит только перезагрузка, «Попробовать снова» падало бы раз за разом
+const STALE_BUILD = /dynamically imported module|Importing a module script failed|Loading chunk/i;
+
 class ToolBoundary extends React.Component<{title: string; children: React.ReactNode}, {error: Error | null}> {
   state = {error: null as Error | null};
   static getDerivedStateFromError(error: Error) { return {error}; }
@@ -220,14 +243,22 @@ class ToolBoundary extends React.Component<{title: string; children: React.React
     reportError('boundary', error, {tool: this.props.title, componentStack: info.componentStack ?? undefined});
   }
   render() {
-    if (!this.state.error) return this.props.children;
+    const {error} = this.state;
+    if (!error) return this.props.children;
+    const stale = STALE_BUILD.test(error.message);
     return (
       <div className="page">
         <div className="card">
           <h1>«{this.props.title}» не открылся</h1>
-          <p className="job-message">{this.state.error.message}</p>
+          <p className="job-message">
+            {stale
+              ? 'Мы обновили KOK, пока страница была открыта. Обновите её — всё ваше сохранено.'
+              : 'На странице произошёл сбой. Мы уже получили отчёт и разберёмся. Попробуйте ещё раз или обновите страницу — сохранённое не потеряется.'}
+          </p>
           <div className="actions-row">
-            <button className="btn" onClick={() => this.setState({error: null})}>Попробовать снова</button>
+            {stale
+              ? <button className="btn primary" onClick={() => window.location.reload()}>Обновить страницу</button>
+              : <button className="btn" onClick={() => this.setState({error: null})}>Попробовать снова</button>}
             <a className="btn ghost" href={href()}>Все пайплайны</a>
           </div>
         </div>
