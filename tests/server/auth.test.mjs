@@ -421,6 +421,20 @@ suite('вход и кабинеты SMMAKER', () => {
       expect((await me(b)).balance.nextExpiry.credits).toBe(5);
     });
 
+    it('подаренные кредиты работают и без подтверждённой почты; без кредитов — просьба подтвердить', async () => {
+      const c = client();
+      expect((await register(c, {name: 'Вера', email: 'c@dealer.test', phone: '+82 10-7777 1212', company: 'Дилер В', password: 'password-c'})).status).toBe(200);
+      const wsC = (await me(c)).workspace.id;
+      // Кривая ссылка: прошёл проверку кредитов — получит 400 за ссылку, не прошёл — 403 за почту
+      const before = await c.call('POST', '/api/carousels', {link: 'не ссылка'});
+      expect(before.status).toBe(403);
+      expect(before.body.error).toMatch(/Подтвердите почту/);
+      expect((await owner.call('POST', `/api/admin/clients/${wsC}/bonus`, {credits: 3, note: 'подарок'})).status).toBe(200);
+      const after = await c.call('POST', '/api/carousels', {link: 'не ссылка'});
+      expect(after.status).toBe(400);
+      expect((await me(c)).user.emailVerified).toBe(false);
+    });
+
     it('журнал в кабинете — построчно, новые сверху, у начислений срок', async () => {
       // С 12.10 журнал в кабинете — страницами (ledgerPage): строки в .rows
       const rows = (await b.call('GET', '/api/account/ledger')).body.rows;
