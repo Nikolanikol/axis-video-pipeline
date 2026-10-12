@@ -13,6 +13,8 @@ import {configureLog} from '../cores/kit/log.mjs';
 import {previewId} from './db/index.mjs';
 import {esc, notify} from './telegram.mjs';
 
+// 10 минут — как у тревог оплат (crashAlarm в payments.mjs): упавшая база за это время даёт сотни
+// одинаковых строк, а владелец за 10 минут успевает прочитать первую и начать разбираться
 const WINDOW_MS = 10 * 60_000;
 const SKIP = new Set(['payments']);
 const seen = new Map();
@@ -24,6 +26,8 @@ const ROOT_PATH = fileURLToPath(ROOT_URL);
 const shortStack = (stack) => stack.split('\n').slice(1, 4)
   .map((s) => s.trim().replace(ROOT_URL, '').replace(ROOT_PATH, '')).join('\n');
 
+// Одинаковый сбой = тот же модуль, то же событие и тот же текст. Компанию и номер запроса в ключ
+// не берём: одна поломка у десяти клиентов — это одна поломка
 const keyOf = (line) => `${line.core}:${line.module ?? ''}:${line.event}:${line.error?.message ?? ''}`;
 
 /** Текст тревоги по строке журнала. repeats — сколько таких же было за прошлое окно */

@@ -38,5 +38,9 @@ configureLog({
   },
 });
 
-/** Журнал модуля сервера: core = «app», module — какой файл пишет */
+/**
+ * Журнал модуля сервера: core = «app», module — какой файл пишет. Поле core общее с ядрами
+ * (у них core = id ядра): одним фильтром по core в Coolify видно или только KOK, или одно ядро.
+ * Имя module — короткое, без .mjs: оно же стоит в тревоге («app · renderer»)
+ */
 export const serverLog = (module) => createLogger('app', {module});

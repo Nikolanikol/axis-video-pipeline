@@ -8,6 +8,8 @@
 import {serverLog} from './log.mjs';
 
 const log = serverLog('browser');
+// 20 за 10 минут с адреса: настоящему клиенту хватает с запасом (сам браузер шлёт не больше 10
+// за открытие страницы), а кто шлёт мусор нарочно — не засыплет журнал и группу
 const MAX_PER_WINDOW = 20;
 const WINDOW_MS = 10 * 60_000;
 const windows = new Map();
