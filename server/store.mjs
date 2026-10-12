@@ -3,6 +3,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {AsyncLocalStorage} from 'node:async_hooks';
+import {serverLog, setWorkspacePeek} from './log.mjs';
 import {fileURLToPath} from 'node:url';
 import {marketFromProfile} from '../src/shared/profile.js';
 import {krwPerUnit} from '../src/shared/currencies.js';
@@ -51,6 +52,9 @@ export const currentWorkspace = () => {
   if (hasDatabase()) throw new Error('Нет компании в контексте запроса — код вызван мимо withWorkspace');
   return DEFAULT_WORKSPACE;
 };
+
+// Компания запроса — в каждую строку журнала (server/log.mjs); без ошибки: журнал пишет и вне запроса
+setWorkspacePeek(() => workspaceContext.getStore() ?? null);
 
 export const workspaceDir = (id = currentWorkspace()) => path.join(DATA_DIR, 'workspaces', id);
 // Адрес той же папки в браузере и для рендера: /data отдаётся из DATA_DIR (с проверкой хозяина)
@@ -126,6 +130,22 @@ const renameWithRetry = async (from, to, tries = 5) => {
       await new Promise((r) => setTimeout(r, i * 20));
     }
   }
+};
+
+const log = serverLog('store');
+
+/**
+ * Для списков (объявления, обзоры, карусели, ролики): запись, которую не прочитать, пропускаем,
+ * чтобы один файл не ронял весь список. Но молча — только если файла нет (папка без него —
+ * недосозданная или удалённая запись). Битый JSON — error с путём и тревогой: раньше такое
+ * объявление просто пропадало из списка, и найти причину было не по чему
+ */
+export const skipUnreadable = (what, file) => (e) => {
+  if (e?.status === 404) return null;
+  // HttpError здесь — чужая папка с неправильным именем: странно, но не поломка
+  const level = e instanceof HttpError ? 'warn' : 'error';
+  log[level]('list.unreadable', {note: `${what} не читается — в списке его не видно`, file: path.relative(DATA_DIR, file), error: e});
+  return null;
 };
 
 export const writeJson = async (file, data) => {
@@ -278,7 +298,7 @@ export const createLot = async (data = {}) => {
 export const listLots = async () => {
   await fs.mkdir(lotsDir(), {recursive: true});
   const dirs = (await fs.readdir(lotsDir(), {withFileTypes: true})).filter((d) => d.isDirectory());
-  const lots = await Promise.all(dirs.map((d) => getLot(d.name).catch(() => null)));
+  const lots = await Promise.all(dirs.map((d) => getLot(d.name).catch(skipUnreadable('объявление', path.join(lotsDir(), d.name, 'lot.json')))));
   return lots.filter(Boolean).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
 };
 

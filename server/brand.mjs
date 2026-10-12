@@ -18,6 +18,9 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
 import {HttpError, getBrand, saveBrand, workspaceDir, workspaceUrl} from './store.mjs';
+import {serverLog} from './log.mjs';
+
+const log = serverLog('brand');
 
 // Своя папка у каждой компании: ниже прежние логотипы удаляются всей папкой, и в общей
 // папке новый логотип одного клиента стёр бы логотипы всех остальных
@@ -42,7 +45,7 @@ export const brandForRender = async (theme) => {
     const file = path.resolve(dir, v.slice(own.length));
     const exists = file.startsWith(dir + path.sep) && await fs.access(file).then(() => true, () => false);
     if (exists) return [k, v];
-    console.warn(`Файл бренда «${k}» не найден (${v}) — рендер без него`);
+    log.warn('asset.missing', {note: 'файл бренда не найден — рендер без него', key: k, url: v});
     return LOGO_KEYS.includes(k) ? [k, ''] : null;
   }));
   return {...theme, assets: Object.fromEntries(entries.filter(Boolean))};

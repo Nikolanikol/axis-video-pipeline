@@ -12,6 +12,11 @@
 // .env: TELEGRAM_BOT_TOKEN (бот @kok_work_bot), TELEGRAM_CHAT_ID (группа), TELEGRAM_PAYMENTS_TOPIC
 // (номер темы «Оплаты» — второй сегмент её ссылки t.me/c/<группа>/<тема>). Нет токена или
 // группы — молчим: на Mac без бота и в тестах.
+import {serverLog} from './log.mjs';
+
+// warn, а не error: тревоги о сбоях сами идут через Telegram (server/alarm.mjs) — его отказ не должен
+// звать новую тревогу по кругу
+const log = serverLog('telegram');
 const TIMEOUT_MS = 10_000;
 
 const settings = () => ({
@@ -55,9 +60,9 @@ export const notify = async (html, {topic} = {}) => {
   try {
     let data = await send(token, {...base, text: html, parse_mode: 'HTML'});
     if (!data.ok && /parse entities/i.test(data.description ?? '')) data = await send(token, {...base, text: plain(html)});
-    if (!data.ok) console.error(`Telegram не принял сообщение: ${data.description}`);
+    if (!data.ok) log.warn('send.rejected', {description: data.description});
   } catch (e) {
-    console.error(`Telegram недоступен: ${e.message}`);
+    log.warn('send.failed', {error: e});
   }
 };
 

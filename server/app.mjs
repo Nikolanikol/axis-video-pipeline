@@ -41,8 +41,13 @@ import {
 import {thumbsHandler} from './thumbs.mjs';
 import {handleUpdate, supportBotHandle, supportEnabled, supportLink, webhookAuthorized} from './support.mjs';
 import {
-  checkoutLimiter, handleNotification, kassaHealth, newRequestId, notifyLimiter, paymentEvents, paymentMethods, paymentOf, paymentsOf, publicOrigin, startCheckout,
+  checkoutLimiter, handleNotification, kassaHealth, notifyLimiter, paymentEvents, paymentMethods, paymentOf, paymentsOf, publicOrigin, startCheckout,
 } from './payments.mjs';
+import {isCoreError} from '../cores/kit/errors.mjs';
+import {requestIdMw, serverLog} from './log.mjs';
+import {clientErrorHandler} from './clientErrors.mjs';
+
+const log = serverLog('api');
 
 // Медиа с путями /data/... браузер рендера берёт по полному адресу этого сервера
 const absolute = (origin, url) => (url && url.startsWith('/') ? `${origin}${url}` : url);
@@ -138,6 +143,8 @@ export const createApp = ({photoOrigin}) => {
   // За Traefik на сервере: верим его X-Forwarded-Proto (для Secure у cookie) и адресу клиента
   // (для ограничения попыток входа) — но только от прокси из внутренней сети, не от кого угодно
   app.set('trust proxy', 'loopback, uniquelocal');
+  // Номер запроса — самым первым: он нужен и ошибке разбора тела, и журналу всех шагов ниже
+  app.use(requestIdMw);
   app.use(express.json({limit: '2mb'}));
   app.use(readSessionMw);
   const api = express.Router();
@@ -202,9 +209,7 @@ export const createApp = ({photoOrigin}) => {
   // Уведомление кассы об оплате — без сессии: приходит от NOWPayments, подлинность — по подписи
   // и сверке с самой кассой (server/payments.mjs). Номер операции — в ответ: по нему её видно в логе
   api.post('/payments/nowpayments/notify', notifyLimiter, (req, res, next) => {
-    const requestId = newRequestId();
-    res.set('X-Request-Id', requestId);
-    handleNotification({body: req.body, signature: req.get('x-nowpayments-sig'), requestId}).then((r) => res.json(r)).catch(next);
+    handleNotification({body: req.body, signature: req.get('x-nowpayments-sig'), requestId: req.requestId}).then((r) => res.json(r)).catch(next);
   });
 
   // Поддержка в Telegram: сообщения клиентов и ответы из рабочей группы (server/support.mjs).
@@ -215,6 +220,9 @@ export const createApp = ({photoOrigin}) => {
     res.json({ok: true});
     void handleUpdate(req.body);
   });
+
+  // Ошибки из браузера (server/clientErrors.mjs) — без сессии: падает и витрина гостя, и экран входа
+  api.post('/client-error', clientErrorHandler);
 
   // Всё ниже — только после входа и от имени своей компании
   api.use(requireUser);
@@ -262,7 +270,7 @@ export const createApp = ({photoOrigin}) => {
   // Оплата тарифа: счёт у кассы → адрес страницы оплаты. Адрес возврата и уведомлений — тот,
   // с которого пришёл клиент (у превью свой, см. startCheckout)
   api.post('/payments/checkout', checkoutLimiter, wrap((req) => startCheckout({
-    workspaceId: req.ws, userId: req.user?.id, packId: req.body?.packId, origin: publicOrigin(req),
+    workspaceId: req.ws, userId: req.user?.id, packId: req.body?.packId, origin: publicOrigin(req), requestId: req.requestId,
   })));
   account.get('/payments', wrap((req) => paymentsOf(req.ws)));
   account.get('/payments/:id', wrap((req) => paymentOf(req.ws, req.params.id)));
@@ -609,12 +617,24 @@ export const createApp = ({photoOrigin}) => {
   // Миниатюры для плашек — те же правила доступа, что у /data (server/thumbs.mjs)
   app.use('/thumbs', guardData, thumbsHandler);
   app.use('/data', guardData, express.static(DATA_DIR, {fallthrough: false}));
+  // Единый ответ об ошибке (стандарт ошибок, 12.10). Наши ошибки (HttpError, ошибки ядер, разбор
+  // тела, размер файла) написаны для человека — их текст и показываем. Всё прочее — поломка у нас:
+  // наружу только «внутренняя ошибка» и код запроса, подробности — в журнал и тревогой в Telegram.
+  // Раньше клиент видел сырой текст исключения — вплоть до ошибки SQL
   app.use('/api', (err, req, res, _next) => {
-    const status = err.status || (err.code === 'LIMIT_FILE_SIZE' ? 413 : 500);
-    // Приёмник файлов отвечает по-английски — человеку нужен ответ, что делать
-    if (err.code === 'LIMIT_FILE_SIZE') err.message = 'Файл слишком большой для загрузки';
-    if (status >= 500) console.error(err);
-    res.status(status).json({error: err.message || 'Ошибка сервера'});
+    if (err.code === 'LIMIT_FILE_SIZE') err = Object.assign(new HttpError(413, 'Файл слишком большой для загрузки'), {cause: err});
+    const ours = err instanceof HttpError || (isCoreError(err) && err.code !== 'INTERNAL') || err.expose === true;
+    const status = ours ? (err.status || err.statusCode || 500) : 500;
+    const where = {method: req.method, path: req.originalUrl.split('?')[0], status};
+    // Ожидаемые 4xx не пишем: это «нет такого объявления», а не событие. Наши 5xx (площадка не
+    // ответила) — warn: граница модуля уже записала подробности. Чужое — error со стеком
+    if (!ours) log.error('request.failed', {...where, error: err});
+    else if (status >= 500) log.warn('request.failed', {...where, message: err.message});
+    const requestId = req.requestId;
+    res.status(status).json({
+      error: ours ? err.message : `Внутренняя ошибка сервера. Код для поддержки: ${requestId}`,
+      ...(status >= 500 ? {requestId} : {}),
+    });
   });
   return app;
 };

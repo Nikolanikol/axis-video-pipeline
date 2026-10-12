@@ -5,6 +5,7 @@
 // каруселями и роликами, вызывается прямым импортом точки входа. Всё, что может сломаться у
 // Autohome, ядро уже перевело в коды контракта; здесь — только граница модуля.
 import {randomUUID} from 'node:crypto';
+import {currentRequestId} from './log.mjs';
 import {HttpError} from './store.mjs';
 import {carFromChe168} from '../src/shared/che168Car.js';
 import {getCar} from '../cores/che168/src/index.mjs';
@@ -25,7 +26,8 @@ const TIMEOUT_MS = 45_000;
  * @param {string} ref — номер машины на che168
  */
 export const fetchChe168 = async (ref) => {
-  const requestId = randomUUID();
+  // Номер запроса клиента — чтобы строки ядра нашлись по коду из ответа; вне запроса — свой
+  const requestId = currentRequestId() ?? randomUUID();
   const rlog = log.child({requestId});
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), TIMEOUT_MS);

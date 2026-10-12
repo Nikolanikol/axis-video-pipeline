@@ -13,6 +13,7 @@ import {currencyCode, currencySign, isDirect, krwPerUnit} from '../src/shared/cu
 import {useRates} from './rates';
 import {TOOLS, hasTool} from './tools';
 import {Toasts} from './Toast';
+import {reportError} from './errorReport';
 
 export const Shell: React.FC = () => {
   const [error, setError] = useState('');
@@ -214,7 +215,10 @@ const ToolScreen: React.FC<{pipeline: Pipeline; tool: ToolMeta}> = ({pipeline, t
 class ToolBoundary extends React.Component<{title: string; children: React.ReactNode}, {error: Error | null}> {
   state = {error: null as Error | null};
   static getDerivedStateFromError(error: Error) { return {error}; }
-  componentDidCatch(error: Error) { console.error(error); }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error(error);
+    reportError('boundary', error, {tool: this.props.title, componentStack: info.componentStack ?? undefined});
+  }
   render() {
     if (!this.state.error) return this.props.children;
     return (

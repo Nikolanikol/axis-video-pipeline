@@ -20,7 +20,7 @@ import {fetchChe168Car} from './che168.mjs';
 import {fetchCarsensorCar} from './carsensor.mjs';
 import {CHE168_SKIP_SLIDES} from '../src/shared/che168Car.js';
 import {CARSENSOR_SKIP_SLIDES} from '../src/shared/carsensorCar.js';
-import {
+import {skipUnreadable, 
   HttpError, PRODUCTION, ROOT, checkId, currentWorkspace, workspaceDir, workspaceUrl, getBrand, readJson, renderMarket, writeJson,
 } from './store.mjs';
 
@@ -175,11 +175,14 @@ export const buildCarousel = async (link, opts = {}) => {
     let lot = null;
     if (src.source === 'lot') lot = {house: src.house, id: src.lotId};
     if (src.source === 'lot-saved') {
-      const saved = await readJson(path.join(carouselsDir(), id, 'carousel.json')).catch(() => null);
+      const savedFile = path.join(carouselsDir(), id, 'carousel.json');
+      const saved = await readJson(savedFile).catch(skipUnreadable('карусель по лоту', savedFile));
       if (!saved?.lot) throw new HttpError(404, 'Карусель по лоту не найдена — вставь ссылку на лот заново');
       lot = {house: saved.lot.house, id: saved.lot.id};
     }
-    const prev = await readJson(path.join(carouselsDir(), id, 'carousel.json')).catch(() => null);
+    // Битый файл прежней карусели не держит сборку, но цена клиента из него потеряется — пишем
+    const prevFile = path.join(carouselsDir(), id, 'carousel.json');
+    const prev = await readJson(prevFile).catch(skipUnreadable('прежняя карусель', prevFile));
     const priceOverride = opts.priceOverride !== undefined ? opts.priceOverride : prev?.priceOverride ?? null;
     // Контакты и компанию берём из профиля клиента: бренд и подпись должны быть его. Профиль —
     // до машины: по его языку ядро che168 отдаёт названия опций
@@ -271,7 +274,8 @@ export const slideFileName = (car, n) => {
  * новые варианты и форматы, за которые берётся кредит
  */
 export const repriceCarousel = async (id, price) => {
-  const saved = await readJson(path.join(carouselsDir(), checkId(id), 'carousel.json')).catch(() => null);
+  const file = path.join(carouselsDir(), checkId(id), 'carousel.json');
+  const saved = await readJson(file).catch(skipUnreadable('карусель', file));
   if (!saved) throw new HttpError(404, 'Карусель не найдена — соберите её по ссылке');
   const v = price === null || price === '' || price === undefined ? null : Number(price);
   if (v !== null && (!Number.isFinite(v) || v <= 0 || v > 1e12)) throw new HttpError(400, 'Цена — положительное число');
@@ -290,7 +294,9 @@ export const deleteCarousel = async (id) => {
 export const listCarousels = async () => {
   await fs.mkdir(carouselsDir(), {recursive: true});
   const dirs = (await fs.readdir(carouselsDir(), {withFileTypes: true})).filter((d) => d.isDirectory());
-  const all = await Promise.all(dirs.map((d) =>
-    readJson(path.join(carouselsDir(), d.name, 'carousel.json')).catch(() => null)));
+  const all = await Promise.all(dirs.map((d) => {
+    const file = path.join(carouselsDir(), d.name, 'carousel.json');
+    return readJson(file).catch(skipUnreadable('карусель', file));
+  }));
   return all.filter(Boolean).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
 };

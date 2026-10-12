@@ -14,6 +14,9 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
 import {DATA_DIR} from './store.mjs';
+import {serverLog} from './log.mjs';
+
+const log = serverLog('thumbs');
 
 const WIDTHS = [160, 240, 480];
 const CACHE_DIR = path.join(DATA_DIR, '.thumbs');
@@ -45,7 +48,7 @@ export const thumbsHandler = async (req, res) => {
     // dotfiles: кэш — в скрытой папке .thumbs, а send по умолчанию скрытое не отдаёт (404)
     res.type('jpg').sendFile(cached, {dotfiles: 'allow'});
   } catch (e) {
-    console.error(`[thumbs] ${req.originalUrl}: ${e?.message || e}`);
+    log.warn('thumb.failed', {url: req.originalUrl, error: e});
     // Миниатюры нет — пусть плашка возьмёт картинку целиком, а не покажет дыру
     if (!res.headersSent) res.redirect(302, `/data${req.path}`);
   }

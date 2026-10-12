@@ -5,6 +5,7 @@
 // витрины импортируют отсюда. Раньше запрос жил внутри модуля каруселей, и лот по ссылке
 // импортировал его оттуда — модули знали друг о друге (переделка 12.10).
 import {randomUUID} from 'node:crypto';
+import {currentRequestId} from './log.mjs';
 import {HttpError} from './store.mjs';
 import {carFromEncar} from '../src/shared/encarCar.js';
 import {getCar} from '../cores/encar/src/index.mjs';
@@ -25,7 +26,8 @@ const TIMEOUT_MS = 75_000;
  * @param {string} ref — номер объявления или ссылка Encar
  */
 export const fetchEncarCar = async (ref) => {
-  const requestId = randomUUID();
+  // Номер запроса клиента — чтобы строки ядра нашлись по коду из ответа; вне запроса — свой
+  const requestId = currentRequestId() ?? randomUUID();
   const rlog = log.child({requestId});
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), TIMEOUT_MS);

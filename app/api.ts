@@ -119,6 +119,11 @@ export type Account = {
 // Вход на устройстве: device — «Chrome · Mac», current — тот, с которого смотрят
 export type SessionRow = {id: string; device: string; ip: string; createdAt: string; seenAt: string; current: boolean};
 
+/** Ответ сервера с ошибкой: текст уже для человека, сторону сервера записал его журнал (app/errorReport.ts её не шлёт) */
+export class ApiError extends Error {
+  constructor(message: string, public status: number) { super(message); this.name = 'ApiError'; }
+}
+
 const request = async <T,>(method: string, url: string, body?: unknown): Promise<T> => {
   const isForm = body instanceof FormData;
   const res = await fetch(url, {
@@ -129,7 +134,7 @@ const request = async <T,>(method: string, url: string, body?: unknown): Promise
   const data = await res.json().catch(() => ({}));
   // Сессия кончилась или вход сброшен на другом устройстве — перезагрузка покажет экран входа
   if (res.status === 401 && !url.startsWith('/api/auth/')) window.location.reload();
-  if (!res.ok) throw new Error(data.error || `${res.status} ${res.statusText}`);
+  if (!res.ok) throw new ApiError(data.error || `${res.status} ${res.statusText}`, res.status);
   return data as T;
 };
 
@@ -224,7 +229,7 @@ export const api = {
     form.append('logo', file);
     const res = await fetch('/api/brand/logo', {method: 'POST', body: form});
     const body = await res.json().catch(() => null);
-    if (!res.ok) throw new Error(body?.error ?? 'Не удалось загрузить логотип');
+    if (!res.ok) throw new ApiError(body?.error ?? 'Не удалось загрузить логотип', res.status);
     return body as {url: string; width: number; height: number; bytes: number; brand: Theme;
       notes: string[]; warnings: string[]; hasRaw: boolean};
   },
@@ -237,7 +242,7 @@ export const api = {
     form.append('icon', file);
     const res = await fetch('/api/brand/icon', {method: 'POST', body: form});
     const body = await res.json().catch(() => null);
-    if (!res.ok) throw new Error(body?.error ?? 'Не удалось загрузить иконку');
+    if (!res.ok) throw new ApiError(body?.error ?? 'Не удалось загрузить иконку', res.status);
     return body as {url: string; width: number; height: number; bytes: number; brand: Theme;
       notes: string[]; warnings: string[]; hasRaw: boolean};
   },
@@ -260,7 +265,7 @@ export const api = {
   // Прослушать спикера: сервер отдаёт mp3, играем его сразу
   previewVoice: async (speaker: string, language: string, text: string) => {
     const res = await fetch('/api/voices/preview', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({speaker, language, text})});
-    if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? 'Не удалось озвучить');
+    if (!res.ok) throw new ApiError((await res.json().catch(() => null))?.error ?? 'Не удалось озвучить', res.status);
     return URL.createObjectURL(await res.blob());
   },
   // Загрузка видео с прогрессом (fetch его не умеет)

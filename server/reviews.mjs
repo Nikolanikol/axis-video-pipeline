@@ -11,9 +11,15 @@ import {buildScript, lineTimes} from '../src/shared/narration.js';
 import {extractAudio, hasKey, hasVoice, synthesizeScript, transcribe, voiceHash} from './speech.mjs';
 import {hasSeparator, separateAmbience} from './ambience.mjs';
 import {refineCuts} from './voiceCuts.mjs';
-import {
+import {skipUnreadable, 
   CONFIG_DIR, DATA_DIR, DEFAULT_MARKET, HttpError, checkId, workspaceDir, workspaceUrl, getLot, readJson, withLock, writeJson,
 } from './store.mjs';
+import {serverLog} from './log.mjs';
+
+const log = serverLog('reviews');
+// Ошибку фоновой задачи не удалось записать в обзор — он так и покажет «идёт» до перезапуска.
+// Это уже не сбой задачи, а сбой записи: нужен человек
+const statusLost = (task, id) => (e) => log.error('status.write_failed', {note: `статус «ошибка» не записан — обзор висит в «${task}»`, review: id, error: e});
 
 export const reviewsDir = () => path.join(workspaceDir(), 'reviews');
 // Приёмник загрузок общий: файл лежит там секунды, пока его не заберёт обзор компании
@@ -67,7 +73,7 @@ const write = async (id, review) => {
 export const listReviews = async () => {
   await fs.mkdir(reviewsDir(), {recursive: true});
   const dirs = (await fs.readdir(reviewsDir(), {withFileTypes: true})).filter((d) => d.isDirectory());
-  const all = await Promise.all(dirs.map((d) => getReview(d.name).catch(() => null)));
+  const all = await Promise.all(dirs.map((d) => getReview(d.name).catch(skipUnreadable('обзор', path.join(reviewsDir(), d.name, 'review.json')))));
   return all.filter(Boolean).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
 };
 
@@ -162,7 +168,8 @@ export const reprocessSource = async (id) => {
   const s = review.source;
   if (!s?.file) throw new HttpError(400, 'Видео не загружено — пересобирать нечего');
   if (progress.has(id) || ingesting.has(id)) throw new HttpError(409, 'Видео уже обрабатывается');
-  const info = await probe(path.join(reviewDir(id), s.file)).catch(() => null);
+  const info = await probe(path.join(reviewDir(id), s.file))
+    .catch((e) => { log.warn('source.unreadable', {review: id, file: s.file, error: e}); return null; });
   if (!info?.video) throw new HttpError(400, 'Исходник не читается — загрузи видео заново');
   const saved = await setSource(id, {
     ...s, status: 'processing', progress: 0, error: undefined,
@@ -243,9 +250,9 @@ const processVideo = (id, file, duration, sourceColour = {}) => {
         thumbs: {fps: THUMBS_FPS, count, base: reviewUrl(id, thumbs)},
       });
     } catch (e) {
-      console.error(`Обработка видео ${id}:`, e);
+      log.error('source.failed', {note: 'обработка видео обзора', review: id, error: e});
       const current = (await read(id).catch(() => ({}))).source ?? {};
-      await setSource(id, {...current, status: 'error', error: String(e?.message || e)}).catch(() => {});
+      await setSource(id, {...current, status: 'error', error: String(e?.message || e)}).catch(statusLost('видео', id));
     } finally {
       progress.delete(id);
     }
@@ -292,8 +299,8 @@ export const transcribeReview = async (id) => {
         updatedAt: new Date().toISOString(),
       });
     } catch (e) {
-      console.error(`Распознавание ${id}:`, e.message);
-      await saveSpeech({...(await read(id).catch(() => ({}))).speech, status: 'error', error: String(e?.message || e)}).catch(() => {});
+      log.error('speech.failed', {note: 'распознавание речи', review: id, error: e});
+      await saveSpeech({...(await read(id).catch(() => ({}))).speech, status: 'error', error: String(e?.message || e)}).catch(statusLost('распознавание', id));
     } finally {
       transcribing.delete(id);
     }
@@ -349,7 +356,7 @@ export const voiceReview = async (id, {language, market} = {}) => {
       // Не получилось — остаётся разметка, как было: озвучка важнее аккуратной границы
       if (!Object.values(times).some((c) => Number.isFinite(c?.cutFrom))) {
         times = await refineCuts(file, times, duration)
-          .catch((e) => { console.error(`Границы фраз ${id}: оставил по разметке —`, e.message); return times; });
+          .catch((e) => { log.warn('cuts.failed', {note: 'границы фраз — оставил по разметке', review: id, error: e}); return times; });
       }
       // Прежние файлы (в том числе построчные клипы старых обзоров) не копим
       for (const f of await fs.readdir(dir)) if (f !== name) await fs.rm(path.join(dir, f), {force: true});
@@ -360,8 +367,8 @@ export const voiceReview = async (id, {language, market} = {}) => {
         clips: times, done: undefined, total: undefined, updatedAt: new Date().toISOString(),
       });
     } catch (e) {
-      console.error(`Озвучка ${id}:`, e.message);
-      await saveVoice({status: 'error', error: String(e?.message || e)}).catch(() => {});
+      log.error('voice.failed', {note: 'озвучка обзора', review: id, error: e});
+      await saveVoice({status: 'error', error: String(e?.message || e)}).catch(statusLost('озвучка', id));
     } finally {
       voicing.delete(id);
     }
@@ -403,8 +410,8 @@ export const ambienceReview = async (id) => {
         updatedAt: new Date().toISOString(),
       });
     } catch (e) {
-      console.error(`Звуки машины ${id}:`, e.message);
-      await save({status: 'error', error: String(e?.message || e)}).catch(() => {});
+      log.error('ambience.failed', {note: 'звуки машины без голоса', review: id, error: e});
+      await save({status: 'error', error: String(e?.message || e)}).catch(statusLost('звуки машины', id));
     } finally {
       separating.delete(id);
     }

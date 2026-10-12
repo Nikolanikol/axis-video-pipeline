@@ -19,6 +19,9 @@
 import path from 'node:path';
 import {db, hasDatabase} from './db/index.mjs';
 import {CONFIG_DIR, HttpError, readJson} from './store.mjs';
+import {serverLog} from './log.mjs';
+
+const journal = serverLog('billing');
 
 // «Вход включён» — то же, что authEnabled в session.mjs; берём из базы напрямую, иначе
 // session → accounts → billing → session замкнулись бы в круг импортов
@@ -226,12 +229,12 @@ export const billed = async (params, work) => {
   try {
     out = await work();
   } catch (e) {
-    await refund(receipt, `ошибка: ${String(e?.message || e).slice(0, 150)}`).catch((err) => console.error('Возврат кредита:', err));
+    await refund(receipt, `ошибка: ${String(e?.message || e).slice(0, 150)}`).catch((err) => journal.error('refund.failed', {note: 'кредит за упавшую работу не вернулся — дожмёт сторож', error: err}));
     throw e;
   }
   // Работа сделана — результат клиенту отдаём, даже если база не приняла закрытие:
   // раньше сбой здесь возвращал кредит и показывал ошибку при готовой карусели. Закрытие дожмёт сторож
-  await settle(receipt).catch((err) => console.error('Закрытие списания:', err.message));
+  await settle(receipt).catch((err) => journal.warn('settle.failed', {note: 'списание не закрылось — дожмёт сторож', error: err}));
   return out;
 };
 

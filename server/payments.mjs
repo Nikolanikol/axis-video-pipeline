@@ -43,6 +43,8 @@ const SYNC_EVERY_MS = 30_000;
 // Счёт выставлен, а касса за 3 дня ни разу не написала — клиент передумал. Помечаем, чтобы в
 // истории не висело «ждём оплату» вечно. Придёт уведомление позже — статус обновится, как обычно
 const ABANDON_AFTER_DAYS = 3;
+// Касса сутки не знает платежа — значит, и не узнает (номер из песочницы, чужой, ошибочный)
+const LOST_AFTER_MS = 24 * 60 * 60_000;
 // Правдоподобный курс воны для счёта. Общая защита rates.mjs (500–5000) — от явного мусора, а для
 // денег она слишком широка: курс 5000 вместо ~1350 продал бы тариф вчетверо дешевле. За последние
 // двадцать лет вона ходила в 900–1600 за доллар; вышло за 900–2200 — счёт не выставляем, зовём человека
@@ -402,8 +404,25 @@ const syncOrder = async (o, requestId = newRequestId(), {force = false} = {}) =>
   } catch (e) {
     const err = toCoreError(e);
     log[levelFor(err.code)]('sync.failed', {requestId, order: o.id, code: err.code, error: err});
-    // Отметка времени — чтобы следующая попытка была не раньше чем через 30 с
-    await db().query('UPDATE smmaker_payments SET updated_at = now() WHERE id = $1', [o.id]).catch(() => {});
+    // Касса не знает платежа, а заказу больше суток: спрашивать дальше бессмысленно — сверка
+    // переспрашивала такие каждые 5 минут все 14 дней (12.10: пять заказов песочницы). Закрываем
+    // брошенным. Начисление это не закрывает: придёт уведомление «оплачено» — apply начислит.
+    // Боевой платёж, о котором касса не знает, — повод для человека; песочница — нет
+    if (err.code === 'NOT_FOUND' && Date.now() - new Date(o.created_at).getTime() > LOST_AFTER_MS) {
+      try {
+        await db().query(`UPDATE smmaker_payments SET status = 'abandoned', updated_at = now() WHERE id = $1 AND credited_at IS NULL`, [o.id]);
+        await event(o.id, 'sync', {status: 'abandoned', data: {reason: 'касса не знает платежа', paymentId: o.payment_id}, requestId});
+        log.warn('sync.lost', {requestId, order: o.id, paymentId: o.payment_id, sandbox: o.sandbox});
+        if (!o.sandbox) await alarm(o, `касса не знает платёж ${o.payment_id} — заказ закрыт брошенным, проверьте в кабинете NOWPayments`, requestId);
+        return;
+      } catch (e2) {
+        log.error('sync.abandon_failed', {requestId, order: o.id, error: e2});
+      }
+    }
+    // Отметка времени — чтобы следующая попытка была не раньше чем через 30 с. Не вышло — ничего:
+    // сверка просто спросит раньше
+    await db().query('UPDATE smmaker_payments SET updated_at = now() WHERE id = $1', [o.id])
+      .catch((e2) => log.warn('sync.touch_failed', {requestId, order: o.id, error: e2}));
   }
 };
 

@@ -18,6 +18,9 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {DATA_DIR, HttpError} from './store.mjs';
 import {CURRENCIES} from '../src/shared/currencies.js';
+import {serverLog} from './log.mjs';
+
+const log = serverLog('rates');
 
 // Источник, срок кэша и таймаут — почему именно они, см. шапку файла
 const SOURCE = 'https://open.er-api.com/v6/latest/USD';
@@ -82,7 +85,7 @@ export const usdKrw = async () => {
       return {...r, stale: false};
     })
     .catch((e) => {
-      console.error(`Курс ₩/$ не обновился: ${e.message}`);
+      log.warn('rates.failed', {note: 'курс не обновился', stale: Boolean(known), error: e});
       if (known) return {...known, stale: true};
       throw new HttpError(502, 'Курс вона пока недоступен — впишите его вручную');
     })

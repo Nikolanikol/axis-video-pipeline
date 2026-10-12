@@ -5,6 +5,7 @@
 // импортом точки входа. Здесь — только граница модуля и курс иены (ядро отдаёт цену в ¥, а
 // слайды и ролики умеют доллары — переводим по курсу дня, тем же, что у остальных цен).
 import {randomUUID} from 'node:crypto';
+import {currentRequestId} from './log.mjs';
 import {HttpError} from './store.mjs';
 import {rates} from './rates.mjs';
 import {carFromCarsensor} from '../src/shared/carsensorCar.js';
@@ -25,7 +26,8 @@ const TIMEOUT_MS = 45_000;
  * @param {string} ref — номер машины на Carsensor («AU7375484964»)
  */
 export const fetchCarsensor = async (ref) => {
-  const requestId = randomUUID();
+  // Номер запроса клиента — чтобы строки ядра нашлись по коду из ответа; вне запроса — свой
+  const requestId = currentRequestId() ?? randomUUID();
   const rlog = log.child({requestId});
   const ac = new AbortController();
   const timer = setTimeout(() => ac.abort(), TIMEOUT_MS);

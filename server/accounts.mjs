@@ -14,6 +14,9 @@ import {db} from './db/index.mjs';
 import {CONFIG_DIR, HttpError, readJson, workspaceDir} from './store.mjs';
 import {addLot, balanceOf, plural, signupCredits, subscriptionOf} from './billing.mjs';
 import {appUrl, deletionMail, emailChangeMail, noticeMail, resetMail, verifyMail} from './mailer.mjs';
+import {serverLog} from './log.mjs';
+
+const journal = serverLog('accounts');
 
 const scrypt = promisify(crypto.scrypt);
 
@@ -130,12 +133,12 @@ const touchSeen = (userId, hash) => {
   db().query(
     `UPDATE smmaker_users SET last_seen_at = now()
       WHERE id = $1 AND (last_seen_at IS NULL OR last_seen_at < now() - $2 * interval '1 minute')`,
-    [userId, SEEN_EVERY_MIN]).catch((e) => console.warn('last_seen_at:', e.message));
+    [userId, SEEN_EVERY_MIN]).catch((e) => journal.warn('seen.update_failed', {table: 'users', error: e}));
   // То же для самой сессии — «был активен» в списке входов кабинета
   db().query(
     `UPDATE smmaker_sessions SET seen_at = now()
       WHERE token_hash = $1 AND (seen_at IS NULL OR seen_at < now() - $2 * interval '1 minute')`,
-    [hash, SEEN_EVERY_MIN]).catch((e) => console.warn('sessions.seen_at:', e.message));
+    [hash, SEEN_EVERY_MIN]).catch((e) => journal.warn('seen.update_failed', {table: 'sessions', error: e}));
 };
 
 /** Роль на платформе → права. admin — всё; manager — лиды и начисление пакетов */
@@ -228,7 +231,7 @@ export const register = async ({name, email, phone, password, company}, meta = {
       `INSERT INTO smmaker_memberships (workspace_id, user_id, role) VALUES ($1, $2, 'owner')`, [workspaceId, user.id]);
     return {userId: user.id, token: await createSession(user.id, client, meta)};
   });
-  await sendVerification(out.userId, {force: true}).catch((e) => console.error('Письмо с кодом не ушло:', e.message));
+  await sendVerification(out.userId, {force: true}).catch((e) => journal.error('mail.failed', {note: 'письмо с кодом подтверждения не ушло', userId: out.userId, error: e}));
   return out;
 };
 
@@ -351,7 +354,7 @@ export const requestReset = async ({email}) => {
     'SELECT id, email FROM smmaker_users WHERE (lower(email) = $1 OR email_key = $2) AND delete_after IS NULL LIMIT 1', [mail, emailKey(mail)]);
   if (!u || await pauseLeft(u.id, 'reset') > 0) return {ok: true};
   const {link} = await inTransaction((client) => issueToken(client, u.id, 'reset', RESET_MINUTES));
-  await resetMail({to: u.email, link: `${appUrl()}/#/reset?t=${link}`}).catch((e) => console.error('Письмо сброса не ушло:', e.message));
+  await resetMail({to: u.email, link: `${appUrl()}/#/reset?t=${link}`}).catch((e) => journal.error('mail.failed', {note: 'письмо сброса пароля не ушло', userId: u.id, error: e}));
   return {ok: true};
 };
 
@@ -479,7 +482,7 @@ export const changePassword = async ({userId, sessionId, current, password}) => 
     'DELETE FROM smmaker_sessions WHERE user_id = $1 AND left(token_hash, $3) <> $2', [userId, sessionId, SID_LEN]);
   await noticeMail({to: u.email, title: 'Пароль изменён',
     text: 'Пароль от KOK только что изменили в кабинете. Остальные устройства вышли из аккаунта.\n\nЕсли это были не вы — сбросьте пароль через «Забыли пароль?» на странице входа и напишите нам.'})
-    .catch((e) => console.error('Уведомление о пароле не ушло:', e.message));
+    .catch((e) => journal.error('mail.failed', {note: 'уведомление о смене пароля не ушло', error: e}));
   return {ok: true, closed};
 };
 
@@ -522,7 +525,7 @@ export const confirmEmailChange = async ({userId, code}) => {
   });
   await noticeMail({to: out.oldEmail, title: 'Почта аккаунта изменена',
     text: `Почту для входа в KOK сменили на ${out.email}. Если это были не вы — срочно напишите нам.`})
-    .catch((e) => console.error('Уведомление о смене почты не ушло:', e.message));
+    .catch((e) => journal.error('mail.failed', {note: 'уведомление о смене почты не ушло', error: e}));
   return {ok: true, email: out.email};
 };
 
@@ -623,7 +626,7 @@ export const requestDeletion = async ({userId, workspaceId, password, confirm}) 
     return {link: t.link, until: r.delete_after};
   });
   await deletionMail({to: u.email, name: u.name, link: `${appUrl()}/#/restore?t=${link}`, until})
-    .catch((e) => console.error('Письмо об удалении не ушло:', e.message));
+    .catch((e) => journal.error('mail.failed', {note: 'письмо об удалении аккаунта не ушло', error: e}));
   return {ok: true, until};
 };
 
@@ -641,7 +644,7 @@ export const restoreAccount = async ({token}, meta = {}) => {
     return {email: u.email, token: await createSession(t.user_id, client, meta)};
   });
   await noticeMail({to: out.email, title: 'Аккаунт восстановлен', text: 'Удаление аккаунта KOK отменено: всё на месте, можно работать дальше.'})
-    .catch((e) => console.error('Письмо о восстановлении не ушло:', e.message));
+    .catch((e) => journal.error('mail.failed', {note: 'письмо о восстановлении аккаунта не ушло', error: e}));
   return out;
 };
 
@@ -700,14 +703,14 @@ export const purgeDeleted = async ({log = console.log} = {}) => {
       // Файлы — после записи в базу: упадёт удаление файлов — данные всё равно обезличены,
       // а папку без хозяина видно в data/ и можно убрать руками
       for (const ws of done.workspaces) {
-        await fs.rm(workspaceDir(ws), {recursive: true, force: true}).catch((e) => console.error(`Файлы ${ws} не удалены:`, e.message));
+        await fs.rm(workspaceDir(ws), {recursive: true, force: true}).catch((e) => journal.error('purge.files_failed', {note: 'файлы удалённой компании не стёрты — убрать руками', workspace: ws, error: e}));
       }
       await noticeMail({to: done.email, title: 'Аккаунт удалён',
         text: 'Аккаунт KOK удалён окончательно: файлы и личные данные стёрты. Спасибо, что были с нами.'})
-        .catch((e) => console.error('Письмо об окончательном удалении не ушло:', e.message));
+        .catch((e) => journal.error('mail.failed', {note: 'письмо об окончательном удалении не ушло', userId: id, error: e}));
       log(`Удалён аккаунт ${id} (компаний: ${done.workspaces.length})`);
     } catch (e) {
-      console.error(`Удаление аккаунта ${id} не прошло:`, e.message);
+      journal.error('purge.failed', {note: 'окончательное удаление аккаунта не прошло', userId: id, error: e});
     }
   }
 };

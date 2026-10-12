@@ -6,6 +6,9 @@ import path from 'node:path';
 import {REVIEW_FPS} from '../src/shared/timeline.js';
 import {ROOT} from './store.mjs';
 import {remotionTool} from './remotion-bin.mjs';
+import {serverLog} from './log.mjs';
+
+const log = serverLog('media');
 
 const tool = (name) => {
   const custom = process.env[name === 'ffmpeg' ? 'FFMPEG_PATH' : 'FFPROBE_PATH'];
@@ -147,7 +150,7 @@ export const makeProxy = async (input, output, duration, onProgress, {hdr = fals
     return await encode(fast);
   } catch (e) {
     // Размеченный не по стандарту файл не должен ронять загрузку: берём его как есть
-    console.warn('Перевод HDR не удался, собираю копию без него:', e.message);
+    log.warn('hdr.failed', {note: 'перевод HDR не удался, копия без него', error: e});
     return encode(plain);
   }
 };
