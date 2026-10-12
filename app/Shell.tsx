@@ -1,6 +1,6 @@
 // Оболочка: шапка с пайплайнами, вкладки инструментов, экран выбранного инструмента
 import React, {Suspense, useCallback, useEffect, useState} from 'react';
-import {Menu, X} from 'lucide-react';
+import {CircleUserRound, Menu, X} from 'lucide-react';
 import {Loading} from './Loading';
 import {ConfigProvider, useConfig} from './config';
 import {AuthGate, VerifyBanner, day, daysLeft, useOutOfCredits, useSession} from './auth';
@@ -93,7 +93,9 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
         {session.enabled && <AccountChip />}
         {/* Только телефон: остаток кредитов всегда на виду, остальное — в меню */}
         {session.enabled && !session.isStaff && session.balance && (
-          <a className="top-credits" href={href('account')} title="Кабинет и тарифы">{session.balance.credits} кр.</a>
+          <a className="top-credits" href={href('account')} title="Личный кабинет и тарифы" aria-label={`Личный кабинет, ${session.balance.credits} кр.`}>
+            <CircleUserRound size={18} aria-hidden />{session.balance.credits} кр.
+          </a>
         )}
         <button className="burger" onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen} aria-controls="menu-sheet"
           aria-label={menuOpen ? 'Закрыть меню' : 'Открыть меню'}>
@@ -197,13 +199,17 @@ const RatesChip: React.FC = () => {
   );
 };
 
-// Компания и кредиты в шапке: клиент видит остаток, не заходя в кабинет
+// Компания и кредиты в шапке: клиент видит остаток, не заходя в кабинет. Иконка профиля —
+// чтобы было понятно, что это вход в личный кабинет (владелец 12.10: одно название компании
+// не читалось как ссылка)
 const AccountChip: React.FC = () => {
   const {workspace, balance, email, isAdmin, isStaff, logout} = useSession();
   const soon = balance?.nextExpiry;
   return (
     <div className="account-chip">
-      <a href={href('account')} title={soon ? `${soon.credits} кр. сгорят ${day(soon.at)}` : email ?? ''}>
+      <a className="account-link" href={href('account')} aria-label="Личный кабинет"
+        title={`Личный кабинет${soon ? ` · ${soon.credits} кр. сгорят ${day(soon.at)}` : email ? ` · ${email}` : ''}`}>
+        <CircleUserRound className="account-icon" size={22} aria-hidden />
         <b>{workspace?.name}</b>
         <span className="muted">
           {isStaff ? (isAdmin ? ' · владелец платформы' : ' · менеджер') : ` · ${balance?.credits ?? 0} кр.`}

@@ -145,7 +145,7 @@ export const Landing: React.FC<{signup: {credits: number; days: number}; notice:
         <h2 className="land-h2">Вопросы</h2>
         <div className="land-faq">
           <details><summary>Нужна ли карта, чтобы попробовать?</summary><p>Нет. Регистрация и пробные кредиты — без оплаты. Решите продолжить — выберете тариф в кабинете и оплатите онлайн, кредиты придут сами.</p></details>
-          <details><summary>Можно вернуть деньги?</summary><p>Да, в течение 14 дней после оплаты, если кредиты из покупки ещё не тратились. Сбой при сборке ролика — кредит возвращается сам. Подробно — в <a href="#/offer">оферте</a>.</p></details>
+          <details><summary>Можно вернуть деньги?</summary><p>Да, в течение 3 суток после оплаты, если кредиты из покупки ещё не тратились: напишите нам заявление на возврат в Telegram. Сбой при сборке ролика — кредит возвращается сам. Подробно — в <a href="#/offer">оферте</a>.</p></details>
           <details><summary>Что будет, если объявление на Encar снимут?</summary><p>Ничего: фото копируются к нам при создании, готовый ролик и карусель от объявления не зависят.</p></details>
           <details><summary>Можно поставить свой логотип и цвета?</summary><p>Да. В настройках бренда — логотип, палитра, шрифты и контакты. Один раз — и они на всех роликах и каруселях.</p></details>
           <details><summary>На каком языке тексты?</summary><p>На языке вашего профиля: характеристики и подписи переводятся сами. Карусели — на русском или английском.</p></details>
@@ -326,7 +326,10 @@ const Carousels: React.FC<{items: Samples['carousels']}> = ({items}) => {
 const Tariffs: React.FC<{offer: PublicOffer | null}> = ({offer}) => {
   const plans = (offer?.packs ?? []).filter((p) => p.kind === 'plan');
   const topups = (offer?.packs ?? []).filter((p) => p.kind === 'topup');
+  // Менеджер — в Telegram (владелец 12.10: обратная связь через Telegram); нет его — WhatsApp
+  const tg = offer?.contacts?.telegram?.trim().replace(/^https?:\/\/t\.me\//, '').replace(/^@/, '');
   const wa = offer?.contacts?.whatsapp?.replace(/\D/g, '');
+  const ask = tg ? {href: `https://t.me/${tg}`, label: 'Telegram'} : wa ? {href: `https://wa.me/${wa}`, label: 'WhatsApp'} : null;
   if (!plans.length && !topups.length) return <p className="land-sub">Тарифы и докупка — в кабинете после регистрации.</p>;
   return (
     <div className="land-tariffs">
@@ -347,7 +350,7 @@ const Tariffs: React.FC<{offer: PublicOffer | null}> = ({offer}) => {
           ))}
         </div>
       )}
-      {wa && <a className="btn ghost" href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer">Спросить менеджера в WhatsApp</a>}
+      {ask && <a className="btn ghost" href={ask.href} target="_blank" rel="noreferrer">Спросить менеджера в {ask.label}</a>}
     </div>
   );
 };
