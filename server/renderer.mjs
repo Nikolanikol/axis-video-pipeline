@@ -179,7 +179,8 @@ const run = async (job) => {
     if (Date.now() - mark.at < STALL_MS) return;
     clearInterval(watchdog);
     cancel();
-    stop(new Error(`Завис на шаге «${job.stage}»: ${Math.round(STALL_MS / 60000)} мин без движения, задание снято`));
+    // HttpError — текст для клиента: он попадает в историю роликов как есть (clientMessage)
+    stop(new HttpError(504, `Завис на шаге «${job.stage}»: ${Math.round(STALL_MS / 60000)} мин без движения, задание снято. Кредиты вернулись — нажмите «Пересобрать»`));
     // Проверяем вчетверо чаще срока, но не чаще раза в четверть секунды и не реже раза в 15 с
   }, Math.min(15 * 1000, Math.max(250, STALL_MS / 4)));
 
