@@ -1,15 +1,16 @@
 // Тарифы и докупка в «Моём кабинете» — карточками (макет владельца 12.10).
 //
 // Нажатие на тариф открывает окно оплаты (12.10): USDT через кассу NOWPayments — кредиты
-// приходят сами; рубли и всё остальное — WhatsApp продаж с готовым текстом (тариф, кредиты,
-// цена и кабинет), чтобы менеджеру не переспрашивать. Нет ключей кассы на сервере — в окне
-// только менеджер.
+// приходят сами; рубли и всё остальное — менеджер в Telegram (владелец 12.10: обратная связь
+// теперь через Telegram и рабочую группу, а не WhatsApp). Готовый текст заявки (тариф, кредиты,
+// цена, кабинет) копируется в буфер — Telegram не берёт текст в ссылке. Нет ключей кассы на
+// сервере — в окне только менеджер.
 //
 // «Выгоднее всего», «−N% за кредит» и «экономия» не вписаны руками, а считаются из прайса:
 // владелец меняет цены в админке, и плашки обязаны пересчитаться сами.
 import React, {useEffect, useState} from 'react';
 import {createPortal} from 'react-dom';
-import {Check} from 'lucide-react';
+import {Check, Send} from 'lucide-react';
 import {Offer, Pack, Payment, api, errorText} from './api';
 import {day, useSession} from './auth';
 import {useConfig} from './config';
@@ -27,14 +28,40 @@ const plural = (n: number, [one, few, many]: [string, string, string]) => {
 const credits = (n: number) => `${n} ${plural(n, ['кредит', 'кредита', 'кредитов'])}`;
 
 /**
- * Куда писать за тарифом: WhatsApp с текстом, нет его — Telegram (текст туда ссылкой не
- * передать), нет и его — письмо с темой и текстом
+ * Куда писать за тарифом — по убыванию: бот поддержки с ключом кабинета (в рабочей группе тема
+ * сразу с компанией и балансом, server/support.mjs), Telegram из контактов, WhatsApp с текстом,
+ * письмо. WhatsApp и почта остаются запасом, если Telegram на сервере не настроен
  */
-const contactLink = (contacts: Offer['contacts'], text: string) => {
-  if (contacts.whatsapp) return `https://wa.me/${contacts.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`;
-  if (contacts.telegram) return `https://t.me/${contacts.telegram.replace(/^@/, '')}`;
-  if (contacts.email) return `mailto:${contacts.email}?subject=${encodeURIComponent('Подписка KOK')}&body=${encodeURIComponent(text)}`;
+type Manager = {kind: 'bot' | 'telegram' | 'whatsapp' | 'email'; label: string; href: string | null};
+const managerOf = (offer: Offer, text: string): Manager | null => {
+  const c = offer.contacts;
+  if (offer.support) return {kind: 'bot', label: 'Telegram', href: null};
+  if (c.telegram) return {kind: 'telegram', label: 'Telegram', href: `https://t.me/${c.telegram.replace(/^https?:\/\/t\.me\//, '').replace(/^@/, '')}`};
+  if (c.whatsapp) return {kind: 'whatsapp', label: 'WhatsApp', href: `https://wa.me/${c.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`};
+  if (c.email) return {kind: 'email', label: 'почту', href: `mailto:${c.email}?subject=${encodeURIComponent('Подписка KOK')}&body=${encodeURIComponent(text)}`};
   return null;
+};
+
+/**
+ * Открыть чат с менеджером. Всё — сразу в обработчике нажатия: Safari не откроет вкладку и не
+ * даст писать в буфер, если перед этим был запрос к серверу. Поэтому вкладка открывается пустой,
+ * а адрес бота с ключом кабинета подставляется, когда сервер его выдаст
+ */
+const openManager = async (m: Manager, text: string) => {
+  if (m.kind === 'whatsapp' || m.kind === 'email') { window.open(m.href!, '_blank', 'noreferrer'); return; }
+  // Не скопировалось (браузер запретил) — не страшно: менеджер спросит сам
+  navigator.clipboard?.writeText(text).catch(() => {});
+  if (m.kind === 'telegram') { window.open(m.href!, '_blank', 'noreferrer'); return; }
+  const tab = window.open('', '_blank');
+  try {
+    const {url} = await api.account.supportLink();
+    if (url && tab) tab.location.href = url;
+    else if (url) window.location.href = url;
+    else tab?.close();
+  } catch (e) {
+    tab?.close();
+    throw e;
+  }
 };
 
 /** Скидка за кредит относительно самого дорогого пакета того же вида, в процентах */
@@ -69,7 +96,15 @@ const PayDialog: React.FC<{pack: Pack; offer: Offer; text: string; onClose: () =
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [rate, setRate] = useState<number | null>(null);
-  const manager = contactLink(offer.contacts, text);
+  const manager = managerOf(offer, text);
+  const [copied, setCopied] = useState(false);
+  const write = async () => {
+    if (!manager) return;
+    setError('');
+    if (manager.kind === 'bot' || manager.kind === 'telegram') setCopied(true);
+    try { await openManager(manager, text); } catch (e) { setError(errorText(e)); }
+  };
+  const telegram = manager?.kind === 'bot' || manager?.kind === 'telegram';
   const usdt = Boolean(offer.pay?.usdt);
 
   useEffect(() => { if (usdt) api.usdKrw().then((r) => setRate(r.krwPerUsd)).catch(() => setRate(null)); }, [usdt]);
@@ -108,15 +143,21 @@ const PayDialog: React.FC<{pack: Pack; offer: Offer; text: string; onClose: () =
         )}
         {manager && (
           <div className="pay-option">
-            <a className={`btn${usdt ? '' : ' primary'}`} href={manager} target="_blank" rel="noreferrer">
-              {usdt ? 'Рубли или другой способ — написать нам' : `Написать в ${offer.contacts.whatsapp ? 'WhatsApp' : 'чат'}`}
-            </a>
-            <p className="hint">Откроется {offer.contacts.whatsapp ? 'WhatsApp' : 'чат'} с готовым сообщением: пришлём реквизиты и подключим.</p>
+            <button type="button" className={`btn${usdt ? '' : ' primary'}${telegram ? ' btn-tg' : ''}`} onClick={write}>
+              {telegram && <Send size={17} aria-hidden />}
+              {usdt ? `Рубли или другой способ — написать в ${manager.label}` : `Написать в ${manager.label}`}
+            </button>
+            <p className="hint">
+              {telegram
+                ? (copied ? 'Текст заявки скопирован — вставьте его в чат. Пришлём реквизиты и подключим.'
+                  : 'Откроется Telegram, текст заявки скопируется сам — останется вставить. Пришлём реквизиты и подключим.')
+                : `Откроется ${manager.label} с готовым сообщением: пришлём реквизиты и подключим.`}
+            </p>
           </div>
         )}
         {!usdt && !manager && <p className="hint">Способы оплаты ещё не настроены — напишите нам на почту из подвала сайта.</p>}
         {/* Модерация кассы и сам клиент: перед оплатой видно условия и возврат */}
-        <p className="hint">Оплачивая, вы принимаете <a href="#/offer" target="_blank" rel="noreferrer">оферту</a>: возврат — 14 дней, если кредиты из покупки не тратились.</p>
+        <p className="hint">Оплачивая, вы принимаете <a href="#/offer" target="_blank" rel="noreferrer">оферту</a>: возврат — в течение 3 суток, если кредиты из покупки не тратились.</p>
         {error && <div className="auth-error">{error}</div>}
         <button type="button" className="btn ghost" onClick={onClose} disabled={busy}>Отмена</button>
       </div>
@@ -249,7 +290,7 @@ export const PlansSection: React.FC = () => {
       <p className="hint plans-foot">
         Докупленные кредиты сгорают вместе с подпиской.
         {usdt ? ' Оплата в USDT — кредиты придут сами; рублями — через менеджера.'
-          : ` Нажмите тариф — откроется ${offer.contacts.whatsapp ? 'WhatsApp' : 'чат'} с готовым сообщением; пришлём реквизиты и подключим.`}
+          : ` Нажмите тариф — напишите нам в ${managerOf(offer, '')?.label ?? 'чат'}: пришлём реквизиты и подключим.`}
       </p>
 
       {payments.length > 0 && (
