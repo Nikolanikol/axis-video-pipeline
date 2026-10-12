@@ -1,4 +1,5 @@
-// Логотип бренда: приём файла, приведение к виду, который годится на тёмный слайд.
+// Логотип бренда (и своя иконка преимущества в CTA): приём файла, приведение к виду, который
+// годится на тёмный слайд.
 //
 // Раньше приёмник требовал готовый PNG с прозрачным фоном 400–2000 точек и не больше 2 МБ —
 // и не пропускал ни одного из 25 файлов собственного брендбука AXIS: 21 из них — логотип
@@ -17,10 +18,38 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
 import {HttpError, getBrand, saveBrand, workspaceDir, workspaceUrl} from './store.mjs';
+import {serverLog} from './log.mjs';
+
+const log = serverLog('brand');
 
 // Своя папка у каждой компании: ниже прежние логотипы удаляются всей папкой, и в общей
 // папке новый логотип одного клиента стёр бы логотипы всех остальных
 export const brandDir = () => path.join(workspaceDir(), 'brand');
+
+const LOGO_KEYS = ['logoStacked', 'logoHorizontal', 'sign'];
+
+/**
+ * Бренд для рендера: файлы, которых нет на диске, убираем из темы.
+ *
+ * В настройках может остаться ссылка на файл, которого уже нет: превью на копии прода
+ * получает базу без файлов, том мог пропасть. Remotion на ненайденной картинке роняет
+ * весь рендер («Error loading image with src…»). Пропавший логотип становится пустой
+ * строкой — на слайде название компании текстом; прочие файлы (иконка) — встроенными.
+ */
+export const brandForRender = async (theme) => {
+  if (!theme?.assets) return theme;
+  const own = `${workspaceUrl()}/brand/`;
+  const dir = brandDir();
+  const entries = await Promise.all(Object.entries(theme.assets).map(async ([k, v]) => {
+    if (typeof v !== 'string' || !v.startsWith(own)) return [k, v];
+    const file = path.resolve(dir, v.slice(own.length));
+    const exists = file.startsWith(dir + path.sep) && await fs.access(file).then(() => true, () => false);
+    if (exists) return [k, v];
+    log.warn('asset.missing', {note: 'файл бренда не найден — рендер без него', key: k, url: v});
+    return LOGO_KEYS.includes(k) ? [k, ''] : null;
+  }));
+  return {...theme, assets: Object.fromEntries(entries.filter(Boolean))};
+};
 
 /** Условия — одним объектом: интерфейс показывает эти же числа, разойтись они не могут */
 export const LOGO_RULES = {
@@ -33,6 +62,19 @@ export const LOGO_RULES = {
   // Больше 2000 смысла нет — только вес и время; уменьшаем сами
   maxSide: 2000,
 };
+
+/**
+ * Своя иконка у преимущества в CTA (рядом с «Работаем без комиссии»). Та же обработка, что
+ * у логотипа, — владелец 11.10: «адаптируй так же, как лого». Рисуется 100 точек по ширине,
+ * поэтому порог мельче и потолок ниже: больше 800 — только вес
+ */
+export const ICON_RULES = {...LOGO_RULES, maxBytes: 5 * 1024 * 1024, minSide: 96, maxSide: 800};
+// Встроенная иконка — к ней возвращает «Вернуть стандартную»
+export const DEFAULT_ICON = 'brand/icon-handshake.png';
+
+// Слова для сообщений: одна обработка на логотип и иконку, а человек должен читать про своё
+const LOGO_WORDS = {it: 'логотип', its: 'логотипа', It: 'Логотип'};
+const ICON_WORDS = {it: 'иконка', its: 'иконки', It: 'Иконка'};
 
 // ——— Обработка ———
 
@@ -163,11 +205,13 @@ const visibleLuma = (data) => {
  * Файл → готовый логотип. Возвращает два PNG: clean (фон убран, поля обрезаны) и raw
  * (только обрезан и уменьшен — на случай, если автоматика ошиблась и человек хочет
  * оставить фон как был), и что было сделано — для подписи в интерфейсе.
+ * RULES и W — пороги и слова для сообщений: та же обработка готовит и свою иконку
+ * преимущества (ICON_RULES, ICON_WORDS), а человек должен читать «иконка», не «логотип».
  */
-export const processLogo = async (buffer) => {
+export const processLogo = async (buffer, RULES = LOGO_RULES, W = LOGO_WORDS) => {
   if (!buffer?.length) throw new HttpError(400, 'Файл не пришёл');
-  if (buffer.length > LOGO_RULES.maxBytes) {
-    throw new HttpError(400, `Файл ${(buffer.length / 1024 / 1024).toFixed(1)} МБ — больше ${LOGO_RULES.maxBytes / 1024 / 1024} МБ`);
+  if (buffer.length > RULES.maxBytes) {
+    throw new HttpError(400, `Файл ${(buffer.length / 1024 / 1024).toFixed(1)} МБ — больше ${RULES.maxBytes / 1024 / 1024} МБ`);
   }
   let meta;
   try {
@@ -175,20 +219,22 @@ export const processLogo = async (buffer) => {
   } catch {
     throw new HttpError(400, 'Это не картинка или файл повреждён');
   }
-  if (!LOGO_RULES.formats.includes(meta.format)) {
+  if (!RULES.formats.includes(meta.format)) {
     throw new HttpError(400, `Нужен PNG, JPG, WebP или SVG, а это ${meta.format?.toUpperCase() || 'неизвестный формат'}`);
   }
 
   const long = Math.max(meta.width ?? 0, meta.height ?? 0);
   // SVG — вектор: рисуем сразу в нужном размере, мелкого у него не бывает
   const isSvg = meta.format === 'svg';
-  if (!isSvg && long < LOGO_RULES.minSide) {
-    throw new HttpError(400, `Слишком мелкий: ${meta.width}×${meta.height}, нужно от ${LOGO_RULES.minSide} точек по длинной стороне — растянутый логотип на ролике будет мыльным`);
+  if (!isSvg && long < RULES.minSide) {
+    throw new HttpError(400, W === LOGO_WORDS
+      ? `Слишком мелкий: ${meta.width}×${meta.height}, нужно от ${RULES.minSide} точек по длинной стороне — растянутый логотип на ролике будет мыльным`
+      : `Слишком мелкая: ${meta.width}×${meta.height}, нужно от ${RULES.minSide} точек по длинной стороне — растянутая иконка на ролике будет мыльной`);
   }
-  const density = isSvg ? Math.min(2400, Math.max(72, 72 * LOGO_RULES.maxSide / Math.max(1, long))) : undefined;
+  const density = isSvg ? Math.min(2400, Math.max(72, 72 * RULES.maxSide / Math.max(1, long))) : undefined;
   const {data, info} = await sharp(buffer, {density, limitInputPixels: 50_000_000})
     .rotate()
-    .resize(LOGO_RULES.maxSide, LOGO_RULES.maxSide, {fit: 'inside', withoutEnlargement: !isSvg})
+    .resize(RULES.maxSide, RULES.maxSide, {fit: 'inside', withoutEnlargement: !isSvg})
     .ensureAlpha()
     .raw()
     .toBuffer({resolveWithObject: true});
@@ -202,7 +248,7 @@ export const processLogo = async (buffer) => {
   if (!transparent) {
     const res = removeFlatBackground(data, width, height);
     if (!res) {
-      throw new HttpError(400, 'Фон неоднородный — похоже на фото или текстуру. Нужен логотип на прозрачном или однотонном фоне');
+      throw new HttpError(400, `Фон неоднородный — похоже на фото или текстуру. Нужен ${W.it} на прозрачном или однотонном фоне`);
     }
     clean = res.data;
     backgroundRemoved = true;
@@ -212,7 +258,7 @@ export const processLogo = async (buffer) => {
   // Меньше полпроцента кадра — после удаления фона от логотипа ничего не осталось:
   // обычно это белый логотип на белом фоне
   if (!box.visible || box.visible < width * height * 0.005) {
-    throw new HttpError(400, 'После удаления фона ничего не осталось — логотип того же цвета, что и фон. Нужен файл, где логотип отличается от фона');
+    throw new HttpError(400, `После удаления фона ничего не осталось — ${W.it} того же цвета, что и фон. Нужен файл, где ${W.it} отличается от фона`);
   }
   const toPng = (raw) => sharp(raw, {raw: {width, height, channels: 4}})
     .extract({left: box.left, top: box.top, width: box.width, height: box.height})
@@ -223,15 +269,15 @@ export const processLogo = async (buffer) => {
 
   const notes = [];
   if (isSvg) notes.push('SVG переведён в PNG');
-  if (long > LOGO_RULES.maxSide && !isSvg) notes.push(`уменьшен с ${meta.width}×${meta.height}`);
+  if (long > RULES.maxSide && !isSvg) notes.push(`уменьшен с ${meta.width}×${meta.height}`);
   if (backgroundRemoved) notes.push('фон убран');
   if (box.width < width * 0.9 || box.height < height * 0.9) notes.push('пустые поля обрезаны');
   const warnings = [];
   const luma = visibleLuma(clean);
-  if (luma.mean < 0.18) warnings.push('логотип тёмный — на тёмном фоне слайда его будет плохо видно. Нужен вариант для тёмного фона');
+  if (luma.mean < 0.18) warnings.push(`${W.it} тёмн${W === LOGO_WORDS ? 'ый' : 'ая'} — на тёмном фоне слайда ${W === LOGO_WORDS ? 'его' : 'её'} будет плохо видно. Нужен вариант для тёмного фона`);
   // Порог 12% подобран на брендбуке AXIS: у логотипов для тёмного фона тёмного не больше
   // 8,6% (тени медных иконок, сглаженный край), у вариантов для светлого фона — от 28%
-  else if (luma.darkShare > 0.12) warnings.push('часть логотипа тёмная и на тёмном слайде пропадёт — похоже, это вариант для светлого фона');
+  else if (luma.darkShare > 0.12) warnings.push(`часть ${W.its} тёмная и на тёмном слайде пропадёт — похоже, это вариант для светлого фона`);
   return {clean: cleanPng, raw: rawPng, width: box.width, height: box.height, notes, warnings};
 };
 
@@ -289,5 +335,63 @@ export const setLogoVariant = async (variant) => {
   if (!exists) throw new HttpError(409, variant === 'raw' ? 'У этого логотипа фон не убирался — возвращать нечего' : 'Файл логотипа пропал — загрузите заново');
   const url = `${own}${name}`;
   await setLogo(url);
+  return {url};
+};
+
+// ——— Иконка преимущества ———
+
+// Иконка — один файл бренда (assets.iconHandshake); логотип и прочие файлы не трогаем
+const setIcon = async (url) => {
+  const brand = await getBrand();
+  await saveBrand({...brand, assets: {...brand.assets, iconHandshake: url}});
+};
+
+/**
+ * Своя иконка у преимущества в CTA: как у логотипа — оба варианта (фон убран и как был),
+ * имя со временем (кэш браузера и рендера), прежние файлы иконки удаляются
+ */
+export const saveIcon = async (buffer) => {
+  const icon = await processLogo(buffer, ICON_RULES, ICON_WORDS);
+  const dir = brandDir();
+  await fs.mkdir(dir, {recursive: true});
+  const stamp = Date.now().toString(36);
+  const name = `icon-${stamp}.png`;
+  await fs.writeFile(path.join(dir, name), icon.clean);
+  if (icon.raw) await fs.writeFile(path.join(dir, `icon-${stamp}-raw.png`), icon.raw);
+  for (const f of await fs.readdir(dir)) {
+    if (f.startsWith('icon-') && !f.startsWith(`icon-${stamp}`)) await fs.rm(path.join(dir, f), {force: true}).catch(() => {});
+  }
+  const url = `${workspaceUrl()}/brand/${name}`;
+  await setIcon(url);
+  return {
+    url, width: icon.width, height: icon.height, bytes: icon.clean.length,
+    notes: icon.notes, warnings: icon.warnings, hasRaw: Boolean(icon.raw),
+  };
+};
+
+/**
+ * Вариант иконки: 'clean' — фон убран, 'raw' — как загружена, 'default' — встроенное
+ * рукопожатие. Свой файл при возврате к встроенной удаляем: держать его незачем, а
+ * «вернуть свою» — это загрузить заново. Спрятать иконку — галочка в «Реклама авто»
+ */
+export const setIconVariant = async (variant) => {
+  if (variant === 'default') {
+    await setIcon(DEFAULT_ICON);
+    const dir = brandDir();
+    for (const f of await fs.readdir(dir).catch(() => [])) {
+      if (f.startsWith('icon-')) await fs.rm(path.join(dir, f), {force: true}).catch(() => {});
+    }
+    return {url: DEFAULT_ICON};
+  }
+  const brand = await getBrand();
+  const current = brand.assets?.iconHandshake ?? '';
+  const own = `${workspaceUrl()}/brand/`;
+  const m = current.startsWith(own) && /^icon-([a-z0-9]+)(-raw)?\.png$/.exec(current.slice(own.length));
+  if (!m) throw new HttpError(409, 'Сначала загрузите иконку');
+  const name = variant === 'raw' ? `icon-${m[1]}-raw.png` : `icon-${m[1]}.png`;
+  const exists = await fs.access(path.join(brandDir(), name)).then(() => true, () => false);
+  if (!exists) throw new HttpError(409, variant === 'raw' ? 'У этой иконки фон не убирался — возвращать нечего' : 'Файл иконки пропал — загрузите заново');
+  const url = `${own}${name}`;
+  await setIcon(url);
   return {url};
 };

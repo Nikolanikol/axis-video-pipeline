@@ -5,10 +5,12 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Loading} from '../Loading';
 import {currencySign} from '../../src/shared/blocks';
 import {autoPickPhotos, lotFieldsFromCar} from '../../src/shared/lotFromCar';
-import {FORMATS, fmt, getFormat, totalInCurrency} from '../../src/shared/model';
+import {sourceNote} from '../../src/shared/encarLink.js';
+import {FORMATS, fmt, getFormat, lotTotal} from '../../src/shared/model';
 import {marketFromProfile} from '../../src/shared/profile';
+import {useTodayMarket} from '../rates';
 import type {Market} from '../../src/shared/types';
-import {api, LotEntry} from '../api';
+import {api, errorText, LotEntry} from '../api';
 import {useConfig} from '../config';
 import {LotForm} from '../LotForm';
 import {EncarImport} from './EncarImport';
@@ -186,7 +188,7 @@ export const LotTool: React.FC = () => {
       setStage({step: 0});
       const car = await api.lookupCar(link);
       // Эта машина уже есть — открываем её, а не плодим второй лот с теми же фото
-      const known = lots.find((l) => l.note?.trim() === `Encar ${car.id}`);
+      const known = lots.find((l) => l.note?.trim() === sourceNote(car.id));
       if (known) { await selectLot(known.id); setStage(null); return; }
       const {hookTagline, ...fields} = lotFieldsFromCar(car, profile.language);
       const rate = await api.usdKrw().catch(() => null);
@@ -196,7 +198,11 @@ export const LotTool: React.FC = () => {
       // Лот появляется сразу с полями, фото догружаются следом: превью и название видны,
       // пока фото качаются, — человек видит, что дело идёт
       const created = await createFromCar({
-        ...fields, format, note: `Encar ${car.id}`, carPriceUsd: null, krwPerUsd: rate?.krwPerUsd ?? null,
+        // carPriceUsd — из fields: у Encar null (цена в вонах), у машины из Китая — доллары che168
+        ...fields, format, note: sourceNote(car.id), krwPerUsd: rate?.krwPerUsd ?? null,
+        // Курс валюты компании (₽, ₸…) — сразу в объявление: дальше клиент правит его сам,
+        // закладывая маржу, и цена ролика не поплывёт на следующий день вместе с биржей
+        ...(market.krwPerUnitToday ? {krwPerUnit: market.krwPerUnitToday, fxCurrency: market.currency} : {}),
         ...(hookTagline ? {texts: {hookTagline}} : {}),
       }, []);
       if (urls.length) {
@@ -205,7 +211,7 @@ export const LotTool: React.FC = () => {
       }
     } catch (e) {
       // Ошибку показываем здесь же, под ссылкой: человек смотрит сюда, а не в шапку
-      setQuickError(e instanceof Error ? e.message : String(e));
+      setQuickError(errorText(e));
     } finally { setStage(null); }
   };
   const chooseFormat = (id: string) => { lastFormat.set(id); editLot({format: id}); };
@@ -259,15 +265,19 @@ export const LotTool: React.FC = () => {
   };
 
   // Данные для превью — из профиля клиента (тот же мост, что и рендер), а не из рынка лота
-  const market = useMemo(() => marketFromProfile(profile, config.copy) as Market, [profile, config.copy]);
+  // С курсом валюты компании на сегодня — как у рендера: цена в карточке и превью та же, что в ролике
+  const market = useTodayMarket(useMemo(() => marketFromProfile(profile, config.copy) as Market, [profile, config.copy]));
   const format = getFormat(lot?.format);
-  const input = useMemo(() => (lot ? {lot, market, theme: brand} : null), [lot, market, brand]);
+  // Название компании — из профиля, как у рендера (theme.name = market.name в server/store.mjs).
+  // В бренде лежит своё старое name, и превью показывало его (на превью PR 13 — «QWEDSAZXC»),
+  // хотя в готовом ролике всё верно
+  const input = useMemo(() => (lot ? {lot, market, theme: {...brand, name: market.name}} : null), [lot, market, brand]);
   const savedProfile = config.profiles.find((p) => p.id === profile.id);
   const unsavedSettings = profile !== savedProfile || brand !== config.brand;
 
   // Цена в карточке — та же, что в ролике: валюта профиля, фрахт
   const priceOf = (l: LotEntry) => {
-    const total = totalInCurrency({...l, freightUsd: l.freightUsd ?? market.freightUsd, currency: market.currency});
+    const total = lotTotal(l, market);
     return total === null ? '' : `${fmt(total)} ${currencySign(market.currency)}`;
   };
 

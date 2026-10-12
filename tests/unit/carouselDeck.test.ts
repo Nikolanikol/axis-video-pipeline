@@ -24,8 +24,16 @@ describe('форматы карусели', () => {
     expect([by.classic.width, by.classic.height]).toEqual([1080, 1920]);
   });
 
-  it('история во всех форматах; на проде её убирают — слайдов на один меньше', () => {
+  // «Разворот» с 12.10 — со слайдом цены вместо истории (тест Дмитрия на превью PR 13): шесть
+  // слайдов 4:5 не вмещают и то и другое, а цена клиенту важнее
+  it('история во всех форматах, кроме «Разворота»; на проде её убирают — слайдов на один меньше', () => {
     for (const f of CAROUSEL_FORMATS) {
+      if (f.id === 'spread') {
+        expect(f.slides).not.toContain('history');
+        expect(f.slides).toContain('price');
+        expect(carouselSlides(f.id, false)).toEqual(f.slides);
+        continue;
+      }
       expect(f.slides, f.id).toContain('history');
       expect(carouselSlides(f.id, false)).toHaveLength(f.slides.length - 1);
     }

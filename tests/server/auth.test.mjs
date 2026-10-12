@@ -255,8 +255,13 @@ suite('вход и кабинеты SMMAKER', () => {
     });
 
     it('менеджер видит лидов с телефонами и начисляет докупку без подписки', async () => {
-      const clients = (await m.call('GET', '/api/admin/clients')).body;
+      const clients = (await m.call('GET', '/api/admin/clients')).body.rows;
       expect(clients.find((c) => c.id === wsA)).toMatchObject({person: 'Анна', phone: '+821011112222', credits: 7, paid_krw: 0, plan_until: null});
+      // Телефон ищется в том виде, как его набирают внутри страны: 010-… вместо +8210…
+      const found = (await m.call('GET', '/api/admin/clients?q=010-1111-2222')).body;
+      expect(found.rows.map((c) => c.id)).toEqual([wsA]);
+      expect(found.counts.all).toBe(1);
+      expect((await m.call('GET', '/api/admin/clients?filter=trial')).body.rows.some((c) => c.id === wsA)).toBe(true);
       const res = await m.call('POST', `/api/admin/clients/${wsA}/packs`, {packId: 'start', note: 'перевод 123'});
       expect(res.status).toBe(200);
       expect(res.body.credits).toBe(17);
@@ -291,7 +296,7 @@ suite('вход и кабинеты SMMAKER', () => {
       expect(topup.expiresAt).toBe(topped.subscription.until);
 
       // Менеджеру видно, у кого какая подписка и до какого числа; оплачено — всё вместе
-      const row = (await m.call('GET', '/api/admin/clients')).body.find((c) => c.id === wsA);
+      const row = (await m.call('GET', '/api/admin/clients')).body.rows.find((c) => c.id === wsA);
       expect(row).toMatchObject({plan_title: 'Базовый', paid_krw: 19000 + 69000 + 49000 + 44000});
       expect(new Date(row.plan_until).toISOString()).toBe(new Date(topped.subscription.until).toISOString());
     });
@@ -314,10 +319,11 @@ suite('вход и кабинеты SMMAKER', () => {
       expect(saved.body).toMatchObject({price_krw: 45000, active: false});
       expect((await a.call('GET', '/api/account/offer')).body.packs.map((p) => p.id)).not.toContain('start');
       expect((await owner.call('POST', `/api/admin/clients/${wsA}/packs`, {packId: 'start'})).status).toBe(404);
-      const clients = (await owner.call('GET', '/api/admin/clients')).body;
+      // Список клиентов с 11.10 — страницами (listClients): строки в .rows
+      const clients = (await owner.call('GET', '/api/admin/clients')).body.rows;
       expect(clients.find((c) => c.id === wsA).paid_krw).toBe(19000 + 69000 + 49000 + 44000);
       // Проданная докупка осталась по цене продажи, а не по новой
-      const rows = (await a.call('GET', '/api/account/ledger')).body;
+      const rows = (await a.call('GET', '/api/account/ledger')).body.rows;
       const sold = rows.find((r) => r.note.includes('перевод 123'));
       expect(sold).toMatchObject({kind: 'grant', delta: 10, source: 'pack', price_krw: 19000});
       expect(sold.note).toMatch(/\+10 кредитов.*перевод 123/);
@@ -399,6 +405,8 @@ suite('вход и кабинеты SMMAKER', () => {
 
     it('сначала тратятся те, что сгорают раньше; сгоревшие не считаются, возврат — в свою партию', async () => {
       // Бонус на год поверх бесплатных (2 кр., сгорят через 30 дней)
+      // Без причины подарок не начисляется: иначе в истории клиента не понять, откуда кредиты
+      expect((await owner.call('POST', `/api/admin/clients/${wsB}/bonus`, {credits: 5, note: ' '})).status).toBe(400);
       const bonus = await owner.call('POST', `/api/admin/clients/${wsB}/bonus`, {credits: 5, note: 'подарок'});
       expect(bonus.body.credits).toBe(7);
       const c1 = await billing.charge({workspaceId: wsB, pipeline: 'ads', jobId: 'fifo-1'});
@@ -414,12 +422,13 @@ suite('вход и кабинеты SMMAKER', () => {
     });
 
     it('журнал в кабинете — построчно, новые сверху, у начислений срок', async () => {
-      const rows = (await b.call('GET', '/api/account/ledger')).body;
+      // С 12.10 журнал в кабинете — страницами (ledgerPage): строки в .rows
+      const rows = (await b.call('GET', '/api/account/ledger')).body.rows;
       expect(rows[0].kind).toBe('refund');
       expect(rows.at(-1)).toMatchObject({kind: 'grant', delta: 7, source: 'signup'});
       expect(rows.at(-1).expires_at).toBeTruthy();
       // Чужой журнал не виден: у владельца своя компания
-      expect((await owner.call('GET', '/api/account/ledger')).body.some((r) => r.job_id === 'job-1')).toBe(false);
+      expect((await owner.call('GET', '/api/account/ledger')).body.rows.some((r) => r.job_id === 'job-1')).toBe(false);
     });
   });
 

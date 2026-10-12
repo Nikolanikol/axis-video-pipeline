@@ -1,5 +1,4 @@
 // API сервера (без Vite и без запуска) — отдельно, чтобы тестировать
-import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import express from 'express';
@@ -12,8 +11,8 @@ import {
 import {reviewStoryboard} from '../src/shared/timeline.js';
 import {getFormat, listFormats, storyboardFrames} from './formats.mjs';
 import {addPhoto, applyBlur, ownFile, photoInfo, removePhoto, stemOf} from './photos.mjs';
-import {checkPhotoUrls, downloadPhoto, lookupCar} from './encar.mjs';
-import {usdKrw} from './rates.mjs';
+import {checkPhotoUrls, downloadPhoto, lookupCar} from './carLink.mjs';
+import {rates, usdKrw} from './rates.mjs';
 import {makeZip} from './zip.mjs';
 import {previewId} from './db/index.mjs';
 import {cancelJob, deleteJob, enqueue, getJob, listJobs, retryJob} from './renderer.mjs';
@@ -24,20 +23,31 @@ import {
 import {apiSettings, resolveSpeaker, voiceConfig} from '../src/shared/voices.js';
 import {hasKey, hasVoice, synthesize} from './speech.mjs';
 import {hasSeparator} from './ambience.mjs';
-import {carouselFormats, carouselsDir, buildCarousel, deleteCarousel, listCarousels, slideFileName} from './carousel.mjs';
-import {LOGO_RULES, saveLogo, setLogoVariant} from './brand.mjs';
-import {balanceOf, billed, creditCosts, ledgerOf, signupCredits} from './billing.mjs';
+import {clientCarouselFormats, carouselsDir, buildCarousel, deleteCarousel, listCarousels, repriceCarousel, slideFileName} from './carousel.mjs';
+import {ICON_RULES, LOGO_RULES, brandForRender, saveIcon, saveLogo, setIconVariant, setLogoVariant} from './brand.mjs';
+import {balanceOf, billed, creditCosts, ledgerOf, ledgerPage, signupCredits} from './billing.mjs';
 import {parseCarouselSource} from '../src/shared/kmotorsLot.js';
 import {PALETTE_KEYS, isHex} from '../src/shared/contrast.js';
 import {withoutMusic} from '../src/shared/nomusic.js';
 import {
-  dropSession, grantBonus, grantPack, listClients, listPacks, listStaff, login, register, requestReset, resetPassword,
-  savePack, sendVerification, setRole, verifyCode, verifyLink,
+  accountOf, cancelEmailChange, requestDeletion, restoreAccount, changePassword, closeOtherSessions, closeSession, confirmEmailChange, dropSession,
+  grantBonus, grantPack, listClients, listPacks, listSessions, listStaff, login, register, requestEmailChange,
+  requestReset, resetPassword, savePack, sendVerification, setRole, updateAccount, verifyCode, verifyLink,
 } from './accounts.mjs';
 import {
   authEnabled, clearSessionCookie, guardData, loginLimiter, readSessionMw, registerLimiter, requireAdmin, requireCredits,
   requireStaff, requireUser, sessionToken, setSessionCookie,
 } from './session.mjs';
+import {thumbsHandler} from './thumbs.mjs';
+import {handleUpdate, supportBotHandle, supportEnabled, supportLink, webhookAuthorized} from './support.mjs';
+import {
+  checkoutLimiter, handleNotification, kassaHealth, notifyLimiter, paymentEvents, paymentMethods, paymentOf, paymentsOf, publicOrigin, startCheckout,
+} from './payments.mjs';
+import {isCoreError} from '../cores/kit/errors.mjs';
+import {requestIdMw, serverLog} from './log.mjs';
+import {clientErrorHandler} from './clientErrors.mjs';
+
+const log = serverLog('api');
 
 // Медиа с путями /data/... браузер рендера берёт по полному адресу этого сервера
 const absolute = (origin, url) => (url && url.startsWith('/') ? `${origin}${url}` : url);
@@ -55,6 +65,10 @@ const themeForRender = (origin, theme) => (theme?.assets
     Object.entries(theme.assets).map(([k, v]) => [k, absolute(origin, v)]))}
   : theme);
 const withAbsolutePhotos = (lot, origin) => lot && {...lot, photos: lot.photos.map((p) => absolute(origin, p))};
+
+// Откуда вход: браузер и адрес — для списка «где выполнен вход» в кабинете.
+// req.ip — с учётом trust proxy ниже, то есть адрес человека, а не Traefik
+const clientMeta = (req) => ({userAgent: req.get('user-agent') ?? '', ip: req.ip ?? ''});
 
 // Обработчик выполняется от имени компании из сессии. Контекст ставим заново здесь, а не
 // полагаемся на общий: приёмник файлов (multer) зовёт следующий шаг из событий потока,
@@ -94,59 +108,43 @@ const checkBrand = (theme) => {
 };
 
 // photoOrigin — адрес этого сервера: браузер рендера берёт по нему фото лотов (/data/...)
-/**
- * Сравнение секретов за постоянное время: обычное === на строках подсказывает длину и
- * первые совпавшие символы по времени ответа. Для пароля это ни к чему.
- */
-const sameSecret = (a, b) => {
-  const ab = Buffer.from(String(a));
-  const bb = Buffer.from(String(b));
-  return ab.length === bb.length && crypto.timingSafeEqual(ab, bb);
-};
 
-/**
- * Вход по паролю (HTTP Basic Auth), включается переменными окружения.
- *
- * Заданы BASIC_AUTH_USER и BASIC_AUTH_PASS — сервер требует вход на всё, кроме проверки
- * живости. Не заданы — работает без пароля: так удобно на Mac, где инструмент и так слушает
- * только localhost. На сервере их задали, когда у инструмента появился публичный домен, а
- * своего входа ещё не было: без заслонки любой мог бы запускать рендеры — дорогие и рядом
- * с боевым сайтом.
- *
- * Со входом SMMAKER (включается с DATABASE_URL, см. session.mjs) заслонка лишняя: она
- * независима от него и снимается, когда вход выложен на прод. Обе сразу — браузер спросит
- * пароль дважды: сначала своё окно Basic Auth, потом экран входа.
- *
- * Сделано в приложении, а не в прокси: Coolify этой версии не даёт удобно править метки
- * Traefik, а так защита в нашем коде и переживает любой передеплой.
- */
-const basicAuth = (user, pass) => (req, res, next) => {
-  // Проверка живости ходит изнутри контейнера без заголовков — её пропускаем, иначе
-  // health-check вечно получал бы 401 и Coolify считал бы контейнер мёртвым
-  if (req.path === '/healthz') return next();
-  const [scheme, encoded] = (req.headers.authorization || '').split(' ');
-  if (scheme === 'Basic' && encoded) {
-    const [u, p] = Buffer.from(encoded, 'base64').toString().split(':');
-    if (sameSecret(u, user) && sameSecret(p ?? '', pass)) return next();
+// Контакты платформы и продавец (витрина, оферта, кабинет). Основа — config/platform.json, а каналы
+// связи перекрываются переменными окружения: номер или ник меняется в Coolify без правки кода и PR
+// (владелец 12.10: «чтобы я мог быстро»). Пустая переменная не перекрывает — значит «не задана»
+const CONTACT_ENV = {
+  whatsapp: 'SMMAKER_SALES_WHATSAPP',
+  telegram: 'SMMAKER_CONTACT_TELEGRAM',
+  email: 'SMMAKER_CONTACT_EMAIL',
+  instagram: 'SMMAKER_CONTACT_INSTAGRAM',
+};
+const platformInfo = async () => {
+  const {_note, legal = {}, ...contacts} = await readJson(path.join(CONFIG_DIR, 'platform.json'));
+  for (const [key, name] of Object.entries(CONTACT_ENV)) {
+    const v = process.env[name]?.trim();
+    if (v) contacts[key] = v;
   }
-  res.set('WWW-Authenticate', 'Basic realm="KOK", charset="UTF-8"').status(401).send('Нужен вход');
+  // Telegram не задан руками — ведём в бота поддержки (владелец 12.10: «лучше всех вести в Telegram»)
+  if (!contacts.telegram) contacts.telegram = (await supportBotHandle()) ?? '';
+  return {contacts, legal};
 };
 
 export const createApp = ({photoOrigin}) => {
   const app = express();
 
-  // Заслонку ставим самой первой: до разбора тела и до любого маршрута, чтобы неавторизованный
-  // запрос не дошёл ни до API, ни до статики
-  const authUser = process.env.BASIC_AUTH_USER;
-  const authPass = process.env.BASIC_AUTH_PASS;
-  if (authUser && authPass) app.use(basicAuth(authUser, authPass));
+  // Заслонки Basic Auth больше нет (снята по слову владельца 11.10): её заменил свой вход —
+  // API требует сессию, файлы /data видит только своя компания (guardData). Она ещё и отвечала
+  // 401 браузеру рендера на его же запросы к /data по 127.0.0.1 — фото и логотип не грузились.
+  // BASIC_AUTH_USER/PASS в окружении теперь ни на что не влияют
 
-  // Живость: без пароля и без разбора тела, отвечает раньше заслонки по пути выше
+  // Живость: без разбора тела
   app.get('/healthz', (_req, res) => res.json({ok: true}));
 
   // За Traefik на сервере: верим его X-Forwarded-Proto (для Secure у cookie) и адресу клиента
   // (для ограничения попыток входа) — но только от прокси из внутренней сети, не от кого угодно
   app.set('trust proxy', 'loopback, uniquelocal');
+  // Номер запроса — самым первым: он нужен и ошибке разбора тела, и журналу всех шагов ниже
+  app.use(requestIdMw);
   app.use(express.json({limit: '2mb'}));
   app.use(readSessionMw);
   const api = express.Router();
@@ -162,9 +160,9 @@ export const createApp = ({photoOrigin}) => {
       balance: req.ws ? await balanceOf(req.ws) : null,
     });
   })().catch(next));
-  api.post('/auth/login', loginLimiter, (req, res, next) => login(req.body ?? {})
+  api.post('/auth/login', loginLimiter, (req, res, next) => login(req.body ?? {}, clientMeta(req))
     .then(({token}) => { setSessionCookie(req, res, token); res.json({ok: true}); }).catch(next));
-  api.post('/auth/register', registerLimiter, (req, res, next) => register(req.body ?? {})
+  api.post('/auth/register', registerLimiter, (req, res, next) => register(req.body ?? {}, clientMeta(req))
     .then(({token}) => { setSessionCookie(req, res, token); res.json({ok: true}); }).catch(next));
   // Подтверждение почты: код — из кабинета (нужна сессия), ссылка — с любого устройства.
   // Ссылка из письма открывает страницу приложения, а та шлёт POST: GET-ссылку почтовые
@@ -182,7 +180,10 @@ export const createApp = ({photoOrigin}) => {
   // Сброс пароля: письмо со ссылкой; по ссылке — новый пароль и сразу вход
   api.post('/auth/forgot', loginLimiter, (req, res, next) => requestReset({email: req.body?.email})
     .then((r) => res.json(r)).catch(next));
-  api.post('/auth/reset', loginLimiter, (req, res, next) => resetPassword({token: req.body?.token, password: req.body?.password})
+  api.post('/auth/reset', loginLimiter, (req, res, next) => resetPassword({token: req.body?.token, password: req.body?.password}, clientMeta(req))
+    .then(({token}) => { setSessionCookie(req, res, token); res.json({ok: true}); }).catch(next));
+  // Ссылка «восстановить» из письма об удалении: аккаунт снова открыт, и сразу вход
+  api.post('/auth/restore', loginLimiter, (req, res, next) => restoreAccount({token: req.body?.token}, clientMeta(req))
     .then(({token}) => { setSessionCookie(req, res, token); res.json({ok: true}); }).catch(next));
   api.post('/auth/logout', (req, res, next) => Promise.resolve(authEnabled() ? dropSession(sessionToken(req)) : null)
     .then(() => { clearSessionCookie(res); res.json({ok: true}); }).catch(next));
@@ -192,44 +193,101 @@ export const createApp = ({photoOrigin}) => {
   // сколько стоит ролик и карусель и сколько стоят тарифы. Контакты продаж — для «написать
   // нам». Из пакетов отдаём только то, что и так показывает кабинет: название, кредиты, цену
   api.get('/public/offer', (_req, res, next) => (async () => {
-    const {_note, ...contacts} = await readJson(path.join(CONFIG_DIR, 'platform.json'));
-    const whatsapp = process.env.SMMAKER_SALES_WHATSAPP?.trim();
+    const {contacts, legal} = await platformInfo();
     const packs = authEnabled() ? await listPacks() : [];
     res.json({
       signup: await signupCredits(),
       costs: await creditCosts(),
-      contacts: whatsapp ? {...contacts, whatsapp} : contacts,
+      contacts,
+      legal,
       packs: packs.map(({id, title, credits, price_krw, valid_days, kind, sort}) => ({id, title, credits, price_krw, valid_days, kind, sort})),
       // Номер PR превью: метка «ТЕСТ» нужна и гостю — витрина открывается до входа, /config ещё закрыт
       preview: previewId(),
     });
   })().catch(next));
 
+  // Уведомление кассы об оплате — без сессии: приходит от NOWPayments, подлинность — по подписи
+  // и сверке с самой кассой (server/payments.mjs). Номер операции — в ответ: по нему её видно в логе
+  api.post('/payments/nowpayments/notify', notifyLimiter, (req, res, next) => {
+    handleNotification({body: req.body, signature: req.get('x-nowpayments-sig'), requestId: req.requestId}).then((r) => res.json(r)).catch(next);
+  });
+
+  // Поддержка в Telegram: сообщения клиентов и ответы из рабочей группы (server/support.mjs).
+  // Без сессии — подлинность по секрету в заголовке, который знаем только мы и Telegram.
+  // Отвечаем сразу: Telegram ждёт ответа и повторяет, а копирование в тему может занять секунды
+  api.post('/telegram/webhook', (req, res) => {
+    if (!webhookAuthorized(req.get('x-telegram-bot-api-secret-token'))) return res.status(401).end();
+    res.json({ok: true});
+    void handleUpdate(req.body);
+  });
+
+  // Ошибки из браузера (server/clientErrors.mjs) — без сессии: падает и витрина гостя, и экран входа
+  api.post('/client-error', clientErrorHandler);
+
   // Всё ниже — только после входа и от имени своей компании
   api.use(requireUser);
   api.use((req, _res, next) => { try { withWorkspace(wsOf(req), next); } catch (e) { next(e); } });
 
   // ——— Кабинет компании ———
-  api.get('/account/ledger', wrap((req) => (authEnabled() ? ledgerOf(req.ws) : [])));
+  api.get('/account/ledger', wrap((req) => (authEnabled() ? ledgerPage(req.ws, req.query.page)
+    : {rows: [], total: 0, page: 1, pages: 1, pageSize: 20})));
+  // Профиль и безопасность: только с базой — без неё нет ни людей, ни паролей
+  const account = express.Router();
+  account.use((req, _res, next) => next(authEnabled() ? undefined : new HttpError(400, 'Профиль работает только с базой')));
+  const who = (req) => ({userId: req.user.id, workspaceId: req.ws, sessionId: req.sessionId});
+  account.get('/profile', wrap((req) => accountOf(req.user.id, req.ws)));
+  account.put('/profile', wrap((req) => updateAccount({...who(req), name: req.body?.name, company: req.body?.company})));
+  // Всё, где проверяется текущий пароль, — под ограничением попыток: иначе вошедший на
+  // чужом ноутбуке перебирал бы пароль владельца, чтобы сменить почту
+  account.post('/password', loginLimiter, wrap((req) => changePassword({...who(req), current: req.body?.current, password: req.body?.password})));
+  account.post('/email', loginLimiter, wrap((req) => requestEmailChange({...who(req), password: req.body?.password, email: req.body?.email})));
+  account.post('/email/confirm', loginLimiter, wrap((req) => confirmEmailChange({...who(req), code: req.body?.code})));
+  account.delete('/email', wrap((req) => cancelEmailChange(who(req))));
+  account.get('/sessions', wrap((req) => listSessions(who(req))));
+  account.delete('/sessions/:id', wrap((req) => closeSession({...who(req), id: req.params.id})));
+  account.post('/sessions/close-others', wrap((req) => closeOtherSessions(who(req))));
+  // Удаление: пароль и название компании руками. Входы сброшены сервером — cookie тоже чистим
+  account.post('/delete', loginLimiter, (req, res, next) => requestDeletion({
+    ...who(req), password: req.body?.password, confirm: req.body?.confirm,
+  }).then((r) => { clearSessionCookie(res); res.json(r); }).catch(next));
   // Куда писать за пакетом и что в прайсе — на экран «кредиты закончились» и в кабинет.
   // WhatsApp продаж — из SMMAKER_SALES_WHATSAPP, если задан: номер менеджера меняется без
   // пересборки образа. Не задан — номер из config/platform.json
+  // «Написать в поддержку» из кабинета: ссылка на бота с одноразовым ключом — тема в группе сразу
+  // с компанией и контактами. url: null — поддержка не включена (Mac, превью)
+  api.post('/account/support-link', wrap((req) => supportLink({userId: req.user.id, workspaceId: req.ws})));
   api.get('/account/offer', wrap(async () => {
-    const {_note, ...contacts} = await readJson(path.join(CONFIG_DIR, 'platform.json'));
-    const whatsapp = process.env.SMMAKER_SALES_WHATSAPP?.trim();
+    const {contacts} = await platformInfo();
     return {
-      contacts: whatsapp ? {...contacts, whatsapp} : contacts,
+      contacts,
       packs: authEnabled() ? await listPacks() : [],
+      // Какие кассы включены: без ключей кнопки «Оплатить USDT» нет, остаётся менеджер
+      pay: paymentMethods(),
+      // Поддержка в Telegram включена — в кабинете есть «Написать в поддержку»
+      support: supportEnabled(),
     };
   }));
+  // Оплата тарифа: счёт у кассы → адрес страницы оплаты. Адрес возврата и уведомлений — тот,
+  // с которого пришёл клиент (у превью свой, см. startCheckout)
+  api.post('/payments/checkout', checkoutLimiter, wrap((req) => startCheckout({
+    workspaceId: req.ws, userId: req.user?.id, packId: req.body?.packId, origin: publicOrigin(req), requestId: req.requestId,
+  })));
+  account.get('/payments', wrap((req) => paymentsOf(req.ws)));
+  account.get('/payments/:id', wrap((req) => paymentOf(req.ws, req.params.id)));
+  // После /account/offer: проверка «нужна база» в роутере иначе закрыла бы и прайс
+  api.use('/account', account);
 
   // ——— Админка: лиды и пакеты — сотрудникам, прайс и роли — только владельцу ———
   const admin = express.Router();
   admin.use((req, _res, next) => next(authEnabled() ? undefined : new HttpError(400, 'Админка работает только с базой')));
   admin.use(requireStaff);
-  admin.get('/clients', wrap(() => listClients()));
+  admin.get('/clients', wrap((req) => listClients(req.query)));
   admin.get('/clients/:id/ledger', wrap((req) => ledgerOf(checkId(req.params.id))));
   admin.get('/packs', wrap(() => listPacks({all: true})));
+  // Журнал заказа оплаты: все уведомления кассы, сверки, отказы и тревоги — разбор спора и сбоя
+  admin.get('/payments/:id/events', wrap((req) => paymentEvents(req.params.id)));
+  // Жива ли касса и принимает ли ключ — первое, что смотреть, если оплаты не идут
+  admin.get('/payments/health', wrap(() => kassaHealth()));
   admin.post('/clients/:id/packs', wrap((req) => grantPack({
     workspaceId: checkId(req.params.id), packId: String(req.body?.packId ?? ''), note: req.body?.note, createdBy: req.user.id,
   })));
@@ -264,7 +322,7 @@ export const createApp = ({photoOrigin}) => {
     // (tests/unit/palettes.test.ts). Клиент выбирает палитру, а не восемь цветов по одному
     palettes: await readJson(path.join(CONFIG_DIR, 'palettes.json')),
     // Форматы карусели: размер кадра и список слайдов
-    carouselFormats: await carouselFormats(),
+    carouselFormats: await clientCarouselFormats(),
     // Спикеры озвучки: интерфейс показывает только тех, кто умеет выбранный язык
     voices: await voiceRegistry(),
     // Что доступно: распознавание речи включается ключом ElevenLabs в .env
@@ -287,6 +345,18 @@ export const createApp = ({photoOrigin}) => {
     if (!['clean', 'raw', 'none'].includes(variant)) throw new HttpError(400, 'Вариант — clean, raw или none');
     return {...(await setLogoVariant(variant)), brand: await getBrand()};
   }));
+  // Своя иконка у преимущества в CTA — та же обработка, что у логотипа, свой потолок (ICON_RULES)
+  const iconUpload = multer({storage: multer.memoryStorage(), limits: {fileSize: ICON_RULES.maxBytes, files: 1}});
+  api.post('/brand/icon', iconUpload.single('icon'), wrap(async (req) => {
+    const saved = await saveIcon(req.file?.buffer);
+    return {...saved, brand: await getBrand()};
+  }));
+  // clean — фон убран, raw — как загружена, default — встроенное рукопожатие
+  api.put('/brand/icon/variant', wrap(async (req) => {
+    const variant = String(req.body?.variant ?? '');
+    if (!['clean', 'raw', 'default'].includes(variant)) throw new HttpError(400, 'Вариант — clean, raw или default');
+    return {...(await setIconVariant(variant)), brand: await getBrand()};
+  }));
   // Рынки — платформенный реестр в config/, общий для всех: править может только владелец
   api.put('/markets/:id', requireAdmin, wrap(async (req) => {
     const {id: _ignored, ...market} = req.body;
@@ -306,6 +376,8 @@ export const createApp = ({photoOrigin}) => {
   api.post('/encar/lookup', wrap((req) => lookupCar(req.body?.link)));
   // Курс ₩ за $1 на сегодня (обновляется раз в сутки, см. server/rates.mjs)
   api.get('/rates/usd-krw', wrap(() => usdKrw()));
+  // Все курсы (единиц за $1) — шапка и пересчёт цены в валюту компании
+  api.get('/rates', wrap(() => rates()));
 
   api.get('/lots', wrap(() => listLots()));
   // Удалить лот вместе с фото и готовыми роликами — список лотов копится (владелец 30.09:
@@ -333,7 +405,7 @@ export const createApp = ({photoOrigin}) => {
     await fs.cp(lotPhotosDir(src.id), lotPhotosDir(created.id), {recursive: true});
     const from = `/lots/${src.id}/photos/`;
     const to = `/lots/${created.id}/photos/`;
-    const note = (data.note ?? '').replace(/^Encar (\d+)/, 'копия Encar $1') || 'копия';
+    const note = (data.note ?? '').replace(/^(Encar|che168|carsensor) ([A-Za-z]*\d+)/, 'копия $1 $2') || 'копия';
     return saveLot(created.id, {...data, photos: data.photos.map((p) => p.replace(from, to)), note});
   }));
   api.post('/lots', wrap((req) => createLot(req.body?.market ? {market: checkId(req.body.market)} : {})));
@@ -391,7 +463,7 @@ export const createApp = ({photoOrigin}) => {
     const lot = await getLot(req.params.id);
     const format = await getFormat(req.body?.format || lot.format);
     if (format.requires.includes('photos') && !lot.photos.length) throw new HttpError(400, 'Добавь хотя бы одно фото');
-    const [market, brand] = await Promise.all([renderMarket(), getBrand()]);
+    const [market, brand] = await Promise.all([renderMarket(), getBrand().then(brandForRender)]);
     const theme = {...brand, name: market.name};
     const title = [lot.brand, lot.model, lot.year].filter(Boolean).join(' ') || lot.id;
     // Музыка убрана из продукта: сохранённый в лоте трек в ролик не идёт (src/shared/nomusic.js)
@@ -445,7 +517,7 @@ export const createApp = ({photoOrigin}) => {
     if (review.source?.status !== 'ready') throw new HttpError(400, 'Видео ещё не готово');
     if (!review.segments.length) throw new HttpError(400, 'Добавь хотя бы один фрагмент');
     const lot = review.lotId ? await getLot(review.lotId).catch(() => null) : null;
-    const [market, brand] = await Promise.all([renderMarket(), getBrand()]);
+    const [market, brand] = await Promise.all([renderMarket(), getBrand().then(brandForRender)]);
     const theme = {...brand, name: market.name};
     const inputProps = {
       review: {
@@ -478,8 +550,9 @@ export const createApp = ({photoOrigin}) => {
     try {
       const src = parseCarouselSource(req.body?.link);
       // Лоты аукциона — источник владельца (решение 06.10): страницы kmotors разбираем для его
-      // каруселей, не как услугу клиентам. Без входа (локально) проверять некого
-      if (src.source !== 'encar' && req.user && !req.user.isStaff) {
+      // каруселей, не как услугу клиентам. Без входа (локально) проверять некого.
+      // Encar, che168 (Китай) и Carsensor (Япония) — для всех
+      if (!['encar', 'che168', 'carsensor'].includes(src.source) && req.user && !req.user.isStaff) {
         return next(new HttpError(403, 'Карусели по лотам аукционов пока доступны только сотрудникам'));
       }
       next();
@@ -489,6 +562,8 @@ export const createApp = ({photoOrigin}) => {
       jobId: `carousel-${req.ws}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
       note: String(req.body?.link ?? '').slice(0, 120)},
     () => buildCarousel(req.body?.link, {format: req.body?.format, seed: req.body?.seed}))));
+  // Пересобрать со своей ценой — бесплатно: та же машина, формат и вариант (repriceCarousel)
+  api.post('/carousels/:id/price', wrap((req) => repriceCarousel(checkId(req.params.id), req.body?.price)));
   api.get('/carousels', wrap(() => listCarousels()));
   api.delete('/carousels/:id', wrap((req) => deleteCarousel(checkId(req.params.id))));
   api.get('/carousels/:id/slide/:n/download', async (req, res, next) => {
@@ -539,13 +614,32 @@ export const createApp = ({photoOrigin}) => {
   });
 
   app.use('/api', api);
+  // Миниатюры для плашек — те же правила доступа, что у /data (server/thumbs.mjs)
+  app.use('/thumbs', guardData, thumbsHandler);
   app.use('/data', guardData, express.static(DATA_DIR, {fallthrough: false}));
+  // Единый ответ об ошибке (стандарт ошибок, 12.10). Наши ошибки (HttpError, ошибки ядер, разбор
+  // тела, размер файла) написаны для человека — их текст и показываем. Всё прочее — поломка у нас:
+  // наружу только «внутренняя ошибка» и код запроса, подробности — в журнал и тревогой в Telegram.
+  // Раньше клиент видел сырой текст исключения — вплоть до ошибки SQL
   app.use('/api', (err, req, res, _next) => {
-    const status = err.status || (err.code === 'LIMIT_FILE_SIZE' ? 413 : 500);
-    // Приёмник файлов отвечает по-английски — человеку нужен ответ, что делать
-    if (err.code === 'LIMIT_FILE_SIZE') err.message = 'Файл слишком большой для загрузки';
-    if (status >= 500) console.error(err);
-    res.status(status).json({error: err.message || 'Ошибка сервера'});
+    if (err.code === 'LIMIT_FILE_SIZE') err = Object.assign(new HttpError(413, 'Файл слишком большой для загрузки'), {cause: err});
+    // Тело запроса не разобралось — текст парсера английский («Expected property name…»). Наш
+    // интерфейс так не шлёт: это оборванный запрос или чужой клиент
+    if (err.type === 'entity.parse.failed') err = Object.assign(new HttpError(400, 'Запрос пришёл повреждённым — обновите страницу и попробуйте ещё раз'), {cause: err});
+    // expose — признак ошибок самого Express (разбор тела, слишком большой запрос): их текст безопасен
+    const ours = err instanceof HttpError || (isCoreError(err) && err.code !== 'INTERNAL') || err.expose === true;
+    const status = ours ? (err.status || err.statusCode || 500) : 500;
+    const where = {method: req.method, path: req.originalUrl.split('?')[0], status};
+    // Ожидаемые 4xx не пишем: это «нет такого объявления», а не событие. Наши 5xx (площадка не
+    // ответила) — warn: граница модуля уже записала подробности. Чужое — error со стеком
+    if (!ours) log.error('request.failed', {...where, error: err});
+    else if (status >= 500) log.warn('request.failed', {...where, message: err.message});
+    const requestId = req.requestId;
+    res.status(status).json({
+      error: ours ? err.message : `Внутренняя ошибка сервера. Код для поддержки: ${requestId}`,
+      // Код отдельным полем — для интерфейса и поддержки; в тексте он тоже есть, чтобы его увидел человек
+      ...(status >= 500 ? {requestId} : {}),
+    });
   });
   return app;
 };

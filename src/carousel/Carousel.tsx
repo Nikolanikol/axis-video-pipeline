@@ -11,6 +11,7 @@ import React from 'react';
 import {AbsoluteFill, Img, staticFile, useCurrentFrame} from 'remotion';
 import {themeOf} from '../shared/model';
 import type {CarouselProps} from '../shared/types';
+import {carouselPrice} from './price';
 import {BODY, CopperText, HEAD, Logo, ThemeProvider, radius, useAsset, useTheme} from '../shared/ui';
 import {Bullets, NumberCard, PAD, PhotoBand, Row, SAFE, Slide, Title, TOTAL} from './Slides';
 import {CarouselText, carouselLang, carouselText} from './i18n';
@@ -232,8 +233,12 @@ const Specs: React.FC<SlideProps> = ({car, brandName, index, total, tx}) => {
   );
 };
 
-const Price: React.FC<SlideProps> = ({car, brandName, index, total, tx}) => {
+const Price: React.FC<SlideProps> = ({car, market, priceOverride, brandName, index, total, tx}) => {
   const C = useTheme();
+  const label = tx.money(carouselPrice(car, market, priceOverride), market.currency);
+  // Кегль по длине: «3 828 197 ₽» вдвое длиннее прежнего «$10 349» и в 168 не влез бы в рамку
+  // (внутри ~770 px: кадр 1080 − поля слайда 2×96 − поля рамки 2×56). Oswald — цифра ≈0,5 кегля
+  const size = Math.min(168, Math.floor(770 / (label.length * 0.5)));
   return (
     <Slide index={index} total={total} brandName={brandName}>
       <div style={{marginTop: 52}}>
@@ -246,13 +251,8 @@ const Price: React.FC<SlideProps> = ({car, brandName, index, total, tx}) => {
       }}>
         <div style={{fontFamily: BODY, fontWeight: 600, fontSize: 30, letterSpacing: 6,
           textTransform: 'uppercase', color: C.grey}}>{tx.s.priceInKorea}</div>
-        <div style={{fontFamily: HEAD, fontWeight: 700, fontSize: 168, lineHeight: 1.05, color: C.white,
-          marginTop: 18}}>{tx.usd(car.price?.usd)}</div>
-        {car.price && (
-          <div style={{fontFamily: BODY, fontWeight: 500, fontSize: 32, color: C.grey, marginTop: 14}}>
-            {tx.krw(car.price.krw)}
-          </div>
-        )}
+        <div style={{fontFamily: HEAD, fontWeight: 700, fontSize: size, lineHeight: 1.05, color: C.white,
+          marginTop: 18, whiteSpace: 'nowrap'}}>{label}</div>
       </div>
       <Bullets items={tx.s.priceNotes} size={34} />
     </Slide>
@@ -282,7 +282,8 @@ const Cta: React.FC<SlideProps> = ({car, market, brandName, index, total, tx}) =
       {/* Номер объявления внизу: по нему машину находят в каталоге и в переписке */}
       <div style={{position: 'absolute', left: 0, right: 0, bottom: 56, textAlign: 'center',
         fontFamily: BODY, fontWeight: 500, fontSize: 26, letterSpacing: 4, color: C.line}}>
-        № {car.id}
+        {/* Номер объявления у источника: у машины из Китая наш id с приставкой «ch-» — её не показываем */}
+        № {String(car.id).replace(/^ch-/, '')}
       </div>
     </Slide>
   );
@@ -298,7 +299,7 @@ export const Carousel: React.FC<CarouselProps> = (props) => {
   // и нумерация «NN / 06» считается от фактического списка, а не от максимума в семь.
   const withHistory = props.includeHistory !== false;
   // Язык слайдов — из профиля клиента; не английский и не русский → английский
-  const tx = carouselText(carouselLang(props.market?.language));
+  const tx = carouselText(carouselLang(props.market?.language), props.car?.origin);
   // Новые форматы («Витрина», «Разворот», «Полная») собираются из библиотеки слайдов
   // (./deck); «Классика» — прежняя вёрстка ниже, как была
   if (carouselFormat(props.format).id !== 'classic') {

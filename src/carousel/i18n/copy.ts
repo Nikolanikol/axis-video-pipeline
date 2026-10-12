@@ -236,6 +236,41 @@ const EN: Copy = {
 
 export const COPY: Record<CarouselLang, Copy> = {ru: RU, en: EN};
 
+// Страна происхождения машины. Тексты написаны под Корею (Encar — первый источник); для машин
+// из Китая (che168, с 11.10) и Японии (Carsensor, с 12.10) те же фразы с другой страной. Заменой,
+// а не вторым набором текстов: варианты фраз и зерно остаются одними, и новая фраза сама получит
+// нужную страну. Порядок важен: «Южной Кореи» раньше «Кореи», иначе вышло бы «Южной Китая»
+const ORIGIN_SWAP: Record<string, Record<CarouselLang, [RegExp, string][]>> = {
+  CN: {
+    ru: [[/Южной Кореи/g, 'Китая'], [/Южная Корея/g, 'Китай'], [/Кореи/g, 'Китая'], [/Корее/g, 'Китае'], [/Корея/g, 'Китай']],
+    en: [[/South Korea/g, 'China'], [/Korea/g, 'China']],
+  },
+  JP: {
+    ru: [[/Южной Кореи/g, 'Японии'], [/Южная Корея/g, 'Япония'], [/Кореи/g, 'Японии'], [/Корее/g, 'Японии'], [/Корея/g, 'Япония']],
+    en: [[/South Korea/g, 'Japan'], [/Korea/g, 'Japan']],
+  },
+};
+const swapDeep = <T,>(v: T, swaps: [RegExp, string][]): T => {
+  if (typeof v === 'string') return swaps.reduce<string>((s, [re, to]) => s.replace(re, to), v) as T;
+  if (Array.isArray(v)) return v.map((x) => swapDeep(x, swaps)) as T;
+  if (v && typeof v === 'object') return Object.fromEntries(Object.entries(v).map(([k, x]) => [k, swapDeep(x, swaps)])) as T;
+  return v;
+};
+const byOrigin = new Map<string, Copy>();
+/** Тексты слайдов на языке и для страны машины: KR (по умолчанию) — как написаны, CN/JP — своя страна */
+export const copyFor = (lang: CarouselLang, origin?: string): Copy => {
+  const swaps = origin ? ORIGIN_SWAP[origin]?.[lang] : undefined;
+  if (!swaps) return COPY[lang];
+  const key = `${lang}:${origin}`;
+  if (!byOrigin.has(key)) byOrigin.set(key, swapDeep(COPY[lang], swaps));
+  return byOrigin.get(key)!;
+};
+/** Та же замена для любых данных (подписи вёрстки в i18n/index.ts) */
+export const forOrigin = <T,>(v: T, lang: CarouselLang, origin?: string): T => {
+  const swaps = origin ? ORIGIN_SWAP[origin]?.[lang] : undefined;
+  return swaps ? swapDeep(v, swaps) : v;
+};
+
 /**
  * Вариант по зерну: одно и то же зерно — один и тот же выбор (пересборка той же карусели
  * даёт те же слайды), другое зерно — другой. Ключ слайда подмешан, чтобы все слайды не

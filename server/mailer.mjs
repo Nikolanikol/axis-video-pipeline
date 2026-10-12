@@ -1,4 +1,5 @@
-// Письма платформы (клиенту она — KOK, внутри — SMMAKER): подтверждение почты и сброс пароля. Отправляет Resend (resend.com).
+// Письма платформы (клиенту она — KOK, внутри — SMMAKER): подтверждение и смена почты, сброс
+// пароля, уведомления о смене пароля и почты. Отправляет Resend (resend.com).
 //
 // Переменные окружения:
 //   RESEND_API_KEY   — ключ Resend. Не задан — письмо не уходит, а пишется в журнал сервера:
@@ -42,14 +43,16 @@ const escape = (s) => String(s).replace(/[&<>"]/g, (c) => ({'&': '&amp;', '<': '
 // полоса под ним тёмная, а тёмный фон зашит и в сам PNG — часть почтовиков выкидывает
 // фон ячеек. Если картинки заблокированы, в полосе остаётся подпись «KOK» из alt.
 // Тело письма — светлое: тёмные письма почтовики в тёмной теме перекрашивают непредсказуемо.
-const layout = (title, body, button) => `<!doctype html><html><body style="margin:0;padding:24px;background:#f4f2ef;font-family:Manrope,Arial,sans-serif;color:#1c1c20">
+// footer — приписка внизу: по умолчанию для писем при регистрации; уведомлениям о действиях
+// в аккаунте нужна своя — «не регистрировались» там звучит странно
+const layout = (title, body, button, footer = 'Если вы не регистрировались в KOK, просто удалите это письмо.') => `<!doctype html><html><body style="margin:0;padding:24px;background:#f4f2ef;font-family:Manrope,Arial,sans-serif;color:#1c1c20">
 <div style="max-width:480px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden">
 <div style="background:#0b0b0d;padding:18px 28px"><img src="${escape(appUrl())}/kok/email-logo.png" width="120" height="38" alt="KOK" style="display:block;border:0;color:#f7f2eb;font-size:22px;font-weight:bold"></div>
 <div style="padding:28px">
 <h1 style="font-size:20px;margin:0 0 16px">${escape(title)}</h1>
 ${body}
 ${button ? `<p style="margin:24px 0"><a href="${escape(button.url)}" style="background:#8e0d2c;color:#f7f2eb;padding:12px 20px;border-radius:6px;text-decoration:none;display:inline-block;font-weight:bold">${escape(button.label)}</a></p>` : ''}
-<p style="font-size:12px;color:#888;margin-top:24px">Если вы не регистрировались в KOK, просто удалите это письмо.</p>
+<p style="font-size:12px;color:#888;margin-top:24px">${escape(footer)}</p>
 </div></div></body></html>`;
 
 export const verifyMail = ({to, name, code, link, credits}) => sendMail({
@@ -72,3 +75,40 @@ export const resetMail = ({to, link}) => sendMail({
     '<p>Чтобы задать новый пароль, нажмите кнопку. Ссылка действует час и сработает один раз.</p><p style="font-size:13px;color:#666">Если вы не просили сброс — ничего не делайте, пароль останется прежним.</p>',
     {url: link, label: 'Задать новый пароль'}),
 });
+
+// Смена почты из кабинета: код на НОВЫЙ адрес. Только код, без кнопки — вводят его в кабинете,
+// где человек уже вошёл; ссылка, открытая на другом устройстве, сменила бы почту без входа
+export const emailChangeMail = ({to, name, code}) => sendMail({
+  to,
+  subject: `Код для смены почты KOK: ${code}`,
+  text: `${name ? `${name}, з` : 'З'}дравствуйте!\n\nКод для смены почты в KOK: ${code}\nВведите его в кабинете. Код действует час.\n\n`
+    + 'Если вы не меняли почту — просто удалите это письмо.',
+  html: layout('Новая почта для KOK',
+    `<p>Код для смены почты:</p><p style="font-size:32px;letter-spacing:6px;font-weight:bold;margin:8px 0">${escape(code)}</p>
+<p>Введите его в кабинете. Код действует час.</p>`,
+    null, 'Если вы не меняли почту — просто удалите это письмо, адрес останется прежним.'),
+});
+
+// Уведомление о действии в аккаунте (сменили пароль, почту): если делал не владелец — узнает сразу
+export const noticeMail = ({to, title, text}) => sendMail({
+  to,
+  subject: `KOK: ${title.toLowerCase()}`,
+  text,
+  html: layout(title, text.split('\n\n').map((p) => `<p>${escape(p)}</p>`).join('\n'), null, 'Письмо о безопасности аккаунта KOK.'),
+});
+
+// Аккаунт поставлен на удаление: до какого числа и кнопка «восстановить». Кнопка ведёт на страницу
+// приложения, а та шлёт POST — GET-ссылку почтовые сканеры открыли бы сами и отменили удаление
+export const deletionMail = ({to, name, link, until}) => {
+  const date = new Date(until).toLocaleDateString('ru-RU');
+  return sendMail({
+    to,
+    subject: 'KOK: аккаунт будет удалён',
+    text: `${name ? `${name}, з` : 'З'}дравствуйте!\n\nАккаунт KOK закрыт и будет удалён окончательно ${date}: ролики, карусели, объявления и настройки сотрутся, `
+      + `оставшиеся кредиты сгорят.\n\nПередумали — откройте ссылку до ${date}, и всё вернётся как было: ${link}`,
+    html: layout('Аккаунт будет удалён',
+      `<p>Аккаунт KOK закрыт и будет удалён окончательно <b>${escape(date)}</b>: ролики, карусели, объявления и настройки сотрутся, оставшиеся кредиты сгорят.</p>
+<p>Передумали — нажмите кнопку до ${escape(date)}, и всё вернётся как было.</p>`,
+      {url: link, label: 'Восстановить аккаунт'}, 'Если удаляли не вы — нажмите кнопку и смените пароль.'),
+  });
+};

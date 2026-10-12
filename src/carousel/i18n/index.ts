@@ -13,6 +13,8 @@
 //     Цветов в русском словаре kmotors нет — они в COLORS_RU ниже.
 // Слово, которого нет в словаре, остаётся английским: лучше английское слово, чем пустое место.
 import dict from './ru-values.json';
+import {copyFor, forOrigin} from './copy';
+import {currencySign} from '../../shared/currencies.js';
 
 export type CarouselLang = 'en' | 'ru';
 export const CAROUSEL_LANGS: CarouselLang[] = ['en', 'ru'];
@@ -97,8 +99,12 @@ const STRINGS = {
 
 export type CarouselText = ReturnType<typeof carouselText>;
 
-/** Всё языковое для слайдов: подписи, перевод данных и числа по правилам языка */
-export const carouselText = (lang: CarouselLang) => {
+/**
+ * Всё языковое для слайдов: подписи, тексты, перевод данных и числа по правилам языка.
+ * origin — страна машины (CarouselCar.origin): у машины из Китая «Цена в Китае» и «Импорт из
+ * Китая» вместо Кореи, у японской — «Япония» (copy.ts, copyFor). Нет — Корея, как было
+ */
+export const carouselText = (lang: CarouselLang, origin?: string) => {
   const locale = lang === 'ru' ? 'ru-RU' : 'en-US';
   // В русской записи разряды — пробелом; toLocaleString ставит неразрывный, он и нужен:
   // «239 601 км» не должен переноситься посередине числа
@@ -106,7 +112,10 @@ export const carouselText = (lang: CarouselLang) => {
   const ru = lang === 'ru';
   return {
     lang,
-    s: STRINGS[lang],
+    origin: origin === 'CN' || origin === 'JP' ? origin : 'KR',
+    s: forOrigin(STRINGS[lang], lang, origin),
+    // Тексты слайдов новых форматов (Deck) — уже для страны машины
+    copy: copyFor(lang, origin),
     /** Топливо, коробка, цвет, кузов */
     value: (en: string) => (ru && en ? ((dict.values as Record<string, string>)[en] ?? COLORS_RU[en] ?? en) : en),
     /** Название опции */
@@ -115,6 +124,12 @@ export const carouselText = (lang: CarouselLang) => {
     km: (v: number | null) => (v === null ? '—' : `${n(v)} ${ru ? 'км' : 'km'}`),
     usd: (v: number | null | undefined) => (v ? `$${n(v)}` : '—'),
     krw: (v: number) => `₩${n(v)}`,
+    /** Цена в валюте компании: $, € и £ — перед числом, как принято; остальные значки — после */
+    money: (v: number | null | undefined, code?: string) => {
+      if (!v) return '—';
+      const sign = currencySign(code);
+      return ['$', '€', '£'].includes(sign) ? `${sign}${n(v)}` : `${n(v)} ${sign}`;
+    },
     liters: (cc: number | null) => (cc ? `${(cc / 1000).toLocaleString(locale, {minimumFractionDigits: 1, maximumFractionDigits: 1})} ${ru ? 'л' : 'L'}` : '—'),
   };
 };

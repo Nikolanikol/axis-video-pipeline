@@ -7,7 +7,10 @@ import {makeCancelSignal, openBrowser, renderMedia, renderStill, selectCompositi
 import sharp from 'sharp';
 import {charge, refund, settle} from './billing.mjs';
 import {authEnabled} from './session.mjs';
-import {HttpError, ROOT, checkId, currentWorkspace, readJson, rendersDir, withWorkspace, workspaceUrl, writeJson} from './store.mjs';
+import {HttpError, ROOT, checkId, clientMessage, skipUnreadable, currentWorkspace, readJson, rendersDir, withWorkspace, workspaceUrl, writeJson} from './store.mjs';
+import {serverLog} from './log.mjs';
+
+const log = serverLog('renderer');
 const browserExecutable = process.env.CHROME_PATH || null;
 const concurrency = process.env.RENDER_CONCURRENCY ? Number(process.env.RENDER_CONCURRENCY) : null;
 const crf = Number(process.env.RENDER_CRF || 20);
@@ -139,8 +142,8 @@ const pump = async () => {
     } else {
       job.status = 'error';
       job.stage = 'Ошибка';
-      job.error = String(e?.message || e);
-      console.error(`Рендер ${job.id}:`, e);
+      job.error = clientMessage(e, 'Ролик не собрался, кредиты вернулись. Нажмите «Пересобрать»; повторится — напишите в поддержку');
+      log.error('render.failed', {job: job.id, format: job.format, error: e});
     }
   } finally {
     job.finishedAt = new Date().toISOString();
@@ -148,8 +151,8 @@ const pump = async () => {
     const billing = job.status === 'done'
       ? settle(job.receipt)
       : refund(job.receipt, job.status === 'cancelled' ? 'отменён' : `ошибка: ${job.error?.slice(0, 150)}`);
-    await billing.catch((e) => console.error(`Кредиты за ${job.id}:`, e));
-    await writeJson(metaFile(job.id, job.ws), publicJob(job)).catch((e) => console.error(e));
+    await billing.catch((e) => log.error('billing.failed', {note: 'кредиты за ролик не закрыты — дожмёт сторож', job: job.id, error: e}));
+    await writeJson(metaFile(job.id, job.ws), publicJob(job)).catch((e) => log.error('meta.write_failed', {note: 'итог ролика не записан — после перезапуска он пропадёт из истории', job: job.id, error: e}));
     running = false;
     pump();
   }
@@ -176,7 +179,8 @@ const run = async (job) => {
     if (Date.now() - mark.at < STALL_MS) return;
     clearInterval(watchdog);
     cancel();
-    stop(new Error(`Завис на шаге «${job.stage}»: ${Math.round(STALL_MS / 60000)} мин без движения, задание снято`));
+    // HttpError — текст для клиента: он попадает в историю роликов как есть (clientMessage)
+    stop(new HttpError(504, `Завис на шаге «${job.stage}»: ${Math.round(STALL_MS / 60000)} мин без движения, задание снято. Кредиты вернулись — нажмите «Пересобрать»`));
     // Проверяем вчетверо чаще срока, но не чаще раза в четверть секунды и не реже раза в 15 с
   }, Math.min(15 * 1000, Math.max(250, STALL_MS / 4)));
 
@@ -243,8 +247,9 @@ export const cancelJob = async (id) => {
     job.status = 'cancelled';
     job.stage = 'Отменён';
     job.finishedAt = new Date().toISOString();
-    await refund(job.receipt, 'отменён в очереди').catch((e) => console.error(`Кредиты за ${job.id}:`, e));
-    await writeJson(metaFile(job.id, job.ws), publicJob(job)).catch(() => {});
+    await refund(job.receipt, 'отменён в очереди').catch((e) => log.error('billing.failed', {note: 'кредит за отменённый ролик не вернулся — дожмёт сторож', job: job.id, error: e}));
+    await writeJson(metaFile(job.id, job.ws), publicJob(job))
+      .catch((e) => log.error('meta.write_failed', {note: 'отмена ролика не записана — после перезапуска он пропадёт из истории', job: job.id, error: e}));
   } else {
     // Живой рендер: дёргаем cancelSignal, дальше run() упадёт, а pump() пометит «Отменён»
     job._cancel?.();
@@ -288,7 +293,7 @@ export const listJobs = async (filter = {}) => {
   const files = (await fs.readdir(RENDERS_DIR)).filter((f) => f.endsWith('.json'));
   const byId = new Map();
   for (const f of files) {
-    const job = await readJson(path.join(RENDERS_DIR, f)).catch(() => null);
+    const job = await readJson(path.join(RENDERS_DIR, f)).catch(skipUnreadable('ролик', path.join(RENDERS_DIR, f)));
     if (job) byId.set(job.id, job);
   }
   const ws = currentWorkspace();

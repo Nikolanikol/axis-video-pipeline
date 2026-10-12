@@ -1,0 +1,108 @@
+{
+  "id": "40303537",
+  "source": "https://www.kmotors.shop/en/catalog/40303537",
+  "brand": "Ford",
+  "model": "F150",
+  "grade": "5.0L",
+  "trim": "",
+  "year": 2018,
+  "firstRegistered": "2020-03-18",
+  "mileageKm": 67842,
+  "displacementCc": 4951,
+  "transmission": "Automatic",
+  "fuel": "Gasoline",
+  "body": "",
+  "color": "Red",
+  "seats": 5,
+  "vin": "TESTVIN303537",
+  "plate": "00가0000",
+  "price": {
+    "krw": 43440000,
+    "usd": 32942,
+    "krwToUsd": 0.0007583225904299689,
+    "quotedAt": "2026.10.12 17:02:43",
+    "rateSource": "kb"
+  },
+  "history": {
+    "accidentsOwn": 0,
+    "accidentsOther": 0,
+    "accidentsTotal": 0,
+    "accidentYears": [],
+    "maxPayoutKrw": null,
+    "claims": [],
+    "ownerChanges": 4,
+    "theft": 0,
+    "flood": 0,
+    "totalLoss": 0
+  },
+  "options": {
+    "comfort": [
+      "Heated rear seats",
+      "Leather seats",
+      "Heated front seats",
+      "Power driver seat",
+      "Power passenger seat",
+      "Auto-dimming mirror (ECM)",
+      "Keyless entry",
+      "Power door locks",
+      "Power windows"
+    ],
+    "safety": [
+      "Rear-view camera",
+      "Front parking sensors",
+      "Rear parking sensors",
+      "Navigation",
+      "Bluetooth",
+      "Cruise control",
+      "Automatic headlights",
+      "Tire pressure monitoring (TPMS)",
+      "Electronic stability control (ESC)",
+      "Curtain airbags",
+      "Driver airbag",
+      "Passenger airbag",
+      "Anti-lock braking system (ABS)",
+      "Traction control (TCS)",
+      "Steering wheel controls",
+      "Front AV monitor",
+      "CD player",
+      "USB port"
+    ],
+    "other": [
+      "Alloy wheels",
+      "Power steering"
+    ],
+    "total": 29
+  },
+  "photos": {
+    "hero": "https://ci.encar.com/carpicture10/pic4030/40303537_001.jpg?impolicy=heightRate&rh=1080",
+    "rear": "https://ci.encar.com/carpicture10/pic4030/40303537_002.jpg?impolicy=heightRate&rh=1080",
+    "interiorShot": "https://ci.encar.com/carpicture10/pic4030/40303537_007.jpg?impolicy=heightRate&rh=1080",
+    "dashboard": "https://ci.encar.com/carpicture10/pic4030/40303537_008.jpg?impolicy=heightRate&rh=1080",
+    "exterior": [
+      "https://ci.encar.com/carpicture10/pic4030/40303537_001.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4030/40303537_002.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4030/40303537_003.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4030/40303537_004.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4030/40303537_005.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4030/40303537_006.jpg?impolicy=heightRate&rh=1080"
+    ],
+    "interior": [
+      "https://ci.encar.com/carpicture10/pic4030/40303537_007.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4030/40303537_008.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4030/40303537_009.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4030/40303537_010.jpg?impolicy=heightRate&rh=1080"
+    ],
+    "other": [
+      "https://ci.encar.com/carpicture10/pic4030/40303537_015.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4030/40303537_016.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4030/40303537_017.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4030/40303537_018.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4030/40303537_019.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4030/40303537_020.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4030/40303537_021.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4030/40303537_022.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4030/40303537_023.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4030/40303537_024.jpg?impolicy=heightRate&rh=1080"
+    ]
+  }
+}

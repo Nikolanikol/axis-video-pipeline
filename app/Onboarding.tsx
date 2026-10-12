@@ -11,7 +11,7 @@
 // #/start/unverified показывает его неподтверждённым, чтобы посмотреть карточку кода.
 import React, {useEffect, useRef, useState} from 'react';
 import {Check, ChevronRight, Mail} from 'lucide-react';
-import {api} from './api';
+import {api, errorText} from './api';
 import {useSession} from './auth';
 import {useConfig} from './config';
 import platformBrand from '../config/brand.json';
@@ -34,7 +34,21 @@ export const useOnboarding = () => {
   const key = (k: string) => `kok:start:${ws}:${k}`;
   const [lots, setLots] = useState<number | null>(null);
   const [, bump] = useState(0);
-  useEffect(() => { api.lots().then((l) => setLots(l.length)).catch(() => setLots(null)); }, []);
+  // Готовые работы: объявления роликов и собранные карусели. Считаем не один раз при открытии, а и
+  // при возврате на страницу: шапка с «3 из 4» живёт всё время, и после первого ролика она
+  // продолжала звать «соберите первый ролик» до перезагрузки (тест Дмитрия, PR 13)
+  useEffect(() => {
+    const count = () => Promise.all([api.lots(), api.carousels().catch(() => [])])
+      .then(([l, c]) => setLots(l.length + c.length)).catch(() => setLots(null));
+    count();
+    const onVisible = () => { if (document.visibilityState === 'visible') count(); };
+    window.addEventListener('hashchange', count);
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.removeEventListener('hashchange', count);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, []);
 
   const preview = !session.enabled && window.location.hash.includes('unverified');
   const c = profile.contacts ?? {whatsapp: null, site: ''};
@@ -67,7 +81,7 @@ const TEXT: Record<StepId, {title: string; why: string; go?: string; link?: stri
     go: 'Заполнить профиль', link: href('settings', 'profile')},
   brand: {title: 'Настройте бренд', why: 'Логотип, цвета и шрифты. Можно позже: без логотипа на роликах будет название компании текстом.',
     go: 'Открыть бренд', link: href('settings', 'brand')},
-  first: {title: 'Соберите первый ролик', why: 'Вставьте ссылку на объявление Encar — фото, характеристики и цена подтянутся сами.',
+  first: {title: 'Соберите первый ролик или карусель', why: 'Вставьте ссылку на объявление Encar, che168 или Carsensor — фото, характеристики и цена подтянутся сами.',
     go: 'Вставить ссылку', link: href('ads', 'lot')},
 };
 
@@ -150,6 +164,50 @@ export const StartCard: React.FC = () => {
   );
 };
 
+// Подписи плиток в кабинете — короче, чем заголовки страницы: плитка узкая
+const SHORT: Record<StepId, string> = {email: 'Почта', company: 'О компании', brand: 'Бренд', first: 'Первый ролик'};
+
+/**
+ * «Настройка кабинета» вверху «Моего кабинета» (владелец 12.10: первые шаги — и в кабинете).
+ * Четыре плитки в ряд с прогрессом: что сделано и куда нажать дальше. Видна, пока список не
+ * пройден, — даже если на главной его скрыли: кабинет и есть место, где к нему возвращаются.
+ * Пройден — карточки нет, кабинет не загромождаем
+ */
+export const SetupCard: React.FC = () => {
+  const o = useOnboarding();
+  if (!o.relevant || o.allDone) return null;
+  const next = o.steps.find((s) => !s.done && !s.skipped);
+  return (
+    <section className="setup">
+      <div className="setup-head">
+        <h2>Настройка кабинета</h2>
+        <span className="muted">{o.passed} из {o.total}</span>
+      </div>
+      <div className="start-bar"><div style={{width: `${(o.passed / o.total) * 100}%`}} /></div>
+      <ol className="setup-steps">
+        {o.steps.map((s, i) => {
+          const t = TEXT[s.id];
+          // Почта вводится крупными клетками на «Первых шагах» — туда и ведём. Плитка нажимается
+          // целиком: в ней одно действие, и узкая ссылка внутри была бы мелкой целью на телефоне.
+          // Сделанные почта и первый ролик никуда не ведут — плитка не двигается при наведении
+          const link = s.id === 'email' ? href('start') : t.link;
+          const clickable = !!link && !(s.done && (s.id === 'email' || s.id === 'first'));
+          const action = s.done ? (clickable ? 'готово · изменить' : 'готово')
+            : s.id === 'email' ? 'Ввести код' : s.skipped ? 'Пропущено — вернуться' : t.go;
+          const body = (
+            <>
+              <span className="start-mark">{s.done ? <Check size={16} /> : i + 1}</span>
+              <div><b>{SHORT[s.id]}</b><span className="muted">{action}</span></div>
+            </>
+          );
+          const cls = `setup-step${s.done ? ' done' : ''}${s.id === next?.id ? ' next' : ''}${clickable ? ' lift' : ''}`;
+          return <li key={s.id}>{clickable ? <a className={cls} href={link}>{body}</a> : <div className={cls}>{body}</div>}</li>;
+        })}
+      </ol>
+    </section>
+  );
+};
+
 /**
  * Подтверждение почты крупно: адрес, шесть клеток под код, «отправить ещё раз» с паузой.
  * Код вводится и вставкой целиком (из темы письма — «Код подтверждения KOK: 123456»),
@@ -174,7 +232,7 @@ const VerifyEmailCard: React.FC = () => {
   const submit = async (code: string) => {
     setBusy(true); setError(''); setNote('');
     try { await api.verify(code); refresh(); } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errorText(e));
       setDigits(Array(6).fill(''));
     } finally { setBusy(false); }
   };
@@ -193,7 +251,7 @@ const VerifyEmailCard: React.FC = () => {
   };
   const resend = async () => {
     setError(''); setNote('');
-    try { await api.resendVerify(); setNote('Отправили новый код.'); setWait(RESEND_PAUSE); } catch (e) { setError(e instanceof Error ? e.message : String(e)); }
+    try { await api.resendVerify(); setNote('Отправили новый код.'); setWait(RESEND_PAUSE); } catch (e) { setError(errorText(e)); }
   };
 
   return (

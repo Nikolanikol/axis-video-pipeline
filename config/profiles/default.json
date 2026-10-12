@@ -1,18 +1,18 @@
 {
-  "company": "K-AXIS MOTORS",
-  "language": "ru",
+  "company": "AXIS",
+  "language": "en",
   "contacts": {
     "whatsapp": "+82 10 5865 4344",
     "site": "kmotors.shop"
   },
   "pricing": {
-    "mode": "domestic",
+    "mode": "export",
     "currency": "KRW",
     "export": {
-      "origin": "Инчон",
-      "originCountry": "Кореја",
-      "port": "Дуррес",
-      "portCountry": "Албания",
+      "origin": "INCHEON",
+      "originCountry": "KOREA",
+      "port": "DURRES",
+      "portCountry": "ALBANIA",
       "freight": 1500
     }
   },

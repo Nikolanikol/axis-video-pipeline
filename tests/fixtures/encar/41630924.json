@@ -1,0 +1,172 @@
+{
+  "id": "41630924",
+  "source": "https://www.kmotors.shop/en/catalog/41630924",
+  "brand": "Hyundai",
+  "model": "Equus",
+  "grade": "VS500",
+  "trim": "Prestige",
+  "year": 2015,
+  "firstRegistered": "2014-04-25",
+  "mileageKm": 239601,
+  "displacementCc": 5038,
+  "transmission": "Automatic",
+  "fuel": "Gasoline",
+  "body": "",
+  "color": "Black",
+  "seats": 5,
+  "vin": "TESTVIN630924",
+  "plate": "00가0000",
+  "price": {
+    "krw": 9340000,
+    "usd": 7083,
+    "krwToUsd": 0.0007583225904299689,
+    "quotedAt": "2026.10.12 17:02:43",
+    "rateSource": "kb"
+  },
+  "history": {
+    "accidentsOwn": 1,
+    "accidentsOther": 3,
+    "accidentsTotal": 4,
+    "accidentYears": [
+      2015,
+      2017,
+      2018,
+      2019
+    ],
+    "maxPayoutKrw": 1067500,
+    "claims": [
+      {
+        "date": "2019-07-24",
+        "payoutKrw": 1067500,
+        "partsKrw": 256899,
+        "laborKrw": 288000,
+        "paintKrw": 386878,
+        "own": false
+      },
+      {
+        "date": "2018-05-15",
+        "payoutKrw": 1041860,
+        "partsKrw": 0,
+        "laborKrw": 198260,
+        "paintKrw": 556920,
+        "own": false
+      },
+      {
+        "date": "2017-01-10",
+        "payoutKrw": 749646,
+        "partsKrw": 171285,
+        "laborKrw": 94540,
+        "paintKrw": 179948,
+        "own": true
+      },
+      {
+        "date": "2015-06-02",
+        "payoutKrw": 501100,
+        "partsKrw": 166500,
+        "laborKrw": 65000,
+        "paintKrw": 151870,
+        "own": false
+      }
+    ],
+    "ownerChanges": 7,
+    "theft": 0,
+    "flood": 0,
+    "totalLoss": 0
+  },
+  "options": {
+    "comfort": [
+      "Ventilated rear seats",
+      "Ventilated passenger seat",
+      "Ventilated driver seat",
+      "Power rear seats",
+      "Rear seat sunshade",
+      "Rear window sunshade",
+      "Ghost door closing",
+      "Driver seat memory",
+      "Heated rear seats",
+      "Heated steering wheel",
+      "Power tailgate",
+      "Leather seats",
+      "Automatic climate control",
+      "Heated front seats",
+      "Power driver seat",
+      "Power passenger seat",
+      "Smart key",
+      "Power-adjustable steering wheel",
+      "Auto-dimming mirror (ECM)",
+      "Power-folding mirrors",
+      "Keyless entry",
+      "Power door locks",
+      "Power windows"
+    ],
+    "safety": [
+      "Head-up display (HUD)",
+      "360° around-view camera",
+      "Adaptive cruise control",
+      "Blind spot monitoring",
+      "Lane departure warning (LDWS)",
+      "Rear-view camera",
+      "Front parking sensors",
+      "Rear parking sensors",
+      "Navigation",
+      "Bluetooth",
+      "LED headlights",
+      "Electronic parking brake (EPB)",
+      "Automatic headlights",
+      "Rain sensor",
+      "Tire pressure monitoring (TPMS)",
+      "Electronic stability control (ESC)",
+      "Hi-Pass toll system",
+      "Side airbags",
+      "Curtain airbags",
+      "Driver airbag",
+      "Passenger airbag",
+      "Anti-lock braking system (ABS)",
+      "Traction control (TCS)",
+      "Electronically controlled suspension (ECS)",
+      "Steering wheel controls",
+      "Rear AV monitor",
+      "Front AV monitor",
+      "CD player",
+      "AUX port",
+      "USB port"
+    ],
+    "other": [
+      "Alloy wheels",
+      "Power steering"
+    ],
+    "total": 55
+  },
+  "photos": {
+    "hero": "https://ci.encar.com/carpicture03/pic4163/41630924_001.jpg?impolicy=heightRate&rh=1080",
+    "rear": "https://ci.encar.com/carpicture03/pic4163/41630924_002.jpg?impolicy=heightRate&rh=1080",
+    "interiorShot": "https://ci.encar.com/carpicture03/pic4163/41630924_007.jpg?impolicy=heightRate&rh=1080",
+    "dashboard": "https://ci.encar.com/carpicture03/pic4163/41630924_008.jpg?impolicy=heightRate&rh=1080",
+    "exterior": [
+      "https://ci.encar.com/carpicture03/pic4163/41630924_001.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture03/pic4163/41630924_002.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture03/pic4163/41630924_003.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture03/pic4163/41630924_004.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture03/pic4163/41630924_005.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture03/pic4163/41630924_006.jpg?impolicy=heightRate&rh=1080"
+    ],
+    "interior": [
+      "https://ci.encar.com/carpicture03/pic4163/41630924_007.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture03/pic4163/41630924_008.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture03/pic4163/41630924_009.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture03/pic4163/41630924_010.jpg?impolicy=heightRate&rh=1080"
+    ],
+    "other": [
+      "https://ci.encar.com/carpicture03/pic4163/41630924_015.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture03/pic4163/41630924_016.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture03/pic4163/41630924_017.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture03/pic4163/41630924_018.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture03/pic4163/41630924_019.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture03/pic4163/41630924_020.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture03/pic4163/41630924_021.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture03/pic4163/41630924_022.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture03/pic4163/41630924_023.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture03/pic4163/41630924_024.jpg?impolicy=heightRate&rh=1080"
+    ]
+  }
+}

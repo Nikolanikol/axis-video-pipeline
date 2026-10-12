@@ -23,6 +23,7 @@ import type {AdProps, Lot, Market, Theme} from '../src/shared/types';
 import {api, PublicOffer} from './api';
 import {AuthCard, AuthMode} from './auth';
 import {Preview} from './Preview';
+import {SiteFooter} from './SiteFooter';
 
 type Samples = {
   videos: {title: string; year: number; format: string; palette: string; video: string; poster: string}[];
@@ -63,6 +64,7 @@ export const Landing: React.FC<{signup: {credits: number; days: number}; notice:
           <a href="#how" onClick={jump('how')}>Как это работает</a>
           <a href="#samples" onClick={jump('samples')}>Образцы</a>
           <a href="#pricing" onClick={jump('pricing')}>Цены</a>
+          <a href="#contacts" onClick={jump('contacts')}>Контакты</a>
         </nav>
         <button className="btn ghost" onClick={() => start('login')}>Войти</button>
         <button className="btn primary land-cta-sm" onClick={() => start('register')}>Попробовать</button>
@@ -139,10 +141,11 @@ export const Landing: React.FC<{signup: {credits: number; days: number}; notice:
         <Tariffs offer={offer} />
       </section>
 
-      <section className="land-section">
+      <section id="faq" className="land-section">
         <h2 className="land-h2">Вопросы</h2>
         <div className="land-faq">
-          <details><summary>Нужна ли карта, чтобы попробовать?</summary><p>Нет. Регистрация и пробные кредиты — без карты. Тариф подключает менеджер, когда вы решите продолжить.</p></details>
+          <details><summary>Нужна ли карта, чтобы попробовать?</summary><p>Нет. Регистрация и пробные кредиты — без оплаты. Решите продолжить — выберете тариф в кабинете и оплатите онлайн, кредиты придут сами.</p></details>
+          <details><summary>Можно вернуть деньги?</summary><p>Да, в течение 14 дней после оплаты, если кредиты из покупки ещё не тратились. Сбой при сборке ролика — кредит возвращается сам. Подробно — в <a href="#/offer">оферте</a>.</p></details>
           <details><summary>Что будет, если объявление на Encar снимут?</summary><p>Ничего: фото копируются к нам при создании, готовый ролик и карусель от объявления не зависят.</p></details>
           <details><summary>Можно поставить свой логотип и цвета?</summary><p>Да. В настройках бренда — логотип, палитра, шрифты и контакты. Один раз — и они на всех роликах и каруселях.</p></details>
           <details><summary>На каком языке тексты?</summary><p>На языке вашего профиля: характеристики и подписи переводятся сами. Карусели — на русском или английском.</p></details>
@@ -173,10 +176,12 @@ export const Landing: React.FC<{signup: {credits: number; days: number}; notice:
         <AuthCard signup={gift} notice={notice} mode={mode} setMode={setMode} />
       </AuthModal>}
 
-      <footer className="land-foot">
-        <img src="/kok/wordmark.svg" alt="KOK" className="land-logo" />
-        <span className="muted">Контент одной кнопкой</span>
-      </footer>
+      <SiteFooter offer={offer} service={[
+        {label: 'Как это работает', href: '#how', onClick: jump('how')},
+        {label: 'Образцы', href: '#samples', onClick: jump('samples')},
+        {label: 'Цены', href: '#pricing', onClick: jump('pricing')},
+        {label: 'Вопросы', href: '#faq', onClick: jump('faq')},
+      ]} />
     </div>
   );
 };
@@ -240,7 +245,7 @@ const LiveDemo: React.FC = () => {
   return (
     <div className="land-demo">
       <div className="land-phone">
-        {input ? <Preview input={input} format={fmt} autoPlay /> : <div className="land-phone-empty" />}
+        {input ? <Preview input={input} format={fmt} autoPlay loop /> : <div className="land-phone-empty" />}
       </div>
       <div className="land-demo-controls">
         <span className="land-try">Попробуйте — ролик меняется сразу</span>

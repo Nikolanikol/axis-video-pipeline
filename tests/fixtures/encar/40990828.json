@@ -1,0 +1,148 @@
+{
+  "id": "40990828",
+  "source": "https://www.kmotors.shop/en/catalog/40990828",
+  "brand": "Audi",
+  "model": "A6",
+  "grade": "40 TFSI Premium",
+  "trim": "C7",
+  "year": 2018,
+  "firstRegistered": "2019-02-08",
+  "mileageKm": 89656,
+  "displacementCc": 1984,
+  "transmission": "Automatic",
+  "fuel": "Gasoline",
+  "body": "",
+  "color": "Black",
+  "seats": 5,
+  "vin": null,
+  "plate": "00가0000",
+  "price": {
+    "krw": 15040000,
+    "usd": 11405,
+    "krwToUsd": 0.0007583225904299689,
+    "quotedAt": "2026.10.12 17:02:43",
+    "rateSource": "kb"
+  },
+  "history": {
+    "accidentsOwn": 3,
+    "accidentsOther": 0,
+    "accidentsTotal": 3,
+    "accidentYears": [
+      2020
+    ],
+    "maxPayoutKrw": 9004870,
+    "claims": [
+      {
+        "date": "2020-10-04",
+        "payoutKrw": 9004870,
+        "partsKrw": 5491192,
+        "laborKrw": 1170200,
+        "paintKrw": 625318,
+        "own": true
+      },
+      {
+        "date": "2020-09-04",
+        "payoutKrw": 3400000,
+        "partsKrw": 2454910,
+        "laborKrw": 389980,
+        "paintKrw": 490000,
+        "own": true
+      },
+      {
+        "date": "2020-04-20",
+        "payoutKrw": 1500000,
+        "partsKrw": 1043100,
+        "laborKrw": 48000,
+        "paintKrw": 273607,
+        "own": true
+      }
+    ],
+    "ownerChanges": 7,
+    "theft": 0,
+    "flood": 0,
+    "totalLoss": 0
+  },
+  "options": {
+    "comfort": [
+      "Sunroof",
+      "Ventilated passenger seat",
+      "Ventilated driver seat",
+      "Driver seat memory",
+      "Heated rear seats",
+      "Heated steering wheel",
+      "Power tailgate",
+      "Leather seats",
+      "Automatic climate control",
+      "Heated front seats",
+      "Power driver seat",
+      "Power passenger seat",
+      "Smart key",
+      "Auto-dimming mirror (ECM)",
+      "Power-folding mirrors",
+      "Keyless entry",
+      "Power door locks",
+      "Power windows"
+    ],
+    "safety": [
+      "Head-up display (HUD)",
+      "360° around-view camera",
+      "Rear-view camera",
+      "Front parking sensors",
+      "Rear parking sensors",
+      "Navigation",
+      "Bluetooth",
+      "HID headlights",
+      "Cruise control",
+      "Automatic headlights",
+      "Rain sensor",
+      "Tire pressure monitoring (TPMS)",
+      "Electronic stability control (ESC)",
+      "Side airbags",
+      "Curtain airbags",
+      "Driver airbag",
+      "Passenger airbag",
+      "Anti-lock braking system (ABS)",
+      "Traction control (TCS)",
+      "Steering wheel controls",
+      "Front AV monitor",
+      "CD player",
+      "AUX port",
+      "USB port"
+    ],
+    "other": [
+      "Alloy wheels",
+      "Power steering"
+    ],
+    "total": 44
+  },
+  "photos": {
+    "hero": "https://ci.encar.com/carpicture09/pic4099/40990828_001.jpg?impolicy=heightRate&rh=1080",
+    "rear": "https://ci.encar.com/carpicture09/pic4099/40990828_002.jpg?impolicy=heightRate&rh=1080",
+    "interiorShot": "https://ci.encar.com/carpicture09/pic4099/40990828_007.jpg?impolicy=heightRate&rh=1080",
+    "dashboard": "https://ci.encar.com/carpicture09/pic4099/40990828_008.jpg?impolicy=heightRate&rh=1080",
+    "exterior": [
+      "https://ci.encar.com/carpicture09/pic4099/40990828_001.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4099/40990828_002.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4099/40990828_003.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4099/40990828_004.jpg?impolicy=heightRate&rh=1080"
+    ],
+    "interior": [
+      "https://ci.encar.com/carpicture09/pic4099/40990828_007.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4099/40990828_008.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4099/40990828_009.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4099/40990828_010.jpg?impolicy=heightRate&rh=1080"
+    ],
+    "other": [
+      "https://ci.encar.com/carpicture09/pic4099/40990828_015.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4099/40990828_016.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4099/40990828_017.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4099/40990828_018.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4099/40990828_019.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4099/40990828_020.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4099/40990828_021.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4099/40990828_022.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4099/40990828_023.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4099/40990828_024.jpg?impolicy=heightRate&rh=1080"
+    ]
+  }
+}

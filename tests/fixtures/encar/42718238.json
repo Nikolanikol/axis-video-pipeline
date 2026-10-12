@@ -1,0 +1,171 @@
+{
+  "id": "42718238",
+  "source": "https://www.kmotors.shop/en/catalog/42718238",
+  "brand": "BMW",
+  "model": "X2 (F39)",
+  "grade": "xDrive20i M Sport",
+  "trim": "",
+  "year": 2023,
+  "firstRegistered": "2022-12-29",
+  "mileageKm": 40282,
+  "displacementCc": 1998,
+  "transmission": "Automatic",
+  "fuel": "Gasoline",
+  "body": "",
+  "color": "",
+  "seats": 5,
+  "vin": "TESTVIN718238",
+  "plate": "00가0000",
+  "price": {
+    "krw": 26940000,
+    "usd": 20429,
+    "krwToUsd": 0.0007583225904299689,
+    "quotedAt": "2026.10.12 17:02:43",
+    "rateSource": "kb"
+  },
+  "history": {
+    "accidentsOwn": 4,
+    "accidentsOther": 0,
+    "accidentsTotal": 4,
+    "accidentYears": [
+      2023,
+      2024
+    ],
+    "maxPayoutKrw": 3049000,
+    "claims": [
+      {
+        "date": "2024-04-21",
+        "payoutKrw": 3049000,
+        "partsKrw": 1660100,
+        "laborKrw": 234800,
+        "paintKrw": 613700,
+        "own": true
+      },
+      {
+        "date": "2024-03-14",
+        "payoutKrw": 2474000,
+        "partsKrw": 1252100,
+        "laborKrw": 238955,
+        "paintKrw": 478640,
+        "own": true
+      },
+      {
+        "date": "2023-09-08",
+        "payoutKrw": 1988450,
+        "partsKrw": 764243,
+        "laborKrw": 122706,
+        "paintKrw": 423029,
+        "own": true
+      },
+      {
+        "date": "2023-02-09",
+        "payoutKrw": 474000,
+        "partsKrw": 392000,
+        "laborKrw": 39000,
+        "paintKrw": 0,
+        "own": true
+      }
+    ],
+    "ownerChanges": 0,
+    "theft": 0,
+    "flood": 0,
+    "totalLoss": 0
+  },
+  "options": {
+    "comfort": [
+      "Sunroof",
+      "Driver seat memory",
+      "Heated steering wheel",
+      "Power tailgate",
+      "Leather seats",
+      "Automatic climate control",
+      "Heated front seats",
+      "Power driver seat",
+      "Power passenger seat",
+      "Smart key",
+      "Auto-dimming mirror (ECM)",
+      "Power-folding mirrors",
+      "Keyless entry",
+      "Power door locks",
+      "Power windows"
+    ],
+    "safety": [
+      "Head-up display (HUD)",
+      "Adaptive cruise control",
+      "Lane departure warning (LDWS)",
+      "Rear-view camera",
+      "Front parking sensors",
+      "Rear parking sensors",
+      "Navigation",
+      "Bluetooth",
+      "LED headlights",
+      "Electronic parking brake (EPB)",
+      "Automatic headlights",
+      "Rain sensor",
+      "Paddle shifters",
+      "Tire pressure monitoring (TPMS)",
+      "Electronic stability control (ESC)",
+      "Hi-Pass toll system",
+      "Side airbags",
+      "Curtain airbags",
+      "Driver airbag",
+      "Passenger airbag",
+      "Anti-lock braking system (ABS)",
+      "Traction control (TCS)",
+      "Steering wheel controls",
+      "Front AV monitor",
+      "USB port"
+    ],
+    "other": [
+      "Roof rails",
+      "Alloy wheels",
+      "Power steering"
+    ],
+    "total": 43
+  },
+  "photos": {
+    "hero": "https://ci.encar.com/carpicture01/pic4271/42718238_027.jpg?impolicy=heightRate&rh=1080",
+    "rear": "https://ci.encar.com/carpicture01/pic4271/42718238_002.jpg?impolicy=heightRate&rh=1080",
+    "interiorShot": "https://ci.encar.com/carpicture01/pic4271/42718238_007.jpg?impolicy=heightRate&rh=1080",
+    "dashboard": "https://ci.encar.com/carpicture01/pic4271/42718238_008.jpg?impolicy=heightRate&rh=1080",
+    "exterior": [
+      "https://ci.encar.com/carpicture01/pic4271/42718238_002.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_003.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_004.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_005.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_006.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_031.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_032.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_033.jpg?impolicy=heightRate&rh=1080"
+    ],
+    "interior": [
+      "https://ci.encar.com/carpicture01/pic4271/42718238_007.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_008.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_009.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_010.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_034.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_035.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_036.jpg?impolicy=heightRate&rh=1080"
+    ],
+    "other": [
+      "https://ci.encar.com/carpicture01/pic4271/42718238_015.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_016.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_017.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_018.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_019.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_020.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_021.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_022.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_023.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_024.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_040.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_041.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_042.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_043.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_044.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_045.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_046.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture01/pic4271/42718238_047.jpg?impolicy=heightRate&rh=1080"
+    ]
+  }
+}

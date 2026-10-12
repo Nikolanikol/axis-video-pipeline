@@ -1,0 +1,147 @@
+{
+  "id": "41756066",
+  "source": "https://www.kmotors.shop/en/catalog/41756066",
+  "brand": "BMW",
+  "model": "3-Series",
+  "grade": "320d M Sport",
+  "trim": "",
+  "year": 2017,
+  "firstRegistered": "2017-05-12",
+  "mileageKm": 113198,
+  "displacementCc": 1995,
+  "transmission": "Automatic",
+  "fuel": "Diesel",
+  "body": "",
+  "color": "Black",
+  "seats": 5,
+  "vin": "TESTVIN756066",
+  "plate": "00가0000",
+  "price": {
+    "krw": 15940000,
+    "usd": 12088,
+    "krwToUsd": 0.0007583225904299689,
+    "quotedAt": "2026.10.12 17:02:43",
+    "rateSource": "kb"
+  },
+  "history": {
+    "accidentsOwn": 3,
+    "accidentsOther": 0,
+    "accidentsTotal": 3,
+    "accidentYears": [
+      2017,
+      2024,
+      2025
+    ],
+    "maxPayoutKrw": 4878830,
+    "claims": [
+      {
+        "date": "2025-07-05",
+        "payoutKrw": 1236900,
+        "partsKrw": 0,
+        "laborKrw": 694110,
+        "paintKrw": 721340,
+        "own": false
+      },
+      {
+        "date": "2024-10-28",
+        "payoutKrw": 4878830,
+        "partsKrw": 3284220,
+        "laborKrw": 349750,
+        "paintKrw": 396160,
+        "own": true
+      },
+      {
+        "date": "2017-05-30",
+        "payoutKrw": 285800,
+        "partsKrw": 143925,
+        "laborKrw": 18000,
+        "paintKrw": 71761,
+        "own": true
+      }
+    ],
+    "ownerChanges": 7,
+    "theft": 0,
+    "flood": 0,
+    "totalLoss": 0
+  },
+  "options": {
+    "comfort": [
+      "Sunroof",
+      "Driver seat memory",
+      "Leather seats",
+      "Automatic climate control",
+      "Heated front seats",
+      "Power driver seat",
+      "Power passenger seat",
+      "Smart key",
+      "Auto-dimming mirror (ECM)",
+      "Power-folding mirrors",
+      "Keyless entry",
+      "Power door locks",
+      "Power windows"
+    ],
+    "safety": [
+      "Head-up display (HUD)",
+      "Rear-view camera",
+      "Front parking sensors",
+      "Rear parking sensors",
+      "Navigation",
+      "Bluetooth",
+      "LED headlights",
+      "Cruise control",
+      "Automatic headlights",
+      "Rain sensor",
+      "Paddle shifters",
+      "Tire pressure monitoring (TPMS)",
+      "Electronic stability control (ESC)",
+      "Side airbags",
+      "Curtain airbags",
+      "Driver airbag",
+      "Passenger airbag",
+      "Anti-lock braking system (ABS)",
+      "Traction control (TCS)",
+      "Steering wheel controls",
+      "Front AV monitor",
+      "CD player",
+      "AUX port",
+      "USB port"
+    ],
+    "other": [
+      "Alloy wheels",
+      "Power steering"
+    ],
+    "total": 39
+  },
+  "photos": {
+    "hero": "https://ci.encar.com/carpicture05/pic4175/41756066_001.jpg?impolicy=heightRate&rh=1080",
+    "rear": "https://ci.encar.com/carpicture05/pic4175/41756066_002.jpg?impolicy=heightRate&rh=1080",
+    "interiorShot": "https://ci.encar.com/carpicture05/pic4175/41756066_007.jpg?impolicy=heightRate&rh=1080",
+    "dashboard": "https://ci.encar.com/carpicture05/pic4175/41756066_008.jpg?impolicy=heightRate&rh=1080",
+    "exterior": [
+      "https://ci.encar.com/carpicture05/pic4175/41756066_001.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture05/pic4175/41756066_002.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture05/pic4175/41756066_003.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture05/pic4175/41756066_004.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture05/pic4175/41756066_005.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture05/pic4175/41756066_006.jpg?impolicy=heightRate&rh=1080"
+    ],
+    "interior": [
+      "https://ci.encar.com/carpicture05/pic4175/41756066_007.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture05/pic4175/41756066_008.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture05/pic4175/41756066_009.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture05/pic4175/41756066_010.jpg?impolicy=heightRate&rh=1080"
+    ],
+    "other": [
+      "https://ci.encar.com/carpicture05/pic4175/41756066_015.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture05/pic4175/41756066_016.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture05/pic4175/41756066_017.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture05/pic4175/41756066_018.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture05/pic4175/41756066_019.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture05/pic4175/41756066_020.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture05/pic4175/41756066_021.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture05/pic4175/41756066_022.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture05/pic4175/41756066_023.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture05/pic4175/41756066_024.jpg?impolicy=heightRate&rh=1080"
+    ]
+  }
+}

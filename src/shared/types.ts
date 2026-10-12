@@ -31,6 +31,14 @@ export type Market = {
   language?: string;
   // Telegram и главный канал связи — кнопка на финале карусели
   telegram?: string; contactPrimary?: 'whatsapp' | 'telegram';
+  // Иконка у строки преимущества в CTA (Настройки → «Реклама авто»); нет — показываем
+  benefitIcon?: boolean;
+  // Вон за единицу валюты компании на сегодня (₽, ₸, €…) — сервер и интерфейс кладут его из
+  // курсов дня; им считается цена объявления, где свой курс не вписан. У ₩ и $ не нужен
+  krwPerUnitToday?: number;
+  // Вон за $1 на сегодня — им слайд карусели переводит в валюту профиля долларовую цену
+  // машины из Китая (у неё нет цены в вонах). Кладут renderMarket и useTodayMarket
+  krwPerUsdToday?: number;
 };
 
 // Профиль клиента: config/profiles/<id>.json. Приходит на смену «рынку» — см. src/shared/profile.js.
@@ -49,8 +57,11 @@ export type Profile = {
   // telegram — @имя или ссылка; primary — чем подписана кнопка связи на финале карусели
   contacts: {whatsapp: string | null; site: string; telegram?: string; primary?: 'whatsapp' | 'telegram'};
   pricing: Pricing;
-  // Правки текстов поверх дефолтов платформы; пусто — всё из дефолтов
-  texts?: Partial<Texts>;
+  // Правки текстов поверх дефолтов платформы, по языкам: {ru: {...}, en: {...}}; пусто — всё
+  // из дефолтов. Старые профили хранили плоскую пачку — её читает textsForLanguage
+  texts?: Record<string, Partial<Texts>> | Partial<Texts>;
+  // Настройки рекламного ролика, не зависящие от языка
+  ad?: {benefitIcon?: boolean};
 };
 
 // Лот — данные об авто. Любое поле рынка можно переопределить (например, whatsapp: null — скрыть номер).
@@ -61,6 +72,13 @@ export type Lot = Partial<Omit<Market, 'texts'>> & {
   brand: string; model: string; trim?: string; year: number; specs: string[];
   // Цена авто: либо сразу в $, либо в ₩ + курс (₩ за $1). Без цены ролик — черновик с заглушкой.
   carPriceUsd?: number | null; carPriceKrw?: number | null; krwPerUsd?: number | null;
+  // Итог в ролике, вписанный руками, — в валюте профиля, как есть: перебивает расчёт
+  // «авто + фрахт». Клиенты ставят свою цену с наценкой, а не закупочную с Encar (11.10)
+  priceOverride?: number | null;
+  // Свой курс объявления для валюты компании: вон за 1 ₽ (₸, €…). Клиент правит его свободно —
+  // так он закладывает маржу (11.10). fxCurrency — к какой валюте курс: сменили валюту в
+  // профиле — старый курс не применяем, считаем по сегодняшнему
+  krwPerUnit?: number | null; fxCurrency?: string;
   // Путь в public/, абсолютный путь сервера (/data/...) или http-ссылка
   photos: string[];
   // История машины из Encar (без списка выплат — ролику нужны только счётчики).
@@ -211,6 +229,11 @@ export type Review = {
 export type CarouselCar = {
   id: string;
   source: string;
+  // Откуда машина: от этого зависят «Цена в Корее / в Китае», «Импорт из …» на слайдах.
+  // Нет поля — Корея (Encar, лоты аукционов); CN — che168, JP — Carsensor
+  origin?: 'KR' | 'CN' | 'JP';
+  // Город машины (che168), префектура (Carsensor): точка отправления в маршруте ролика
+  city?: string;
   brand: string; model: string; grade: string; trim: string;
   year: number | null;
   firstRegistered: string | null;
@@ -221,7 +244,9 @@ export type CarouselCar = {
   vin: string | null; plate: string | null;
   // Цена в Корее: воны, доллары и курс с отметкой времени — без неё цифры в постах
   // расходятся между днями, и объяснить расхождение нечем
-  price: {krw: number; usd: number | null; krwToUsd: number; quotedAt: string; rateSource: string} | null;
+  // У машины из Китая вон нет (krw: null) — только доллары международной версии che168.
+  // У японской (Carsensor) — иены (jpy) и доллары, пересчитанные из них по курсу дня на сборке
+  price: {krw: number | null; usd: number | null; krwToUsd: number | null; quotedAt: string | null; rateSource: string; jpy?: number | null} | null;
   // null — история недоступна. Это НЕ то же самое, что «происшествий не было»
   history: {
     accidentsOwn: number; accidentsOther: number; accidentsTotal: number;
@@ -246,6 +271,8 @@ export type CarouselCar = {
 // skip — слайды, которые не рисуем вовсе (лот аукциона без цены, истории и опций).
 // format — id из config/carousel-formats.json (нет — «Классика»); seed — зерно варианта:
 // то же зерно даёт те же компоновку и фразы, «Другой вариант» — новое зерно
-export type CarouselProps = {car: CarouselCar; market: Market; theme?: Partial<Theme>; includeHistory?: boolean; skip?: string[]; format?: string; seed?: number};
+export type CarouselProps = {car: CarouselCar; market: Market; theme?: Partial<Theme>; includeHistory?: boolean; skip?: string[]; format?: string; seed?: number;
+  // Своя цена клиента на слайде цены, в валюте профиля (src/carousel/price.ts)
+  priceOverride?: number | null};
 
 export type ReviewProps = {review: Review; lot?: Lot | null; market: Market; theme?: Partial<Theme>};

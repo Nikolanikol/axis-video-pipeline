@@ -9,14 +9,19 @@ import {Home, PipelinePage} from './Home';
 import {StartPage} from './Onboarding';
 import {Pipeline, ToolMeta, findPipeline, isClosed, toolKey, visiblePipelines} from './pipelines';
 import {href, useRoute} from './router';
+import {currencyCode, currencySign, isDirect, krwPerUnit} from '../src/shared/currencies';
+import {useRates} from './rates';
 import {TOOLS, hasTool} from './tools';
 import {Toasts} from './Toast';
+import {reportError} from './errorReport';
+import {errorText} from './api';
+import {SiteFooter} from './SiteFooter';
 
 export const Shell: React.FC = () => {
   const [error, setError] = useState('');
-  const report = useCallback((e: unknown) => setError(e instanceof Error ? e.message : String(e)), []);
+  const report = useCallback((e: unknown) => setError(errorText(e)), []);
   return (
-    <div className="app">
+    <div className="shell">
       <AuthGate>
         <ConfigProvider report={report}>
           <Frame error={error} clearError={() => setError('')} />
@@ -57,13 +62,25 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
     return () => window.removeEventListener('keydown', onKey);
   }, [menuOpen]);
 
+  // Подвал — под рабочей зоной высотой в экран (владелец 12.10): виден всегда, но до него надо
+  // чуть прокрутить. Исключение — телефон на экранах с выдвижными панелями (MobileTabs.tsx): там
+  // панели, нижние вкладки и кнопка сборки закреплены поверх экрана и закрывали бы подвал, а верх
+  // панелей (--mtop) меряется без учёта прокрутки страницы
+  const fixedPanels = !!pipeline && !!tool && PHONE_PANEL_TOOLS.has(toolKey(pipeline.id, tool.id)) && !isClosed(pipeline.id, config.production);
+  const service = [
+    ...main.map((p) => ({label: p.title, href: href(p.id, firstReady(p)?.id)})),
+    ...(session.enabled && !session.isStaff ? [{label: 'Кабинет и тарифы', href: href('account')}] : []),
+  ];
+
   return (
     <>
+    <div className="app">
       <div className={menuOpen ? 'menu-scrim open' : 'menu-scrim'} onClick={() => setMenuOpen(false)} aria-hidden="true" />
       <header className="top">
         <a href={href()} className="top-home" title="Все пайплайны">
           <img src="/kok/wordmark.svg" alt="KOK" className="top-logo" />
         </a>
+        <RatesChip />
         {config.preview && <span className="top-preview" title="Превью ветки: тестовая база, не прод">ТЕСТ · PR {config.preview}</span>}
         <nav className="crumbs">
           <a href={href()}>Пайплайны</a>
@@ -87,6 +104,8 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
             {navItems.map((i) => <a key={i.key} href={i.to} className={i.active ? 'menu-link active' : 'menu-link'}>{i.label}</a>)}
           </nav>
           {session.enabled && <AccountChip />}
+          {/* На телефоне курсы — в меню: в шапке рядом с логотипом им нет места */}
+          <RatesChip />
         </div>
       </header>
 
@@ -121,9 +140,14 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
               : !tool ? <NotFound />
                 : <ToolScreen pipeline={pipeline} tool={tool} />}
       </div>
+    </div>
+    <SiteFooter service={service} className={fixedPanels ? 'foot-no-phone' : undefined} />
     </>
   );
 };
+
+// Инструменты с выдвижными панелями на телефоне (usePanelSwipes) — там подвала на телефоне нет
+const PHONE_PANEL_TOOLS = new Set(['ads/lot', 'carousels/build', 'settings/profile', 'settings/brand', 'settings/ads']);
 
 /**
  * Подписка скоро кончится: за RENEW_DAYS дней до конца. Кредиты подписки сгорают, поэтому
@@ -146,6 +170,30 @@ const RenewBanner: React.FC = () => {
       {burning > 0 && <>, вместе с ней сгорят {burning} кр.</>}.{' '}
       <a href={href('account')}>Продлить</a>
     </div>
+  );
+};
+
+/**
+ * Курсы на сегодня рядом с логотипом (владелец 11.10): доллар и валюта компании к воне —
+ * цены на Encar в вонах, и дилер сверяется с курсом, не уходя со страницы. Справочно: цены
+ * объявлений считаются по курсу, записанному в объявлении, — его клиент правит сам
+ */
+const RatesChip: React.FC = () => {
+  const {profile} = useConfig();
+  const rates = useRates();
+  if (!rates) return null;
+  const currency = currencyCode(profile.pricing?.currency);
+  const krwUsd = rates.usdRates.KRW;
+  const own = isDirect(currency) ? null : krwPerUnit(currency, rates.usdRates);
+  const n = (v: number) => v.toLocaleString('ru-RU', {maximumFractionDigits: 2});
+  const day = new Date(rates.fetchedAt).toLocaleDateString('ru-RU', {day: 'numeric', month: 'long'});
+  return (
+    <span className={rates.stale ? 'top-rates stale' : 'top-rates'}
+      title={`${rates.stale ? 'Курс не обновился, последний известный' : 'Курс'} на ${day} · ${rates.source}`}>
+      {krwUsd ? <span>1 $ = <b>{n(krwUsd)} ₩</b></span> : null}
+      {own ? <span>1 {currencySign(currency)} = <b>{n(own)} ₩</b></span> : null}
+      {rates.stale && <span className="muted">на {day}</span>}
+    </span>
   );
 };
 
@@ -181,20 +229,36 @@ const ToolScreen: React.FC<{pipeline: Pipeline; tool: ToolMeta}> = ({pipeline, t
   );
 };
 
-// Ошибка внутри инструмента не роняет всё приложение
+// Ошибка внутри инструмента не роняет всё приложение. Текст исключения человеку не показываем:
+// он английский и про код («Cannot read properties of undefined»), — отчёт уже ушёл нам.
+// Отдельный случай — после выкладки старая вкладка просит кусок сборки, которого больше нет:
+// это лечит только перезагрузка, «Попробовать снова» падало бы раз за разом
+const STALE_BUILD = /dynamically imported module|Importing a module script failed|Loading chunk/i;
+
 class ToolBoundary extends React.Component<{title: string; children: React.ReactNode}, {error: Error | null}> {
   state = {error: null as Error | null};
   static getDerivedStateFromError(error: Error) { return {error}; }
-  componentDidCatch(error: Error) { console.error(error); }
+  componentDidCatch(error: Error, info: React.ErrorInfo) {
+    console.error(error);
+    reportError('boundary', error, {tool: this.props.title, componentStack: info.componentStack ?? undefined});
+  }
   render() {
-    if (!this.state.error) return this.props.children;
+    const {error} = this.state;
+    if (!error) return this.props.children;
+    const stale = STALE_BUILD.test(error.message);
     return (
       <div className="page">
         <div className="card">
           <h1>«{this.props.title}» не открылся</h1>
-          <p className="job-message">{this.state.error.message}</p>
+          <p className="job-message">
+            {stale
+              ? 'Мы обновили KOK, пока страница была открыта. Обновите её — всё ваше сохранено.'
+              : 'На странице произошёл сбой. Мы уже получили отчёт и разберёмся. Попробуйте ещё раз или обновите страницу — сохранённое не потеряется.'}
+          </p>
           <div className="actions-row">
-            <button className="btn" onClick={() => this.setState({error: null})}>Попробовать снова</button>
+            {stale
+              ? <button className="btn primary" onClick={() => window.location.reload()}>Обновить страницу</button>
+              : <button className="btn" onClick={() => this.setState({error: null})}>Попробовать снова</button>}
             <a className="btn ghost" href={href()}>Все пайплайны</a>
           </div>
         </div>

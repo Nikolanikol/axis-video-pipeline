@@ -26,6 +26,9 @@ import path from 'node:path';
 import zlib from 'node:zlib';
 import {parseLotPage} from '../src/shared/kmotorsLot.js';
 import {HttpError} from './store.mjs';
+import {serverLog} from './log.mjs';
+
+const log = serverLog('kmotors-lot');
 
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36';
 const TIMEOUT_MS = 20_000;
@@ -82,7 +85,7 @@ export const fetchLot = async ({house, id}, {fetchImpl = fetch} = {}) => {
   if (!parsed.ok) {
     if (parsed.reason === 'gone') throw new HttpError(404, 'Лот не найден — возможно, торги закончились и он ушёл со страницы');
     // Страница есть, а нужных данных в ней нет: сменилась вёрстка. Это поломка у нас, не у человека
-    console.error(`[kmotors-lot] ${key}: страница отдалась, но лот не разобрался — сменилась вёрстка?`);
+    log.error('parse.failed', {note: 'страница отдалась, но лот не разобрался — сменилась вёрстка?', key});
     throw new HttpError(502, 'Страница лота изменилась, и я не смог её прочитать. Сообщите разработчику');
   }
   if (cache.size >= CACHE_MAX) cache.delete(cache.keys().next().value);

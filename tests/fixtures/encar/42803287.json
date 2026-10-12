@@ -1,0 +1,136 @@
+{
+  "id": "42803287",
+  "source": "https://www.kmotors.shop/en/catalog/42803287",
+  "brand": "Renault Korea",
+  "model": "QM6",
+  "grade": "2.0 GDe PREMIERE 2WD",
+  "trim": "",
+  "year": 2023,
+  "firstRegistered": "2022-11-17",
+  "mileageKm": 43844,
+  "displacementCc": 1997,
+  "transmission": "Automatic",
+  "fuel": "Gasoline",
+  "body": "",
+  "color": "White",
+  "seats": 5,
+  "vin": null,
+  "plate": "00가0000",
+  "price": {
+    "krw": 25240000,
+    "usd": 19140,
+    "krwToUsd": 0.0007583225904299689,
+    "quotedAt": "2026.10.12 17:02:43",
+    "rateSource": "kb"
+  },
+  "history": {
+    "accidentsOwn": 1,
+    "accidentsOther": 0,
+    "accidentsTotal": 1,
+    "accidentYears": [
+      2023
+    ],
+    "maxPayoutKrw": 735000,
+    "claims": [
+      {
+        "date": "2023-02-09",
+        "payoutKrw": 735000,
+        "partsKrw": 0,
+        "laborKrw": 0,
+        "paintKrw": 0,
+        "own": false
+      }
+    ],
+    "ownerChanges": 2,
+    "theft": 0,
+    "flood": 0,
+    "totalLoss": 0
+  },
+  "options": {
+    "comfort": [
+      "Massage seat",
+      "Ventilated passenger seat",
+      "Ventilated driver seat",
+      "Driver seat memory",
+      "Heated rear seats",
+      "Heated steering wheel",
+      "Power tailgate",
+      "Leather seats",
+      "Automatic climate control",
+      "Heated front seats",
+      "Power driver seat",
+      "Power passenger seat",
+      "Smart key",
+      "Auto-dimming mirror (ECM)",
+      "Power-folding mirrors",
+      "Keyless entry",
+      "Power door locks",
+      "Power windows"
+    ],
+    "safety": [
+      "Adaptive cruise control",
+      "Blind spot monitoring",
+      "Lane departure warning (LDWS)",
+      "Rear-view camera",
+      "Front parking sensors",
+      "Rear parking sensors",
+      "Navigation",
+      "Bluetooth",
+      "LED headlights",
+      "Electronic parking brake (EPB)",
+      "Automatic headlights",
+      "Rain sensor",
+      "Tire pressure monitoring (TPMS)",
+      "Electronic stability control (ESC)",
+      "Hi-Pass toll system",
+      "Side airbags",
+      "Curtain airbags",
+      "Driver airbag",
+      "Passenger airbag",
+      "Anti-lock braking system (ABS)",
+      "Traction control (TCS)",
+      "Steering wheel controls",
+      "Front AV monitor",
+      "AUX port",
+      "USB port"
+    ],
+    "other": [
+      "Roof rails",
+      "Alloy wheels",
+      "Power steering"
+    ],
+    "total": 46
+  },
+  "photos": {
+    "hero": "https://ci.encar.com/carpicture10/pic4280/42803287_001.jpg?impolicy=heightRate&rh=1080",
+    "rear": "https://ci.encar.com/carpicture10/pic4280/42803287_002.jpg?impolicy=heightRate&rh=1080",
+    "interiorShot": "https://ci.encar.com/carpicture10/pic4280/42803287_007.jpg?impolicy=heightRate&rh=1080",
+    "dashboard": "https://ci.encar.com/carpicture10/pic4280/42803287_008.jpg?impolicy=heightRate&rh=1080",
+    "exterior": [
+      "https://ci.encar.com/carpicture10/pic4280/42803287_001.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4280/42803287_002.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4280/42803287_003.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4280/42803287_004.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4280/42803287_005.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4280/42803287_006.jpg?impolicy=heightRate&rh=1080"
+    ],
+    "interior": [
+      "https://ci.encar.com/carpicture10/pic4280/42803287_007.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4280/42803287_008.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4280/42803287_009.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4280/42803287_010.jpg?impolicy=heightRate&rh=1080"
+    ],
+    "other": [
+      "https://ci.encar.com/carpicture10/pic4280/42803287_015.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4280/42803287_016.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4280/42803287_017.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4280/42803287_018.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4280/42803287_019.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4280/42803287_020.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4280/42803287_021.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4280/42803287_022.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4280/42803287_023.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture10/pic4280/42803287_024.jpg?impolicy=heightRate&rh=1080"
+    ]
+  }
+}

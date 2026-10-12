@@ -1,9 +1,9 @@
-// Карусели по авто: ссылка Encar → карточка от шлюза kmotors → слайды в выбранном формате
+// Карусели по авто: ссылка Encar / che168 / Carsensor → карточка от модуля-ядра источника
+// (server/encar.mjs, che168.mjs, carsensor.mjs) → слайды в выбранном формате
 // (config/carousel-formats.json: от 6 до 12 картинок, 1:1, 4:5 или 9:16).
 //
-// Данные берём не из Encar напрямую: он режет адреса дата-центров, и на сервере это
-// однажды перестанет работать. Шлюз kmotors ходит туда сам и умеет обходить блокировку
-// через свой прокси — см. ~/Desktop/recup/KMotors-1/src/app/api/vehicle/[id]/route.ts.
+// Как источник достаёт машину — его дело (Encar — через шлюз kmotors, cores/encar); карусели
+// получают готовую карточку CarouselCar.
 //
 // Рендерим не видео, а кадры: композиция carousel — кадр на слайд, каждый снимается
 // renderStill; размер кадра и число слайдов композиция берёт из формата. Поэтому карусель живёт в общем движке рядом с роликами и
@@ -13,8 +13,14 @@ import path from 'node:path';
 import {bundle} from '@remotion/bundler';
 import {openBrowser, renderStill, selectComposition} from '@remotion/renderer';
 import {LOT_SKIP_SLIDES, carFromLot, lotPageUrl, missingForCarousel, parseCarouselSource} from '../src/shared/kmotorsLot.js';
+import {brandForRender} from './brand.mjs';
 import {fetchLot} from './kmotorsLot.mjs';
-import {
+import {fetchEncarCar} from './encar.mjs';
+import {fetchChe168Car} from './che168.mjs';
+import {fetchCarsensorCar} from './carsensor.mjs';
+import {CHE168_SKIP_SLIDES} from '../src/shared/che168Car.js';
+import {CARSENSOR_SKIP_SLIDES} from '../src/shared/carsensorCar.js';
+import {skipUnreadable, 
   HttpError, PRODUCTION, ROOT, checkId, currentWorkspace, workspaceDir, workspaceUrl, getBrand, readJson, renderMarket, writeJson,
 } from './store.mjs';
 
@@ -30,47 +36,20 @@ const INCLUDE_HISTORY = !PRODUCTION;
 
 /** Форматы карусели. Незнакомый id — отказ: иначе молча вышла бы «Классика» */
 export const carouselFormats = () => readJson(path.join(ROOT, 'config', 'carousel-formats.json'));
+/**
+ * Форматы для интерфейса — с тем числом слайдов, что реально выйдет. Без истории (на сервере)
+ * слайдов на один меньше, а карточка формата обещала полное число: Дмитрий на превью PR 13
+ * получил 6 вместо 7, 8 вместо 9, 11 вместо 12 (решение владельца 12.10 — честное число).
+ * Поэтому и в note числа нет: его пишет интерфейс по slides.length
+ */
+export const clientCarouselFormats = async () => (await carouselFormats())
+  .map((f) => ({...f, slides: f.slides.filter((s) => INCLUDE_HISTORY || s !== 'history')}));
 const checkFormat = async (id) => {
   const list = await carouselFormats();
   const found = list.find((f) => f.id === (id || 'classic'));
   if (!found) throw new HttpError(400, `Нет такого формата карусели: ${id}`);
   return found.id;
 };
-// Шлюз ходит в Encar и ждёт ответа от него; у самого Encar таймаут 8 с плюс запасной прокси,
-// которому на холодную нужны десятки секунд
-const GATEWAY_TIMEOUT_MS = Number(process.env.CAROUSEL_TIMEOUT_MS || 60_000);
-
-const gateway = () => {
-  const base = process.env.KMOTORS_API_URL;
-  const secret = process.env.KMOTORS_API_SECRET;
-  if (!base || !secret) {
-    throw new HttpError(400, 'Не настроен шлюз: добавь KMOTORS_API_URL и KMOTORS_API_SECRET в .env');
-  }
-  return {base: base.replace(/\/+$/, ''), secret};
-};
-
-/** Карточка авто по номеру объявления. Бросает с текстом, пригодным для интерфейса. */
-export const fetchCar = async (id) => {
-  const {base, secret} = gateway();
-  let res;
-  try {
-    res = await fetch(`${base}/api/vehicle/${encodeURIComponent(id)}`, {
-      headers: {'x-vehicle-secret': secret},
-      signal: AbortSignal.timeout(GATEWAY_TIMEOUT_MS),
-    });
-  } catch (e) {
-    if (e?.name === 'TimeoutError') throw new HttpError(504, 'Шлюз не ответил вовремя — попробуй ещё раз');
-    throw new HttpError(502, `Не достучались до шлюза: ${e?.message || e}`);
-  }
-  if (res.status === 404) throw new HttpError(404, 'Машина не найдена — возможно, объявление снято');
-  if (res.status === 401) throw new HttpError(400, 'Шлюз не принял секрет: проверь KMOTORS_API_SECRET');
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new HttpError(502, body?.error || `Шлюз ответил ${res.status}`);
-  }
-  return res.json();
-};
-
 // Фото лотов лежат на CDN площадок. Качаем только с известных хостов (адреса приходят со
 // страницы чужого сайта, и сервер не должен ходить по ним куда попало), только по одному
 // кадру за раз ограниченной пачкой, и кладём к себе: рендер берёт их с нашего адреса, а
@@ -118,7 +97,7 @@ const localizePhotos = async (car, dir, id, origin) => {
   await Promise.all(Array.from({length: 4}, worker));
   const to = (u) => mapped.get(u) ?? null;
   const p = car.photos;
-  if (!to(p.hero)) throw new HttpError(502, 'Не удалось скачать фото лота — площадка не отдаёт их с сервера. Попробуйте позже');
+  if (!to(p.hero)) throw new HttpError(502, 'Не удалось скачать фото машины — площадка не отдаёт их с сервера. Попробуйте позже');
   return {
     ...car,
     photos: {
@@ -176,9 +155,11 @@ const runKey = (id) => `${currentWorkspace()}:${id}`;
 
 /**
  * Собрать карусель по ссылке или номеру.
- * @param {string} link — ссылка Encar или голый номер
- * @param {{format?: string, seed?: number}} [opts] — формат из реестра и зерно варианта:
- *   то же зерно — те же компоновка и фразы; нет зерна — случайное («Другой вариант»)
+ * @param {string} link — ссылка Encar / che168 / Carsensor, голый номер Encar или наш id («ch-60154824», «cs-au…», «km-…»)
+ * @param {{format?: string, seed?: number, priceOverride?: number | null}} [opts] — формат из
+ *   реестра и зерно варианта: то же зерно — те же компоновка и фразы; нет зерна — случайное
+ *   («Другой вариант»). priceOverride — своя цена клиента на слайде цены; не передана —
+ *   остаётся прежняя из carousel.json: «Другой вариант» не должен сбрасывать цену клиента
  * @returns {Promise<{id: string, car: object, slides: string[], updatedAt: string, format: string, seed: number}>}
  */
 export const buildCarousel = async (link, opts = {}) => {
@@ -194,14 +175,28 @@ export const buildCarousel = async (link, opts = {}) => {
     let lot = null;
     if (src.source === 'lot') lot = {house: src.house, id: src.lotId};
     if (src.source === 'lot-saved') {
-      const saved = await readJson(path.join(carouselsDir(), id, 'carousel.json')).catch(() => null);
+      const savedFile = path.join(carouselsDir(), id, 'carousel.json');
+      const saved = await readJson(savedFile).catch(skipUnreadable('карусель по лоту', savedFile));
       if (!saved?.lot) throw new HttpError(404, 'Карусель по лоту не найдена — вставь ссылку на лот заново');
       lot = {house: saved.lot.house, id: saved.lot.id};
     }
-    let car = lot ? await carFromLink({house: lot.house, lotId: lot.id}) : await fetchCar(id);
-    // Карусель — всегда про корейское объявление (источник Encar), но контакты и компанию
-    // берём из профиля клиента: бренд и подпись должны быть его.
-    const [profileMarket, brand] = await Promise.all([renderMarket(), getBrand()]);
+    // Битый файл прежней карусели не держит сборку, но цена клиента из него потеряется — пишем
+    const prevFile = path.join(carouselsDir(), id, 'carousel.json');
+    const prev = await readJson(prevFile).catch(skipUnreadable('прежняя карусель', prevFile));
+    const priceOverride = opts.priceOverride !== undefined ? opts.priceOverride : prev?.priceOverride ?? null;
+    // Контакты и компанию берём из профиля клиента: бренд и подпись должны быть его. Профиль —
+    // до машины: по его языку ядро che168 отдаёт названия опций
+    const [profileMarket, brand] = await Promise.all([renderMarket(), getBrand().then(brandForRender)]);
+    // Машина из Китая — через модуль-ядро che168 (cores/che168, граница — server/che168.mjs)
+    // Машина из Японии — через ядро carsensor (cores/carsensor, граница — server/carsensor.mjs)
+    const china = src.source === 'che168';
+    const japan = src.source === 'carsensor';
+    let car = lot ? await carFromLink({house: lot.house, lotId: lot.id})
+      : china ? await fetchChe168Car(src.ref, profileMarket.language)
+        : japan ? await fetchCarsensorCar(src.ref, profileMarket.language) : await fetchEncarCar(id);
+    // Нет фото вовсе — так и говорим, а не «площадка не отдаёт» (это про сбой скачивания); до
+    // создания папки — пустая папка карусели не нужна
+    if ((china || japan) && !car.photos.hero) throw new HttpError(422, 'У этого объявления нет фото — карусель по нему не собрать');
     const theme = {...brand, name: profileMarket.name};
     const market = profileMarket;
     // Логотип из настроек лежит на нашем сервере, а рендер грузит сборку с адреса Remotion:
@@ -214,10 +209,14 @@ export const buildCarousel = async (link, opts = {}) => {
       : theme.assets;
     const dir = path.join(carouselsDir(), id);
     await fs.mkdir(dir, {recursive: true});
+    // Фото лотов — к себе: рендер берёт их с нашего адреса, а не с CDN площадки. Машины из Китая —
+    // как Encar, прямо с CDN Autohome (открыт, исходники «0x0_» без входа): со своего адреса браузер
+    // рендера в превью получал 401 от заслонки Basic Auth (11.10), а ослаблять её — не наше решение
     if (lot) car = await localizePhotos(car, dir, id, origin);
-    // У лота нет цены, истории и опций: эти слайды не рисуем, а не заполняем прочерками
+    // У лота нет цены, истории и опций: эти слайды не рисуем, а не заполняем прочерками.
+    // У машины из Китая нет истории: лист осмотра в рекламу не идёт (решение владельца 11.10)
     const inputProps = {car, market, theme: {...theme, assets}, includeHistory: INCLUDE_HISTORY, format, seed,
-      skip: lot ? LOT_SKIP_SLIDES : []};
+      skip: lot ? LOT_SKIP_SLIDES : china ? CHE168_SKIP_SLIDES : japan ? CARSENSOR_SKIP_SLIDES : [], priceOverride};
     // Старые кадры убираем перед сборкой: та же машина, пересобранная на проде, даёт шесть
     // слайдов вместо прежних семи, и осиротевший slide-7.png остался бы на диске — со старой
     // историей. Ответ ссылается только на новые шесть, но файл-призрак в томе ни к чему.
@@ -246,6 +245,7 @@ export const buildCarousel = async (link, opts = {}) => {
       slides: Array.from({length: count}, (_, i) => `${workspaceUrl()}/carousels/${id}/slide-${i + 1}.png`),
       updatedAt: new Date().toISOString(),
       format, seed,
+      ...(priceOverride ? {priceOverride} : {}),
       // Откуда лот: «Пересобрать» идёт по нему, кнопка «Открыть лот» — по адресу
       ...(lot ? {lot: {...lot, url: lotPageUrl(lot.house, lot.id)}} : {}),
     };
@@ -267,6 +267,22 @@ export const slideFileName = (car, n) => {
 };
 
 /** Удалить собранную карусель со всеми слайдами. Пересобирать её — тот же buildCarousel по номеру. */
+/**
+ * Пересобрать уже собранную карусель со своей ценой — бесплатно (владелец 11.10): машина,
+ * формат и вариант те же, что были, меняется только цена на слайде. Поэтому формат и зерно
+ * берём из сохранённой карусели, а не из запроса: иначе через бесплатную кнопку собирали бы
+ * новые варианты и форматы, за которые берётся кредит
+ */
+export const repriceCarousel = async (id, price) => {
+  const file = path.join(carouselsDir(), checkId(id), 'carousel.json');
+  const saved = await readJson(file).catch(skipUnreadable('карусель', file));
+  if (!saved) throw new HttpError(404, 'Карусель не найдена — соберите её по ссылке');
+  const v = price === null || price === '' || price === undefined ? null : Number(price);
+  if (v !== null && (!Number.isFinite(v) || v <= 0 || v > 1e12)) throw new HttpError(400, 'Цена — положительное число');
+  // Папка лота (km-…) сама разбирается как «сохранённый лот», номер Encar — как объявление
+  return buildCarousel(id, {format: saved.format, seed: saved.seed, priceOverride: v ? Math.round(v) : null});
+};
+
 export const deleteCarousel = async (id) => {
   checkId(id);
   if (running.has(runKey(id))) throw new HttpError(409, 'Эта карусель сейчас собирается — дождись');
@@ -278,7 +294,9 @@ export const deleteCarousel = async (id) => {
 export const listCarousels = async () => {
   await fs.mkdir(carouselsDir(), {recursive: true});
   const dirs = (await fs.readdir(carouselsDir(), {withFileTypes: true})).filter((d) => d.isDirectory());
-  const all = await Promise.all(dirs.map((d) =>
-    readJson(path.join(carouselsDir(), d.name, 'carousel.json')).catch(() => null)));
+  const all = await Promise.all(dirs.map((d) => {
+    const file = path.join(carouselsDir(), d.name, 'carousel.json');
+    return readJson(file).catch(skipUnreadable('карусель', file));
+  }));
   return all.filter(Boolean).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
 };

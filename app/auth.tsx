@@ -5,12 +5,15 @@
 // входа и регистрации (app/Landing.tsx).
 import React, {Suspense, createContext, lazy, useCallback, useContext, useEffect, useState} from 'react';
 import {Loading} from './Loading';
-import {Balance, Me, Registration, User, api} from './api';
+import {Balance, Me, Registration, User, api, errorText} from './api';
 import {Field} from './LotForm';
 import {useRoute} from './router';
 
 // Витрина — отдельным куском сборки: в ней плеер и композиции роликов, вошедшему они не нужны
 const Landing = lazy(() => import('./Landing').then((m) => ({default: m.Landing})));
+// Оферта и политика — открыты всем, и гостю, и вошедшему: их открывают по прямой ссылке
+// модератор платёжного сервиса и клиент из окна оплаты
+const LegalPage = lazy(() => import('./Legal').then((m) => ({default: m.LegalPage})));
 
 type Session = {
   enabled: boolean;
@@ -51,16 +54,47 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
   // Перечитать, кто вошёл: после подтверждения почты меняются и признак, и баланс
   const load = useCallback(() => {
     api.me().then((m) => { setMe(m); if (signedIn(m)) setBalance(m.balance); })
-      .catch((e) => setError(e.message));
+      .catch((e) => setError(errorText(e)));
   }, []);
 
+  // Баланс меняется и в других вкладках (собрали там ролик, оплатили тариф). Раньше он читался
+  // один раз при открытии, и вкладка показывала старое число до перезагрузки (тест Дмитрия, PR 13).
+  // Перечитываем при возврате во вкладку и при переходе между разделами — только баланс
+  const signed = !!me && signedIn(me);
+  const freshBalance = useCallback(() => {
+    if (signed && document.visibilityState === 'visible') api.me().then((m) => { if (signedIn(m)) setBalance(m.balance); }).catch(() => {});
+  }, [signed]);
   useEffect(() => {
+    document.addEventListener('visibilitychange', freshBalance);
+    window.addEventListener('focus', freshBalance);
+    return () => {
+      document.removeEventListener('visibilitychange', freshBalance);
+      window.removeEventListener('focus', freshBalance);
+    };
+  }, [freshBalance]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(freshBalance, [route]);
+
+  useEffect(() => {
+    // Ссылка «восстановить» из письма об удалении: сервер снимает удаление и сразу впускает
+    if (link?.kind === 'restore') {
+      api.restore(link.token)
+        .then(() => setNotice('Аккаунт восстановлен — всё на месте'))
+        .catch((e) => setNotice(errorText(e)))
+        .finally(() => { window.history.replaceState(null, '', '#/account'); load(); });
+      return;
+    }
+    // Только что удалили аккаунт — витрина откроет окно входа с этой строкой
+    if (window.location.hash.startsWith('#/deleted')) {
+      setNotice('Аккаунт закрыт и будет удалён через 14 дней. Передумаете — восстановите по ссылке из письма.');
+      window.history.replaceState(null, '', window.location.pathname);
+    }
     if (link?.kind !== 'verify') { load(); return; }
     // Подтверждаем и убираем ключ из адреса: в истории браузера и при пересылке ссылки
     // ему делать нечего
     api.verifyLink(link.token)
       .then(() => setNotice('Почта подтверждена — бесплатные кредиты на счёте'))
-      .catch((e) => setNotice(e.message))
+      .catch((e) => setNotice(errorText(e)))
       .finally(() => { window.history.replaceState(null, '', '#/account'); load(); });
   }, [link, load]);
 
@@ -69,7 +103,16 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
   }, []);
 
   if (link?.kind === 'reset') return <ResetScreen token={link.token} />;
-  if (error) return <div className="boot">Сервер не отвечает: {error}</div>;
+  // До проверки входа: документ не зависит от сессии и должен открываться, даже если сервер вход не отдал
+  if (route.pipeline === 'offer' || route.pipeline === 'privacy') {
+    return <Suspense fallback={<Loading />}><LegalPage kind={route.pipeline} anchor={route.tool} /></Suspense>;
+  }
+  if (error) return (
+    <div className="boot">
+      <p>{error}</p>
+      <button className="btn" onClick={() => window.location.reload()}>Обновить страницу</button>
+    </div>
+  );
   if (!me) return <Loading />;
   // Гость — витрина KOK с образцами, условиями и формой (владелец 01.10: «зазвать людей»).
   // #/welcome показывает её и без базы — посмотреть витрину на копии сервера без входа
@@ -91,9 +134,9 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
   );
 };
 
-type EmailLink = {kind: 'verify' | 'reset'; token: string};
+type EmailLink = {kind: 'verify' | 'reset' | 'restore'; token: string};
 const readEmailLink = (): EmailLink | null => {
-  const m = /^#\/(verify|reset)\?t=([\w-]+)/.exec(window.location.hash);
+  const m = /^#\/(verify|reset|restore)\?t=([\w-]+)/.exec(window.location.hash);
   return m ? {kind: m[1] as EmailLink['kind'], token: m[2]} : null;
 };
 
@@ -111,7 +154,7 @@ const ResetScreen: React.FC<{token: string}> = ({token}) => {
       // Сервер уже впустил с новым паролем — на главную, ключ сброса из адреса убираем
       window.location.replace(window.location.pathname);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorText(err));
       setBusy(false);
     }
   };
@@ -189,7 +232,7 @@ export const AuthCard: React.FC<{signup: {credits: number; days: number}; notice
       // от имени вошедшей компании, с нуля
       window.location.reload();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(errorText(err));
       setBusy(false);
     }
   };
@@ -232,6 +275,11 @@ export const AuthCard: React.FC<{signup: {credits: number; days: number}; notice
           {mode === 'login' ? 'Войти' : mode === 'register' ? 'Создать кабинет' : 'Прислать ссылку'}
         </button>
         {mode === 'login' && <p className="hint"><button type="button" className="link" onClick={() => { setMode('forgot'); setSent(false); }}>Забыли пароль?</button></p>}
+        {/* Акцепт оферты — регистрацией (Legal.tsx): клиент должен видеть, с чем соглашается */}
+        {mode === 'register' && (
+          <p className="hint">Создавая кабинет, вы принимаете <a href="#/offer" target="_blank" rel="noreferrer">оферту</a> и{' '}
+            <a href="#/privacy" target="_blank" rel="noreferrer">политику персональных данных</a>.</p>
+        )}
         {mode === 'forgot' && <p className="hint"><button type="button" className="link" onClick={() => setMode('login')}>Вернуться ко входу</button></p>}
       </form>
   );

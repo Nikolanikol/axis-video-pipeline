@@ -2,6 +2,7 @@
 // Черновики сразу видны в превью; на диск — по кнопке «Сохранить».
 import React, {createContext, useCallback, useContext, useEffect, useMemo, useState} from 'react';
 import {Loading} from './Loading';
+import {useSession} from './auth';
 import type {Theme} from '../src/shared/types';
 import {api, Config, ProfileEntry} from './api';
 
@@ -41,10 +42,13 @@ export const ConfigProvider: React.FC<{report: (e: unknown) => void; children: R
   }, [report]);
 
   const brandSaved = useCallback((t: Theme) => { setBrandDraft(t); setConfig((c) => c && {...c, brand: t}); }, []);
+  const {refresh} = useSession();
   const profileSaved = useCallback((p: ProfileEntry) => {
+    // Название кабинета в шапке идёт за компанией профиля (сервер, saveProfile) — перечитываем сессию
+    refresh();
     setProfileDraft(p);
     setConfig((c) => c && {...c, profiles: [...c.profiles.filter((x) => x.id !== p.id), p].sort(byId)});
-  }, []);
+  }, [refresh]);
 
   const value = useMemo<Ctx | null>(() => {
     if (!config || !brand || !profile) return null;

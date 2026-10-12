@@ -262,7 +262,9 @@ export const parseCarouselSource = (raw) => {
     return {source: 'lot', id: lotCarId(house, id), house, lotId: id};
   }
   try { return parseCarLink(text); } catch (e) {
-    throw new Error(text && host ? `Беру ссылки Encar и лоты аукционов kmotors.shop, а это ${host}` : e.message);
+    // Чужой сайт — подскажем, какие ссылки берём; своя площадка без номера — её же текст
+    const foreign = String(e?.message).startsWith('Пока умею');
+    throw new Error(text && host && foreign ? `Беру ссылки Encar, che168, Carsensor и лоты аукционов kmotors.shop, а это ${host}` : e.message);
   }
 };
 

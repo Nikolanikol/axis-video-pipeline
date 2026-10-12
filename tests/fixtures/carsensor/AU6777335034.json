@@ -1,0 +1,1119 @@
+{
+ "source": "carsensor",
+ "ref": "AU6777335034",
+ "fetchedAt": "2026-10-11T17:00:54.552Z",
+ "urls": {
+  "ad": "https://www.carsensor.net/usedcar/detail/AU6777335034/index.html"
+ },
+ "ids": {
+  "brandSlug": "bmw",
+  "modelSlug": "3_series",
+  "catalogModel": "F005",
+  "shopUrl": "https://www.carsensor.net/shop/fukuoka/201175001/?BKKN=AU6777335034"
+ },
+ "price": {
+  "amount": 2180000,
+  "currency": "JPY",
+  "totalJpy": 2258000
+ },
+ "mileageKm": 52000,
+ "photos": [
+  {
+   "url": "https://ccsrpcma.carsensor.net/CSphoto/bkkn/420/801/U00051420801/U00051420801_002.JPG?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcma.carsensor.net/CSphoto/bkkn/420/801/U00051420801/U00051420801_002L.JPG",
+   "label": "左斜前",
+   "category": "exterior",
+   "angle": "front-34-left",
+   "ad": false,
+   "source": "listing",
+   "main": true,
+   "sticker": true,
+   "caption": "●人気の【320i】が入庫致しました！大変お買得価格となっております！試乗・無料お見積り作成可能ですので、是非ご来店・お問合せ下さいませ！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_1_018.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_1_018.jpg",
+   "label": "販促用画像",
+   "category": "document",
+   "angle": "promo",
+   "ad": false,
+   "source": "listing",
+   "caption": "事前のご来店予約で更にお得です。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_2_012.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_2_012.jpg",
+   "label": "その他",
+   "category": "unknown",
+   "angle": null,
+   "ad": false,
+   "source": "listing",
+   "caption": "●お気軽にお電話ください！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_3_012.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_3_012.jpg",
+   "label": "その他",
+   "category": "unknown",
+   "angle": null,
+   "ad": false,
+   "source": "listing",
+   "caption": "☆簡単オンライン商談可能です☆LINE友だち追加⇒氏名と問合せ車名をメッセージください☆担当者が確認して随時対応いたします☆"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_4_013.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_4_013.jpg",
+   "label": "その他",
+   "category": "unknown",
+   "angle": null,
+   "ad": false,
+   "source": "listing",
+   "caption": "●おすすめポイントのご紹介！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_5_016.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_5_016.jpg",
+   "label": "バックミラー",
+   "category": "interior",
+   "angle": "rear-view-mirror",
+   "ad": false,
+   "source": "listing",
+   "caption": "●便利なＥＴＣを装備しておりますので、楽々料金所を通過できる上、高速料金もお得になります！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_6_016.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_6_016.jpg",
+   "label": "カーナビ",
+   "category": "interior",
+   "angle": "screen",
+   "ad": true,
+   "source": "listing",
+   "caption": "●【お車の装備について3】安心の全方位カメラ＆コーナーセンサー付き！初めて輸入車を乗られる方でも先進技術がお客様の運転をしっかりサポート！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_7_016.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_7_016.jpg",
+   "label": "カーナビ",
+   "category": "interior",
+   "angle": "screen",
+   "ad": true,
+   "source": "listing",
+   "caption": "●自社の積載車（荷台フラットタイプですので、ローダウン車も対応）を完備しております！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_8_015.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_8_015.jpg",
+   "label": "付属品",
+   "category": "detail",
+   "angle": "accessories",
+   "ad": false,
+   "source": "listing",
+   "caption": "スペアキー、取説、記録簿"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_9_014.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_9_014.jpg",
+   "label": "ミラー",
+   "category": "detail",
+   "angle": "mirror",
+   "ad": true,
+   "source": "listing",
+   "caption": "●ブラインドスポットアシストを装備！見えない死角部分を教えてくれるので安心です！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_10_014.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_10_014.jpg",
+   "label": "その他",
+   "category": "unknown",
+   "angle": null,
+   "ad": false,
+   "source": "listing",
+   "caption": "●エクステリアのご紹介！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_11_014.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_11_014.jpg",
+   "label": "正面",
+   "category": "exterior",
+   "angle": "front",
+   "ad": true,
+   "source": "listing",
+   "caption": "●【お車の外装について】このお車の外装は特に大きな傷など無く艶やかでピカピカでございます♪また御納車時には撥水コーティング施工してのお渡しになりますので、きっとご満足いただけると思います！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_12_014.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_12_014.jpg",
+   "label": "正面",
+   "category": "exterior",
+   "angle": "front",
+   "ad": true,
+   "source": "listing",
+   "caption": "●外装は専任スタッフが真心込めてキレイに丁寧に仕上げております。そのクオリティーの高さはぜひお客様の目でしっかりお確かめください。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_13_014.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_13_014.jpg",
+   "label": "ライト・ランプ",
+   "category": "detail",
+   "angle": "headlight",
+   "ad": true,
+   "source": "listing",
+   "caption": "●内外装共に非常にキレイで程度良好な１台です！全車早い者勝ちとなっておりますので、是非お早めにご検討下さい！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_14_014.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_14_014.jpg",
+   "label": "ライト・ランプ",
+   "category": "detail",
+   "angle": "headlight",
+   "ad": true,
+   "source": "listing",
+   "caption": "●専門店ではアフターサービスも自信がございます！車検や修理はお得な金額となっております。ご要望も何なりとお申し付けくださいませ。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_15_014.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_15_014.jpg",
+   "label": "ミラー",
+   "category": "detail",
+   "angle": "mirror",
+   "ad": true,
+   "source": "listing",
+   "caption": "●当店車両は全車修復歴なし・実走行です！「修復歴なし」をお選びください！決して安くない買い物です！決して無駄にしてはいけない命です。大事なお金、大事な人を守る選択を妥協しないでください。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_16_014.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_16_014.jpg",
+   "label": "ミラー",
+   "category": "detail",
+   "angle": "mirror",
+   "ad": true,
+   "source": "listing",
+   "caption": "●室内クリーニング、撥水ボディコートを行いピカピカの状態で納車いたします♪"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_17_014.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_17_014.jpg",
+   "label": "ライト・ランプ",
+   "category": "detail",
+   "angle": "headlight",
+   "ad": true,
+   "source": "listing",
+   "caption": "●弊社在庫車は１ヵ月工賃保証付きです！ほかにも有償保証などもご準備しておりますので、保証が気になる方はお申し付けください。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_18_014.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_18_014.jpg",
+   "label": "ライト・ランプ",
+   "category": "detail",
+   "angle": "headlight",
+   "ad": true,
+   "source": "listing",
+   "caption": "●北海道から沖縄まで全国どこでもご納車しております！お気軽にお問い合わせ下さい！全国のお客様からのお問い合わせをお待ちしております！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_19_014.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_19_014.jpg",
+   "label": "後",
+   "category": "exterior",
+   "angle": "rear",
+   "ad": true,
+   "source": "listing",
+   "caption": "●日本中古自動車販売協会連合会・Ｊｕ　加盟　　●あいおいニッセイ同和・損保ジャパン　代理店"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_30_014.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_30_014.jpg",
+   "label": "左斜後",
+   "category": "exterior",
+   "angle": "rear-34-left",
+   "ad": true,
+   "source": "listing",
+   "caption": "●外装は専任スタッフが真心込めてキレイに丁寧に仕上げております。そのクオリティーの高さはぜひお客様の目でしっかりお確かめください。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_31_014.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_31_014.jpg",
+   "label": "左",
+   "category": "exterior",
+   "angle": "side-left",
+   "ad": true,
+   "source": "listing",
+   "caption": "●内外装に気になるキズなどがある場合も修理をしてご納車させていただくことも可能となりますので気になるところがございましたらお気軽にお申し付けください。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_32_014.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_32_014.jpg",
+   "label": "右斜後",
+   "category": "exterior",
+   "angle": "rear-34-right",
+   "ad": true,
+   "source": "listing",
+   "caption": "●仮審査もお気軽にご相談ください！！弊社は銀行には出来ない最長ローンを使用する事が出来ます。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_33_013.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_33_013.jpg",
+   "label": "タイヤ・ホイール",
+   "category": "detail",
+   "angle": "wheel",
+   "ad": true,
+   "source": "listing",
+   "caption": "●ホイールに傷がある場合でもリペアをすることも可能となりますので、ご希望の方はお申し付けください。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_34_013.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_34_013.jpg",
+   "label": "タイヤ・ホイール",
+   "category": "detail",
+   "angle": "wheel",
+   "ad": true,
+   "source": "listing",
+   "caption": "●ホイールに傷がある場合でもリペアをすることも可能となりますので、ご希望の方はお申し付けください。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_35_013.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_35_013.jpg",
+   "label": "タイヤ・ホイール",
+   "category": "detail",
+   "angle": "wheel",
+   "ad": true,
+   "source": "listing",
+   "caption": "●ホイールに傷がある場合でもリペアをすることも可能となりますので、ご希望の方はお申し付けください。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_36_013.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_36_013.jpg",
+   "label": "タイヤ・ホイール",
+   "category": "detail",
+   "angle": "wheel",
+   "ad": true,
+   "source": "listing",
+   "caption": "●ホイールに傷がある場合でもリペアをすることも可能となりますので、ご希望の方はお申し付けください。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_37_013.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_37_013.jpg",
+   "label": "エンジンルーム",
+   "category": "engine",
+   "angle": "engine",
+   "ad": false,
+   "source": "listing",
+   "caption": "●エンジンルーム内も隅々まで、綺麗に清掃済みです。またご納車の前にも再度清掃致しますのでご満足いただけると思います。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_38_014.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_38_014.jpg",
+   "label": "その他",
+   "category": "unknown",
+   "angle": null,
+   "ad": false,
+   "source": "listing",
+   "caption": "●インテリアのご紹介！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_39_013.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_39_013.jpg",
+   "label": "インパネ全体",
+   "category": "interior",
+   "angle": "dashboard",
+   "ad": true,
+   "source": "listing",
+   "caption": "●ホイールに傷がある場合でもリペアをすることも可能となりますので、ご希望の方はお申し付けください。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_40_014.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_40_014.jpg",
+   "label": "ハンドル",
+   "category": "interior",
+   "angle": "steering",
+   "ad": true,
+   "source": "listing",
+   "caption": "●室内も気になるにおいや汚れ等無く、大変キレイで程度良好な一台です！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_41_014.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_41_014.jpg",
+   "label": "運転席",
+   "category": "interior",
+   "angle": "front-seats",
+   "ad": true,
+   "source": "listing",
+   "caption": "●展示車は、すべてクリーニング施行済です。納車前にもクリーニングを行います。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_42_014.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_42_014.jpg",
+   "label": "後部座席",
+   "category": "interior",
+   "angle": "rear-seats",
+   "ad": true,
+   "source": "listing",
+   "caption": "●【お車の内装について】シンプルで上質なインテリアです！視認性もよく、コックピット周りには便利な機能が満載です！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_43_014.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_43_014.jpg",
+   "label": "後部座席",
+   "category": "interior",
+   "angle": "rear-seats",
+   "ad": true,
+   "source": "listing",
+   "caption": "●【お車の内装について】後席シートに大きなへたりなどはなく、座り心地のいいシートでリラックスしてゆったりと座れます。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_44_014.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_44_014.jpg",
+   "label": "助手席",
+   "category": "interior",
+   "angle": "passenger-seat",
+   "ad": true,
+   "source": "listing",
+   "caption": "●【お車の内装について】ホールド感のある座り心地のいいシートです。ロングドライブでも疲れにくいです♪"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_45_014.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_45_014.jpg",
+   "label": "インパネ全体",
+   "category": "interior",
+   "angle": "dashboard",
+   "ad": true,
+   "source": "listing",
+   "caption": "●お車が決まっていないお客様でもスタッフが一緒に考えライフスタイルやご予算に合った車輌、プランをご提案させて頂きます。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_46_014.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_46_014.jpg",
+   "label": "エアコン吹き出し",
+   "category": "interior",
+   "angle": "vents",
+   "ad": false,
+   "source": "listing",
+   "caption": "●最新スキャンツールを使用したコンピューター診断も可能。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_47_013.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_47_013.jpg",
+   "label": "カーナビ",
+   "category": "interior",
+   "angle": "screen",
+   "ad": true,
+   "source": "listing",
+   "caption": "●【お車の装備について1】純正ナビです！大変見やすく、案内もしっかりとしてくれます！他にも多数のメディアにも対応！車内マルチメディアも充実です！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_48_012.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_48_012.jpg",
+   "label": "カーナビ",
+   "category": "interior",
+   "angle": "screen",
+   "ad": true,
+   "source": "listing",
+   "caption": "●【お車の装備について2】Bluetoothなどと充実しております。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_49_013.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_49_013.jpg",
+   "label": "カーナビ",
+   "category": "interior",
+   "angle": "screen",
+   "ad": true,
+   "source": "listing",
+   "caption": "●お車を買った後も全力でサポートさせていただきますので、お困りごとがあった際はお気軽にご連絡いただけましたら幸いです。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_50_013.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_50_013.jpg",
+   "label": "未設定",
+   "category": "unknown",
+   "angle": null,
+   "ad": false,
+   "source": "listing",
+   "caption": "●株式会社　ベイズ　　福岡県北九州市小倉南区津田５－２－１　　ＴＥＬ　０９３－４７４－４５１１　　ＦＡＸ　０９３－４７４－４５１２"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_51_013.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_51_013.jpg",
+   "label": "エアコン吹き出し",
+   "category": "interior",
+   "angle": "vents",
+   "ad": false,
+   "source": "listing",
+   "caption": "●車両販売以外にも整備や車検、鈑金、ドラレコや、ガラスコーティング施工なども専門店ならではの安心価格にて対応可能です。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_52_013.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_52_013.jpg",
+   "label": "シフトレバー",
+   "category": "interior",
+   "angle": "gear",
+   "ad": true,
+   "source": "listing",
+   "caption": "●中古車の欠点は汚れている。弊社ではその欠点を無くす為にガラスコーティングをオススメしています。艶・撥水がたまりません！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_53_013.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_53_013.jpg",
+   "label": "シフトレバー",
+   "category": "interior",
+   "angle": "gear",
+   "ad": true,
+   "source": "listing",
+   "caption": "●店頭に無い車をお探しの場合は、予約注文も承ります。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_54_013.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_54_013.jpg",
+   "label": "シフトレバー",
+   "category": "interior",
+   "angle": "gear",
+   "ad": true,
+   "source": "listing",
+   "caption": "●自社保証に加えて、その他の長期延長保証もご用意しておりますので、お気軽にご相談下さい。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_55_013.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_55_013.jpg",
+   "label": "運転席操作部",
+   "category": "interior",
+   "angle": "controls",
+   "ad": false,
+   "source": "listing",
+   "caption": "●新入庫車両のご案内＆スタッフのブログを当店ホームページで公開しております！「ベイズガレージ　北九州」で検索お願いいたします！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_56_013.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_56_013.jpg",
+   "label": "シフトレバー",
+   "category": "interior",
+   "angle": "gear",
+   "ad": true,
+   "source": "listing",
+   "caption": "●当店は国産＆輸入車問わず、高価下取り＆買取り致します。●残債が残っている車も下取り＆買取りが可能となりますので、ぜひ一度査定をご依頼下さいませ"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_57_012.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_57_012.jpg",
+   "label": "運転席操作部",
+   "category": "interior",
+   "angle": "controls",
+   "ad": false,
+   "source": "listing",
+   "caption": "●中古車の欠点は汚れている。弊社ではその欠点を無くす為にガラスコーティングをオススメしています。艶・撥水がたまりません！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_58_012.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_58_012.jpg",
+   "label": "運転席操作部",
+   "category": "interior",
+   "angle": "controls",
+   "ad": false,
+   "source": "listing",
+   "caption": "●ご納車までの期間ですが、県内のお客様は１～２週間、県外のお客様は２～３週間ほどでご納車が可能となります。但し、お支払いや書類の状況によっては多少の前後もありますので、その際には何卒ご了承下さい。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_59_012.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_59_012.jpg",
+   "label": "運転席操作部",
+   "category": "interior",
+   "angle": "controls",
+   "ad": false,
+   "source": "listing",
+   "caption": "●当店の営業時間は「10:00-19:00」●月曜日定休　●フリーダイアル「0078-6002-114441」お気軽にお問合せください。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_60_012.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_60_012.jpg",
+   "label": "運転席操作部",
+   "category": "interior",
+   "angle": "controls",
+   "ad": false,
+   "source": "listing",
+   "caption": "●ご来店することが難しい場合は、現車を見ずにご契約することも可能となりますのでお気軽にお問い合わせ下さいませ！他にお車の詳しい写真や質問などのお問い合わせもお気軽にお待ちしております(^O^)"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_61_012.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_61_012.jpg",
+   "label": "スピードメーター",
+   "category": "interior",
+   "angle": "meter",
+   "ad": true,
+   "source": "listing",
+   "caption": "●新入庫車両のご案内＆スタッフのブログを当店ホームページで公開しております！「ベイズガレージ　北九州」で検索お願いいたします！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_62_012.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_62_012.jpg",
+   "label": "運転席操作部",
+   "category": "interior",
+   "angle": "controls",
+   "ad": false,
+   "source": "listing",
+   "caption": "●車検や法定点検ができる自社認証工場完備。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_63_012.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_63_012.jpg",
+   "label": "窓操作部",
+   "category": "interior",
+   "angle": "window-controls",
+   "ad": false,
+   "source": "listing",
+   "caption": "●各種ローンもご用意しております★月々のお支払いパターンも自由に設定できますので、お客様にお支払い方法をご相談しながら決めていくことができます！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_64_012.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_64_012.jpg",
+   "label": "未設定",
+   "category": "unknown",
+   "angle": null,
+   "ad": false,
+   "source": "listing",
+   "caption": "●内張りの状態も綺麗です！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_65_012.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_65_012.jpg",
+   "label": "窓操作部",
+   "category": "interior",
+   "angle": "window-controls",
+   "ad": false,
+   "source": "listing",
+   "caption": "●内張りの状態も綺麗です！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_66_012.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_66_012.jpg",
+   "label": "窓操作部",
+   "category": "interior",
+   "angle": "window-controls",
+   "ad": false,
+   "source": "listing",
+   "caption": "●内張りの状態も綺麗です！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_67_012.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_67_012.jpg",
+   "label": "窓操作部",
+   "category": "interior",
+   "angle": "window-controls",
+   "ad": false,
+   "source": "listing",
+   "caption": "●内張りの状態も綺麗です！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_68_012.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_68_012.jpg",
+   "label": "窓操作部",
+   "category": "interior",
+   "angle": "window-controls",
+   "ad": false,
+   "source": "listing",
+   "caption": "●内張りの状態も綺麗です！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_69_012.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_69_012.jpg",
+   "label": "トランク",
+   "category": "detail",
+   "angle": "trunk",
+   "ad": true,
+   "source": "listing",
+   "caption": "・広々としたトランクルームになっております。収納量も兼ね備えられています。"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_70_012.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_70_012.jpg",
+   "label": "その他",
+   "category": "unknown",
+   "angle": null,
+   "ad": false,
+   "source": "listing",
+   "caption": null
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_71_012.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_71_012.jpg",
+   "label": "その他",
+   "category": "unknown",
+   "angle": null,
+   "ad": false,
+   "source": "listing",
+   "caption": "●なんでもお気軽にお伝えください♪"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_72_012.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_72_012.jpg",
+   "label": "その他",
+   "category": "unknown",
+   "angle": null,
+   "ad": false,
+   "source": "listing",
+   "caption": "●ご納車の流れに関してもお気軽にご相談ください！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_73_012.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_73_012.jpg",
+   "label": "その他",
+   "category": "unknown",
+   "angle": null,
+   "ad": false,
+   "source": "listing",
+   "caption": "●"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_74_012.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_74_012.jpg",
+   "label": "その他",
+   "category": "unknown",
+   "angle": null,
+   "ad": false,
+   "source": "listing",
+   "caption": "●ご要望をお聞かせください♪"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_75_012.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_75_012.jpg",
+   "label": "その他",
+   "category": "unknown",
+   "angle": null,
+   "ad": false,
+   "source": "listing",
+   "caption": "●キッズスペースもございますのでご家族でお気軽にご来店ください"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_76_012.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_76_012.jpg",
+   "label": "その他",
+   "category": "unknown",
+   "angle": null,
+   "ad": false,
+   "source": "listing",
+   "caption": "●メンテナンスに関してもお任せください！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_77_012.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_77_012.jpg",
+   "label": "その他",
+   "category": "unknown",
+   "angle": null,
+   "ad": false,
+   "source": "listing",
+   "caption": "●ベンツBMW専門店として豊富な在庫がございます！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_78_011.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_78_011.jpg",
+   "label": "その他",
+   "category": "unknown",
+   "angle": null,
+   "ad": false,
+   "source": "listing",
+   "caption": "●納車前に整備も徹底しております！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_79_011.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_79_011.jpg",
+   "label": "その他",
+   "category": "unknown",
+   "angle": null,
+   "ad": false,
+   "source": "listing",
+   "caption": "●アフターフォローん関しても自信があります！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_80_012.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_80_012.jpg",
+   "label": "その他",
+   "category": "unknown",
+   "angle": null,
+   "ad": false,
+   "source": "listing",
+   "caption": "●入庫前に入念にチェックし安心できる車両を販売しております！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_81_010.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_81_010.jpg",
+   "label": "その他",
+   "category": "unknown",
+   "angle": null,
+   "ad": false,
+   "source": "listing",
+   "caption": "●大きな看板が目印です！"
+  },
+  {
+   "url": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_82_008.jpg?ver=detail001&impolicy=car_002",
+   "preview": "https://ccsrpcml.carsensor.net/CSphoto/ml/420/801/U00051420801/U00051420801_82_008.jpg",
+   "label": "その他",
+   "category": "unknown",
+   "angle": null,
+   "ad": false,
+   "source": "listing",
+   "caption": "●皆様のご来店を心よりお待ちしております！"
+  }
+ ],
+ "repairHistory": false,
+ "certification": {
+  "score": "4.5",
+  "inspectedAt": "2026-08-18",
+  "repairHistory": false,
+  "summary": "内外装に目立たない軽微なキズ、ヘコミが少し認められますが、良好な状態です。"
+ },
+ "byLang": {
+  "en": {
+   "car": {
+    "title": "BMW 3 Series 320d xDrive Edition Joy Plus Diesel Turbo 4WD",
+    "brand": "BMW",
+    "model": "3 Series",
+    "grade": "320d xDrive Edition Joy Plus Diesel Turbo 4WD",
+    "year": 2021,
+    "regDate": "2021",
+    "mileageKm": 52000,
+    "displacementCc": 2000,
+    "fuel": "Diesel",
+    "transmission": "Automatic",
+    "body": "Sedan",
+    "drive": "AWD",
+    "color": "Black",
+    "seats": 5,
+    "doors": 4,
+    "steering": "Right",
+    "city": "Fukuoka"
+   },
+   "options": [
+    {
+     "group": "safety",
+     "name": "Power Steering",
+     "ja": "パワステ"
+    },
+    {
+     "group": "safety",
+     "name": "ABS",
+     "ja": "ABS"
+    },
+    {
+     "group": "safety",
+     "name": "Safety Support Car",
+     "ja": "サポカー"
+    },
+    {
+     "group": "safety",
+     "name": "Automatic Emergency Braking",
+     "ja": "衝突被害軽減ブレーキ"
+    },
+    {
+     "group": "safety",
+     "name": "Adaptive Cruise Control",
+     "ja": "アダプティブクルーズコントロール"
+    },
+    {
+     "group": "safety",
+     "name": "Lane Keeping Assist",
+     "ja": "レーンキープアシスト"
+    },
+    {
+     "group": "safety",
+     "name": "Parking Assist",
+     "ja": "パーキングアシスト"
+    },
+    {
+     "group": "safety",
+     "name": "Pedal Misapplication Prevention",
+     "ja": "アクセル踏み間違い（誤発進）防止装置"
+    },
+    {
+     "group": "safety",
+     "name": "Parking Sensors",
+     "ja": "障害物センサー"
+    },
+    {
+     "group": "safety",
+     "name": "Airbags (driver, passenger, side, curtain)",
+     "ja": "エアバッグ：運転席/助手席/サイド/カーテン"
+    },
+    {
+     "group": "safety",
+     "name": "360° Camera",
+     "ja": "全周囲カメラ"
+    },
+    {
+     "group": "safety",
+     "name": "Camera (front, side, rear)",
+     "ja": "カメラ：フロント/サイド/バック"
+    },
+    {
+     "group": "safety",
+     "name": "Blind Spot & Rear Cross Traffic Monitor",
+     "ja": "モニター：ブラインドスポット/リアトラフィック"
+    },
+    {
+     "group": "safety",
+     "name": "Stability Control",
+     "ja": "横滑り防止装置"
+    },
+    {
+     "group": "safety",
+     "name": "Start/Stop",
+     "ja": "アイドリングストップ"
+    },
+    {
+     "group": "safety",
+     "name": "Immobilizer",
+     "ja": "盗難防止装置"
+    },
+    {
+     "group": "safety",
+     "name": "Auto High Beam",
+     "ja": "オートマチックハイビーム"
+    },
+    {
+     "group": "comfort",
+     "name": "Turbocharged",
+     "ja": "過給器設定モデル"
+    },
+    {
+     "group": "comfort",
+     "name": "Air Conditioning",
+     "ja": "エアコン・クーラー"
+    },
+    {
+     "group": "comfort",
+     "name": "Rear Air Conditioning",
+     "ja": "Wエアコン"
+    },
+    {
+     "group": "comfort",
+     "name": "Navigation (HDD)",
+     "ja": "カーナビ：HDD"
+    },
+    {
+     "group": "comfort",
+     "name": "Music Player Connection",
+     "ja": "ミュージックプレイヤー接続可"
+    },
+    {
+     "group": "comfort",
+     "name": "ETC Toll Unit",
+     "ja": "ETC"
+    },
+    {
+     "group": "comfort",
+     "name": "Apple CarPlay / Android Auto",
+     "ja": "ディスプレイオーディオ(Apple CarPlay、Android Autoなど)"
+    },
+    {
+     "group": "interior",
+     "name": "Keyless Entry",
+     "ja": "キーレス"
+    },
+    {
+     "group": "interior",
+     "name": "Smart Key",
+     "ja": "スマートキー"
+    },
+    {
+     "group": "interior",
+     "name": "Power Windows",
+     "ja": "パワーウインドウ"
+    },
+    {
+     "group": "interior",
+     "name": "Power Seats",
+     "ja": "電動シート"
+    },
+    {
+     "group": "interior",
+     "name": "Heated Seats",
+     "ja": "シートヒーター"
+    },
+    {
+     "group": "exterior",
+     "name": "Adaptive LED Headlights",
+     "ja": "ヘッドライト：LED、アダプティブ"
+    },
+    {
+     "group": "exterior",
+     "name": "Alloy Wheels",
+     "ja": "アルミホイール"
+    }
+   ]
+  },
+  "ru": {
+   "car": {
+    "title": "BMW 3 Series 320d xDrive Edition Joy Plus Diesel Turbo 4WD",
+    "brand": "BMW",
+    "model": "3 Series",
+    "grade": "320d xDrive Edition Joy Plus Diesel Turbo 4WD",
+    "year": 2021,
+    "regDate": "2021",
+    "mileageKm": 52000,
+    "displacementCc": 2000,
+    "fuel": "Diesel",
+    "transmission": "Automatic",
+    "body": "Sedan",
+    "drive": "AWD",
+    "color": "Black",
+    "seats": 5,
+    "doors": 4,
+    "steering": "Right",
+    "city": "Fukuoka"
+   },
+   "options": [
+    {
+     "group": "safety",
+     "name": "Усилитель руля",
+     "ja": "パワステ"
+    },
+    {
+     "group": "safety",
+     "name": "ABS",
+     "ja": "ABS"
+    },
+    {
+     "group": "safety",
+     "name": "Пакет помощи водителю",
+     "ja": "サポカー"
+    },
+    {
+     "group": "safety",
+     "name": "Автоматическое экстренное торможение",
+     "ja": "衝突被害軽減ブレーキ"
+    },
+    {
+     "group": "safety",
+     "name": "Адаптивный круиз-контроль",
+     "ja": "アダプティブクルーズコントロール"
+    },
+    {
+     "group": "safety",
+     "name": "Удержание в полосе",
+     "ja": "レーンキープアシスト"
+    },
+    {
+     "group": "safety",
+     "name": "Помощь при парковке",
+     "ja": "パーキングアシスト"
+    },
+    {
+     "group": "safety",
+     "name": "Защита от ошибочного нажатия газа",
+     "ja": "アクセル踏み間違い（誤発進）防止装置"
+    },
+    {
+     "group": "safety",
+     "name": "Парктроники",
+     "ja": "障害物センサー"
+    },
+    {
+     "group": "safety",
+     "name": "Подушки безопасности (водителя, пассажира, боковые, шторки)",
+     "ja": "エアバッグ：運転席/助手席/サイド/カーテン"
+    },
+    {
+     "group": "safety",
+     "name": "Камеры кругового обзора",
+     "ja": "全周囲カメラ"
+    },
+    {
+     "group": "safety",
+     "name": "Камеры (передняя, боковые, задняя)",
+     "ja": "カメラ：フロント/サイド/バック"
+    },
+    {
+     "group": "safety",
+     "name": "Контроль слепых зон и движения сзади",
+     "ja": "モニター：ブラインドスポット/リアトラフィック"
+    },
+    {
+     "group": "safety",
+     "name": "Система стабилизации",
+     "ja": "横滑り防止装置"
+    },
+    {
+     "group": "safety",
+     "name": "Старт-стоп",
+     "ja": "アイドリングストップ"
+    },
+    {
+     "group": "safety",
+     "name": "Иммобилайзер",
+     "ja": "盗難防止装置"
+    },
+    {
+     "group": "safety",
+     "name": "Автоматический дальний свет",
+     "ja": "オートマチックハイビーム"
+    },
+    {
+     "group": "comfort",
+     "name": "Турбонаддув",
+     "ja": "過給器設定モデル"
+    },
+    {
+     "group": "comfort",
+     "name": "Кондиционер",
+     "ja": "エアコン・クーラー"
+    },
+    {
+     "group": "comfort",
+     "name": "Задний кондиционер",
+     "ja": "Wエアコン"
+    },
+    {
+     "group": "comfort",
+     "name": "Навигация (HDD)",
+     "ja": "カーナビ：HDD"
+    },
+    {
+     "group": "comfort",
+     "name": "Подключение плеера",
+     "ja": "ミュージックプレイヤー接続可"
+    },
+    {
+     "group": "comfort",
+     "name": "Транспондер ETC",
+     "ja": "ETC"
+    },
+    {
+     "group": "comfort",
+     "name": "Apple CarPlay / Android Auto",
+     "ja": "ディスプレイオーディオ(Apple CarPlay、Android Autoなど)"
+    },
+    {
+     "group": "interior",
+     "name": "Бесключевой доступ",
+     "ja": "キーレス"
+    },
+    {
+     "group": "interior",
+     "name": "Смарт-ключ",
+     "ja": "スマートキー"
+    },
+    {
+     "group": "interior",
+     "name": "Электростеклоподъёмники",
+     "ja": "パワーウインドウ"
+    },
+    {
+     "group": "interior",
+     "name": "Электрорегулировка сидений",
+     "ja": "電動シート"
+    },
+    {
+     "group": "interior",
+     "name": "Подогрев сидений",
+     "ja": "シートヒーター"
+    },
+    {
+     "group": "exterior",
+     "name": "Фары: светодиодные, адаптивные",
+     "ja": "ヘッドライト：LED、アダプティブ"
+    },
+    {
+     "group": "exterior",
+     "name": "Легкосплавные диски",
+     "ja": "アルミホイール"
+    }
+   ]
+  }
+ }
+}

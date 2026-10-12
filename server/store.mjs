@@ -3,8 +3,10 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {AsyncLocalStorage} from 'node:async_hooks';
+import {serverLog, setWorkspacePeek} from './log.mjs';
 import {fileURLToPath} from 'node:url';
 import {marketFromProfile} from '../src/shared/profile.js';
+import {krwPerUnit} from '../src/shared/currencies.js';
 import {db, hasDatabase} from './db/index.mjs';
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -51,6 +53,9 @@ export const currentWorkspace = () => {
   return DEFAULT_WORKSPACE;
 };
 
+// Компания запроса — в каждую строку журнала (server/log.mjs); без ошибки: журнал пишет и вне запроса
+setWorkspacePeek(() => workspaceContext.getStore() ?? null);
+
 export const workspaceDir = (id = currentWorkspace()) => path.join(DATA_DIR, 'workspaces', id);
 // Адрес той же папки в браузере и для рендера: /data отдаётся из DATA_DIR (с проверкой хозяина)
 export const workspaceUrl = (id = currentWorkspace()) => `/data/workspaces/${id}`;
@@ -89,6 +94,14 @@ export class HttpError extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
 
+/**
+ * Текст ошибки фоновой задачи (рендер, видео, речь, озвучка) для экрана клиента. У задачи нет
+ * ответа сервера, где сырое исключение спряталось бы за «внутренней ошибкой», — её текст пишется
+ * в запись и показывается как есть. Раньше клиент видел там английские сообщения Remotion и ffmpeg.
+ * HttpError написан для человека — его оставляем, всё прочее — общая фраза, подробности в журнале
+ */
+export const clientMessage = (e, fallback) => (e instanceof HttpError ? e.message : fallback);
+
 const ID_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
 export const checkId = (id) => {
   if (!ID_RE.test(String(id))) throw new HttpError(400, `Некорректный id «${id}»: только латиница, цифры и дефис`);
@@ -107,7 +120,8 @@ export const readJson = async (file) => {
   try {
     return JSON.parse(await fs.readFile(file, 'utf8'));
   } catch (e) {
-    if (e.code === 'ENOENT') throw new HttpError(404, `Не найдено: ${path.relative(ROOT, file)}`);
+    // Путь к файлу клиенту не показываем: в нём папки компании, а человеку он ничего не скажет
+    if (e.code === 'ENOENT') throw new HttpError(404, 'Не найдено — возможно, это уже удалили. Обновите страницу');
     throw e;
   }
 };
@@ -125,6 +139,22 @@ const renameWithRetry = async (from, to, tries = 5) => {
       await new Promise((r) => setTimeout(r, i * 20));
     }
   }
+};
+
+const log = serverLog('store');
+
+/**
+ * Для списков (объявления, обзоры, карусели, ролики): запись, которую не прочитать, пропускаем,
+ * чтобы один файл не ронял весь список. Но молча — только если файла нет (папка без него —
+ * недосозданная или удалённая запись). Битый JSON — error с путём и тревогой: раньше такое
+ * объявление просто пропадало из списка, и найти причину было не по чему
+ */
+export const skipUnreadable = (what, file) => (e) => {
+  if (e?.status === 404) return null;
+  // HttpError здесь — чужая папка с неправильным именем: странно, но не поломка
+  const level = e instanceof HttpError ? 'warn' : 'error';
+  log[level]('list.unreadable', {note: `${what} не читается — в списке его не видно`, file: path.relative(DATA_DIR, file), error: e});
+  return null;
 };
 
 export const writeJson = async (file, data) => {
@@ -183,6 +213,11 @@ export const saveProfile = async (id, profile) => {
   if (!hasDatabase()) return writeJson(path.join(PROFILES_DIR, `${checkId(id)}.json`), profile);
   ownProfile(id);
   await updateWorkspace('profile', profile);
+  // Название кабинета — это название компании из профиля (владелец 12.10: одно название, а не
+  // два). Админка и шапка читают smmaker_workspaces.name — держим его вровень. Пустое не пишем:
+  // кабинет без имени в списке клиентов не найти
+  const company = String(profile?.company ?? '').trim().slice(0, 120);
+  if (company) await updateWorkspace('name', company);
 };
 export const listProfiles = async () => {
   if (hasDatabase()) return [{id: DEFAULT_PROFILE, ...(await getProfile(DEFAULT_PROFILE))}];
@@ -229,8 +264,18 @@ export const legacyDataDirs = async () => {
  * Единая точка входа: раньше каждый пайплайн звал getMarket по id из лота, теперь берёт
  * один профиль клиента (MVP — он один). Тексты подставлены, режим цены и валюта уже внутри.
  */
-export const renderMarket = async (id = DEFAULT_PROFILE) =>
-  marketFromProfile(await getProfile(id), await getCopy());
+export const renderMarket = async (id = DEFAULT_PROFILE) => {
+  const market = marketFromProfile(await getProfile(id), await getCopy());
+  // Курс валюты компании на сегодня — им считается цена объявления, где свой курс не вписан.
+  // Источник недоступен — без него: цена тогда заглушка, а не доллары под значком ₽
+  // Для долларов тоже: им считает цену слайд карусели (ролик берёт курс ₩/$ из объявления)
+  // rates.mjs сам импортирует store.mjs — грузим по месту, без кольца на старте модулей
+  const today = await import('./rates.mjs').then((m) => m.rates()).catch(() => null);
+  // ₩ за $1 — для машин из Китая: их цена в долларах, и слайд переводит её через вону
+  const krwPerUsdToday = krwPerUnit('USD', today?.usdRates) ?? undefined;
+  if (market.currency === 'KRW') return {...market, krwPerUsdToday};
+  return {...market, krwPerUnitToday: krwPerUnit(market.currency, today?.usdRates) ?? undefined, krwPerUsdToday};
+};
 
 // Лоты: <папка компании>/lots/<id>/lot.json + photos/
 export const lotDir = (id) => path.join(lotsDir(), checkId(id));
@@ -262,7 +307,7 @@ export const createLot = async (data = {}) => {
 export const listLots = async () => {
   await fs.mkdir(lotsDir(), {recursive: true});
   const dirs = (await fs.readdir(lotsDir(), {withFileTypes: true})).filter((d) => d.isDirectory());
-  const lots = await Promise.all(dirs.map((d) => getLot(d.name).catch(() => null)));
+  const lots = await Promise.all(dirs.map((d) => getLot(d.name).catch(skipUnreadable('объявление', path.join(lotsDir(), d.name, 'lot.json')))));
   return lots.filter(Boolean).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
 };
 

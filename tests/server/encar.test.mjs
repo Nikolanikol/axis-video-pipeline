@@ -9,7 +9,7 @@ let encar;
 let rates;
 beforeAll(async () => {
   env = await useTempEnv();
-  encar = await import('../../server/encar.mjs');
+  encar = await import('../../server/carLink.mjs');
   rates = await import('../../server/rates.mjs');
 });
 afterAll(() => env.cleanup());
@@ -66,3 +66,17 @@ describe('курс ₩/$', () => {
     await expect(rates.usdKrw()).rejects.toMatchObject({status: 502});
   });
 });
+
+describe('курсы всех валют', () => {
+  it('один поход к источнику даёт и ₩/$, и курс рубля; мусор в ответе отбрасывается', async () => {
+    const fetch = vi.fn(async () => ({ok: true, json: async () => ({rates: {KRW: 1350, RUB: 80, KZT: 0, EUR: 'x'}})}));
+    vi.stubGlobal('fetch', fetch);
+    const r = await rates.rates();
+    expect(r.usdRates).toMatchObject({USD: 1, KRW: 1350, RUB: 80});
+    expect(r.usdRates.KZT).toBeUndefined();
+    expect(r.usdRates.EUR).toBeUndefined();
+    expect((await rates.usdKrw()).krwPerUsd).toBe(1350);
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+});
+

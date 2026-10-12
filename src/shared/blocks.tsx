@@ -12,11 +12,10 @@ export type CarTitleProps = {brand: string; model: string; year?: number | strin
 // с разной скоростью. На 30 кадрах значения совпадают с прежними.
 const atSec = (sec: number, fps: number) => Math.round(sec * fps);
 
-// Символ валюты профиля: экспорт из Кореи считается в долларах, внутренний рынок может быть
-// в евро/фунтах. Значение цены как есть — конвертация валют вне MVP, дилер вводит своё число;
-// а вот символ обязан совпадать с валютой профиля, иначе «€ по цене $» выглядит обманом.
-const CURRENCY_SYMBOL: Record<string, string> = {USD: '$', EUR: '€', GBP: '£', JPY: '¥', KRW: '₩'};
-export const currencySign = (code?: string) => CURRENCY_SYMBOL[code ?? 'USD'] ?? code ?? '$';
+// Символ валюты профиля: обязан совпадать с валютой, иначе «€ по цене $» выглядит обманом.
+// Список и значки — src/shared/currencies.js; отсюда реэкспорт, им пользуются вёрстка и форма
+import {currencySign} from './currencies.js';
+export {currencySign};
 
 // Марка, модель, год, версия и подзаголовок — выезжают снизу
 export const CarTitle: React.FC<CarTitleProps> = ({brand, model, year, trim, tagline}) => {

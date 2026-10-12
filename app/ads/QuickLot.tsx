@@ -5,21 +5,22 @@
 // подзаголовок, фото (autoPickPhotos), формат — последний использованный. Ручное
 // управление не убрано, а спрятано под «Изменить» и нигде не обязательно.
 import React, {useRef, useState} from 'react';
-import {encarAdUrl, parseCarLink} from '../../src/shared/encarLink.js';
+import {encarAdUrl, idFromNote, parseCarLink, sourceName} from '../../src/shared/encarLink.js';
 import {FORMATS} from '../../src/shared/model';
 import type {FormatMeta} from '../../src/shared/types';
 import type {LotEntry} from '../api';
 import {BusyModal} from '../BusyModal';
 import {Copy, ExternalLink, Link2, Search, Trash2} from 'lucide-react';
 import {lotIsBlank} from '../../src/shared/lotFromCar';
+import {thumb} from '../thumb';
 
 /** Где сейчас загрузка лота по ссылке: шаг 0 — поиск машины, 1 — лот, 2 — фото */
 export type ImportStage = {step: 0 | 1 | 2; photos?: number} | null;
 
-/** Окно загрузки машины из Encar — общее окно BusyModal с тремя шагами */
+/** Окно загрузки машины по ссылке (Encar, che168, Carsensor) — общее окно BusyModal с тремя шагами */
 export const ImportModal: React.FC<{stage: ImportStage}> = ({stage}) => (
-  <BusyModal step={stage?.step ?? null} label="Загрузка машины из Encar" note="Обычно 10–15 секунд. Не закрывайте страницу"
-    steps={['Ищу машину на Encar', 'Создаю объявление', stage?.photos ? `Загружаю ${stage.photos} фото` : 'Загружаю фото']} />
+  <BusyModal step={stage?.step ?? null} label="Загрузка машины по ссылке" note="Обычно 10–15 секунд. Не закрывайте страницу"
+    steps={['Ищу машину', 'Создаю объявление', stage?.photos ? `Загружаю ${stage.photos} фото` : 'Загружаю фото']} />
 );
 
 /**
@@ -31,7 +32,7 @@ export const QuickLink: React.FC<{
   // Какие ссылки принимает экран: по умолчанию — Encar; карусели добавляют лоты аукционов
   parse?: (link: string) => unknown;
 }> = (
-  {onLink, error, busy, placeholder = 'Вставьте ссылку на объявление Encar — остальное сделается само', parse = parseCarLink},
+  {onLink, error, busy, placeholder = 'Вставьте ссылку на объявление Encar, che168 или Carsensor — остальное сделается само', parse = parseCarLink},
 ) => {
   const [value, setValue] = useState('');
   const ref = useRef<HTMLInputElement>(null);
@@ -48,7 +49,7 @@ export const QuickLink: React.FC<{
       <form className="link-bar" onSubmit={(e) => { e.preventDefault(); if (!value.trim()) ref.current?.focus(); else go(value); }}>
         <Link2 className="link-bar-icon" size={20} aria-hidden />
         <input ref={ref} value={value} disabled={busy} autoFocus
-          placeholder={placeholder} aria-label="Ссылка на объявление Encar"
+          placeholder={placeholder} aria-label="Ссылка на объявление Encar, che168 или Carsensor"
           onChange={(e) => setValue(e.target.value)}
           onPaste={(e) => {
             // Вставили ссылку — сразу в работу; не ссылку — пусть ляжет в поле как текст
@@ -83,8 +84,9 @@ const titleOf = (l: LotEntry) => [l.brand, l.model].filter(Boolean).join(' ') ||
 // «сохранённая ссылка» лота: номер машины уже лежит в пометке, отдельное поле не нужно,
 // и работает это для лотов, созданных до 01.10
 export const encarUrl = (l: LotEntry) => {
-  const m = l.note?.match(/Encar (\d+)/);
-  return m ? encarAdUrl(m[1]) : null;
+  // «Encar 41630924», «che168 60154824» (Китай) или «carsensor AU7375484964» (Япония)
+  const id = idFromNote(l.note);
+  return id ? encarAdUrl(id) : null;
 };
 /** Пустой лот: без фото и без машины — копятся от «+ Новый лот», их удаляют пачкой */
 export const isEmptyLot = (l: LotEntry) => !l.photos.length && lotIsBlank(l);
@@ -135,7 +137,8 @@ export const LotsPanel: React.FC<{
             <div key={l.id} role="button" tabIndex={0} className={`car-card${l.id === current ? ' on' : ''}${busy ? ' pending' : ''}`}
               onClick={() => onOpen(l.id)} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(l.id); }}>
               {l.photos[0]
-                ? <img src={l.photos[0]} alt="" loading="lazy" style={{aspectRatio: '16 / 9', width: 96}} />
+                // Миниатюра, а не фото целиком: полное — до 2000 px и сотни КБ на значок в 96 px
+                ? <img src={thumb(l.photos[0])} alt="" loading="lazy" style={{aspectRatio: '16 / 9', width: 96}} />
                 : <span className="lot-row-empty" style={{width: 96}}>нет фото</span>}
               <div className="car-card-body">
                 <b>{titleOf(l)}</b>
@@ -145,8 +148,8 @@ export const LotsPanel: React.FC<{
                     <button className="icon-btn" title="Дублировать — копия с теми же фото и полями" aria-label="Дублировать"
                       onClick={stop(() => onCopy(l))}><Copy size={16} /></button>
                     {url && (
-                      <a className="icon-btn" href={url} target="_blank" rel="noreferrer" title="Открыть объявление на Encar"
-                        aria-label="Открыть на Encar" onClick={(e) => e.stopPropagation()}><ExternalLink size={16} /></a>
+                      <a className="icon-btn" href={url} target="_blank" rel="noreferrer" title={`Открыть объявление на ${sourceName(idFromNote(l.note))}`}
+                        aria-label={`Открыть на ${sourceName(idFromNote(l.note))}`} onClick={(e) => e.stopPropagation()}><ExternalLink size={16} /></a>
                     )}
                     <button className="icon-btn danger" title="Удалить объявление вместе с его роликами" aria-label="Удалить"
                       onClick={stop(() => onDelete(l))}><Trash2 size={16} /></button>

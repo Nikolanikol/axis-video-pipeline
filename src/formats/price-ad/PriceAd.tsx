@@ -48,6 +48,24 @@ const Specs: React.FC<{ad: Ad}> = ({ad}) => {
   );
 };
 
+// Подпись точки маршрута. Точки стоят у краёв кадра (x 150 и 930), и длинное слово по центру
+// под точкой уходило за край: «ВЛАДИВОСТОК» в 52 px резался справа (тест Дмитрия, PR 13).
+// Ширину текста SVG до рендера не узнать, поэтому оцениваем её с запасом: средняя ширина
+// заглавной кириллицы — до 0,62 кегля у узких шрифтов и до 0,7 у широких (Manrope), строчной —
+// около 0,56. Подпись держим в своей половине кадра с полями SAFE_X: не влезает — сдвигаем
+// к центру, всё ещё не влезает — уменьшаем кегль, но не мельче 60% (дальше не читается с телефона)
+const SAFE_X = 60;
+const HALF = (1080 - 2 * SAFE_X - 40) / 2;
+const Label: React.FC<{text: string; at: number; y: number; size: number; upper?: boolean; fill: string; style: React.CSSProperties}> = (
+  {text, at, y, size, upper, fill, style},
+) => {
+  const em = (text || '').length * (upper ? 0.7 : 0.56);
+  const fs = em ? Math.max(Math.round(size * 0.6), Math.min(size, Math.floor(HALF / em))) : size;
+  const w = Math.min(HALF, em * fs);
+  const x = Math.min(Math.max(at, SAFE_X + w / 2), 1080 - SAFE_X - w / 2);
+  return <text x={x} y={y} textAnchor="middle" fill={fill} style={{...style, fontSize: fs}}>{text}</text>;
+};
+
 // Сцена 3: маршрут и цена — главный момент ролика
 const Route: React.FC<{ad: Ad}> = ({ad}) => {
   const C = useTheme();
@@ -61,8 +79,8 @@ const Route: React.FC<{ad: Ad}> = ({ad}) => {
   const bez = (i: 0 | 1) => (1 - t) ** 3 * P[0][i] + 3 * (1 - t) ** 2 * t * P[1][i] + 3 * (1 - t) * t ** 2 * P[2][i] + t ** 3 * P[3][i];
   const [bx, by] = [bez(0), bez(1)];
   const d = `M ${P[0].join(' ')} C ${P[1].join(' ')}, ${P[2].join(' ')}, ${P[3].join(' ')}`;
-  const city = {fontFamily: HEAD, fontWeight: 500, fontSize: 52, textTransform: 'uppercase'} as const;
-  const country = {fontFamily: BODY, fontWeight: 500, fontSize: 30} as const;
+  const city = {fontFamily: HEAD, fontWeight: 500, textTransform: 'uppercase'} as const;
+  const country = {fontFamily: BODY, fontWeight: 500} as const;
   return (
     <AbsoluteFill style={{background: `radial-gradient(ellipse at 50% 30%, ${C.panel} 0%, ${C.bg} 65%)`}}>
       <AbsoluteFill style={{alignItems: 'center', top: 330, opacity: 0.06}}>
@@ -87,10 +105,10 @@ const Route: React.FC<{ad: Ad}> = ({ad}) => {
           <rect width={80} height={48} rx={4} fill="url(#copper)" />
           {[16, 32, 48, 64].map((x) => <rect key={x} x={x - 1.5} y={8} width={3} height={32} fill={C.copperDark} opacity={0.7} />)}
         </g>
-        <text x={P[0][0]} y={550} textAnchor="middle" fill={C.white} style={city}>{ad.origin}</text>
-        <text x={P[0][0]} y={600} textAnchor="middle" fill={C.grey} style={country}>{ad.originCountry}</text>
-        <text x={P[3][0]} y={550} textAnchor="middle" fill={C.white} style={city}>{ad.port}</text>
-        <text x={P[3][0]} y={600} textAnchor="middle" fill={C.grey} style={country}>{ad.portCountry}</text>
+        <Label text={ad.origin} at={P[0][0]} y={550} size={52} upper fill={C.white} style={city} />
+        <Label text={ad.originCountry} at={P[0][0]} y={600} size={30} fill={C.grey} style={country} />
+        <Label text={ad.port} at={P[3][0]} y={550} size={52} upper fill={C.white} style={city} />
+        <Label text={ad.portCountry} at={P[3][0]} y={600} size={30} fill={C.grey} style={country} />
       </svg>
       <PriceTag ad={ad} delay={45} />
       <TopLogo scrim={false} />
@@ -108,6 +126,8 @@ export const Cta: React.FC<{ad: Ad}> = ({ad}) => {
   const c = spring({frame: f - 32, fps, config: {damping: 200}});
   const rise = (v: number) => ({opacity: v, transform: `translateY(${(1 - v) * 50}px)`});
   const row: React.CSSProperties = {display: 'flex', alignItems: 'center', gap: 30};
+  // Хук — до условия: число хуков не должно зависеть от настройки
+  const icon = useAsset('iconHandshake');
   return (
     <AbsoluteFill style={{background: `radial-gradient(ellipse at 50% 18%, ${C.panel} 0%, ${C.bg} 60%)`,
       padding: '190px 150px 360px 80px', alignItems: 'center'}}>
@@ -119,7 +139,9 @@ export const Cta: React.FC<{ad: Ad}> = ({ad}) => {
         </div>
       </div>
       <div style={{...rise(b), ...row, marginTop: 70, alignSelf: 'stretch'}}>
-        <Img src={useAsset('iconHandshake')} style={{width: 100}} />
+        {/* Иконку можно выключить в настройках: у клиента своя графика или она не к месту */}
+        {/* Своя иконка бывает любой формы: высоту держим в 100, чтобы высокая не раздвигала строку */}
+        {ad.benefitIcon !== false && <Img src={icon} style={{width: 100, maxHeight: 100, objectFit: 'contain'}} />}
         <div style={{fontFamily: BODY, fontWeight: 600, fontSize: 46, color: C.white}}>{ad.texts.ctaBenefit}</div>
       </div>
       <div style={{...rise(c), marginTop: 'auto', alignSelf: 'stretch'}}>

@@ -1,0 +1,1374 @@
+{
+ "source": "che168",
+ "ref": "60152276",
+ "fetchedAt": "2026-10-11T14:04:50.506Z",
+ "urls": {
+  "global": "https://global.che168.com/en/detail/60152276",
+  "cn": "https://www.che168.com/dealer/466721/60152276.html"
+ },
+ "ids": {
+  "brandid": 44,
+  "seriesid": 3209,
+  "specid": 41445,
+  "dealerid": 466721,
+  "cityid": 610100
+ },
+ "price": {
+  "amount": 19190,
+  "currency": "USD",
+  "exportFee": 400,
+  "portFee": 530
+ },
+ "mileageKm": 35700,
+ "photoSet": "studio",
+ "photos": [
+  {
+   "url": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M04/7F/4D/0x0_autohomecar__ChtpWGrKHUmAPoJ2AAFurA7Gtgs876.jpg",
+   "preview": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M04/7F/4D/1400x0_c42_autohomecar__ChtpWGrKHUmAPoJ2AAFurA7Gtgs876.jpg.webp",
+   "category": "exterior",
+   "angle": "front-34",
+   "ad": false,
+   "source": "studio",
+   "sticker": true
+  },
+  {
+   "url": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M06/83/1F/0x0_autohomecar__ChxpWGrKHUuADZg7AAEWt5CYcLU954.jpg",
+   "preview": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M06/83/1F/1400x0_c42_autohomecar__ChxpWGrKHUuADZg7AAEWt5CYcLU954.jpg.webp",
+   "category": "exterior",
+   "angle": "rear-34",
+   "ad": true,
+   "source": "studio"
+  },
+  {
+   "url": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M0B/83/1F/0x0_autohomecar__ChxpWGrKHUyAd9QRAAD4LiAv9LU162.jpg",
+   "preview": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M0B/83/1F/1400x0_c42_autohomecar__ChxpWGrKHUyAd9QRAAD4LiAv9LU162.jpg.webp",
+   "category": "exterior",
+   "angle": "front",
+   "ad": true,
+   "source": "studio"
+  },
+  {
+   "url": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M03/83/19/0x0_autohomecar__ChxpV2rKHU2ARiUIAADlCNkOt4Q846.jpg",
+   "preview": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M03/83/19/1400x0_c42_autohomecar__ChxpV2rKHU2ARiUIAADlCNkOt4Q846.jpg.webp",
+   "category": "exterior",
+   "angle": "rear",
+   "ad": true,
+   "source": "studio"
+  },
+  {
+   "url": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M04/83/1F/0x0_autohomecar__ChxpWGrKHU6AdiKoAAGwmDB-rYQ368.jpg",
+   "preview": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M04/83/1F/1400x0_c42_autohomecar__ChxpWGrKHU6AdiKoAAGwmDB-rYQ368.jpg.webp",
+   "category": "interior",
+   "angle": "dashboard",
+   "ad": true,
+   "source": "studio"
+  },
+  {
+   "url": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M01/7F/4E/0x0_autohomecar__ChtpWGrKHVCAJDphAAH2AJ7MKeE747.jpg",
+   "preview": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M01/7F/4E/1400x0_c42_autohomecar__ChtpWGrKHVCAJDphAAH2AJ7MKeE747.jpg.webp",
+   "category": "engine",
+   "angle": "engine",
+   "ad": false,
+   "source": "studio"
+  },
+  {
+   "url": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M07/7F/4E/0x0_autohomecar__ChtpWGrKHVKAST2XAAE4XWxf5vw193.jpg",
+   "preview": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M07/7F/4E/1400x0_c42_autohomecar__ChtpWGrKHVKAST2XAAE4XWxf5vw193.jpg.webp",
+   "category": "detail",
+   "angle": "headlight",
+   "ad": true,
+   "source": "studio"
+  },
+  {
+   "url": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M09/7F/4E/0x0_autohomecar__ChtpWGrKHVOAFU0eAAElWtlJU-M915.jpg",
+   "preview": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M09/7F/4E/1400x0_c42_autohomecar__ChtpWGrKHVOAFU0eAAElWtlJU-M915.jpg.webp",
+   "category": "interior",
+   "angle": "door-open",
+   "ad": false,
+   "source": "studio"
+  },
+  {
+   "url": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M09/7F/4E/0x0_autohomecar__ChtpWGrKHVSARTFfAAG04_CcobU890.jpg",
+   "preview": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M09/7F/4E/1400x0_c42_autohomecar__ChtpWGrKHVSARTFfAAG04_CcobU890.jpg.webp",
+   "category": "detail",
+   "angle": "door-panel",
+   "ad": false,
+   "source": "studio"
+  },
+  {
+   "url": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M09/83/19/0x0_autohomecar__ChxpV2rKHVWAYVZdAAGPQAPyKAY909.jpg",
+   "preview": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M09/83/19/1400x0_c42_autohomecar__ChxpV2rKHVWAYVZdAAGPQAPyKAY909.jpg.webp",
+   "category": "interior",
+   "angle": "front-seats",
+   "ad": true,
+   "source": "studio"
+  },
+  {
+   "url": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M00/83/19/0x0_autohomecar__ChxpV2rKHVaAcOvyAAGPelJq1J4147.jpg",
+   "preview": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M00/83/19/1400x0_c42_autohomecar__ChxpV2rKHVaAcOvyAAGPelJq1J4147.jpg.webp",
+   "category": "interior",
+   "angle": "steering",
+   "ad": true,
+   "source": "studio"
+  },
+  {
+   "url": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M04/7F/4E/0x0_autohomecar__ChtpWGrKHVeAHBe2AAG6MkTMGvk043.jpg",
+   "preview": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M04/7F/4E/1400x0_c42_autohomecar__ChtpWGrKHVeAHBe2AAG6MkTMGvk043.jpg.webp",
+   "category": "interior",
+   "angle": "screen",
+   "ad": true,
+   "source": "studio"
+  },
+  {
+   "url": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M02/83/19/0x0_autohomecar__ChxpV2rKHVmACSdfAAF1dCDdd7w489.jpg",
+   "preview": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M02/83/19/1400x0_c42_autohomecar__ChxpV2rKHVmACSdfAAF1dCDdd7w489.jpg.webp",
+   "category": "interior",
+   "angle": "gear",
+   "ad": true,
+   "source": "studio"
+  },
+  {
+   "url": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M02/83/1F/0x0_autohomecar__ChxpWGrKHVqANeIoAADWM4sHzQE377.jpg",
+   "preview": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M02/83/1F/1400x0_c42_autohomecar__ChxpWGrKHVqANeIoAADWM4sHzQE377.jpg.webp",
+   "category": "interior",
+   "angle": "sunroof",
+   "ad": true,
+   "source": "studio"
+  },
+  {
+   "url": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M0A/83/1A/0x0_autohomecar__ChxpV2rKHVuAWhFRAAF6rsrSJCg360.jpg",
+   "preview": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M0A/83/1A/1400x0_c42_autohomecar__ChxpV2rKHVuAWhFRAAF6rsrSJCg360.jpg.webp",
+   "category": "interior",
+   "angle": "rear-seats",
+   "ad": true,
+   "source": "studio"
+  },
+  {
+   "url": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M04/7F/4E/0x0_autohomecar__ChtpWGrKHVyAaV7aAAEf-t0kEPI034.jpg",
+   "preview": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M04/7F/4E/1400x0_c42_autohomecar__ChtpWGrKHVyAaV7aAAEf-t0kEPI034.jpg.webp",
+   "category": "detail",
+   "angle": "trunk",
+   "ad": true,
+   "source": "studio"
+  },
+  {
+   "url": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M0B/83/20/0x0_autohomecar__ChxpWGrKHV2ANgp6AAGGh8ThEFY570.jpg",
+   "preview": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M0B/83/20/1400x0_c42_autohomecar__ChxpWGrKHV2ANgp6AAGGh8ThEFY570.jpg.webp",
+   "category": "detail",
+   "angle": "wheel",
+   "ad": true,
+   "source": "studio"
+  },
+  {
+   "url": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M07/83/1A/0x0_autohomecar__ChxpV2rKHV-ADPdeAAC00Ga33Dk104.jpg",
+   "preview": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M07/83/1A/1400x0_c42_autohomecar__ChxpV2rKHV-ADPdeAAC00Ga33Dk104.jpg.webp",
+   "category": "detail",
+   "angle": "door-handle",
+   "ad": false,
+   "source": "studio"
+  },
+  {
+   "url": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M00/83/20/0x0_autohomecar__ChxpWGrKHWCAf1rgAAFHStBL4b8683.jpg",
+   "preview": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M00/83/20/1400x0_c42_autohomecar__ChxpWGrKHWCAf1rgAAFHStBL4b8683.jpg.webp",
+   "category": "detail",
+   "angle": "key",
+   "ad": false,
+   "source": "studio"
+  },
+  {
+   "url": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M02/83/1A/0x0_autohomecar__ChxpV2rKHWGAM1AvAAHIzIsAzGg373.jpg",
+   "preview": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M02/83/1A/1400x0_c42_autohomecar__ChxpV2rKHWGAM1AvAAHIzIsAzGg373.jpg.webp",
+   "category": "detail",
+   "angle": "seat-detail",
+   "ad": false,
+   "source": "studio"
+  },
+  {
+   "url": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M05/83/1A/0x0_autohomecar__ChxpV2rKHWKALY5jAAGIlpWt7yM057.jpg",
+   "preview": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M05/83/1A/1400x0_c42_autohomecar__ChxpV2rKHWKALY5jAAGIlpWt7yM057.jpg.webp",
+   "category": "detail",
+   "angle": "controls",
+   "ad": false,
+   "source": "studio"
+  },
+  {
+   "url": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M08/83/1A/0x0_autohomecar__ChxpV2rKHWOAe6goAAGJ_swU4qI406.jpg",
+   "preview": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M08/83/1A/1400x0_c42_autohomecar__ChxpV2rKHWOAe6goAAGJ_swU4qI406.jpg.webp",
+   "category": "interior",
+   "angle": "driver-view",
+   "ad": true,
+   "source": "studio"
+  },
+  {
+   "url": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M03/7F/4F/0x0_autohomecar__ChtpWGrKHWSAfxyQAAFwy__TtW4235.jpg",
+   "preview": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M03/7F/4F/1400x0_c42_autohomecar__ChtpWGrKHWSAfxyQAAFwy__TtW4235.jpg.webp",
+   "category": "interior",
+   "angle": "rear-seats-side",
+   "ad": false,
+   "source": "studio"
+  },
+  {
+   "url": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M07/7F/4F/0x0_autohomecar__ChtpWGrKHWWAG-DoAAFjgcN0-p8997.jpg",
+   "preview": "https://erscglobal2.autoimg.cn/escimg/auto/g34/M07/7F/4F/1400x0_c42_autohomecar__ChtpWGrKHWWAG-DoAAFjgcN0-p8997.jpg.webp",
+   "category": "detail",
+   "angle": "tire",
+   "ad": false,
+   "source": "studio"
+  }
+ ],
+ "certified": true,
+ "byLang": {
+  "en": {
+   "car": {
+    "title": "Jaguar F-PACE 2020 300-Sport",
+    "brand": "Jaguar",
+    "series": "Jaguar F-PACE",
+    "trim": "2020 300-Sport",
+    "modelYear": "2019.09",
+    "regDate": "2021.02",
+    "productionDate": "2021-02-25",
+    "mileageKm": 35700,
+    "fuel": "Gasoline",
+    "engine": "2.0T 300hp L4",
+    "transmission": "8-speed automatic with manual shift mode",
+    "drive": "Front Engine, All-Wheel Drive",
+    "steering": "Left",
+    "body": "SUV",
+    "class": "Mid-size SUV",
+    "seats": 5,
+    "doors": 5,
+    "color": "Dark Gray",
+    "dimensionsMm": "4731*1936*1666",
+    "curbWeightKg": null,
+    "city": "xian",
+    "vinMasked": "SADC********58392",
+    "remark": null
+   },
+   "newPriceCny": 596800,
+   "specs": [
+    {
+     "group": "Basic Specifications",
+     "items": [
+      {
+       "name": "Model Name",
+       "value": "Jaguar F-PACE 2020 300-Sport Edition"
+      },
+      {
+       "name": "Manufacturer Suggested Retail Price (¥)",
+       "value": "596800"
+      },
+      {
+       "name": "Manufacturer",
+       "value": "Jaguar (Imported)"
+      },
+      {
+       "name": "Class",
+       "value": "Mid-size SUV"
+      },
+      {
+       "name": "Energy Type",
+       "value": "Gasoline"
+      },
+      {
+       "name": "Emission Standard",
+       "value": "China VI"
+      },
+      {
+       "name": "Launch Date",
+       "value": "Sept 2019"
+      },
+      {
+       "name": "Maximum power (kW)",
+       "value": "221"
+      },
+      {
+       "name": "Max Torque (N·m)",
+       "value": "400"
+      },
+      {
+       "name": "Abbreviation",
+       "value": "8-speed automatic with manual shift mode"
+      },
+      {
+       "name": "Engine",
+       "value": "2.0T 300hp L4"
+      },
+      {
+       "name": "Length*Width*Height (mm)",
+       "value": "4731*1936*1666"
+      },
+      {
+       "name": "Official 0-100km/h acceleration (s)",
+       "value": "6.1"
+      },
+      {
+       "name": "Top speed (km/h)",
+       "value": "233"
+      },
+      {
+       "name": "NEDC combined fuel consumption (L/100km)",
+       "value": "7.9"
+      }
+     ]
+    },
+    {
+     "group": "Body",
+     "items": [
+      {
+       "name": "Length (mm)",
+       "value": "4731"
+      },
+      {
+       "name": "Width (mm)",
+       "value": "1936"
+      },
+      {
+       "name": "Height (mm)",
+       "value": "1666"
+      },
+      {
+       "name": "Wheelbase (mm)",
+       "value": "2874"
+      },
+      {
+       "name": "Front track (mm)",
+       "value": "1641"
+      },
+      {
+       "name": "Rear track (mm)",
+       "value": "1654"
+      },
+      {
+       "name": "Body structure",
+       "value": "SUV"
+      },
+      {
+       "name": "Fuel tank capacity (L)",
+       "value": "82"
+      }
+     ]
+    },
+    {
+     "group": "Engine",
+     "items": [
+      {
+       "name": "Engine model",
+       "value": "PT204"
+      },
+      {
+       "name": "Displacement (mL)",
+       "value": "1997"
+      },
+      {
+       "name": "Displacement (L)",
+       "value": "2.0"
+      },
+      {
+       "name": "Intake form",
+       "value": "Turbocharged"
+      },
+      {
+       "name": "Engine Layout",
+       "value": "Longitudinal"
+      },
+      {
+       "name": "Cylinder arrangement",
+       "value": "L"
+      },
+      {
+       "name": "Number of cylinders",
+       "value": "4"
+      },
+      {
+       "name": "Valves per cylinder",
+       "value": "4"
+      },
+      {
+       "name": "Compression ratio",
+       "value": "9.5"
+      },
+      {
+       "name": "Valvetrain",
+       "value": "DOHC"
+      },
+      {
+       "name": "Bore (mm)",
+       "value": "83"
+      },
+      {
+       "name": "Stroke (mm)",
+       "value": "92.29"
+      },
+      {
+       "name": "Maximum horsepower (Ps)",
+       "value": "300"
+      },
+      {
+       "name": "Maximum power (kW)",
+       "value": "221"
+      },
+      {
+       "name": "Max Power RPM",
+       "value": "5500"
+      },
+      {
+       "name": "Max Torque (N·m)",
+       "value": "400"
+      },
+      {
+       "name": "Max Torque RPM",
+       "value": "1500-4500"
+      },
+      {
+       "name": "Maximum Net Power (kW)",
+       "value": "221"
+      },
+      {
+       "name": "Energy Type",
+       "value": "Gasoline"
+      },
+      {
+       "name": "Fuel Grade",
+       "value": "95 Octane"
+      },
+      {
+       "name": "Fuel Supply System",
+       "value": "Direct Injection"
+      },
+      {
+       "name": "Cylinder Head Material",
+       "value": "Aluminum Alloy"
+      },
+      {
+       "name": "Cylinder Block Material",
+       "value": "Aluminum Alloy"
+      },
+      {
+       "name": "Emission Standard",
+       "value": "China VI"
+      }
+     ]
+    },
+    {
+     "group": "Transmission",
+     "items": [
+      {
+       "name": "Abbreviation",
+       "value": "8-speed automatic with manual shift mode"
+      },
+      {
+       "name": "Number of Gears",
+       "value": "8"
+      },
+      {
+       "name": "Transmission Type",
+       "value": "Semi-Automatic Transmission (AT)"
+      }
+     ]
+    },
+    {
+     "group": "Chassis & Steering",
+     "items": [
+      {
+       "name": "Body Structure",
+       "value": "Unibody"
+      }
+     ]
+    }
+   ],
+   "options": [
+    {
+     "group": "Passive Safety",
+     "items": [
+      {
+       "name": "Driver/Passenger Airbags",
+       "value": "Primary ●/Secondary ●"
+      },
+      {
+       "name": "Front/Rear Side Airbags",
+       "value": "Front ●/Rear -"
+      },
+      {
+       "name": "Front/Rear Curtain Airbags",
+       "value": "Front ●/Rear ●"
+      }
+     ]
+    },
+    {
+     "group": "Active Safety",
+     "items": [
+      {
+       "name": "ABS (Anti-lock Braking System)",
+       "value": "●"
+      },
+      {
+       "name": "Brake Force Distribution (EBD/CBC)",
+       "value": "●"
+      },
+      {
+       "name": "Brake Assist (EBA/BAS/BA)",
+       "value": "●"
+      },
+      {
+       "name": "Traction Control (ASR/TCS/TRC)",
+       "value": "●"
+      },
+      {
+       "name": "Electronic Stability Control (ESC/ESP/DSC)",
+       "value": "●"
+      },
+      {
+       "name": "ISOFIX Child Seat Anchors",
+       "value": "●"
+      },
+      {
+       "name": "Lane Departure Warning System",
+       "value": "●"
+      },
+      {
+       "name": "Autonomous Emergency Braking",
+       "value": "●"
+      },
+      {
+       "name": "Driver Drowsiness Monitoring",
+       "value": "●"
+      },
+      {
+       "name": "Roadside Assistance Call",
+       "value": "●"
+      }
+     ]
+    },
+    {
+     "group": "Driving & Handling",
+     "items": [
+      {
+       "name": "Engine Start/Stop System",
+       "value": "●"
+      },
+      {
+       "name": "Hill Start Assist",
+       "value": "●"
+      },
+      {
+       "name": "Hill Descent Control",
+       "value": "●"
+      }
+     ]
+    },
+    {
+     "group": "Driving Hardware",
+     "items": [
+      {
+       "name": "Front/Rear Parking Sensors",
+       "value": "Front ●/Rear ●"
+      }
+     ]
+    },
+    {
+     "group": "Driving Functions",
+     "items": [
+      {
+       "name": "Rear Cross Traffic Alert",
+       "value": "○"
+      },
+      {
+       "name": "Satellite Navigation System",
+       "value": "●"
+      },
+      {
+       "name": "Blind Spot Monitoring",
+       "value": "○"
+      },
+      {
+       "name": "Lane Keeping Assist System",
+       "value": "●"
+      },
+      {
+       "name": "Parking Assist",
+       "value": "○"
+      }
+     ]
+    },
+    {
+     "group": "Exterior & Anti-Theft",
+     "items": [
+      {
+       "name": "Power Tailgate",
+       "value": "●"
+      },
+      {
+       "name": "Hands-Free Tailgate",
+       "value": "○"
+      },
+      {
+       "name": "Power Tailgate Position Memory",
+       "value": "●"
+      },
+      {
+       "name": "Roof Rack",
+       "value": "○"
+      },
+      {
+       "name": "Engine Immobilizer",
+       "value": "●"
+      },
+      {
+       "name": "Central Locking",
+       "value": "●"
+      },
+      {
+       "name": "Keyless Start System",
+       "value": "●"
+      }
+     ]
+    },
+    {
+     "group": "Exterior Lighting",
+     "items": [
+      {
+       "name": "LED Daytime Running Lights",
+       "value": "●"
+      },
+      {
+       "name": "Adaptive High Beams",
+       "value": "●"
+      },
+      {
+       "name": "Automatic Headlights",
+       "value": "●"
+      },
+      {
+       "name": "Adaptive Headlights",
+       "value": "●"
+      },
+      {
+       "name": "Adjustable Headlight Height",
+       "value": "●"
+      },
+      {
+       "name": "Headlight Washers",
+       "value": "●"
+      },
+      {
+       "name": "Headlight Delay Off",
+       "value": "●"
+      }
+     ]
+    },
+    {
+     "group": "Sunroof & Glass",
+     "items": [
+      {
+       "name": "Front/Rear Power Windows",
+       "value": "Front ●/Rear ●"
+      },
+      {
+       "name": "Power Window Anti-pinch Function",
+       "value": "●"
+      },
+      {
+       "name": "Rear Side Privacy Glass",
+       "value": "●"
+      },
+      {
+       "name": "Rear Wiper",
+       "value": "●"
+      }
+     ]
+    },
+    {
+     "group": "Connectivity & Intelligence",
+     "items": [
+      {
+       "name": "Split-Screen Display",
+       "value": "○"
+      },
+      {
+       "name": "Bluetooth/In-car Phone",
+       "value": "●"
+      },
+      {
+       "name": "In-car TV",
+       "value": "○"
+      },
+      {
+       "name": "Vehicle Networking",
+       "value": "●"
+      }
+     ]
+    },
+    {
+     "group": "Steering Wheel & Interior Rearview Mirror",
+     "items": [
+      {
+       "name": "Multi-function Steering Wheel",
+       "value": "●"
+      },
+      {
+       "name": "Paddle Shifters",
+       "value": "●"
+      },
+      {
+       "name": "Heated Steering Wheel",
+       "value": "○"
+      },
+      {
+       "name": "Memory Steering Wheel",
+       "value": "○"
+      },
+      {
+       "name": "Full LCD Instrument Cluster",
+       "value": "●"
+      }
+     ]
+    },
+    {
+     "group": "Interior Charging",
+     "items": [
+      {
+       "name": "12V Power Outlet in Trunk",
+       "value": "●"
+      }
+     ]
+    },
+    {
+     "group": "Seat Features",
+     "items": [
+      {
+       "name": "Sport Style Seats",
+       "value": "●"
+      },
+      {
+       "name": "Power-adjustable Driver/Passenger Seats",
+       "value": "Primary ●/Secondary ●"
+      },
+      {
+       "name": "Power Adjustable 2nd Row Seats",
+       "value": "○"
+      },
+      {
+       "name": "Front/Rear Center Armrest",
+       "value": "Front ●/Rear ●"
+      },
+      {
+       "name": "Rear Cup Holders",
+       "value": "●"
+      }
+     ]
+    },
+    {
+     "group": "Audio & Interior Lighting",
+     "items": [
+      {
+       "name": "Touch Reading Light",
+       "value": "●"
+      }
+     ]
+    },
+    {
+     "group": "Air Conditioning & Refrigerator",
+     "items": [
+      {
+       "name": "Rear Independent Climate Control",
+       "value": "○"
+      },
+      {
+       "name": "Rear Air Vents",
+       "value": "●"
+      },
+      {
+       "name": "Dual-Zone Climate Control",
+       "value": "●"
+      },
+      {
+       "name": "In-vehicle Air Purifier",
+       "value": "●"
+      },
+      {
+       "name": "PM2.5 Air Filter",
+       "value": "●"
+      }
+     ]
+    }
+   ],
+   "inspection": null
+  },
+  "ru": {
+   "car": {
+    "title": "Jaguar F-PACE 2020 300-Sport",
+    "brand": "Jaguar",
+    "series": "Jaguar F-PACE",
+    "trim": "2020 300-Sport",
+    "modelYear": "2019.09",
+    "regDate": "2021.02",
+    "productionDate": "2021-02-25",
+    "mileageKm": 35700,
+    "fuel": "Бензин",
+    "engine": "2.0T 300 л.с. L4",
+    "transmission": "8-ступенчатая коробка передач с ручным/автоматическим режимом",
+    "drive": "Передний полный привод",
+    "steering": "Left",
+    "body": "Внедорожник (SUV)",
+    "class": "Среднеразмерный SUV",
+    "seats": 5,
+    "doors": 5,
+    "color": "Темно-серый",
+    "dimensionsMm": "4731*1936*1666",
+    "curbWeightKg": null,
+    "city": "xian",
+    "vinMasked": "SADC********58392",
+    "remark": null
+   },
+   "newPriceCny": 596800,
+   "specs": [
+    {
+     "group": "Основные параметры",
+     "items": [
+      {
+       "name": "Название модели",
+       "value": "Jaguar F-PACE 2020 300-Sport Спортивная версия"
+      },
+      {
+       "name": "Рекомендованная цена производителя (¥)",
+       "value": "596800"
+      },
+      {
+       "name": "Производитель",
+       "value": "Jaguar (импорт)"
+      },
+      {
+       "name": "Класс",
+       "value": "Среднеразмерный SUV"
+      },
+      {
+       "name": "Тип топлива",
+       "value": "Бензин"
+      },
+      {
+       "name": "Экологический стандарт",
+       "value": "Государственный стандарт VI"
+      },
+      {
+       "name": "Дата выпуска",
+       "value": "2019.09"
+      },
+      {
+       "name": "максимальная мощность (кВт)",
+       "value": "221"
+      },
+      {
+       "name": "Максимальный крутящий момент (Н·м)",
+       "value": "400"
+      },
+      {
+       "name": "Краткое название",
+       "value": "8-ступенчатая коробка передач с ручным/автоматическим режимом"
+      },
+      {
+       "name": "Двигатель",
+       "value": "2.0T 300 л.с. L4"
+      },
+      {
+       "name": "Длина*Ширина*Высота (мм)",
+       "value": "4731*1936*1666"
+      },
+      {
+       "name": "Официальное ускорение 0-100 км/ч (с)",
+       "value": "6.1"
+      },
+      {
+       "name": "Максимальная скорость (км/ч)",
+       "value": "233"
+      },
+      {
+       "name": "Комбинированный расход топлива NEDC (л/100 км)",
+       "value": "7,9"
+      }
+     ]
+    },
+    {
+     "group": "Кузов",
+     "items": [
+      {
+       "name": "Длина (мм)",
+       "value": "4731"
+      },
+      {
+       "name": "Ширина (мм)",
+       "value": "1936"
+      },
+      {
+       "name": "Высота (мм)",
+       "value": "1666"
+      },
+      {
+       "name": "Колёсная база (мм)",
+       "value": "2874"
+      },
+      {
+       "name": "Колея передних колёс (мм)",
+       "value": "1641"
+      },
+      {
+       "name": "Колея задних колёс (мм)",
+       "value": "1654"
+      },
+      {
+       "name": "Тип кузова",
+       "value": "Внедорожник (SUV)"
+      },
+      {
+       "name": "Объем топливного бака (л)",
+       "value": "82"
+      }
+     ]
+    },
+    {
+     "group": "Двигатель",
+     "items": [
+      {
+       "name": "Модель двигателя",
+       "value": "PT204"
+      },
+      {
+       "name": "Объем двигателя (мл)",
+       "value": "1997"
+      },
+      {
+       "name": "Объем двигателя (л)",
+       "value": "2.0"
+      },
+      {
+       "name": "тип впуска",
+       "value": "Турбонаддув"
+      },
+      {
+       "name": "Компоновка двигателя",
+       "value": "Продольное расположение"
+      },
+      {
+       "name": "расположение цилиндров",
+       "value": "L"
+      },
+      {
+       "name": "количество цилиндров (шт,)",
+       "value": "4"
+      },
+      {
+       "name": "количество клапанов на цилиндр (шт,)",
+       "value": "4"
+      },
+      {
+       "name": "степень сжатия",
+       "value": "9.5"
+      },
+      {
+       "name": "механизм газораспределения",
+       "value": "DOHC"
+      },
+      {
+       "name": "диаметр цилиндра (мм)",
+       "value": "83"
+      },
+      {
+       "name": "ход поршня (мм)",
+       "value": "92.29"
+      },
+      {
+       "name": "максимальная мощность (л,с,)",
+       "value": "300"
+      },
+      {
+       "name": "максимальная мощность (кВт)",
+       "value": "221"
+      },
+      {
+       "name": "Максимальная частота вращения мощности (об/мин)",
+       "value": "5500"
+      },
+      {
+       "name": "Максимальный крутящий момент (Н·м)",
+       "value": "400"
+      },
+      {
+       "name": "Максимальная частота вращения крутящего момента (об/мин)",
+       "value": "1500-4500"
+      },
+      {
+       "name": "Максимальная чистая мощность (кВт)",
+       "value": "221"
+      },
+      {
+       "name": "Тип топлива",
+       "value": "Бензин"
+      },
+      {
+       "name": "Марка топлива",
+       "value": "95-й"
+      },
+      {
+       "name": "Способ подачи топлива",
+       "value": "Прямой впрыск"
+      },
+      {
+       "name": "Материал головки блока цилиндров",
+       "value": "алюминиевый сплав"
+      },
+      {
+       "name": "Материал блока цилиндров",
+       "value": "алюминиевый сплав"
+      },
+      {
+       "name": "Экологический стандарт",
+       "value": "Государственный стандарт VI"
+      }
+     ]
+    },
+    {
+     "group": "Трансмиссия",
+     "items": [
+      {
+       "name": "Краткое название",
+       "value": "8-ступенчатая коробка передач с ручным/автоматическим режимом"
+      },
+      {
+       "name": "Количество передач",
+       "value": "8"
+      },
+      {
+       "name": "Тип коробки передач",
+       "value": "Автоматическая коробка передач с ручным режимом (АКПП)"
+      }
+     ]
+    },
+    {
+     "group": "Шасси и рулевое управление",
+     "items": [
+      {
+       "name": "конструкция кузова",
+       "value": "Несущий кузов"
+      }
+     ]
+    }
+   ],
+   "options": [
+    {
+     "group": "Пассивная безопасность",
+     "items": [
+      {
+       "name": "Фронтальные подушки безопасности",
+       "value": "Основной●/Дополнительный●"
+      },
+      {
+       "name": "Боковые подушки безопасности передних и задних сидений",
+       "value": "перед ●/зад -"
+      },
+      {
+       "name": "Головные подушки безопасности передних и задних сидений (шторки)",
+       "value": "Передний●/Задний●"
+      }
+     ]
+    },
+    {
+     "group": "Активная безопасность",
+     "items": [
+      {
+       "name": "Антиблокировочная система (ABS)",
+       "value": "●"
+      },
+      {
+       "name": "Распределение тормозных усилий (EBD/CBC и др.)",
+       "value": "●"
+      },
+      {
+       "name": "Ассистент торможения (EBA/BAS/BA и др.)",
+       "value": "●"
+      },
+      {
+       "name": "Контроль тяги (ASR/TCS/TRC и др.)",
+       "value": "●"
+      },
+      {
+       "name": "Система стабилизации (ESC/ESP/DSC и др.)",
+       "value": "●"
+      },
+      {
+       "name": "Монтажные места для детских кресел ISOFIX",
+       "value": "●"
+      },
+      {
+       "name": "Система предупреждения о выходе за пределы полосы",
+       "value": "●"
+      },
+      {
+       "name": "Автоматическая система экстренного торможения",
+       "value": "●"
+      },
+      {
+       "name": "Система контроля усталости водителя",
+       "value": "●"
+      },
+      {
+       "name": "вызов дорожной помощи",
+       "value": "●"
+      }
+     ]
+    },
+    {
+     "group": "Управляемость",
+     "items": [
+      {
+       "name": "Система запуска/остановки двигателя",
+       "value": "●"
+      },
+      {
+       "name": "Ассистент при старте на подъем",
+       "value": "●"
+      },
+      {
+       "name": "Система контроля спуска по крутому склону",
+       "value": "●"
+      }
+     ]
+    },
+    {
+     "group": "Аппаратное обеспечение вождения",
+     "items": [
+      {
+       "name": "Парковочные датчики (передние/задние)",
+       "value": "Передний●/Задний●"
+      }
+     ]
+    },
+    {
+     "group": "Функции вождения",
+     "items": [
+      {
+       "name": "Система предупреждения о боковом столкновении при движении задним ходом",
+       "value": "○"
+      },
+      {
+       "name": "спутниковая навигационная система",
+       "value": "●"
+      },
+      {
+       "name": "Система контроля слепых зон",
+       "value": "○"
+      },
+      {
+       "name": "Система поддержки полосы движения",
+       "value": "●"
+      },
+      {
+       "name": "система помощи при парковке",
+       "value": "○"
+      }
+     ]
+    },
+    {
+     "group": "Экстерьер / Противоугонная система",
+     "items": [
+      {
+       "name": "электропривод багажника",
+       "value": "●"
+      },
+      {
+       "name": "сенсорный багажник",
+       "value": "○"
+      },
+      {
+       "name": "Память положения электрического багажника",
+       "value": "●"
+      },
+      {
+       "name": "Багажник на крыше",
+       "value": "○"
+      },
+      {
+       "name": "Электронный антиугонный системой двигателя",
+       "value": "●"
+      },
+      {
+       "name": "Центральный замок автомобиля",
+       "value": "●"
+      },
+      {
+       "name": "Система запуска без ключа",
+       "value": "●"
+      }
+     ]
+    },
+    {
+     "group": "Внешнее освещение",
+     "items": [
+      {
+       "name": "LED дневные ходовые огни",
+       "value": "●"
+      },
+      {
+       "name": "Адаптивный дальний свет",
+       "value": "●"
+      },
+      {
+       "name": "Автоматические фары",
+       "value": "●"
+      },
+      {
+       "name": "Поворотные фары",
+       "value": "●"
+      },
+      {
+       "name": "Регулировка высоты фар",
+       "value": "●"
+      },
+      {
+       "name": "Омыватель фар",
+       "value": "●"
+      },
+      {
+       "name": "Задержка отключения фар",
+       "value": "●"
+      }
+     ]
+    },
+    {
+     "group": "Люк / Стекла",
+     "items": [
+      {
+       "name": "Электростеклоподъемники передние/задние",
+       "value": "Передний●/Задний●"
+      },
+      {
+       "name": "Защитная функция окон от укуса рук",
+       "value": "●"
+      },
+      {
+       "name": "Темное боковое стекло для задней части",
+       "value": "●"
+      },
+      {
+       "name": "задний стеклоочиститель",
+       "value": "●"
+      }
+     ]
+    },
+    {
+     "group": "Связь / Интеллектуальные системы",
+     "items": [
+      {
+       "name": "разделенный экран центральной ЖК-панели",
+       "value": "○"
+      },
+      {
+       "name": "Bluetooth/автомобильный телефон",
+       "value": "●"
+      },
+      {
+       "name": "Автомобильный телевизор",
+       "value": "○"
+      },
+      {
+       "name": "Автомобильная связь",
+       "value": "●"
+      }
+     ]
+    },
+    {
+     "group": "Руль / Салонное зеркало",
+     "items": [
+      {
+       "name": "мультируль",
+       "value": "●"
+      },
+      {
+       "name": "лепестки переключения передач на руле",
+       "value": "●"
+      },
+      {
+       "name": "Обогрев руля",
+       "value": "○"
+      },
+      {
+       "name": "Память настроек руля",
+       "value": "○"
+      },
+      {
+       "name": "Полноценный жидкокристаллический приборный панель",
+       "value": "●"
+      }
+     ]
+    },
+    {
+     "group": "Зарядка в салоне",
+     "items": [
+      {
+       "name": "Разъем 12V в багажнике",
+       "value": "●"
+      }
+     ]
+    },
+    {
+     "group": "Конфигурация сидений",
+     "items": [
+      {
+       "name": "Спортивные сиденья",
+       "value": "●"
+      },
+      {
+       "name": "Электрическое регулирование водительского и пассажирского сиденьев",
+       "value": "Основной●/Дополнительный●"
+      },
+      {
+       "name": "электрическая регулировка сидений второго ряда",
+       "value": "○"
+      },
+      {
+       "name": "передний/задний центральный подлокотник",
+       "value": "Передний●/Задний●"
+      },
+      {
+       "name": "Подставки для стаканов в задней части",
+       "value": "●"
+      }
+     ]
+    },
+    {
+     "group": "Аудиосистема / Внутреннее освещение",
+     "items": [
+      {
+       "name": "Сенсорный свет для чтения",
+       "value": "●"
+      }
+     ]
+    },
+    {
+     "group": "Кондиционер / Холодильник",
+     "items": [
+      {
+       "name": "Независимый климат-контроль для задней части",
+       "value": "○"
+      },
+      {
+       "name": "вентиляционные отверстия для задних сидений",
+       "value": "●"
+      },
+      {
+       "name": "зонный климат-контроль",
+       "value": "●"
+      },
+      {
+       "name": "Автомобильный очиститель воздуха",
+       "value": "●"
+      },
+      {
+       "name": "Фильтр PM2.5 для салона",
+       "value": "●"
+      }
+     ]
+    }
+   ],
+   "inspection": null
+  }
+ }
+}

@@ -11,11 +11,17 @@
 //   • задание выполнено — списание закрывается (settled_at); упало или отменено — кредиты
 //     возвращаются в те же партии, откуда взяты;
 //   • сервер перезапустился посреди задания — очередь в памяти пропала, при старте за всё
-//     незакрытое кредиты возвращаются.
+//     незакрытое кредиты возвращаются;
+//   • база не приняла исход (обрыв соединения, 12.10 на превью так пропал кредит за карусель:
+//     возврат упал один раз и больше не повторялся) — исход помним и дожимаем сторожем
+//     sweepCharges раз в пару минут, а не ждём следующего перезапуска.
 // Владелец платформы и сервер без базы (вход выключен) не платят.
 import path from 'node:path';
 import {db, hasDatabase} from './db/index.mjs';
-import {CONFIG_DIR, HttpError, readJson} from './store.mjs';
+import {CONFIG_DIR, HttpError, clientMessage, readJson} from './store.mjs';
+import {serverLog} from './log.mjs';
+
+const journal = serverLog('billing');
 
 // «Вход включён» — то же, что authEnabled в session.mjs; берём из базы напрямую, иначе
 // session → accounts → billing → session замкнулись бы в круг импортов
@@ -34,7 +40,15 @@ export const creditCosts = async () => {
 /** Бесплатные кредиты новой компании — начисляются при подтверждении почты: {credits, days} */
 export const signupCredits = async () => ({credits: 7, days: 30, ...(await creditsConfig()).signup});
 
-const plural = (n) => {
+// Задания этого процесса, за которые списано и исход ещё не известен: сторож их не трогает
+const live = new Set();
+// Исход известен, но база его не приняла: jobId → {kind: 'settle' | 'refund', note}
+const owed = new Map();
+// Списание без исхода старше этого и не наше — сирота (процесс, что его делал, умер).
+// С запасом: при выкладке старый контейнер ещё доделывает своё, пока новый уже работает
+const ORPHAN_AGE_MIN = 10;
+
+export const plural = (n) => {
   const d = n % 10;
   const h = n % 100;
   if (d === 1 && h !== 11) return 'кредит';
@@ -132,6 +146,7 @@ export const charge = async ({workspaceId, pipeline, jobId, note = '', userId = 
        VALUES ($1, $2, 'charge', $3, $4, $5, $6, $7)`,
       [workspaceId, -cost, pipeline, jobId, String(note).slice(0, 200), userId, JSON.stringify(taken)]);
     await client.query('COMMIT');
+    live.add(jobId);
     return {jobId, cost};
   } catch (e) {
     await client.query('ROLLBACK').catch(() => {});
@@ -141,12 +156,29 @@ export const charge = async ({workspaceId, pipeline, jobId, note = '', userId = 
   }
 };
 
+/**
+ * Записать исход задания. Не вышло — запоминаем и пробрасываем ошибку: сторож повторит,
+ * а вызывающий решает сам, пугать ли клиента (готовую карусель — нет, она уже собрана)
+ */
+const close = async (jobId, kind, note, write) => {
+  live.delete(jobId);
+  try {
+    await write();
+    owed.delete(jobId);
+  } catch (e) {
+    owed.set(jobId, {kind, note});
+    throw e;
+  }
+};
+
+const writeSettle = (jobId) => db().query(
+  `UPDATE smmaker_credit_ledger SET settled_at = now() WHERE job_id = $1 AND kind = 'charge' AND settled_at IS NULL`,
+  [jobId]);
+
 /** Задание выполнено — списание окончательное */
 export const settle = async (receipt) => {
   if (!receipt) return;
-  await db().query(
-    `UPDATE smmaker_credit_ledger SET settled_at = now() WHERE job_id = $1 AND kind = 'charge' AND settled_at IS NULL`,
-    [receipt.jobId]);
+  await close(receipt.jobId, 'settle', '', () => writeSettle(receipt.jobId));
 };
 
 /**
@@ -157,6 +189,10 @@ export const settle = async (receipt) => {
  */
 export const refund = async (receipt, note = 'не выполнено') => {
   if (!receipt) return;
+  await close(receipt.jobId, 'refund', note, () => writeRefund(receipt, note));
+};
+
+const writeRefund = async (receipt, note) => {
   const client = await db().connect();
   try {
     await client.query('BEGIN');
@@ -189,14 +225,18 @@ export const refund = async (receipt, note = 'не выполнено') => {
  */
 export const billed = async (params, work) => {
   const receipt = await charge(params);
+  let out;
   try {
-    const out = await work();
-    await settle(receipt);
-    return out;
+    out = await work();
   } catch (e) {
-    await refund(receipt, `ошибка: ${String(e?.message || e).slice(0, 150)}`).catch((err) => console.error('Возврат кредита:', err));
+    // Примечание видно клиенту в «Истории кредитов» — только текст для человека, не исключение
+    await refund(receipt, `ошибка: ${clientMessage(e, 'сбой сборки').slice(0, 150)}`).catch((err) => journal.error('refund.failed', {note: 'кредит за упавшую работу не вернулся — дожмёт сторож', error: err}));
     throw e;
   }
+  // Работа сделана — результат клиенту отдаём, даже если база не приняла закрытие:
+  // раньше сбой здесь возвращал кредит и показывал ошибку при готовой карусели. Закрытие дожмёт сторож
+  await settle(receipt).catch((err) => journal.warn('settle.failed', {note: 'списание не закрылось — дожмёт сторож', error: err}));
+  return out;
 };
 
 /**
@@ -214,9 +254,53 @@ export const refundOrphans = async ({log = console.log} = {}) => {
   return rows.length;
 };
 
-/** Журнал кредитов компании — для кабинета: что, когда и за сколько; у начислений — срок партии */
+/**
+ * Сторож кредитов, раз в пару минут (server/index.mjs): дожимает исходы, которые база не
+ * приняла, и возвращает списания-сироты — без исхода дольше ORPHAN_AGE_MIN и не наши живые.
+ * Без него кредит за упавшую при обрыве базы карусель висел до следующего перезапуска.
+ */
+export const sweepCharges = async ({log = console.log} = {}) => {
+  let fixed = 0;
+  for (const [jobId, {kind, note}] of owed) {
+    try {
+      await close(jobId, kind, note, () => (kind === 'settle' ? writeSettle(jobId) : writeRefund({jobId}, note)));
+      fixed++;
+    } catch { /* база всё ещё не отвечает — попробуем в следующий заход */ }
+  }
+  const {rows} = await db().query(
+    `SELECT job_id FROM smmaker_credit_ledger c
+      WHERE kind = 'charge' AND settled_at IS NULL AND job_id IS NOT NULL
+        AND created_at < now() - $1 * interval '1 minute'
+        AND NOT EXISTS (SELECT 1 FROM smmaker_credit_ledger r WHERE r.job_id = c.job_id AND r.kind = 'refund')`,
+    [ORPHAN_AGE_MIN]);
+  const orphans = rows.map((r) => r.job_id).filter((id) => !live.has(id) && !owed.has(id));
+  for (const jobId of orphans) await refund({jobId}, 'задание не завершилось — кредиты возвращены');
+  if (fixed || orphans.length) log(`Кредиты: дожато исходов ${fixed}, возвращено сирот ${orphans.length}`);
+  return {fixed, orphans: orphans.length};
+};
+
+/** Журнал кредитов компании — для админки: что, когда и за сколько; у начислений — срок партии */
 export const ledgerOf = async (workspaceId, limit = 200) => (await db().query(
   `SELECT l.id, l.delta, l.kind, l.pipeline, l.job_id, l.note, l.created_at, t.expires_at, t.source, t.price_krw
      FROM smmaker_credit_ledger l LEFT JOIN smmaker_credit_lots t ON t.id = l.lot_id
     WHERE l.workspace_id = $1 ORDER BY l.created_at DESC, l.id DESC LIMIT $2`,
   [workspaceId, limit])).rows;
+
+// Строк на страницу истории в кабинете: экран-полтора, дальше — «Вперёд»
+const LEDGER_PAGE = 20;
+
+/**
+ * Журнал кредитов страницами — для кабинета (владелец 12.10: строк будет много). Каждая
+ * генерация — строка, у активного клиента это сотни за месяц: целиком не отдаём
+ */
+export const ledgerPage = async (workspaceId, page = 1) => {
+  const {rows: [c]} = await db().query('SELECT count(*)::int AS n FROM smmaker_credit_ledger WHERE workspace_id = $1', [workspaceId]);
+  const pages = Math.max(1, Math.ceil(c.n / LEDGER_PAGE));
+  const at = Math.min(Math.max(1, Math.floor(Number(page)) || 1), pages);
+  const {rows} = await db().query(
+    `SELECT l.id, l.delta, l.kind, l.pipeline, l.job_id, l.note, l.created_at, t.expires_at, t.source, t.price_krw
+       FROM smmaker_credit_ledger l LEFT JOIN smmaker_credit_lots t ON t.id = l.lot_id
+      WHERE l.workspace_id = $1 ORDER BY l.created_at DESC, l.id DESC LIMIT $2 OFFSET $3`,
+    [workspaceId, LEDGER_PAGE, (at - 1) * LEDGER_PAGE]);
+  return {rows, total: c.n, page: at, pages, pageSize: LEDGER_PAGE};
+};

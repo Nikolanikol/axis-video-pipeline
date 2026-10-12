@@ -14,6 +14,10 @@ import '@fontsource/manrope/latin-700.css';
 import '@fontsource/manrope/cyrillic-800.css';
 import '@fontsource/manrope/latin-800.css';
 import {Shell} from './Shell';
+import {installErrorReports} from './errorReport';
 import './styles.css';
+
+// Ошибки страницы — в журнал сервера и тревогой в «Сбои» (app/errorReport.ts)
+installErrorReports();
 
 createRoot(document.getElementById('root')!).render(<Shell />);

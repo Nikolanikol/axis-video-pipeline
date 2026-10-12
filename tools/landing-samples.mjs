@@ -15,7 +15,7 @@ import {openBrowser, renderMedia, renderStill, selectComposition} from '@remotio
 import {execFileSync} from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import {fetchCar} from '../server/carousel.mjs';
+import {fetchEncarCar} from '../server/encar.mjs';
 import {DEMO_PROFILE, demoTheme} from '../src/shared/landingDemo.js';
 import {withoutMusic} from '../src/shared/nomusic.js';
 import {marketFromProfile} from '../src/shared/profile.js';
@@ -103,7 +103,7 @@ for (const v of VIDEOS) {
 const browser = await openBrowser('chrome', {browserExecutable});
 try {
   for (const c of CAROUSELS) {
-    const car = await fetchCar(c.id);
+    const car = await fetchEncarCar(c.id);
     const fmt = carouselFormats.find((f) => f.id === c.format);
     const inputProps = {car, market, theme: themeOf(c.palette), includeHistory: true, format: c.format, seed: 7};
     const composition = await selectComposition({serveUrl, id: 'carousel', inputProps, puppeteerInstance: browser});

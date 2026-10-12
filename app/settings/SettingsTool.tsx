@@ -1,4 +1,4 @@
-// Раздел «Настройки»: профиль и бренд. Справа — живое превью последнего открытого лота.
+// Раздел «Настройки»: профиль, бренд и надписи рекламы. Справа — живое превью последнего открытого лота.
 import React, {useEffect, useState} from 'react';
 import {getFormat} from '../../src/shared/model';
 import {marketFromProfile} from '../../src/shared/profile';
@@ -6,34 +6,52 @@ import type {Market} from '../../src/shared/types';
 import {lotTitle} from '../ads/LotTool';
 import {api, LotEntry, MarketEntry} from '../api';
 import {useConfig} from '../config';
+import {useTodayMarket} from '../rates';
 import {Player} from '@remotion/player';
 import {Eye, SlidersHorizontal} from 'lucide-react';
 import {MobileTabs, useIsPhone} from '../MobileTabs';
 import {BrandPreview} from '../../src/brand/BrandPreview';
 import {Preview} from '../Preview';
 import {href, lastLot} from '../router';
-import {BrandForm, ProfileForm} from '../SettingsForms';
+import {AdTextsForm, BrandForm, ProfileForm} from '../SettingsForms';
+
+const DEMO_LOT = '/preview-demo/lot.json';
+const DEMO_ID = 'demo';
 
 const usePreviewLot = () => {
   const {report} = useConfig();
   const [lot, setLot] = useState<LotEntry | null | undefined>(undefined);
   useEffect(() => {
-    api.lots().then((list) => setLot(list.find((l) => l.id === lastLot.get()) ?? list[0] ?? null)).catch(report);
+    api.lots().then(async (list) => {
+      const own = list.find((l) => l.id === lastLot.get()) ?? list[0];
+      if (own) return setLot(own);
+      // Новый клиент без объявлений: превью иначе пустое, и настройкам не на чем показать себя.
+      // Берём демо-объявление кабинета (public/preview-demo, Ford F-150 с Encar 40303537 — выбор
+      // владельца 12.10; витрина гостя держит свою Kona). Своё объявление появится — превью перейдёт на него
+      const demo = await fetch(DEMO_LOT).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      setLot(demo ? {...demo, id: DEMO_ID} as LotEntry : null);
+    }).catch(report);
   }, [report]);
   return lot;
 };
 
-const PreviewPanel: React.FC<{lot: LotEntry | null | undefined; market: MarketEntry}> = ({lot, market}) => {
+const PreviewPanel: React.FC<{lot: LotEntry | null | undefined; market: MarketEntry}> = ({lot, market: base}) => {
   const {brand} = useConfig();
+  // Курс валюты компании на сегодня — цена в превью та же, что в ролике
+  const market = useTodayMarket(base as Market & MarketEntry);
   if (lot === undefined) return <div className="empty">Загрузка превью…</div>;
   if (lot === null) return <div className="empty">Превью появится, когда будет хотя бы одно объявление</div>;
   const format = getFormat(lot.format);
   return (
     <>
       <div className="format-bar">
-        <span className="muted">Превью: <a href={href('ads', 'lot')}>{lotTitle(lot)}</a> · {format.title}</span>
+        <span className="muted">
+          {lot.id === DEMO_ID
+            ? <>Превью на примере: {lotTitle(lot)} · {format.title}. Добавьте своё объявление — превью перейдёт на него</>
+            : <>Превью: <a href={href('ads', 'lot')}>{lotTitle(lot)}</a> · {format.title}</>}
+        </span>
       </div>
-      <Preview input={{lot: {...lot, market: market.id}, market: market as Market, theme: brand}} format={format} />
+      <Preview input={{lot: {...lot, market: market.id}, market: market as Market, theme: {...brand, name: market.name}}} format={format} />
     </>
   );
 };
@@ -70,6 +88,27 @@ export const ProfileTool: React.FC = () => {
     <SettingsLayout
       editor={<ProfileForm profile={profile} saved={savedProfile} onChange={setProfile} onSaved={profileSaved} onError={report} />}
       preview={<PreviewPanel lot={lot} market={{...market, id: profile.id}} />} />
+  );
+};
+
+/**
+ * Настройки → «Реклама авто»: надписи роликов компании по сценам и языкам, иконка
+ * преимущества. Язык правки свой (переключатель в форме), превью — на нём же
+ */
+export const AdTextsTool: React.FC = () => {
+  const {config, profile, setProfile, profileSaved, brand, brandSaved, report} = useConfig();
+  const lot = usePreviewLot();
+  const [language, setLanguage] = useState(profile.language);
+  const savedProfile = config.profiles.find((p) => p.id === profile.id);
+  // Превью — на том языке, чьи тексты сейчас правят: иначе правка английских при постах на
+  // русском была бы не видна вовсе
+  const market = {...(marketFromProfile({...profile, language}, config.copy) as Market), id: profile.id};
+  return (
+    <SettingsLayout
+      editor={<AdTextsForm profile={profile} saved={savedProfile} copy={config.copy} theme={brand} onBrandSaved={brandSaved}
+        language={language} onLanguage={setLanguage}
+        onChange={setProfile} onSaved={profileSaved} onError={report} />}
+      preview={<PreviewPanel lot={lot} market={market} />} />
   );
 };
 

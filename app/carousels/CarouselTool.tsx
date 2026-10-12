@@ -8,18 +8,24 @@
 // Отличие от ролика: превью ролика живое, и формат там меняется бесплатно, а карусель надо
 // собрать — это кредит. Поэтому клик по формату только выбирает его, пересборка — отдельной
 // кнопкой, а ссылка на уже собранную машину открывает готовую карусель, а не собирает заново.
-import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {encarAdUrl} from '../../src/shared/encarLink.js';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {encarAdUrl, sourceName} from '../../src/shared/encarLink.js';
+import {thumb} from '../thumb';
 import {parseCarouselSource} from '../../src/shared/kmotorsLot.js';
 import {QuickLink} from '../ads/QuickLot';
 import {Check, ChevronLeft, ChevronRight, Download, ExternalLink, Images, List, RefreshCw, Trash2, X} from 'lucide-react';
 import {MobileTabs, usePanelSwipes} from '../MobileTabs';
 import {toast} from '../Toast';
-import {api, CarouselEntry, CarouselFormat} from '../api';
+import {api, CarouselEntry, CarouselFormat, errorText} from '../api';
 import {useConfig} from '../config';
 import {useCost, useSession} from '../auth';
 import {carouselLang} from '../../src/carousel/i18n';
 import {BusyModal} from '../BusyModal';
+import {carouselPrice} from '../../src/carousel/price';
+import {currencySign} from '../../src/shared/currencies';
+import {marketFromProfile} from '../../src/shared/profile';
+import type {Market} from '../../src/shared/types';
+import {useTodayMarket} from '../rates';
 import {canSaveToFolder, canSaveToGallery, saveToFolder, shareFiles, slideName, usePreparedFiles} from '../saveFiles';
 
 const km = (v: number | null) => (v === null ? '—' : `${v.toLocaleString('ru-RU')} км`);
@@ -29,8 +35,12 @@ const CarSummary: React.FC<{entry: CarouselEntry}> = ({entry}) => {
   const c = entry.car;
   const bits = [
     c.year, km(c.mileageKm), c.transmission, c.fuel,
-    c.price?.usd ? `$${c.price.usd.toLocaleString('ru-RU')}` : null,
-    c.history ? `${c.history.accidentsTotal} ДТП` : 'история недоступна',
+    c.price?.krw ? `${c.price.krw.toLocaleString('ru-RU')} ₩ на Encar`
+      // У японской — иены, как на Carsensor: доллары из них посчитаны нами по курсу дня
+      : c.price?.jpy ? `${c.price.jpy.toLocaleString('ru-RU')} ¥ на ${sourceName(c.id)}`
+        : c.price?.usd ? `$${c.price.usd.toLocaleString('ru-RU')} на ${sourceName(c.id)}` : null,
+    // У машин из Китая и Японии истории нет вовсе (в рекламу не идёт) — и строку о ней не пишем
+    c.origin === 'CN' || c.origin === 'JP' ? null : c.history ? `${c.history.accidentsTotal} ДТП` : 'история недоступна',
     c.history ? `${c.history.ownerChanges} смен владельца` : null,
   ].filter(Boolean);
   return (
@@ -40,11 +50,39 @@ const CarSummary: React.FC<{entry: CarouselEntry}> = ({entry}) => {
         <span>№ {entry.id}</span>
       </div>
       <div className="muted">{bits.join(' · ')}</div>
-      {c.price && (
-        <div className="muted">
-          курс {Math.round(1 / c.price.krwToUsd).toLocaleString('ru-RU')} ₩ за $1, котировка {c.price.quotedAt}
-        </div>
-      )}
+    </div>
+  );
+};
+
+/**
+ * Цена на слайде: в валюте профиля по курсу дня, или своя — и «Пересобрать с этой ценой»
+ * бесплатно (владелец 11.10). Своё число — это маржа клиента; пусто — вернуть расчёт.
+ * Пересобирается та же машина в том же формате и варианте, меняется только слайд цены
+ */
+const PriceBox: React.FC<{entry: CarouselEntry; busy: boolean; onReprice: (price: number | null) => void}> = ({entry, busy, onReprice}) => {
+  const {config, profile} = useConfig();
+  const market = useTodayMarket(useMemo(() => marketFromProfile(profile, config.copy) as Market, [profile, config.copy]));
+  const computed = carouselPrice(entry.car, market, null);
+  const [value, setValue] = useState(entry.priceOverride ? String(entry.priceOverride) : '');
+  useEffect(() => setValue(entry.priceOverride ? String(entry.priceOverride) : ''), [entry.id, entry.priceOverride]);
+  const sign = currencySign(market.currency);
+  const typed = value.trim() === '' ? null : Number(value.replace(/[\s,]/g, ''));
+  const bad = typed !== null && (!Number.isFinite(typed) || typed <= 0);
+  const same = (typed ?? null) === (entry.priceOverride ?? null);
+  return (
+    <div className="carousel-price">
+      <label className="field">
+        <span className="label">Цена на слайде, {sign}</span>
+        <input inputMode="decimal" value={value} placeholder={computed === null ? '' : String(computed)} onChange={(e) => setValue(e.target.value)} />
+        <span className="hint">
+          {entry.priceOverride
+            ? <>своя цена · {market.currency === 'KRW' && entry.car.price?.krw ? `на ${sourceName(entry.id)}` : 'расчёт по курсу дал бы'} {computed === null ? '—' : `${computed.toLocaleString('ru-RU')} ${sign}`}</>
+            : <>пусто — цена с {sourceName(entry.id)}{market.currency === 'KRW' && entry.car.price?.krw ? '' : ' по курсу дня'}{computed === null ? '' : `: ${computed.toLocaleString('ru-RU')} ${sign}`}; впишите свою — она и будет на слайде</>}
+        </span>
+      </label>
+      <button className="btn" disabled={busy || bad || same} onClick={() => onReprice(typed)}>
+        {typed === null && entry.priceOverride ? 'Вернуть расчёт и пересобрать' : 'Пересобрать с этой ценой'} · бесплатно
+      </button>
     </div>
   );
 };
@@ -244,7 +282,8 @@ const CarouselsPanel: React.FC<{
             // div, а не button: внутри свои кнопки, а кнопка в кнопке — недопустимая разметка
             <div key={c.id} role="button" tabIndex={0} className={`car-card${c.id === current ? ' on' : ''}${pending.has(c.id) ? ' pending' : ''}`}
               onClick={() => onOpen(c)} onKeyDown={(e) => { if (e.key === 'Enter') onOpen(c); }}>
-              <img src={`${c.slides[0]}?v=${encodeURIComponent(c.updatedAt)}`} alt=""
+              {/* Миниатюра слайда: PNG 1080×1920 весит 1–3 МБ — на плашку это лишнее */}
+              <img src={thumb(`${c.slides[0]}?v=${encodeURIComponent(c.updatedAt)}`, 160)} alt=""
                 style={{aspectRatio: f ? `${f.width} / ${f.height}` : '9 / 16'}} loading="lazy" />
               <div className="car-card-body">
                 <b>{[c.car.brand, c.car.model].filter(Boolean).join(' ') || `№ ${c.id}`}</b>
@@ -254,8 +293,8 @@ const CarouselsPanel: React.FC<{
                   <button className="icon-btn" title={`Пересобрать в формате «${f?.title ?? ''}»${cost}`} aria-label="Пересобрать"
                     disabled={busy} onClick={stop(() => onRebuild(c))}><RefreshCw size={16} /></button>
                   <a className="icon-btn" href={c.lot?.url ?? encarAdUrl(c.id)} target="_blank" rel="noreferrer"
-                    title={c.lot ? 'Открыть лот на kmotors' : 'Открыть объявление на Encar'}
-                    aria-label={c.lot ? 'Открыть лот' : 'Открыть на Encar'} onClick={(e) => e.stopPropagation()}><ExternalLink size={16} /></a>
+                    title={c.lot ? 'Открыть лот на kmotors' : `Открыть объявление на ${sourceName(c.id)}`}
+                    aria-label={c.lot ? 'Открыть лот' : `Открыть на ${sourceName(c.id)}`} onClick={(e) => e.stopPropagation()}><ExternalLink size={16} /></a>
                   <button className="icon-btn danger" title="Удалить" aria-label="Удалить" disabled={busy}
                     onClick={stop(() => onDelete(c))}><Trash2 size={16} /></button>
                 </div>}
@@ -299,7 +338,7 @@ const SlideViewer: React.FC<{entry: CarouselEntry; ratio: string; onZoom: (i: nu
       <div className="slide-thumbs">
         {entry.slides.map((src, i) => (
           <button key={src} className={i === at ? 'slide-thumb on' : 'slide-thumb'} onClick={() => setAt(i)} style={{aspectRatio: ratio}}>
-            <img src={`${src}${v}`} alt={`Слайд ${i + 1}`} loading="lazy" />
+            <img src={thumb(`${src}${v}`, 160)} alt={`Слайд ${i + 1}`} loading="lazy" />
           </button>
         ))}
       </div>
@@ -355,7 +394,7 @@ export const CarouselTool: React.FC = () => {
       setHistory((h) => [made, ...h.filter((x) => x.id !== made.id)]);
     } catch (e) {
       // Ошибку сборки по ссылке — под строкой ссылки: человек смотрит туда
-      setLinkError(e instanceof Error ? e.message : String(e));
+      setLinkError(errorText(e));
     } finally { setBusy(false); refreshAccess(); }
   };
 
@@ -367,6 +406,18 @@ export const CarouselTool: React.FC = () => {
     const known = history.find((h) => h.id === id);
     if (known) { setEntry(known); setLinkError(''); setMtab('main'); return; }
     run(link);
+  };
+
+  // Своя цена — пересборка без кредита: та же машина, формат и вариант (server/carousel.mjs)
+  const reprice = async (price: number | null) => {
+    if (!entry) return;
+    setBusy(true);
+    try {
+      const made = await api.repriceCarousel(entry.id, price);
+      setEntry(made);
+      setHistory((h) => h.map((x) => (x.id === made.id ? made : x)));
+      toast(price === null ? 'Цена — снова по курсу, слайды пересобраны' : 'Слайды пересобраны с вашей ценой');
+    } catch (e) { report(e); } finally { setBusy(false); }
   };
 
   const remove = async (id: string) => {
@@ -399,7 +450,11 @@ export const CarouselTool: React.FC = () => {
     try {
       const folder = await saveToFolder(files, setSaving);
       if (folder) setSavedTo({id: entry.id, folder});
-    } catch (e) { report(e); } finally { setSaving(null); }
+    } catch {
+      // Выбор папки запрещён (облачный браузер, политика компании, системная папка) — не пугаем
+      // технической ошибкой, а отдаём тот же комплект архивом (тест Дмитрия, PR 13)
+      window.location.href = `/api/carousels/${entry.id}/zip`;
+    } finally { setSaving(null); }
   };
   const slideFiles = usePreparedFiles(entry?.id ?? null, (entry?.slides ?? []).map((_, i) => ({
     url: `/api/carousels/${entry!.id}/slide/${i + 1}/download`,
@@ -418,7 +473,7 @@ export const CarouselTool: React.FC = () => {
       {/* quick-screen — один экран, как у «Ролика по лоту»: колонки прокручиваются внутри */}
       <div className="quick-screen">
       <QuickLink onLink={fromLink} error={linkError} busy={busy} parse={parseCarouselSource}
-        placeholder={`Вставьте ссылку на объявление Encar — карусель соберётся сама (слайды на ${slidesLang})`} />
+        placeholder={`Вставьте ссылку на объявление Encar, che168 или Carsensor — карусель соберётся сама (слайды на ${slidesLang})`} />
       {/* Сборка — 10–20 секунд (замер 30.09: 13 с на 9 слайдов); экран закрыт окном, как у лота по ссылке */}
       <BusyModal step={busy ? 0 : null} steps={['Собираю карусель: данные и слайды']} label="Сборка карусели"
         note="Обычно 10–20 секунд. Не закрывайте страницу" />
@@ -432,7 +487,7 @@ export const CarouselTool: React.FC = () => {
         <section className="quick-preview">
           {entry
             ? <SlideViewer entry={entry} ratio={ratio} onZoom={setOpen} />
-            : <div className="empty">Вставьте ссылку на объявление Encar — слайды появятся здесь.</div>}
+            : <div className="empty">Вставьте ссылку на объявление Encar, che168 или Carsensor — слайды появятся здесь.</div>}
         </section>
 
         <section className="quick-side">
@@ -464,10 +519,15 @@ export const CarouselTool: React.FC = () => {
                 <a className="btn primary big" href={`/api/carousels/${entry.id}/zip`}>Скачать все {entry.slides.length} · ZIP</a>
               )}
               {otherFormat && <span className="hint">Сейчас открыта «{entryFormat?.title}» — выбран другой формат. Карусель у машины одна: новая заменит прежнюю.</span>}
+              {/* Запасной путь рядом с папкой: архив работает в любом браузере */}
+              {!otherFormat && canSaveToFolder && !canSaveToGallery && (
+                <a className="hint" href={`/api/carousels/${entry.id}/zip`}>или одним архивом · ZIP</a>
+              )}
               {!otherFormat && savedTo?.id === entry.id && saving === null && (
                 <span className="hint" style={{color: 'var(--ok)'}}>Сохранено {entry.slides.length} слайдов в папку «{savedTo.folder}»</span>
               )}
               {!otherFormat && canSaveToGallery && <span className="hint">В меню выберите «Сохранить изображения» — слайды попадут в «Фото». Там же можно сразу в Instagram.</span>}
+              {!otherFormat && <PriceBox entry={entry} busy={busy} onReprice={reprice} />}
               <div className="btn-row">
                 {!otherFormat && entry.format !== 'classic' && (
                   <button className="btn" onClick={() => run(entry.id)} disabled={busy}
@@ -477,7 +537,7 @@ export const CarouselTool: React.FC = () => {
                   <button className="btn ghost" onClick={() => run(entry.id, entry.seed)} disabled={busy}
                     title="Те же компоновка и фразы, свежие данные и текущий бренд">Пересобрать{cost}</button>
                 )}
-                <a className="btn ghost" href={entry.lot?.url ?? encarAdUrl(entry.id)} target="_blank" rel="noreferrer">{entry.lot ? 'Открыть лот' : 'На Encar'}</a>
+                <a className="btn ghost" href={entry.lot?.url ?? encarAdUrl(entry.id)} target="_blank" rel="noreferrer">{entry.lot ? 'Открыть лот' : `На ${sourceName(entry.id)}`}</a>
                 <button className="btn ghost" onClick={() => remove(entry.id)} disabled={busy}>Удалить</button>
               </div>
             </div>
