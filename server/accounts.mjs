@@ -684,6 +684,10 @@ export const purgeDeleted = async ({log = console.log} = {}) => {
         await client.query('DELETE FROM smmaker_memberships WHERE user_id = $1', [id]);
         await client.query('DELETE FROM smmaker_sessions WHERE user_id = $1', [id]);
         await client.query('DELETE FROM smmaker_email_tokens WHERE user_id = $1', [id]);
+        // Поддержка в Telegram: ключи привязки — прочь, тема остаётся (переписка живёт в Telegram),
+        // но без ссылки на человека — шапка новой привязки его уже не покажет
+        await client.query('DELETE FROM smmaker_support_links WHERE user_id = $1', [id]);
+        await client.query('UPDATE smmaker_support_threads SET user_id = NULL WHERE user_id = $1', [id]);
         // Строку человека не удаляем: на неё ссылаются «кто начислил» в журнале и партиях.
         // Пароль-заглушка не проходит проверку scrypt — войти нельзя
         const gone = `deleted-${id}@deleted.invalid`;

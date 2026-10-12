@@ -7,6 +7,8 @@
 // Отправка никогда не ломает то, о чём сообщает: оплата начислена — она начислена, даже если
 // Telegram не ответил. Ошибка — только строка в журнал сервера.
 //
+// Тот же бот — и поддержка клиентов (server/support.mjs): тема на клиента, переписка через бота.
+//
 // .env: TELEGRAM_BOT_TOKEN (бот @kok_work_bot), TELEGRAM_CHAT_ID (группа), TELEGRAM_PAYMENTS_TOPIC
 // (номер темы «Оплаты» — второй сегмент её ссылки t.me/c/<группа>/<тема>). Нет токена или
 // группы — молчим: на Mac без бота и в тестах.
@@ -57,6 +59,40 @@ export const notify = async (html, {topic} = {}) => {
   } catch (e) {
     console.error(`Telegram недоступен: ${e.message}`);
   }
+};
+
+/** Ошибка Bot API: code — HTTP-код Telegram (403 — клиент заблокировал бота), description — его слова */
+export class TelegramError extends Error {
+  constructor(method, data) {
+    super(`Telegram ${method}: ${data?.description ?? 'нет ответа'}`);
+    this.code = data?.error_code ?? 0;
+    this.description = data?.description ?? '';
+  }
+}
+
+let api = null;
+/** Для тестов: подменить вызовы Bot API (method, payload) → result. Без аргумента — снова настоящие */
+export const setTelegramApi = (fn = null) => { api = fn; };
+
+/** Есть ли бот и рабочая группа — без них поддержка и сообщения молчат */
+export const telegramReady = () => Boolean(api || (settings().token && settings().chat));
+export const workChat = () => settings().chat;
+
+/**
+ * Любой метод Bot API (бот поддержки, server/support.mjs). Возвращает result, при отказе — TelegramError.
+ * timeoutMs — для долгого опроса getUpdates, который сам держит соединение до 50 с
+ */
+export const tgCall = async (method, payload = {}, {timeoutMs = TIMEOUT_MS} = {}) => {
+  if (api) return api(method, payload);
+  const {token} = settings();
+  if (!token) throw new TelegramError(method, {description: 'нет TELEGRAM_BOT_TOKEN'});
+  const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify(payload), signal: AbortSignal.timeout(timeoutMs),
+  });
+  const data = await res.json().catch(() => ({ok: false, error_code: res.status, description: `HTTP ${res.status}`}));
+  if (!data.ok) throw new TelegramError(method, data);
+  return data.result;
 };
 
 /** В тему «Оплаты» */

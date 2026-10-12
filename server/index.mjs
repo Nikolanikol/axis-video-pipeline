@@ -9,6 +9,7 @@ import {hasDatabase, migrate} from './db/index.mjs';
 import {refundOrphans} from './billing.mjs';
 import {purgeDeleted} from './accounts.mjs';
 import {reconcilePayments} from './payments.mjs';
+import {startSupport} from './support.mjs';
 import {DEFAULT_WORKSPACE, ensureWorkspace, legacyDataDirs} from './store.mjs';
 
 const PORT = Number(process.env.PORT || 3210);
@@ -47,6 +48,9 @@ if (hasDatabase()) {
   const reconcile = () => reconcilePayments().catch((e) => console.error('Сверка оплат:', e.message));
   reconcile();
   setInterval(reconcile, 5 * 60 * 1000).unref();
+  // Поддержка в Telegram (server/support.mjs): вебхук на проде, опрос на Mac — по TELEGRAM_SUPPORT.
+  // Не ждём: Telegram недоступен — сервер всё равно должен отвечать клиентам
+  void startSupport().catch((e) => console.error('Поддержка Telegram:', e.message));
 }
 
 // Файлы старой раскладки сервер не видит — история и лоты выглядели бы пропавшими.

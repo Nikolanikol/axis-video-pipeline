@@ -39,6 +39,7 @@ import {
   requireStaff, requireUser, sessionToken, setSessionCookie,
 } from './session.mjs';
 import {thumbsHandler} from './thumbs.mjs';
+import {handleUpdate, supportBotHandle, supportEnabled, supportLink, webhookAuthorized} from './support.mjs';
 import {
   checkoutLimiter, handleNotification, kassaHealth, newRequestId, notifyLimiter, paymentEvents, paymentMethods, paymentOf, paymentsOf, publicOrigin, startCheckout,
 } from './payments.mjs';
@@ -118,6 +119,8 @@ const platformInfo = async () => {
     const v = process.env[name]?.trim();
     if (v) contacts[key] = v;
   }
+  // Telegram не задан руками — ведём в бота поддержки (владелец 12.10: «лучше всех вести в Telegram»)
+  if (!contacts.telegram) contacts.telegram = (await supportBotHandle()) ?? '';
   return {contacts, legal};
 };
 
@@ -204,6 +207,15 @@ export const createApp = ({photoOrigin}) => {
     handleNotification({body: req.body, signature: req.get('x-nowpayments-sig'), requestId}).then((r) => res.json(r)).catch(next);
   });
 
+  // Поддержка в Telegram: сообщения клиентов и ответы из рабочей группы (server/support.mjs).
+  // Без сессии — подлинность по секрету в заголовке, который знаем только мы и Telegram.
+  // Отвечаем сразу: Telegram ждёт ответа и повторяет, а копирование в тему может занять секунды
+  api.post('/telegram/webhook', (req, res) => {
+    if (!webhookAuthorized(req.get('x-telegram-bot-api-secret-token'))) return res.status(401).end();
+    res.json({ok: true});
+    void handleUpdate(req.body);
+  });
+
   // Всё ниже — только после входа и от имени своей компании
   api.use(requireUser);
   api.use((req, _res, next) => { try { withWorkspace(wsOf(req), next); } catch (e) { next(e); } });
@@ -233,6 +245,9 @@ export const createApp = ({photoOrigin}) => {
   // Куда писать за пакетом и что в прайсе — на экран «кредиты закончились» и в кабинет.
   // WhatsApp продаж — из SMMAKER_SALES_WHATSAPP, если задан: номер менеджера меняется без
   // пересборки образа. Не задан — номер из config/platform.json
+  // «Написать в поддержку» из кабинета: ссылка на бота с одноразовым ключом — тема в группе сразу
+  // с компанией и контактами. url: null — поддержка не включена (Mac, превью)
+  api.post('/account/support-link', wrap((req) => supportLink({userId: req.user.id, workspaceId: req.ws})));
   api.get('/account/offer', wrap(async () => {
     const {contacts} = await platformInfo();
     return {
@@ -240,6 +255,8 @@ export const createApp = ({photoOrigin}) => {
       packs: authEnabled() ? await listPacks() : [],
       // Какие кассы включены: без ключей кнопки «Оплатить USDT» нет, остаётся менеджер
       pay: paymentMethods(),
+      // Поддержка в Telegram включена — в кабинете есть «Написать в поддержку»
+      support: supportEnabled(),
     };
   }));
   // Оплата тарифа: счёт у кассы → адрес страницы оплаты. Адрес возврата и уведомлений — тот,

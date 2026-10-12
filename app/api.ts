@@ -69,7 +69,7 @@ export type Me =
 // kind: plan — подписка на месяц (кредиты сгорают в конце месяца), topup — докупка, сгорает вместе с подпиской
 export type Pack = {id: string; title: string; credits: number; price_krw: number; valid_days: number; active: boolean; sort: number; kind: 'plan' | 'topup'};
 // pay — какие кассы включены на сервере (нет ключей — только менеджер)
-export type Offer = {contacts: {whatsapp?: string; telegram?: string; email?: string; instagram?: string}; packs: Pack[]; pay?: {usdt: boolean}};
+export type Offer = {contacts: {whatsapp?: string; telegram?: string; email?: string; instagram?: string}; packs: Pack[]; pay?: {usdt: boolean}; support?: boolean};
 // Оплата тарифа через кассу. status — общий для всех касс (cores/PAYMENTS.md): created — счёт выставлен, waiting,
 // confirming, paid, partial, failed, expired, refunded, abandoned; credited — кредиты начислены
 export type Payment = {
@@ -152,6 +152,8 @@ export const api = {
     get: (id: string) => request<Payment>('GET', `/api/account/payments/${encodeURIComponent(id)}`),
   },
   account: {
+    // Ссылка на бота поддержки с одноразовым ключом привязки кабинета; null — поддержка выключена
+    supportLink: () => request<{url: string | null}>('POST', '/api/account/support-link'),
     profile: () => request<Account>('GET', '/api/account/profile'),
     save: (data: {name: string; company?: string}) => request<Account>('PUT', '/api/account/profile', data),
     changePassword: (current: string, password: string) =>

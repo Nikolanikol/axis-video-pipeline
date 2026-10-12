@@ -49,7 +49,12 @@ export const AccountPage: React.FC = () => {
           <h1 className="page-title">Мой кабинет</h1>
           <p className="muted">{workspace?.name}{!isStaff && balance ? ` · ${balance.credits} кр.` : ''}</p>
         </div>
-        {!isStaff && <button className="btn primary" onClick={toPlans}>{balance?.subscription ? 'Продлить подписку' : 'Оформить подписку'}</button>}
+        {!isStaff && (
+          <div className="account-head-actions">
+            <SupportButton />
+            <button className="btn primary" onClick={toPlans}>{balance?.subscription ? 'Продлить подписку' : 'Оформить подписку'}</button>
+          </div>
+        )}
       </header>
       {/* Вернулись из кассы (#/account/pay-…) — сверху, а не у тарифов: человек ждёт ответа сразу */}
       <PaymentReturn />
@@ -75,6 +80,34 @@ export const AccountPage: React.FC = () => {
       {!isStaff && <DangerZone />}
     </div>
   );
+};
+
+/**
+ * «Написать в поддержку» — бот в Telegram с ключом кабинета (server/support.mjs): в рабочей группе
+ * тема сразу с компанией, контактами и балансом. Кнопки нет, пока поддержка не включена на сервере.
+ * Окно открываем сразу по нажатию и потом ведём на ссылку: Safari не откроет новую вкладку, если
+ * между нажатием и открытием был запрос к серверу
+ */
+const SupportButton: React.FC = () => {
+  const [on, setOn] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { api.offer().then((o) => setOn(Boolean(o.support))).catch(() => setOn(false)); }, []);
+  if (!on) return null;
+  const open = async () => {
+    const tab = window.open('', '_blank');
+    setBusy(true);
+    try {
+      const {url} = await api.account.supportLink();
+      if (url && tab) tab.location.href = url;
+      else if (url) window.location.href = url;
+      else tab?.close();
+    } catch {
+      tab?.close();
+    } finally {
+      setBusy(false);
+    }
+  };
+  return <button className="btn" onClick={open} disabled={busy}>{busy ? 'Открываю…' : 'Написать в поддержку'}</button>;
 };
 
 /** Кредиты, подписка и ближайшее сгорание строками; партии — таблицей, если их несколько */

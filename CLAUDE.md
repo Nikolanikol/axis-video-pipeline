@@ -250,6 +250,11 @@ DNS добавляй только на поддоменах: корень `axis-
 - новая касса (AnyPay) — новый модуль `cores/pay-<id>` и строка в `payKassa.mjs`, а не правка NOWPayments;
 - на Mac уведомление кассы не дойдёт — оплату проверяй через API песочницы (`case: success`), см. README модуля.
 
+**Бот поддержки (`server/support.mjs`) — вебхук у бота один.** Не ставь `TELEGRAM_SUPPORT=webhook` на
+превью с боевым ботом (страховка — `TELEGRAM_SUPPORT_PREVIEW`) и не вызывай `deleteWebhook` с Mac: прод
+перестанет получать сообщения клиентов. На Mac — `TELEGRAM_SUPPORT=poll`, пока у бота нет вебхука прода.
+Ответ клиенту — только `copyMessage` (не `forwardMessage`: он показывает автора-сотрудника).
+
 **Клиенту — «объявление», в коде — `lot`.** С 01.10 в текстах интерфейса и ошибках сервера
 лот называется «объявление» (склоняется; «лот» — аукционное слово). Код, данные, адреса и
 документация остаются с «лот» — не переименовывай. В палитре фото Encar «объявление» — это
@@ -388,7 +393,7 @@ CONTEXT.md, раздел «Известные дыры» — что не дод�
 | модуль-ядро che168 (`cores/che168`) | машины из Китая для каруселей и лота по ссылке (открытый API Autohome) | без ключа |
 | модуль-ядро carsensor (`cores/carsensor`) | машины из Японии (витрина дилеров Carsensor, HTML страницы) | без ключа |
 | open.er-api.com | курс ₩/$ раз в сутки (`server/rates.mjs`) | без ключа |
-| Telegram (бот @kok_work_bot) | сообщения об оплатах в группу «KOK — работа», тема «Оплаты» (`server/telegram.mjs`) | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_PAYMENTS_TOPIC` |
+| Telegram (бот @kok_work_bot) | сообщения об оплатах в группу «KOK — работа», тема «Оплаты» (`server/telegram.mjs`); поддержка — тема на клиента (`server/support.mjs`) | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_PAYMENTS_TOPIC`; поддержка — `TELEGRAM_SUPPORT` (webhook/poll), `TELEGRAM_WEBHOOK_SECRET` |
 | NOWPayments | онлайн-оплата тарифов в USDT TRC20 (модуль `cores/pay-nowpayments`) | `NOWPAYMENTS_API_KEY`, `NOWPAYMENTS_IPN_SECRET`; песочница — `NOWPAYMENTS_SANDBOX_*`, `NOWPAYMENTS_SANDBOX=1` |
 | Demucs | звуки машины без голоса (проба) | окружение `.venv-demucs`, необязательно |
 | Resend | письма: код подтверждения почты, сброс пароля | `RESEND_API_KEY`, `RESEND_FROM`, `SMMAKER_APP_URL` |

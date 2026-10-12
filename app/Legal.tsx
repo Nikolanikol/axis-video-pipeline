@@ -26,11 +26,11 @@ const credits = (n: number) => {
 /** Контакты платформы ссылками: WhatsApp, Telegram, почта — что заполнено в config/platform.json */
 export const contactLinks = (c: Offer['contacts'] | undefined) => {
   const out: {label: string; value: string; href: string}[] = [];
-  const wa = c?.whatsapp?.replace(/\D/g, '');
-  if (wa) out.push({label: 'WhatsApp', value: c!.whatsapp!, href: `https://wa.me/${wa}`});
-  // Telegram пишут и «@ник», и ссылкой — ведём на t.me в обоих случаях
+  // Telegram — первым: главный канал поддержки (владелец 12.10). Пишут и «@ник», и ссылкой — ведём на t.me
   const tg = c?.telegram?.trim().replace(/^https?:\/\/t\.me\//, '').replace(/^@/, '');
   if (tg) out.push({label: 'Telegram', value: `@${tg}`, href: `https://t.me/${tg}`});
+  const wa = c?.whatsapp?.replace(/\D/g, '');
+  if (wa) out.push({label: 'WhatsApp', value: c!.whatsapp!, href: `https://wa.me/${wa}`});
   if (c?.email) out.push({label: 'Почта', value: c.email, href: `mailto:${c.email}`});
   // Instagram — ссылкой на профиль; показываем ник из адреса
   const ig = c?.instagram?.trim().replace(/[?#].*$/, '').replace(/\/+$/, '');

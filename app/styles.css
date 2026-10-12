@@ -1541,3 +1541,13 @@ a.tab { text-decoration: none; }
   .legal-req { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   .legal-req dd { margin-bottom: 10px; }
 }
+
+/* Кабинет: «Написать в поддержку» рядом с главной кнопкой; на телефоне — столбиком во всю ширину */
+.account-head-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+@media (max-width: 900px) { .account-head-actions { width: 100%; } .account-head-actions .btn { flex: 1 1 100%; justify-content: center; } }
+
+/* Главная кнопка подвала — Telegram (владелец 12.10): заметнее строк WhatsApp и почты */
+.land-foot-col .land-foot-tg { display: inline-flex; align-items: center; justify-content: center; gap: 8px; align-self: flex-start;
+  color: #fff; text-decoration: none; margin-bottom: 4px; }
+.land-foot-col .land-foot-tg:hover { color: #fff; }
+@media (max-width: 900px) { .land-foot-col .land-foot-tg { align-self: stretch; } }

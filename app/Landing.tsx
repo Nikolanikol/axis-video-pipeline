@@ -322,6 +322,7 @@ const Carousels: React.FC<{items: Samples['carousels']}> = ({items}) => {
 // конца. Каналы и продавец — из config/platform.json через /api/public/offer
 const Footer: React.FC<{offer: PublicOffer | null}> = ({offer}) => {
   const links = contactLinks(offer?.contacts);
+  const tg = links.find((c) => c.label === 'Telegram');
   const l = offer?.legal;
   const icon = (label: string) => label === 'WhatsApp' ? <MessageCircle size={18} aria-hidden />
     : label === 'Telegram' ? <Send size={18} aria-hidden />
@@ -355,7 +356,14 @@ const Footer: React.FC<{offer: PublicOffer | null}> = ({offer}) => {
         </nav>
         <div className="land-foot-col">
           <b>Связаться</b>
-          {links.map((c) => <a key={c.label} href={c.href} target="_blank" rel="noreferrer">{c.label}: <span className="nowrap">{c.value}</span></a>)}
+          {/* Telegram — главный канал (владелец 12.10): там бот поддержки и тема на клиента у команды.
+              Остальные каналы — строками ниже, тише */}
+          {tg && (
+            <a className="btn primary land-foot-tg" href={tg.href} target="_blank" rel="noreferrer">
+              <Send size={17} aria-hidden /> Написать в Telegram
+            </a>
+          )}
+          {links.filter((c) => c !== tg).map((c) => <a key={c.label} href={c.href} target="_blank" rel="noreferrer">{c.label}: <span className="nowrap">{c.value}</span></a>)}
           <span className="muted">Оплата, возвраты, помощь с кабинетом</span>
         </div>
       </div>
