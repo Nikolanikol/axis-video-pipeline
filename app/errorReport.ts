@@ -16,6 +16,14 @@ const NOISE = [
   /ResizeObserver loop/i,
   /^Script error\.?$/i,
   /Failed to fetch|Load failed|NetworkError|Network request failed/i,
+  // Браузер не дал запустить видео или звук — это его политика, а не поломка нашего кода; ролик
+  // просто ждёт нажатия ▶. Откуда правило: 12.10 тревогой в «Сбои» пришёл отказ InvalidStateError
+  // «Failed to start the audio device» со встроенного браузера Instagram на iPhone (витрина гостя,
+  // код отчёта 3d437b7f7c). Источник в плеере закрыт (numberOfSharedAudioTags в app/Preview.tsx),
+  // а этот фильтр — на остальные такие же отказы: «play() request was interrupted» и «play() failed
+  // because the user didn't interact» (Chrome, автозапуск без нажатия), «not allowed by the user
+  // agent» (Safari), занятое звуковое устройство. Каждый такой отказ иначе будил бы тревогу впустую
+  /Failed to start the audio device|play\(\) (request was interrupted|failed because the user)|not allowed by the user agent/i,
   // Новая выкладка: старая вкладка просит кусок сборки, которого уже нет. Лечится перезагрузкой
   /dynamically imported module|Importing a module script failed|Loading chunk/i,
 ];

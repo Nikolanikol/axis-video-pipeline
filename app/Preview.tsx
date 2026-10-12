@@ -63,6 +63,17 @@ export const Preview: React.FC<{input: AdProps; format: FormatMeta; autoPlay?: b
           controls
           loop={loop}
           autoPlay={autoPlay}
+          // Почему 0 аудиоэлементов. 12.10 пришла тревога в «Сбои»: InvalidStateError «Failed to start
+          // the audio device» — необработанный отказ (rejection) на витрине гостя (`/`), iPhone с iOS 27,
+          // встроенный браузер Instagram (гость пришёл по ссылке из Instagram). Код отчёта в журнале
+          // Coolify — 3d437b7f7c.
+          // Причина: плеер Remotion по умолчанию заранее создаёт 5 общих <audio> и при автозапуске ролика
+          // (autoPlay на витрине) запускает их вместе с картинкой. Встроенный браузер Instagram звуковое
+          // устройство странице не даёт — play() у этих <audio> отклоняется, и отказ никто не ловит.
+          // Звука в превью при этом нет вовсе: ролик идёт без музыки (withoutMusic выше), в форматах
+          // других звуков нет. Поэтому аудиоэлементы не нужны, и без них отказу неоткуда взяться.
+          // Вернётся музыка в превью — убрать эту строку, иначе звук в плеере не заиграет
+          numberOfSharedAudioTags={0}
           clickToPlay
         />
       </div>
