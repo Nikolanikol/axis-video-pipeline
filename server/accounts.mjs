@@ -13,7 +13,7 @@ import {promisify} from 'node:util';
 import {db} from './db/index.mjs';
 import {CONFIG_DIR, HttpError, readJson, workspaceDir} from './store.mjs';
 import {addLot, balanceOf, plural, signupCredits, subscriptionOf} from './billing.mjs';
-import {appUrl, deletionMail, emailChangeMail, noticeMail, resetMail, verifyMail} from './mailer.mjs';
+import {appUrl, deletionMail, emailChangeMail, noticeMail, paymentMail, resetMail, verifyMail} from './mailer.mjs';
 import {serverLog} from './log.mjs';
 
 const journal = serverLog('accounts');
@@ -777,8 +777,42 @@ export const grantPack = async ({workspaceId, packId, note = '', createdBy}) => 
   if (!pack) throw new HttpError(404, 'Нет такого действующего пакета');
   const {rowCount} = await db().query('SELECT 1 FROM smmaker_workspaces WHERE id = $1', [workspaceId]);
   if (!rowCount) throw new HttpError(404, 'Нет такой компании');
-  await inTransaction((client) => grantPackIn(client, {workspaceId, pack, note, createdBy}));
+  const lot = await inTransaction((client) => grantPackIn(client, {workspaceId, pack, note, createdBy}));
+  await packMail({workspaceId, pack, lot, by: createdBy});
   return balanceOf(workspaceId);
+};
+
+/**
+ * Владелец кабинета — участник с ролью owner, первый по времени вступления. Ему уходят письма о
+ * деньгах кабинета (подтверждение оплаты, 13.10): адрес — почта, с которой кабинет регистрировали
+ */
+export const ownerOf = async (workspaceId) => {
+  const {rows: [u]} = await db().query(
+    `SELECT u.id, u.email, u.name FROM smmaker_memberships m JOIN smmaker_users u ON u.id = m.user_id
+      WHERE m.workspace_id = $1 AND m.role = 'owner' ORDER BY m.created_at LIMIT 1`, [workspaceId]);
+  return u ?? null;
+};
+
+/**
+ * Подтверждение пакета, начисленного менеджером (клиент заплатил мимо кассы — переводом, рублями).
+ * После транзакции и не ломая ответ: кредиты уже начислены, менеджер не должен видеть ошибку и
+ * начислять второй раз. Не ушло — error в журнал, оттуда тревога в «Сбои» (server/alarm.mjs)
+ */
+const packMail = async ({workspaceId, pack, lot, by}) => {
+  try {
+    const u = await ownerOf(workspaceId);
+    if (!u?.email) {
+      journal.warn('mail.no_owner', {ws: workspaceId, note: 'подтверждение ручного начисления некому отправить'});
+      return;
+    }
+    await paymentMail({
+      to: u.email, name: u.name, plan: pack.kind === 'plan', title: pack.title ?? pack.id, credits: pack.credits,
+      until: lot.expires_at, priceKrw: pack.price_krw, paidAt: new Date(), link: `${appUrl()}/#/account`,
+    });
+    journal.info('mail.pack_sent', {ws: workspaceId, lot: Number(lot.id), by});
+  } catch (e) {
+    journal.error('mail.failed', {ws: workspaceId, lot: Number(lot.id), note: 'подтверждение ручного начисления пакета не ушло клиенту', error: e});
+  }
 };
 
 /**
