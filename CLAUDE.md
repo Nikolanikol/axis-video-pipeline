@@ -255,7 +255,7 @@ Encar 40303537, выбор владельца 12.10), не витринная Ko
 - адрес для кассы — `publicOrigin` (хост запроса из списка своих), не голый `req.get('host')`;
 - ключи для заказа — по его признаку `sandbox`, не по текущей настройке; песочница на проде запрещена — не ослабляй;
 - модуль-касса не знает про базу и кредиты и не читает окружение — ключи ему передаёт `payKassa.mjs`;
-- новая касса (AnyPay) — новый модуль `cores/pay-<id>` и строка в `payKassa.mjs`, а не правка NOWPayments;
+- новая касса (AnyPay) — новый модуль `cores/pay-<id>` и строка в `payKassa.mjs`, а не правка NOWPayments; её способы оплаты словами — в `PAY_METHODS` (`payments.mjs`), иначе в письме-подтверждении выйдет сырой код;
 - на Mac уведомление кассы не дойдёт — оплату проверяй через API песочницы (`case: success`), см. README модуля.
 
 **Бот поддержки (`server/support.mjs`) — вебхук у бота один.** Не ставь `TELEGRAM_SUPPORT=webhook` на
@@ -416,7 +416,7 @@ CONTEXT.md, раздел «Известные дыры» — что не дод�
 | Telegram (бот @kok_work_bot) | сообщения об оплатах в группу «KOK — работа», тема «Оплаты» (`server/telegram.mjs`); поддержка — тема на клиента (`server/support.mjs`) | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`, `TELEGRAM_PAYMENTS_TOPIC`; поддержка — `TELEGRAM_SUPPORT` (webhook/poll), `TELEGRAM_WEBHOOK_SECRET` |
 | NOWPayments | онлайн-оплата тарифов в USDT TRC20 (модуль `cores/pay-nowpayments`) | `NOWPAYMENTS_API_KEY`, `NOWPAYMENTS_IPN_SECRET`; песочница — `NOWPAYMENTS_SANDBOX_*`, `NOWPAYMENTS_SANDBOX=1` |
 | Demucs | звуки машины без голоса (проба) | окружение `.venv-demucs`, необязательно |
-| Resend | письма: код подтверждения почты, сброс пароля | `RESEND_API_KEY`, `RESEND_FROM`, `SMMAKER_APP_URL` |
+| Resend | письма: код подтверждения почты, сброс пароля, подтверждение оплаты владельцу кабинета | `RESEND_API_KEY`, `RESEND_FROM`, `SMMAKER_APP_URL` |
 | Postgres (общий Supabase) | база SMMAKER: кабинеты, пакеты, кредиты | `DATABASE_URL`, `SMMAKER_DB_SCHEMA` |
 | страницы лотов kmotors.shop | карусели по аукционным лотам (06.10, только сотрудникам) | `KMOTORS_LOT_ORIGIN`, `KMOTORS_LOT_FIXTURES`, `KMOTORS_CF_ACCESS_ID`, `KMOTORS_CF_ACCESS_SECRET` — все необязательные |
 

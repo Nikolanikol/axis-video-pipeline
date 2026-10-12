@@ -97,6 +97,61 @@ export const noticeMail = ({to, title, text}) => sendMail({
   html: layout(title, text.split('\n\n').map((p) => `<p>${escape(p)}</p>`).join('\n'), null, 'Письмо о безопасности аккаунта KOK.'),
 });
 
+// Сумма в валюте заказа. Валюта — код ISO строчными, как пишет её касса в заказ (usd у NOWPayments,
+// у рублёвой кассы будет rub). Знак — для привычных валют, остальные — кодом: письмо не должно
+// падать из-за новой валюты новой кассы
+const SIGNS = {usd: '$', krw: '₩', rub: '₽', eur: '€', jpy: '¥', cny: '¥'};
+// Вона, иена и рубль — целыми (копейки в рублёвой кассе — редкость, а «49 000,00 ₩» читается как ошибка)
+const WHOLE = new Set(['krw', 'jpy', 'rub']);
+export const money = (amount, currency) => {
+  const c = String(currency ?? '').toLowerCase();
+  const n = Number(amount);
+  const digits = WHOLE.has(c) && Number.isInteger(n) ? 0 : 2;
+  const num = n.toLocaleString('ru-RU', {minimumFractionDigits: digits, maximumFractionDigits: 2});
+  if (c === 'usd') return `$${num}`;
+  if (c === 'krw') return `₩${num}`;
+  return SIGNS[c] ? `${num} ${SIGNS[c]}` : `${num} ${c.toUpperCase()}`;
+};
+
+// Подтверждение пополнения кредитов владельцу кабинета: что куплено, сколько и как заплачено, сколько
+// кредитов и до какого числа. Это подтверждение, а не чек — фискальных документов KOK не выдаёт,
+// слово «чек» в письме не пишем.
+//   paid    — {amount, currency, method}: онлайн-оплата через кассу, любую (USDT, рубли AnyPay…).
+//             Нет — пакет начислил менеджер в админке после оплаты мимо кассы: сколько и в какой валюте
+//             клиент заплатил на самом деле, мы не знаем, поэтому пишем цену тарифа, а не «оплачено»;
+//   priceKrw — цена тарифа в вонах (по ней считается счёт), в скобках, если валюта оплаты другая;
+//   orderId — номер заказа кассы; у ручного начисления его нет;
+//   sandbox — оплата из песочницы (превью): помечаем, чтобы тестовое письмо не приняли за настоящее
+export const paymentMail = ({to, name, plan, title, credits, until, paid = null, priceKrw, orderId = null, paidAt, link, sandbox = false}) => {
+  const date = (d) => new Date(d).toLocaleDateString('ru-RU');
+  const price = money(priceKrw, 'krw');
+  const sum = paid && [money(paid.amount, paid.currency), paid.method && `· ${paid.method}`,
+    String(paid.currency).toLowerCase() !== 'krw' && `(тариф ${price})`].filter(Boolean).join(' ');
+  const rows = [
+    ['Покупка', `${plan ? 'Тариф' : 'Докупка'} «${title}»`],
+    paid ? ['Оплачено', sum] : ['Стоимость', `${price} · оплата через менеджера`],
+    ['Зачислено', `${credits} кр. — действуют до ${date(until)}`],
+    ['Дата', date(paidAt)],
+    orderId && ['Номер заказа', orderId],
+  ].filter(Boolean);
+  const test = sandbox ? 'Тестовая оплата из песочницы — настоящих денег не было.' : '';
+  const button = orderId ? 'Открыть заказ' : 'Открыть кабинет';
+  return sendMail({
+    to,
+    subject: `${sandbox ? '[ТЕСТ] ' : ''}KOK: оплата получена, +${credits} кр.`,
+    text: `${name ? `${name}, з` : 'З'}дравствуйте!\n\nОплата получена, кредиты зачислены на счёт.\n\n`
+      + rows.map(([k, v]) => `${k}: ${v}`).join('\n')
+      + `\n\n${button}: ${link}${test ? `\n\n${test}` : ''}`,
+    html: layout('Оплата получена',
+      `<p>Кредиты зачислены на счёт, можно работать.</p>
+<table style="width:100%;border-collapse:collapse;font-size:14px;margin:8px 0">${rows.map(([k, v]) =>
+  `<tr><td style="padding:6px 12px 6px 0;color:#666;white-space:nowrap;vertical-align:top">${escape(k)}</td><td style="padding:6px 0;font-weight:bold">${escape(v)}</td></tr>`).join('')}</table>
+${test ? `<p style="font-size:13px;color:#8e0d2c">${escape(test)}</p>` : ''}`,
+      {url: link, label: button},
+      `Подтверждение оплаты KOK. Это не фискальный чек. Вопросы по оплате — напишите в поддержку${orderId ? ' и укажите номер заказа' : ''}.`),
+  });
+};
+
 // Аккаунт поставлен на удаление: до какого числа и кнопка «восстановить». Кнопка ведёт на страницу
 // приложения, а та шлёт POST — GET-ссылку почтовые сканеры открыли бы сами и отменили удаление
 export const deletionMail = ({to, name, link, until}) => {

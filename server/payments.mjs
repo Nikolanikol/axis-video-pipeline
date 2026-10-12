@@ -5,7 +5,7 @@
 //   1. checkout   — клиент выбрал тариф → заказ в smmaker_payments → счёт у кассы → страница оплаты;
 //   2. notify     — касса шлёт уведомление: подпись → запись статуса → если «оплачено» — шаг 3;
 //   3. credit     — сверка платежа у самой кассы → партия кредитов + отметка «начислено» одной
-//                   транзакцией → сообщение в группу;
+//                   транзакцией → сообщение в группу и подтверждение оплаты на почту владельца;
 //   4. sync       — страховка от потерянных уведомлений: экран оплаты и фоновая сверка раз в 5 минут
 //                   сами переспрашивают кассу.
 // Каждый шаг пишет строку в журнал smmaker_payment_events и строку JSON в лог сервера с одним
@@ -24,8 +24,8 @@
 import crypto from 'node:crypto';
 import {db, hasDatabase} from './db/index.mjs';
 import {HttpError} from './store.mjs';
-import {grantPackIn, inTransaction} from './accounts.mjs';
-import {appUrl} from './mailer.mjs';
+import {grantPackIn, inTransaction, ownerOf} from './accounts.mjs';
+import {appUrl, paymentMail} from './mailer.mjs';
 import {usdKrw} from './rates.mjs';
 import {esc, notifyPayments} from './telegram.mjs';
 import {PROVIDER, kassa, kassaHttpError, kassaInfo, kassaReady, sandboxForbidden, sandboxMode} from './payKassa.mjs';
@@ -307,7 +307,46 @@ const credit = async (o, paymentId, requestId) => {
     .then((who) => notifyPayments([`✅ <b>Оплата пришла</b>${tag(o)}`, LINE, who, LINE, what({...o, title: done.pack.title, kind: done.pack.kind}),
       `🎟 +${done.pack.credits} кр. до ${dayKst(done.lot.expires_at)}`, LINE, orderLine(o)].join('\n')))
     .catch((e) => rlog.error('notify.send_failed', {error: e}));
+  void receipt(o, done, paymentId, requestId);
   return true;
+};
+
+/**
+ * Подтверждение оплаты на почту владельца кабинета (решение владельца 13.10: адрес — почта, с которой
+ * кабинет зарегистрирован, а не того, кто нажал «Оплатить», — ownerOf). Сумма и валюта — из заказа, как
+ * их записала касса: письмо одно для всех касс (USDT, рубли). Зовётся один раз на заказ: credit доходит сюда только
+ * у того вызова, который сам начислил.
+ *
+ * Письмо не держит оплату: кредиты уже зачислены, ответ кассе не ждёт Resend. Не ушло — повторять не
+ * пытаемся (повтор после частичной доставки дал бы два письма), а зовём человека в тему «Оплаты»:
+ * журнал модуля payments в «Сбои» не идёт (server/alarm.mjs), поэтому тревога — своя, alarm()
+ */
+// Чем платил клиент — словами для письма. Касса пишет в заказ свой код способа (pay_currency); новая
+// касса — новые строки сюда, незнакомый код выйдет в письме как есть, заглавными
+const PAY_METHODS = {usdttrc20: 'USDT TRC20'};
+const payMethod = (code) => (code ? PAY_METHODS[code] ?? String(code).toUpperCase() : null);
+
+const receipt = async (o, {pack, lot}, paymentId, requestId) => {
+  const rlog = log.child({requestId, order: o.id});
+  try {
+    const u = await ownerOf(o.workspace_id);
+    if (!u?.email) {
+      rlog.warn('mail.no_owner', {ws: o.workspace_id});
+      await alarm(o, 'подтверждение оплаты не отправлено: у кабинета нет владельца с почтой', requestId);
+      return;
+    }
+    await paymentMail({
+      to: u.email, name: u.name, plan: pack.kind === 'plan', title: pack.title ?? pack.id, credits: pack.credits,
+      until: lot.expires_at, paid: {amount: o.amount, currency: o.currency, method: payMethod(o.pay_currency)}, priceKrw: o.price_krw, orderId: o.id, paidAt: new Date(),
+      link: `${appUrl()}/#/account/${o.id}`, sandbox: o.sandbox,
+    });
+    await event(o.id, 'mail', {status: 'paid', data: {to: u.email, paymentId}, requestId});
+    rlog.info('mail.sent', {paymentId});
+  } catch (e) {
+    rlog.error('mail.failed', {paymentId, error: e});
+    await alarm(o, `подтверждение оплаты не ушло клиенту на почту: ${String(e?.message ?? e).slice(0, 200)}`, requestId)
+      .catch((err) => rlog.error('mail.alarm_failed', {error: err}));
+  }
 };
 
 /**

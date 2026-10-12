@@ -23,6 +23,7 @@ suite('оплата тарифа', () => {
   // Что «знает» касса: номер платежа → ответ GET /payment/:id
   const kassa = new Map();
   const telegram = [];
+  const mails = [];
   let invoices = 0;
 
   beforeAll(async () => {
@@ -32,7 +33,14 @@ suite('оплата тарифа', () => {
     await dbm.migrate({log: () => {}});
     db = dbm.db();
     await db.query(`INSERT INTO smmaker_workspaces (id, name) VALUES ($1, 'Тест оплаты')`, [WS]);
+    // Владелец кабинета — ему уходит подтверждение оплаты; второй участник — чтобы письмо не ушло не тому
+    const {rows: [owner]} = await db.query(`INSERT INTO smmaker_users (email, email_key, password_hash, name)
+      VALUES ('owner@kok.test', 'owner@kok.test', 'x', 'Иван') RETURNING id`);
+    const {rows: [member]} = await db.query(`INSERT INTO smmaker_users (email, email_key, password_hash, name)
+      VALUES ('member@kok.test', 'member@kok.test', 'x', 'Пётр') RETURNING id`);
+    await db.query(`INSERT INTO smmaker_memberships (workspace_id, user_id, role) VALUES ($1, $2, 'owner'), ($1, $3, 'member')`, [WS, owner.id, member.id]);
     (await import('../../server/telegram.mjs')).setTelegramTransport(async (m) => { telegram.push(m.text); });
+    (await import('../../server/mailer.mjs')).setMailTransport(async (m) => { mails.push(m); });
     pay = await import('../../server/payments.mjs');
   });
 
@@ -54,6 +62,7 @@ suite('оплата тарифа', () => {
   afterAll(async () => {
     vi.unstubAllGlobals();
     (await import('../../server/telegram.mjs')).setTelegramTransport();
+    (await import('../../server/mailer.mjs')).setMailTransport();
     await db?.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
     await (await import('../../server/db/index.mjs')).closeDb();
     for (const k of [...Object.keys(KEYS), 'DATABASE_URL', 'SMMAKER_DB_SCHEMA']) delete process.env[k];
@@ -97,6 +106,71 @@ suite('оплата тарифа', () => {
     expect(await order(id)).toMatchObject({status: 'paid', payment_id: '7001'});
     expect(await pay.paymentOf(WS, id)).toMatchObject({credited: true, status: 'paid'});
     expect(telegram.some((t) => t.startsWith('✅ Оплата пришла') && t.includes(id))).toBe(true);
+  });
+
+  // Письмо уходит после ответа кассе (не держит оплату) — ждём его, а не полагаемся на порядок
+  const settle = () => new Promise((r) => setTimeout(r, 50));
+  const events = async (id, kind) => (await db.query('SELECT * FROM smmaker_payment_events WHERE payment_id = $1 AND kind = $2', [id, kind])).rows;
+
+  it('подтверждение оплаты — одно письмо владельцу кабинета, сколько бы ни было уведомлений', async () => {
+    const {id} = await checkout('plan-basic');
+    const body = await paid(id, 7101);
+    const before = mails.length;
+    await notify(body);
+    await Promise.all([notify(body), notify(body)]);
+    await settle();
+    const got = mails.slice(before);
+    expect(got).toHaveLength(1);
+    expect(got[0].to).toBe('owner@kok.test');
+    expect(got[0].subject).toMatch(/\+30 кр\./);
+    expect(got[0].text).toContain(id);
+    expect(got[0].text).toContain('песочниц');
+    expect(got[0].text).toMatch(/Оплачено: \$36,51 · USDT TRC20 \(тариф ₩49\s000\)/);
+    expect(got[0].html).toContain(`/#/account/${id}`);
+    expect(await events(id, 'mail')).toHaveLength(1);
+  });
+
+  it('письмо не ушло — кредиты на месте, тревога в «Оплаты» одна', async () => {
+    const mailer = await import('../../server/mailer.mjs');
+    mailer.setMailTransport(async () => { throw new Error('Resend ответил 500'); });
+    try {
+      const {id} = await checkout();
+      const body = await paid(id, 7102);
+      await notify(body);
+      await notify(body);
+      await settle();
+      expect(await order(id)).toMatchObject({status: 'paid'});
+      expect((await order(id)).credited_at).not.toBeNull();
+      expect(await events(id, 'mail')).toHaveLength(0);
+      expect(telegram.filter((t) => t.includes('подтверждение оплаты не ушло') && t.includes(id))).toHaveLength(1);
+    } finally {
+      mailer.setMailTransport(async (m) => { mails.push(m); });
+    }
+  });
+
+  it('пакет, начисленный менеджером в админке, — тоже письмо владельцу, с ценой тарифа, без номера заказа', async () => {
+    const {grantPack} = await import('../../server/accounts.mjs');
+    const before = mails.length;
+    await grantPack({workspaceId: WS, packId: 'start', note: 'перевод на карту', createdBy: null});
+    const got = mails.slice(before);
+    expect(got).toHaveLength(1);
+    expect(got[0].to).toBe('owner@kok.test');
+    expect(got[0].text).toMatch(/Стоимость: ₩.+ · оплата через менеджера/);
+    expect(got[0].text).not.toContain('Номер заказа');
+    expect(got[0].text).not.toContain('песочниц');
+  });
+
+  it('письмо о ручном начислении не ушло — кредиты всё равно начислены, менеджер ошибки не видит', async () => {
+    const {grantPack} = await import('../../server/accounts.mjs');
+    const mailer = await import('../../server/mailer.mjs');
+    mailer.setMailTransport(async () => { throw new Error('Resend ответил 500'); });
+    try {
+      const before = (await lots()).length;
+      await expect(grantPack({workspaceId: WS, packId: 'start', createdBy: null})).resolves.toBeTruthy();
+      expect(await lots()).toHaveLength(before + 1);
+    } finally {
+      mailer.setMailTransport(async (m) => { mails.push(m); });
+    }
   });
 
   it('подпись верна, но касса знает платёж с другой суммой — не начисляем, тревога одна', async () => {
