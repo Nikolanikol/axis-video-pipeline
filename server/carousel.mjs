@@ -1,9 +1,9 @@
-// Карусели по авто: ссылка Encar → карточка от шлюза kmotors → слайды в выбранном формате
+// Карусели по авто: ссылка Encar / che168 / Carsensor → карточка от модуля-ядра источника
+// (server/encar.mjs, che168.mjs, carsensor.mjs) → слайды в выбранном формате
 // (config/carousel-formats.json: от 6 до 12 картинок, 1:1, 4:5 или 9:16).
 //
-// Данные берём не из Encar напрямую: он режет адреса дата-центров, и на сервере это
-// однажды перестанет работать. Шлюз kmotors ходит туда сам и умеет обходить блокировку
-// через свой прокси — см. ~/Desktop/recup/KMotors-1/src/app/api/vehicle/[id]/route.ts.
+// Как источник достаёт машину — его дело (Encar — через шлюз kmotors, cores/encar); карусели
+// получают готовую карточку CarouselCar.
 //
 // Рендерим не видео, а кадры: композиция carousel — кадр на слайд, каждый снимается
 // renderStill; размер кадра и число слайдов композиция берёт из формата. Поэтому карусель живёт в общем движке рядом с роликами и
@@ -15,6 +15,7 @@ import {openBrowser, renderStill, selectComposition} from '@remotion/renderer';
 import {LOT_SKIP_SLIDES, carFromLot, lotPageUrl, missingForCarousel, parseCarouselSource} from '../src/shared/kmotorsLot.js';
 import {brandForRender} from './brand.mjs';
 import {fetchLot} from './kmotorsLot.mjs';
+import {fetchEncarCar} from './encar.mjs';
 import {fetchChe168Car} from './che168.mjs';
 import {fetchCarsensorCar} from './carsensor.mjs';
 import {CHE168_SKIP_SLIDES} from '../src/shared/che168Car.js';
@@ -49,41 +50,6 @@ const checkFormat = async (id) => {
   if (!found) throw new HttpError(400, `Нет такого формата карусели: ${id}`);
   return found.id;
 };
-// Шлюз ходит в Encar и ждёт ответа от него; у самого Encar таймаут 8 с плюс запасной прокси,
-// которому на холодную нужны десятки секунд
-const GATEWAY_TIMEOUT_MS = Number(process.env.CAROUSEL_TIMEOUT_MS || 60_000);
-
-const gateway = () => {
-  const base = process.env.KMOTORS_API_URL;
-  const secret = process.env.KMOTORS_API_SECRET;
-  if (!base || !secret) {
-    throw new HttpError(400, 'Не настроен шлюз: добавь KMOTORS_API_URL и KMOTORS_API_SECRET в .env');
-  }
-  return {base: base.replace(/\/+$/, ''), secret};
-};
-
-/** Карточка авто по номеру объявления. Бросает с текстом, пригодным для интерфейса. */
-export const fetchCar = async (id) => {
-  const {base, secret} = gateway();
-  let res;
-  try {
-    res = await fetch(`${base}/api/vehicle/${encodeURIComponent(id)}`, {
-      headers: {'x-vehicle-secret': secret},
-      signal: AbortSignal.timeout(GATEWAY_TIMEOUT_MS),
-    });
-  } catch (e) {
-    if (e?.name === 'TimeoutError') throw new HttpError(504, 'Шлюз не ответил вовремя — попробуй ещё раз');
-    throw new HttpError(502, `Не достучались до шлюза: ${e?.message || e}`);
-  }
-  if (res.status === 404) throw new HttpError(404, 'Машина не найдена — возможно, объявление снято');
-  if (res.status === 401) throw new HttpError(400, 'Шлюз не принял секрет: проверь KMOTORS_API_SECRET');
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new HttpError(502, body?.error || `Шлюз ответил ${res.status}`);
-  }
-  return res.json();
-};
-
 // Фото лотов лежат на CDN площадок. Качаем только с известных хостов (адреса приходят со
 // страницы чужого сайта, и сервер не должен ходить по ним куда попало), только по одному
 // кадру за раз ограниченной пачкой, и кладём к себе: рендер берёт их с нашего адреса, а
@@ -224,7 +190,7 @@ export const buildCarousel = async (link, opts = {}) => {
     const japan = src.source === 'carsensor';
     let car = lot ? await carFromLink({house: lot.house, lotId: lot.id})
       : china ? await fetchChe168Car(src.ref, profileMarket.language)
-        : japan ? await fetchCarsensorCar(src.ref, profileMarket.language) : await fetchCar(id);
+        : japan ? await fetchCarsensorCar(src.ref, profileMarket.language) : await fetchEncarCar(id);
     // Нет фото вовсе — так и говорим, а не «площадка не отдаёт» (это про сбой скачивания); до
     // создания папки — пустая папка карусели не нужна
     if ((china || japan) && !car.photos.hero) throw new HttpError(422, 'У этого объявления нет фото — карусель по нему не собрать');

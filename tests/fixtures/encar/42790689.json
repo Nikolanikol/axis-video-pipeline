@@ -1,0 +1,140 @@
+{
+  "id": "42790689",
+  "source": "https://www.kmotors.shop/en/catalog/42790689",
+  "brand": "Hyundai",
+  "model": "Santafe",
+  "grade": "Diesel(e-VGT) 2.0 2WD Premium",
+  "trim": "",
+  "year": 2013,
+  "firstRegistered": "2012-10-15",
+  "mileageKm": 184000,
+  "displacementCc": 1995,
+  "transmission": "Automatic",
+  "fuel": "Diesel",
+  "body": "",
+  "color": "White",
+  "seats": 7,
+  "vin": null,
+  "plate": "00가0000",
+  "price": {
+    "krw": 5430000,
+    "usd": 4118,
+    "krwToUsd": 0.0007583225904299689,
+    "quotedAt": "2026.10.12 17:02:43",
+    "rateSource": "kb"
+  },
+  "history": {
+    "accidentsOwn": 3,
+    "accidentsOther": 0,
+    "accidentsTotal": 3,
+    "accidentYears": [
+      2017,
+      2022
+    ],
+    "maxPayoutKrw": 1725700,
+    "claims": [
+      {
+        "date": "2022-10-23",
+        "payoutKrw": 783200,
+        "partsKrw": 449800,
+        "laborKrw": 181100,
+        "paintKrw": 263400,
+        "own": false
+      },
+      {
+        "date": "2017-08-14",
+        "payoutKrw": 1725700,
+        "partsKrw": 663480,
+        "laborKrw": 349290,
+        "paintKrw": 282630,
+        "own": true
+      },
+      {
+        "date": "2017-01-17",
+        "payoutKrw": 563300,
+        "partsKrw": 388460,
+        "laborKrw": 165800,
+        "paintKrw": 139960,
+        "own": false
+      }
+    ],
+    "ownerChanges": 3,
+    "theft": 0,
+    "flood": 0,
+    "totalLoss": 0
+  },
+  "options": {
+    "comfort": [
+      "Ventilated driver seat",
+      "Heated rear seats",
+      "Heated steering wheel",
+      "Leather seats",
+      "Automatic climate control",
+      "Heated front seats",
+      "Power driver seat",
+      "Smart key",
+      "Auto-dimming mirror (ECM)",
+      "Power-folding mirrors",
+      "Keyless entry",
+      "Power door locks",
+      "Power windows"
+    ],
+    "safety": [
+      "Rear-view camera",
+      "Rear parking sensors",
+      "Navigation",
+      "Bluetooth",
+      "HID headlights",
+      "Cruise control",
+      "Automatic headlights",
+      "Electronic stability control (ESC)",
+      "Hi-Pass toll system",
+      "Side airbags",
+      "Curtain airbags",
+      "Driver airbag",
+      "Passenger airbag",
+      "Anti-lock braking system (ABS)",
+      "Traction control (TCS)",
+      "Steering wheel controls",
+      "CD player",
+      "AUX port",
+      "USB port"
+    ],
+    "other": [
+      "Roof rails",
+      "Alloy wheels",
+      "Power steering"
+    ],
+    "total": 35
+  },
+  "photos": {
+    "hero": "https://ci.encar.com/carpicture09/pic4279/42790689_001.jpg?impolicy=heightRate&rh=1080",
+    "rear": "https://ci.encar.com/carpicture09/pic4279/42790689_002.jpg?impolicy=heightRate&rh=1080",
+    "interiorShot": "https://ci.encar.com/carpicture09/pic4279/42790689_007.jpg?impolicy=heightRate&rh=1080",
+    "dashboard": "https://ci.encar.com/carpicture09/pic4279/42790689_008.jpg?impolicy=heightRate&rh=1080",
+    "exterior": [
+      "https://ci.encar.com/carpicture09/pic4279/42790689_001.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4279/42790689_002.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4279/42790689_003.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4279/42790689_004.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4279/42790689_005.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4279/42790689_006.jpg?impolicy=heightRate&rh=1080"
+    ],
+    "interior": [
+      "https://ci.encar.com/carpicture09/pic4279/42790689_007.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4279/42790689_008.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4279/42790689_009.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4279/42790689_010.jpg?impolicy=heightRate&rh=1080"
+    ],
+    "other": [
+      "https://ci.encar.com/carpicture09/pic4279/42790689_015.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4279/42790689_016.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4279/42790689_017.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4279/42790689_018.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4279/42790689_019.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4279/42790689_020.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4279/42790689_021.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic4279/42790689_022.jpg?impolicy=heightRate&rh=1080"
+    ]
+  }
+}

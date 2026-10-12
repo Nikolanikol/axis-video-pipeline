@@ -11,7 +11,7 @@ import {
 import {reviewStoryboard} from '../src/shared/timeline.js';
 import {getFormat, listFormats, storyboardFrames} from './formats.mjs';
 import {addPhoto, applyBlur, ownFile, photoInfo, removePhoto, stemOf} from './photos.mjs';
-import {checkPhotoUrls, downloadPhoto, lookupCar} from './encar.mjs';
+import {checkPhotoUrls, downloadPhoto, lookupCar} from './carLink.mjs';
 import {rates, usdKrw} from './rates.mjs';
 import {makeZip} from './zip.mjs';
 import {previewId} from './db/index.mjs';

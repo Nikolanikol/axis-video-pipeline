@@ -9,7 +9,7 @@ let encar;
 let rates;
 beforeAll(async () => {
   env = await useTempEnv();
-  encar = await import('../../server/encar.mjs');
+  encar = await import('../../server/carLink.mjs');
   rates = await import('../../server/rates.mjs');
 });
 afterAll(() => env.cleanup());

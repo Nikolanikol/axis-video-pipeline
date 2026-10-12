@@ -1,0 +1,126 @@
+{
+  "id": "38395901",
+  "source": "https://www.kmotors.shop/en/catalog/38395901",
+  "brand": "KG Mobility",
+  "model": "Rexton",
+  "grade": "Diesel 2.2 4WD",
+  "trim": "Prestige",
+  "year": 2022,
+  "firstRegistered": "2022-06-24",
+  "mileageKm": 22591,
+  "displacementCc": 2157,
+  "transmission": "Automatic",
+  "fuel": "Diesel",
+  "body": "",
+  "color": "Gray",
+  "seats": 5,
+  "vin": "TESTVIN395901",
+  "plate": "00가0000",
+  "price": {
+    "krw": 23340000,
+    "usd": 17699,
+    "krwToUsd": 0.0007583225904299689,
+    "quotedAt": "2026.10.12 17:02:43",
+    "rateSource": "kb"
+  },
+  "history": {
+    "accidentsOwn": 1,
+    "accidentsOther": 0,
+    "accidentsTotal": 1,
+    "accidentYears": [
+      2024
+    ],
+    "maxPayoutKrw": 3186200,
+    "claims": [
+      {
+        "date": "2024-01-09",
+        "payoutKrw": 3186200,
+        "partsKrw": 2027110,
+        "laborKrw": 268650,
+        "paintKrw": 600869,
+        "own": true
+      }
+    ],
+    "ownerChanges": 1,
+    "theft": 0,
+    "flood": 0,
+    "totalLoss": 0
+  },
+  "options": {
+    "comfort": [
+      "Ventilated driver seat",
+      "Heated rear seats",
+      "Heated steering wheel",
+      "Leather seats",
+      "Automatic climate control",
+      "Heated front seats",
+      "Power driver seat",
+      "Smart key",
+      "Auto-dimming mirror (ECM)",
+      "Power-folding mirrors",
+      "Keyless entry",
+      "Power door locks",
+      "Power windows"
+    ],
+    "safety": [
+      "Blind spot monitoring",
+      "Lane departure warning (LDWS)",
+      "Rear-view camera",
+      "Rear parking sensors",
+      "Navigation",
+      "Bluetooth",
+      "HID headlights",
+      "Cruise control",
+      "Automatic headlights",
+      "Rain sensor",
+      "Tire pressure monitoring (TPMS)",
+      "Electronic stability control (ESC)",
+      "Hi-Pass toll system",
+      "Driver airbag",
+      "Passenger airbag",
+      "Anti-lock braking system (ABS)",
+      "Traction control (TCS)",
+      "Steering wheel controls",
+      "Front AV monitor",
+      "USB port"
+    ],
+    "other": [
+      "Roof rails",
+      "Alloy wheels",
+      "Power steering"
+    ],
+    "total": 36
+  },
+  "photos": {
+    "hero": "https://ci.encar.com/carpicture09/pic3839/38395901_001.jpg?impolicy=heightRate&rh=1080",
+    "rear": "https://ci.encar.com/carpicture09/pic3839/38395901_002.jpg?impolicy=heightRate&rh=1080",
+    "interiorShot": "https://ci.encar.com/carpicture09/pic3839/38395901_007.jpg?impolicy=heightRate&rh=1080",
+    "dashboard": "https://ci.encar.com/carpicture09/pic3839/38395901_008.jpg?impolicy=heightRate&rh=1080",
+    "exterior": [
+      "https://ci.encar.com/carpicture09/pic3839/38395901_001.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic3839/38395901_002.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic3839/38395901_003.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic3839/38395901_004.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic3839/38395901_005.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic3839/38395901_006.jpg?impolicy=heightRate&rh=1080"
+    ],
+    "interior": [
+      "https://ci.encar.com/carpicture09/pic3839/38395901_007.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic3839/38395901_008.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic3839/38395901_009.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic3839/38395901_010.jpg?impolicy=heightRate&rh=1080"
+    ],
+    "other": [
+      "https://ci.encar.com/carpicture09/pic3839/38395901_015.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic3839/38395901_016.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic3839/38395901_017.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic3839/38395901_018.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic3839/38395901_019.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic3839/38395901_020.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic3839/38395901_021.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic3839/38395901_022.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic3839/38395901_023.jpg?impolicy=heightRate&rh=1080",
+      "https://ci.encar.com/carpicture09/pic3839/38395901_024.jpg?impolicy=heightRate&rh=1080"
+    ]
+  }
+}
