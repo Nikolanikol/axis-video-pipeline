@@ -209,6 +209,7 @@ suite('оплата тарифа', () => {
     await notify(await paid(id, 7005, {payment_status: 'waiting'}));
     const before = (await lots()).length;
     await notify(await paid(id, 7006));
+    await settle(); // тревога уходит в фоне — не держит ответ кассе
     expect(await lots()).toHaveLength(before);
     expect(telegram.some((t) => t.includes(id) && /второй платёж/.test(t))).toBe(true);
   });
