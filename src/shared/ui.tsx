@@ -222,8 +222,7 @@ export const Photo: React.FC<{src?: string; dur: number}> = ({src: s, dur}) => {
   if (!url || ratio === null) return <AbsoluteFill style={{background: C.bg}} />;
   return (
     <AbsoluteFill style={{background: C.bg}}>
-      <Img src={url} style={{position: 'absolute', inset: -80, width: 'calc(100% + 160px)', height: 'calc(100% + 160px)',
-        objectFit: 'cover', filter: 'blur(50px) brightness(0.35)'}} />
+      <Backdrop src={url} />
       {ratio < 1 ? (
         <div style={{position: 'absolute', top: 0, left: 0, width: 1080, height: Math.min(1920, Math.round(1080 / ratio)), overflow: 'hidden'}}>
           <Img src={url} style={{width: '100%', height: '100%', objectFit: 'cover', transform: `scale(${zoom})`}} />
@@ -242,6 +241,30 @@ export const Photo: React.FC<{src?: string; dur: number}> = ({src: s, dur}) => {
 
 /** Адрес фото для <Img>: путь внутри public/ → staticFile, остальное как есть */
 export const photoSrc = (s: string) => src(s);
+
+// Рабочая копия фото объявления: …/lots/<id>/photos/<имя>.jpg — у неё рядом готовый размытый фон
+const OWN_PHOTO = /^(.*\/lots\/[\w-]+\/photos\/)([\w-]+(?:~\d+)?\.jpg)$/;
+/** Адрес готового размытого фона (photos/bg/, server/photos.mjs) или null — фото не из объявления */
+export const backdropSrc = (url: string) => {
+  const m = OWN_PHOTO.exec(url);
+  return m ? `${m[1]}bg/${m[2]}` : null;
+};
+
+/**
+ * Размытый тёмный фон под фото на весь кадр (с запасом 80 px за край).
+ *
+ * У фото объявления фон размыт заранее, на сервере: фильтр blur(50px) браузер считал на
+ * каждом кадре, и без видеокарты рендер шёл вдвое медленнее (замер 13.10: 6,2 → 12,6 кадра/с),
+ * а превью на телефоне подтормаживало. Встроенные и внешние картинки (демо, витрина) готового
+ * фона не имеют — им по-прежнему фильтр.
+ */
+export const Backdrop: React.FC<{src: string}> = ({src: url}) => {
+  const ready = backdropSrc(url);
+  return (
+    <Img src={ready ?? url} style={{position: 'absolute', inset: -80, width: 'calc(100% + 160px)', height: 'calc(100% + 160px)',
+      objectFit: 'cover', filter: ready ? 'brightness(0.35)' : 'blur(50px) brightness(0.35)'}} />
+  );
+};
 
 // Затемнение снизу под текст + лёгкое сверху под логотип
 export const Shade: React.FC = () => {

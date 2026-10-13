@@ -1,9 +1,13 @@
-// Фото лота: оригинал в photos/src/<stem>.jpg, рабочая копия для ролика — photos/<stem>~<версия>.jpg.
+// Фото лота: оригинал в photos/src/<stem>.jpg, рабочая копия для ролика — photos/<stem>~<версия>.jpg,
+// размытый фон кадра под ней — photos/bg/<то же имя> (backdropFile).
 // Размытие хранится в lot.blur[stem] как [x, y, w, h] в долях кадра и накладывается на оригинал заново.
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
-import {HttpError, lotPhotosDir, photoUrl} from './store.mjs';
+import {DATA_DIR, HttpError, lotPhotosDir, photoUrl} from './store.mjs';
+import {serverLog} from './log.mjs';
+
+const log = serverLog('photos');
 
 const WIDTH = 1080;          // ширина рабочей копии вертикального фото — ровно ширина кадра
 // Горизонтальное фото в ролике — полоса 1150 px с верхом, срезанным на 22% (LANDSCAPE_BAND
@@ -19,6 +23,63 @@ const srcFile = (lotId, stem) => path.join(srcDir(lotId), `${stem}.jpg`);
 const srcUrl = (lotId, stem) => photoUrl(lotId, `src/${stem}.jpg`);
 
 const exists = (file) => fs.access(file).then(() => true, () => false);
+
+// Сжатие — обычный libjpeg, а не mozjpeg. Замер на сервере 13.10, фото Encar 2200×1238:
+// оригинал 336 → 80 мс, рабочая копия 591 → 251 мс. mozjpeg выигрывает только размер файла
+// (~10–15%), а на загрузке объявления из 9 фото стоил ~5 с ожидания клиента
+const JPEG_SOURCE = {quality: 92};
+const JPEG_COPY = {quality: 90};
+
+/**
+ * Размытый фон кадра — заранее, а не фильтром blur(50px) в ролике.
+ *
+ * Замер 13.10 на сервере (6 ядер, без видеокарты): blur(50px) на фоне 1240×2080 браузер
+ * пересчитывает на каждом кадре процессором, и рендер шёл 6,2 кадра/с; с готовой размытой
+ * картинкой — 12,6–15,8. Число вкладок рендера при размытии почти не помогало (4 вкладки — 7,4).
+ * Телефон в превью тоже считал это размытие на каждом кадре — отсюда подтормаживание.
+ *
+ * Геометрия повторяет прежний фильтр: фон в ролике — 1240×2080 (кадр плюс 80 px с каждой
+ * стороны, object-fit: cover). Готовим в четверть размера (310×520) с сигмой 50/4 — после
+ * растяжки вчетверо выходит то же размытие в 50 px, а файл весит ~10 КБ. Затемнение
+ * (brightness 0.35) остаётся фильтром в ролике: оно дешёвое, и его меняют вместе с вёрсткой.
+ * Строится из готовой рабочей копии — значит, с уже размытым номером.
+ */
+const BACKDROP = {width: 310, height: 520, sigma: 12.5};
+export const backdropFile = (photoFile) => path.join(path.dirname(photoFile), 'bg', path.basename(photoFile));
+export const buildBackdrop = async (input, out) => {
+  await fs.mkdir(path.dirname(out), {recursive: true});
+  // Через временный файл: при рендере фон запрашивают сразу несколько вкладок, и недописанный
+  // файл ушёл бы им битой картинкой
+  const tmp = `${out}.${process.pid}-${Math.random().toString(36).slice(2, 8)}.tmp`;
+  await sharp(input).resize(BACKDROP.width, BACKDROP.height, {fit: 'cover'}).blur(BACKDROP.sigma)
+    .jpeg({quality: 80}).toFile(tmp);
+  await fs.rename(tmp, out);
+};
+
+/**
+ * Фон для фото, собранных до 13.10 (у них нет photos/bg): строится при первом запросе.
+ * Стоит перед раздачей /data, после guardData — права те же, что у самого фото. Нет рабочей
+ * копии — ничего не делаем, раздача ответит 404, как и раньше. Пачку одновременных запросов
+ * одного фона (вкладки рендера) обслуживает одна сборка.
+ */
+const BACKDROP_PATH = /^\/workspaces\/[\w-]+\/lots\/[\w-]+\/photos\/bg\/([\w-]+(?:~\d+)?\.jpg)$/;
+const building = new Map();
+export const backdropHandler = async (req, res, next) => {
+  const match = BACKDROP_PATH.exec(req.path);
+  if (!match) return next();
+  const out = path.join(DATA_DIR, req.path);
+  const photo = path.join(path.dirname(path.dirname(out)), match[1]);
+  try {
+    if (!(await exists(out)) && (await exists(photo))) {
+      if (!building.has(out)) building.set(out, buildBackdrop(photo, out).finally(() => building.delete(out)));
+      await building.get(out);
+    }
+  } catch (e) {
+    // Не собрался фон — ролик без фона хуже, чем с ним, но ошибкой его не роняем: дальше 404
+    log.warn('backdrop.failed', {url: req.originalUrl, error: e});
+  }
+  next();
+};
 
 // Фото, которые лежат в папке лота (не public/ и не внешние ссылки)
 export const ownFile = (lotId, url) => {
@@ -72,7 +133,9 @@ export const buildPhoto = async (source, regions, out) => {
     const patch = await blurPatch(data, info.width, info.height, region);
     if (patch) patches.push(patch);
   }
-  await sharp(data).composite(patches).jpeg({quality: 90, mozjpeg: true}).toFile(out);
+  const final = await sharp(data).composite(patches).jpeg(JPEG_COPY).toBuffer();
+  await fs.writeFile(out, final);
+  await buildBackdrop(final, backdropFile(out));
 };
 
 export const addPhoto = async (lotId, buffer, originalName) => {
@@ -80,7 +143,7 @@ export const addPhoto = async (lotId, buffer, originalName) => {
   await fs.mkdir(srcDir(lotId), {recursive: true});
   try {
     await sharp(buffer).rotate().resize({width: SOURCE_MAX, height: SOURCE_MAX, fit: 'inside', withoutEnlargement: true})
-      .jpeg({quality: 92, mozjpeg: true}).toFile(srcFile(lotId, stem));
+      .jpeg(JPEG_SOURCE).toFile(srcFile(lotId, stem));
   } catch {
     throw new HttpError(400, `Не удалось прочитать изображение «${originalName}»`);
   }
@@ -113,7 +176,10 @@ export const applyBlur = async (lot, url, rawRegions) => {
   }
   const next = `${stem}~${Date.now()}.jpg`;
   await buildPhoto(srcFile(lot.id, stem), regions, path.join(dir, next));
-  if (next !== name) await fs.rm(path.join(dir, name), {force: true});
+  if (next !== name) {
+    await fs.rm(path.join(dir, name), {force: true});
+    await fs.rm(backdropFile(path.join(dir, name)), {force: true});
+  }
   const blur = {...lot.blur};
   if (regions.length) blur[stem] = regions; else delete blur[stem];
   return {
@@ -132,6 +198,7 @@ export const removePhoto = async (lot, url) => {
   if (name) {
     const stem = stemOf(name);
     await fs.rm(path.join(lotPhotosDir(lot.id), name), {force: true});
+    await fs.rm(backdropFile(path.join(lotPhotosDir(lot.id), name)), {force: true});
     await fs.rm(srcFile(lot.id, stem), {force: true});
     delete blur[stem];
     if (sources) delete sources[stem];
