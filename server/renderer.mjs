@@ -9,11 +9,16 @@ import {charge, refund, settle} from './billing.mjs';
 import {authEnabled} from './session.mjs';
 import {HttpError, ROOT, checkId, clientMessage, skipUnreadable, currentWorkspace, readJson, rendersDir, withWorkspace, workspaceUrl, writeJson} from './store.mjs';
 import {serverLog} from './log.mjs';
+import {run as runTool} from './media.mjs';
 
 const log = serverLog('renderer');
 const browserExecutable = process.env.CHROME_PATH || null;
 const concurrency = process.env.RENDER_CONCURRENCY ? Number(process.env.RENDER_CONCURRENCY) : null;
 const crf = Number(process.env.RENDER_CRF || 20);
+// Пресет x264: veryfast вместо стандартного medium. Замер 13.10 на сервере (6 ядер, 90 кадров
+// фото с наездом): 14,3 → 15,7 кадра/с при 3 вкладках, 17,4 при 4. Качество держит crf,
+// пресет меняет только время сжатия и размер файла
+const x264Preset = process.env.RENDER_X264_PRESET || 'veryfast';
 
 // Сборка проекта Remotion. Пересобираем, если изменился код ролика или ассеты бренда.
 let bundled = null; // {signature, serveUrl}
@@ -39,6 +44,39 @@ const getServeUrl = async () => {
     bundled = {signature, serveUrl};
   }
   return bundled.serveUrl;
+};
+
+// Раскадровка: кадры в ряд по 360×640 с зазором 10 px на сером фоне
+const TILE = {w: 360, h: 640, gap: 10, bg: '#333333'};
+
+/**
+ * Раскадровка из готового mp4 — вместо отрисовки каждого кадра заново в браузере. Замер 13.10
+ * на сервере: пять кадров браузером — 4 с после готового видео, а клиент всё это время видит
+ * «не готово». Кадры из сжатого видео для плашки 360 px неотличимы.
+ *
+ * ffmpeg из сборки Remotion урезан (нет select и tile), поэтому каждый кадр — отдельным
+ * вызовом с перемоткой, параллельно, а ряд склеивает sharp. Перемотка — на четверть кадра
+ * раньше нужного: ffmpeg отдаёт первый кадр не раньше отметки, и точное n/fps из-за округления
+ * могло бы дать соседний.
+ */
+const storyboardFromVideo = async (video, frames, fps, out) => {
+  const dir = await fs.mkdtemp(path.join(path.dirname(out), '.sb-'));
+  try {
+    const tiles = await Promise.all(frames.map(async (frame, i) => {
+      const file = path.join(dir, `${i}.jpg`);
+      await runTool('ffmpeg', [
+        '-v', 'error', '-y', '-ss', String(Math.max(0, (frame - 0.25) / fps)), '-i', video,
+        '-frames:v', '1', '-vf', `scale=${TILE.w}:${TILE.h}`, '-q:v', '2', file,
+      ], {timeout: 60 * 1000});
+      return fs.readFile(file);
+    }));
+    await sharp({create: {width: tiles.length * (TILE.w + TILE.gap) - TILE.gap, height: TILE.h, channels: 3, background: TILE.bg}})
+      .composite(tiles.map((input, i) => ({input, left: i * (TILE.w + TILE.gap), top: 0})))
+      .jpeg({quality: 88})
+      .toFile(out);
+  } finally {
+    await fs.rm(dir, {recursive: true, force: true});
+  }
 };
 
 const jobs = new Map();
@@ -197,7 +235,7 @@ const run = async (job) => {
     const composition = await selectComposition({serveUrl, id: job.format, inputProps, puppeteerInstance: browser});
     // enforceAudioTrack: без аудиодорожки мессенджеры и соцсети принимают mp4 за GIF — всегда пишем хотя бы тишину.
     // Музыки в роликах нет, звук добавляется уже в соцсети, поэтому ролик и так готов под трендовый звук.
-    const media = {composition, serveUrl, codec: 'h264', crf, colorSpace: 'bt709', concurrency, puppeteerInstance: browser, enforceAudioTrack: true, cancelSignal};
+    const media = {composition, serveUrl, codec: 'h264', crf, x264Preset, colorSpace: 'bt709', concurrency, puppeteerInstance: browser, enforceAudioTrack: true, cancelSignal};
     job.stage = 'Рендер видео';
     await renderMedia({
       ...media, inputProps, outputLocation: path.join(RENDERS_DIR, `${job.id}.mp4`),
@@ -205,17 +243,24 @@ const run = async (job) => {
     });
 
     job.stage = 'Раскадровка';
-    const tiles = [];
-    for (const frame of job.frames) {
-      const {buffer} = await renderStill({composition, serveUrl, frame, inputProps, puppeteerInstance: browser, imageFormat: 'jpeg', cancelSignal});
-      tiles.push(await sharp(buffer).resize(360, 640).toBuffer());
-      job.progress += 2;
+    const video = path.join(RENDERS_DIR, `${job.id}.mp4`);
+    const sheet = path.join(RENDERS_DIR, `${job.id}.jpg`);
+    try {
+      await storyboardFromVideo(video, job.frames, composition.fps, sheet);
+    } catch (e) {
+      // Запасной путь — кадры заново через браузер: медленнее, но раскадровка будет
+      log.warn('storyboard.ffmpeg_failed', {job: job.id, error: e});
+      const tiles = [];
+      for (const frame of job.frames) {
+        const {buffer} = await renderStill({composition, serveUrl, frame, inputProps, puppeteerInstance: browser, imageFormat: 'jpeg', cancelSignal});
+        tiles.push(await sharp(buffer).resize(TILE.w, TILE.h).toBuffer());
+        job.progress += 2;
+      }
+      await sharp({create: {width: tiles.length * (TILE.w + TILE.gap) - TILE.gap, height: TILE.h, channels: 3, background: TILE.bg}})
+        .composite(tiles.map((input, i) => ({input, left: i * (TILE.w + TILE.gap), top: 0})))
+        .jpeg({quality: 88})
+        .toFile(sheet);
     }
-    const gap = 10;
-    await sharp({create: {width: tiles.length * (360 + gap) - gap, height: 640, channels: 3, background: '#333333'}})
-      .composite(tiles.map((input, i) => ({input, left: i * (360 + gap), top: 0})))
-      .jpeg({quality: 88})
-      .toFile(path.join(RENDERS_DIR, `${job.id}.jpg`));
     job.progress = 100;
   })();
 

@@ -10,7 +10,7 @@ import {
 } from './store.mjs';
 import {reviewStoryboard} from '../src/shared/timeline.js';
 import {getFormat, listFormats, storyboardFrames} from './formats.mjs';
-import {addPhoto, applyBlur, ownFile, photoInfo, removePhoto, stemOf} from './photos.mjs';
+import {addPhoto, applyBlur, backdropHandler, ownFile, photoInfo, removePhoto, stemOf} from './photos.mjs';
 import {checkPhotoUrls, downloadPhoto, lookupCar} from './carLink.mjs';
 import {rates, usdKrw} from './rates.mjs';
 import {makeZip} from './zip.mjs';
@@ -48,6 +48,8 @@ import {requestIdMw, serverLog} from './log.mjs';
 import {clientErrorHandler} from './clientErrors.mjs';
 
 const log = serverLog('api');
+// Сколько фото объявления качать и обрабатывать разом (загрузка по ссылке, см. photos/import)
+const IMPORT_PARALLEL = 6;
 
 // Медиа с путями /data/... браузер рендера берёт по полному адресу этого сервера
 const absolute = (origin, url) => (url && url.startsWith('/') ? `${origin}${url}` : url);
@@ -446,10 +448,26 @@ export const createApp = ({photoOrigin}) => {
   api.post('/lots/:id/photos/import', wrap(async (req) => {
     const urls = checkPhotoUrls(req.body?.urls);
     const lot = await getLot(req.params.id);
-    const added = [];
-    // По одному, а не разом: Encar на пачку одновременных запросов с одного адреса
-    // отвечает отказами, а выигрыш в секундах тут не важен
-    for (const [i, url] of urls.entries()) added.push(await addPhoto(lot.id, await downloadPhoto(url), `encar-${i + 1}.jpg`));
+    // Несколько фото разом — и скачивание, и обработка. Раньше качали по одному: Encar будто бы
+    // отвечал отказами на пачку запросов с одного адреса. Замер 13.10 с сервера на свежих машинах:
+    // фото Encar, которое ещё никто не запрашивал, идёт ~0,8 с; девять по одному — 7,6 с, все
+    // девять разом — 0,9 с, отказов нет. Плюс обработка ~0,9 с на фото — по одному объявление
+    // грузилось 17–25 с. Шесть — с запасом под одно объявление и без пачки в 30 запросов
+    const added = new Array(urls.length);
+    let next = 0;
+    // Одно фото не скачалось — клиент уже получит ошибку, остальные потоки новых не берут
+    let failed = false;
+    await Promise.all(Array.from({length: Math.min(IMPORT_PARALLEL, urls.length)}, async () => {
+      while (!failed && next < urls.length) {
+        const i = next++;
+        try {
+          added[i] = await addPhoto(lot.id, await downloadPhoto(urls[i]), `encar-${i + 1}.jpg`);
+        } catch (e) {
+          failed = true;
+          throw e;
+        }
+      }
+    }));
     // Откуда каждое фото: по этой записи палитра объявления помечает снимки «в лоте» и не
     // даёт загрузить их второй раз. Ключ — имя файла без версии, как у размытия (версия
     // меняется при каждом размытии); адрес — без параметров размера: палитра показывает тот
@@ -629,7 +647,8 @@ export const createApp = ({photoOrigin}) => {
   app.use('/api', api);
   // Миниатюры для плашек — те же правила доступа, что у /data (server/thumbs.mjs)
   app.use('/thumbs', guardData, thumbsHandler);
-  app.use('/data', guardData, express.static(DATA_DIR, {fallthrough: false}));
+  // Размытый фон кадра у старых фото достраивается при первом запросе (server/photos.mjs)
+  app.use('/data', guardData, backdropHandler, express.static(DATA_DIR, {fallthrough: false}));
   // Единый ответ об ошибке (стандарт ошибок, 12.10). Наши ошибки (HttpError, ошибки ядер, разбор
   // тела, размер файла) написаны для человека — их текст и показываем. Всё прочее — поломка у нас:
   // наружу только «внутренняя ошибка» и код запроса, подробности — в журнал и тревогой в Telegram.

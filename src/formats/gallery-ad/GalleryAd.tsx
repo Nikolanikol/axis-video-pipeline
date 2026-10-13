@@ -9,12 +9,12 @@
 // обзорные, как «рекомендованные» из Encar, — остальные галерея), а в форме лота у каждого
 // фото можно выбрать место руками.
 import React from 'react';
-import {AbsoluteFill, Easing, Img, Sequence, interpolate, spring, useCurrentFrame, useVideoConfig} from 'remotion';
+import {AbsoluteFill, Easing, Sequence, interpolate, spring, useCurrentFrame, useVideoConfig} from 'remotion';
 import {getFormat, resolveAd, themeOf} from '../../shared/model';
 import {photoLayout, type Layout} from '../../shared/photoSlots';
 import {BackgroundMusic} from '../../shared/music';
 import type {Ad, AdProps} from '../../shared/types';
-import {BODY, CopperText, HEAD, LANDSCAPE_BAND, Landscape, Metal, PAD, Shade, ThemeProvider, TopLogo, clamp, photoSrc, useTheme} from '../../shared/ui';
+import {BODY, Backdrop, CopperText, HEAD, LANDSCAPE_BAND, Landscape, Metal, PAD, Shade, ThemeProvider, TopLogo, clamp, photoSrc, useTheme} from '../../shared/ui';
 import {Cta, Hook, PriceScene} from '../price-ad/PriceAd';
 
 const FORMAT = getFormat('gallery-ad');
@@ -40,8 +40,7 @@ const Cut: React.FC<{src: string}> = ({src}) => {
   const url = photoSrc(src);
   return (
     <AbsoluteFill style={{background: C.bg, opacity}}>
-      <Img src={url} style={{position: 'absolute', inset: -80, width: 'calc(100% + 160px)', height: 'calc(100% + 160px)',
-        objectFit: 'cover', filter: 'blur(50px) brightness(0.35)'}} />
+      <Backdrop src={url} />
       <Landscape src={url} w={1080} h={LANDSCAPE_BAND} />
     </AbsoluteFill>
   );
