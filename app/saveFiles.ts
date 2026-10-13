@@ -72,6 +72,7 @@ export const usePreparedFilesProgress = (key: string | null, urls: {url: string;
     const report = () => {
       const total = bytes.reduce((a, b) => a + b.total, 0);
       // Пока не все файлы назвали размер — процент врал бы, показываем без него
+      // Не больше 99: 100% — только когда файл собран и кнопка правда готова
       if (alive && total && bytes.every((b) => b.total)) setProgress(Math.min(99, Math.floor(bytes.reduce((a, b) => a + b.loaded, 0) / total * 100)));
     };
     Promise.all(urls.map((u, i) => fetchFile(u, (loaded, total) => { bytes[i] = {loaded, total}; report(); })))
