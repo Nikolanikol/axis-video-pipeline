@@ -11,6 +11,8 @@
 // и knownRatio / preloadedSrc отдают исходный адрес — рендер работает как раньше.
 import {prefetch} from 'remotion';
 
+// blobs — копии в памяти (blob:-адреса), их освобождает уборка preloadPhotos. ratios не чистим
+// намеренно: число на фото, и вернувшись к объявлению, сцена сразу знает раскладку
 const blobs = new Map<string, string>();
 const ratios = new Map<string, number>();
 
@@ -26,6 +28,7 @@ export const rememberRatio = (url: string, ratio: number) => { ratios.set(url, r
  */
 export const preloadPhotos = (urls: string[]) => {
   const handles = urls.map((url) => {
+    // blob-url, а не base64: base64 раздувает фото на треть и держит строку в памяти дважды
     const handle = prefetch(url, {method: 'blob-url'});
     handle.waitUntilDone().then((blob) => {
       blobs.set(url, blob);
