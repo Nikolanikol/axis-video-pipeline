@@ -10,7 +10,8 @@
 // Тот же бот — и поддержка клиентов (server/support.mjs): тема на клиента, переписка через бота.
 //
 // .env: TELEGRAM_BOT_TOKEN (бот @kok_work_bot), TELEGRAM_CHAT_ID (группа), TELEGRAM_PAYMENTS_TOPIC
-// (номер темы «Оплаты» — второй сегмент её ссылки t.me/c/<группа>/<тема>). Нет токена или
+// (номер темы «Оплаты» — второй сегмент её ссылки t.me/c/<группа>/<тема>), TELEGRAM_ANYPAY_TOPIC
+// (тема «AnyPay — журнал оплат», 13.10: тема 120 создана ботом через createForumTopic). Нет токена или
 // группы — молчим: на Mac без бота и в тестах.
 import {serverLog} from './log.mjs';
 
@@ -102,3 +103,12 @@ export const tgCall = async (method, payload = {}, {timeoutMs = TIMEOUT_MS} = {}
 
 /** В тему «Оплаты» */
 export const notifyPayments = (text) => notify(text, {topic: process.env.TELEGRAM_PAYMENTS_TOPIC});
+
+/**
+ * В тему «AnyPay — журнал оплат» (13.10): хроника каждого шага оплат через AnyPay. Темы нет
+ * (TELEGRAM_ANYPAY_TOPIC пуст) — молчим, а не пишем в общую ленту: хроника там утопила бы всё
+ */
+export const notifyAnypay = (text) => {
+  const topic = process.env.TELEGRAM_ANYPAY_TOPIC?.trim();
+  return topic ? notify(text, {topic}) : undefined;
+};

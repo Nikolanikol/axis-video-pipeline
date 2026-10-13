@@ -139,6 +139,11 @@ export const createApp = ({photoOrigin}) => {
 
   // Живость: без разбора тела
   app.get('/healthz', (_req, res) => res.json({ok: true}));
+  // Возврат из кассы AnyPay: касса не принимает адрес с «#» — даём путь, а сервер ведёт на экран заказа
+  app.get('/pay-return/:id', (req, res) => {
+    const id = /^pay-[a-f0-9]{20}$/.test(req.params.id) ? req.params.id : '';
+    res.redirect(302, id ? `/#/account/${id}` : '/#/account');
+  });
 
   // За Traefik на сервере: верим его X-Forwarded-Proto (для Secure у cookie) и адресу клиента
   // (для ограничения попыток входа) — но только от прокси из внутренней сети, не от кого угодно
@@ -211,6 +216,13 @@ export const createApp = ({photoOrigin}) => {
   api.post('/payments/nowpayments/notify', notifyLimiter, (req, res, next) => {
     handleNotification({body: req.body, signature: req.get('x-nowpayments-sig'), requestId: req.requestId}).then((r) => res.json(r)).catch(next);
   });
+  // Оповещение AnyPay (карта в сумах и гривнах): адрес задаётся в кабинете кассы, тело — форма (POST) или строка
+  // запроса (GET — если в кабинете оставили его), подпись — полем sign в теле. Касса ждёт в ответ
+  // ровно «OK», иначе повторяет оповещение каждые 10 минут в течение часа (ANYPAY.md)
+  api.all('/payments/anypay/notify', notifyLimiter, express.urlencoded({extended: false, limit: '32kb'}), (req, res, next) => {
+    const body = req.method === 'GET' ? req.query : req.body;
+    handleNotification({provider: 'anypay', body, ip: req.ip, requestId: req.requestId}).then(() => res.type('text/plain').send('OK')).catch(next);
+  });
 
   // Поддержка в Telegram: сообщения клиентов и ответы из рабочей группы (server/support.mjs).
   // Без сессии — подлинность по секрету в заголовке, который знаем только мы и Telegram.
@@ -261,7 +273,7 @@ export const createApp = ({photoOrigin}) => {
     return {
       contacts,
       packs: authEnabled() ? await listPacks() : [],
-      // Какие кассы включены: без ключей кнопки «Оплатить USDT» нет, остаётся менеджер
+      // Какие способы оплаты включены ({usdt, sbp, card}): без ключей кнопок кассы нет, остаётся менеджер
       pay: paymentMethods(),
       // Поддержка в Telegram включена — в кабинете есть «Написать в поддержку»
       support: supportEnabled(),
@@ -270,7 +282,8 @@ export const createApp = ({photoOrigin}) => {
   // Оплата тарифа: счёт у кассы → адрес страницы оплаты. Адрес возврата и уведомлений — тот,
   // с которого пришёл клиент (у превью свой, см. startCheckout)
   api.post('/payments/checkout', checkoutLimiter, wrap((req) => startCheckout({
-    workspaceId: req.ws, userId: req.user?.id, packId: req.body?.packId, origin: publicOrigin(req), requestId: req.requestId,
+    workspaceId: req.ws, userId: req.user?.id, packId: req.body?.packId, method: String(req.body?.method ?? 'usdt'),
+    origin: publicOrigin(req), requestId: req.requestId,
   })));
   account.get('/payments', wrap((req) => paymentsOf(req.ws)));
   account.get('/payments/:id', wrap((req) => paymentOf(req.ws, req.params.id)));

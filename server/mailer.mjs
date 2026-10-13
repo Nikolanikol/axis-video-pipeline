@@ -110,9 +110,9 @@ export const noticeMail = ({to, title, text}) => sendMail({
 // Сумма в валюте заказа. Валюта — код ISO строчными, как пишет её касса в заказ (usd у NOWPayments,
 // у рублёвой кассы будет rub). Знак — для привычных валют, остальные — кодом: письмо не должно
 // падать из-за новой валюты новой кассы
-const SIGNS = {usd: '$', krw: '₩', rub: '₽', eur: '€', jpy: '¥', cny: '¥'};
+const SIGNS = {usd: '$', krw: '₩', rub: '₽', eur: '€', jpy: '¥', cny: '¥', uah: '₴', uzs: 'сум', kgs: 'сом'};
 // Вона, иена и рубль — целыми (копейки в рублёвой кассе — редкость, а «49 000,00 ₩» читается как ошибка)
-const WHOLE = new Set(['krw', 'jpy', 'rub']);
+const WHOLE = new Set(['krw', 'jpy', 'rub', 'uzs']);
 export const money = (amount, currency) => {
   const c = String(currency ?? '').toLowerCase();
   const n = Number(amount);

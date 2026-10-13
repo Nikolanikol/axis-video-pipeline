@@ -1,7 +1,7 @@
 // Тарифы и докупка в «Моём кабинете» — карточками (макет владельца 12.10).
 //
-// Нажатие на тариф открывает окно оплаты (12.10): USDT через кассу NOWPayments — кредиты
-// приходят сами; рубли и всё остальное — менеджер в Telegram (владелец 12.10: обратная связь
+// Нажатие на тариф открывает окно оплаты (12.10): USDT через кассу NOWPayments и карта через AnyPay
+// (13.10: сумы и гривны; рубли и СБП — кнопки есть, но касса их пока не принимает) — кредиты приходят сами; всё остальное — менеджер в Telegram (владелец 12.10: обратная связь
 // теперь через Telegram и рабочую группу, а не WhatsApp). Готовый текст заявки (тариф, кредиты,
 // цена, кабинет) копируется в буфер — Telegram не берёт текст в ссылке. Нет ключей кассы на
 // сервере — в окне только менеджер.
@@ -11,13 +11,25 @@
 import React, {useEffect, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {Check, Send} from 'lucide-react';
-import {Offer, Pack, Payment, api, errorText} from './api';
+import {Offer, Pack, PayMethod, Payment, api, errorText} from './api';
 import {day, useSession} from './auth';
 import {useConfig} from './config';
 import {useRoute} from './router';
 
 const won = (n: number) => `₩${n.toLocaleString('ru-RU')}`;
 const usd = (n: number) => `$${n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+// Валюты AnyPay: знак и копейки (сумы — целыми, на картах Узбекистана копеек нет)
+const CUR: Record<string, {sign: string; digits: number; name: string}> = {
+  rub: {sign: '₽', digits: 2, name: 'рубли'}, uah: {sign: '₴', digits: 2, name: 'гривны'},
+  uzs: {sign: 'сум', digits: 0, name: 'сумы'}, kgs: {sign: 'сом', digits: 2, name: 'сомы'},
+};
+const inCur = (n: number, c: string) => `${n.toLocaleString('ru-RU', {minimumFractionDigits: CUR[c]?.digits ?? 2, maximumFractionDigits: CUR[c]?.digits ?? 2})} ${CUR[c]?.sign ?? c.toUpperCase()}`;
+// Сумма заказа в валюте его кассы: доллары USDT (NOWPayments) или валюта AnyPay
+const paid = (p: Payment) => (p.currency === 'usd' ? `${usd(p.amount)} USDT` : inCur(p.amount, p.currency));
+// Карта AnyPay в валютах, которые касса принимает (13.10 рубли закрыты): способ клиента → валюта
+const CARD_CURRENCIES: {key: PayMethod; cur: string; country: string}[] = [
+  {key: 'card_uzs', cur: 'uzs', country: 'Узбекистан'}, {key: 'card_kgs', cur: 'kgs', country: 'Киргизия'}, {key: 'card_uah', cur: 'uah', country: 'Украина'},
+];
 const perCredit = (p: Pack) => p.price_krw / p.credits;
 // 1 ролик, 2 ролика, 5 роликов
 const plural = (n: number, [one, few, many]: [string, string, string]) => {
@@ -106,21 +118,37 @@ const PayDialog: React.FC<{pack: Pack; offer: Offer; text: string; onClose: () =
   };
   const telegram = manager?.kind === 'bot' || manager?.kind === 'telegram';
   const usdt = Boolean(offer.pay?.usdt);
+  const sbp = Boolean(offer.pay?.sbp);
+  const card = Boolean(offer.pay?.card);
+  const rubles = sbp || card;
+  const cards = CARD_CURRENCIES.filter((c) => offer.pay?.[c.key]);
+  const anypay = rubles || cards.length > 0;
+  // Курсы для подсказки «≈ сумма»: точную сумму считает сервер по тому же курсу дня
+  const [usdRates, setUsdRates] = useState<Record<string, number> | null>(null);
 
   useEffect(() => { if (usdt) api.usdKrw().then((r) => setRate(r.krwPerUsd)).catch(() => setRate(null)); }, [usdt]);
+  useEffect(() => { if (anypay) api.rates().then((r) => setUsdRates(r.usdRates)).catch(() => setUsdRates(null)); }, [anypay]);
+  const approx = (c: string) => {
+    const per = usdRates?.KRW && usdRates[c.toUpperCase()] ? usdRates.KRW / usdRates[c.toUpperCase()] : 0;
+    return per ? ` · ≈ ${inCur(pack.price_krw / per, c)}` : '';
+  };
+  const approxRub = approx('rub');
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !busy) onClose(); };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [busy, onClose]);
 
-  const pay = async () => {
+  // Какой способ сейчас открывается — надпись «Открываю кассу…» только на своей кнопке
+  const [busyWith, setBusyWith] = useState<PayMethod | null>(null);
+  const pay = async (method: PayMethod) => {
     setBusy(true);
+    setBusyWith(method);
     setError('');
     try {
-      const {url} = await api.pay.checkout(pack.id);
+      const {url} = await api.pay.checkout(pack.id, method);
       window.location.assign(url);
-    } catch (e) { setError(errorText(e)); setBusy(false); }
+    } catch (e) { setError(errorText(e)); setBusy(false); setBusyWith(null); }
   };
 
   // Порталом в body: у предков анимация появления оставляет transform, и fixed внутри них
@@ -130,10 +158,40 @@ const PayDialog: React.FC<{pack: Pack; offer: Offer; text: string; onClose: () =
       <div className="pay-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="pay-title">
         <h2 id="pay-title">{pack.kind === 'plan' ? `Тариф «${pack.title}»` : `+${credits(pack.credits)}`}</h2>
         <p className="pay-sum">{won(pack.price_krw)}{pack.kind === 'plan' ? <span className="muted"> · {credits(pack.credits)} на месяц</span> : null}</p>
+        {rubles && (
+          <div className="pay-option">
+            {sbp && (
+              <button className="btn primary" onClick={() => pay('sbp')} disabled={busy}>
+                {busyWith === 'sbp' ? 'Открываю кассу…' : `Оплатить по СБП${approxRub}`}
+              </button>
+            )}
+            {card && (
+              <button className={`btn${sbp ? '' : ' primary'}`} onClick={() => pay('card')} disabled={busy}>
+                {busyWith === 'card' ? 'Открываю кассу…' : `Оплатить картой${approxRub}`}
+              </button>
+            )}
+            <p className="hint">
+              Рубли — {[sbp && 'по СБП', card && 'картой российского банка'].filter(Boolean).join(' или ')}. Кредиты придут сами через несколько минут после оплаты.
+            </p>
+          </div>
+        )}
+        {cards.length > 0 && (
+          <div className="pay-option">
+            {cards.map((c, i) => (
+              <button key={c.key} className={`btn${!rubles && i === 0 ? ' primary' : ''}`} onClick={() => pay(c.key)} disabled={busy}>
+                {busyWith === c.key ? 'Открываю кассу…' : `Картой · ${CUR[c.cur].name}${approx(c.cur)}`}
+              </button>
+            ))}
+            <p className="hint">
+              Карта банка: {cards.map((c) => c.country).join(', ')}. Касса покажет реквизиты для перевода с вашей карты.
+              Кредиты придут сами через несколько минут после оплаты.
+            </p>
+          </div>
+        )}
         {usdt && (
           <div className="pay-option">
-            <button className="btn primary" onClick={pay} disabled={busy}>
-              {busy ? 'Открываю кассу…' : `Оплатить USDT${rate ? ` · ≈ ${usd(Math.round((pack.price_krw / rate) * 100) / 100)}` : ''}`}
+            <button className={`btn${anypay ? '' : ' primary'}`} onClick={() => pay('usdt')} disabled={busy}>
+              {busyWith === 'usdt' ? 'Открываю кассу…' : `Оплатить USDT${rate ? ` · ≈ ${usd(Math.round((pack.price_krw / rate) * 100) / 100)}` : ''}`}
             </button>
             <p className="hint">
               Сеть <b>TRON (TRC20)</b>. Кредиты придут сами через несколько минут после оплаты.
@@ -143,9 +201,10 @@ const PayDialog: React.FC<{pack: Pack; offer: Offer; text: string; onClose: () =
         )}
         {manager && (
           <div className="pay-option">
-            <button type="button" className={`btn${usdt ? '' : ' primary'}${telegram ? ' btn-tg' : ''}`} onClick={write}>
+            <button type="button" className={`btn${usdt || anypay ? '' : ' primary'}${telegram ? ' btn-tg' : ''}`} onClick={write}>
               {telegram && <Send size={17} aria-hidden />}
-              {usdt ? `Рубли или другой способ — написать в ${manager.label}` : `Написать в ${manager.label}`}
+              {rubles ? `Другой способ — написать в ${manager.label}`
+                : usdt ? `Рубли или другой способ — написать в ${manager.label}` : `Написать в ${manager.label}`}
             </button>
             <p className="hint">
               {telegram
@@ -155,7 +214,7 @@ const PayDialog: React.FC<{pack: Pack; offer: Offer; text: string; onClose: () =
             </p>
           </div>
         )}
-        {!usdt && !manager && <p className="hint">Способы оплаты ещё не настроены — напишите нам на почту из подвала сайта.</p>}
+        {!usdt && !anypay && !manager && <p className="hint">Способы оплаты ещё не настроены — напишите нам на почту из подвала сайта.</p>}
         {/* Модерация кассы и сам клиент: перед оплатой видно условия и возврат */}
         <p className="hint">Оплачивая, вы принимаете <a href="#/offer" target="_blank" rel="noreferrer">оферту</a>: возврат — в течение 3 суток, если кредиты из покупки не тратились.</p>
         {error && <div className="auth-error">{error}</div>}
@@ -181,7 +240,7 @@ export const PaymentReturn: React.FC = () => {
     if (!id) return;
     let stop = false;
     let timer: number | undefined;
-    // Перевод в сети TRON подтверждается за минуту-другую; полчаса — с запасом на медленную
+    // Перевод в сети TRON и по СБП подтверждается за минуту-другую; полчаса — с запасом на медленную
     // кассу, дальше человек уже ушёл со страницы
     const until = Date.now() + 30 * 60_000;
     const tick = () => api.pay.get(id).then((r) => {
@@ -199,7 +258,7 @@ export const PaymentReturn: React.FC = () => {
   return (
     <div className={`notice pay-return${p?.credited ? ' ok' : p && settled(p) ? ' warn' : ''}`}>
       <div>
-        <b>{p ? `${p.title} · ${usd(p.amount)}` : 'Оплата'}</b>
+        <b>{p ? `${p.title} · ${paid(p)}` : 'Оплата'}</b>
         <span>{error || (p ? statusText(p) : 'Проверяем оплату…')}</span>
         {p && !settled(p) && <span className="muted">Страницу можно не обновлять — проверяем сами каждые несколько секунд.</span>}
       </div>
@@ -231,6 +290,9 @@ export const PlansSection: React.FC = () => {
   const carousels = config.credits?.carousels ?? 1;
   const top = plans.length ? Math.max(...plans.map(perCredit)) : 0;
   const usdt = Boolean(offer.pay?.usdt);
+  const rubles = Boolean(offer.pay?.sbp || offer.pay?.card);
+  const cardCountries = CARD_CURRENCIES.filter((c) => offer.pay?.[c.key]).map((c) => c.country);
+  const cardsOn = cardCountries.length > 0;
 
   return (
     <section id="plans" className="plans">
@@ -289,7 +351,8 @@ export const PlansSection: React.FC = () => {
       )}
       <p className="hint plans-foot">
         Докупленные кредиты сгорают вместе с подпиской.
-        {usdt ? ' Оплата в USDT — кредиты придут сами; рублями — через менеджера.'
+        {rubles || cardsOn ? ` Оплата ${[rubles && 'рублями', cardsOn && `картой (${cardCountries.join(', ')})`, usdt && 'в USDT'].filter(Boolean).join(', ')} — кредиты придут сами.`
+          : usdt ? ' Оплата в USDT — кредиты придут сами; рублями — через менеджера.'
           : ` Нажмите тариф — напишите нам в ${managerOf(offer, '')?.label ?? 'чат'}: пришлём реквизиты и подключим.`}
       </p>
 
@@ -304,7 +367,7 @@ export const PlansSection: React.FC = () => {
                   <tr key={p.id}>
                     <td className="nowrap">{day(p.createdAt)}</td>
                     <td>{p.title}{p.sandbox ? ' · тест' : ''}</td>
-                    <td className="nowrap">{usd(p.amount)} USDT</td>
+                    <td className="nowrap">{paid(p)}</td>
                     <td>{statusText(p)}</td>
                   </tr>
                 ))}

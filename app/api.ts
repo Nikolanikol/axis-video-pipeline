@@ -69,7 +69,11 @@ export type Me =
 // kind: plan — подписка на месяц (кредиты сгорают в конце месяца), topup — докупка, сгорает вместе с подпиской
 export type Pack = {id: string; title: string; credits: number; price_krw: number; valid_days: number; active: boolean; sort: number; kind: 'plan' | 'topup'};
 // pay — какие кассы включены на сервере (нет ключей — только менеджер)
-export type Offer = {contacts: {whatsapp?: string; telegram?: string; email?: string; instagram?: string}; packs: Pack[]; pay?: {usdt: boolean}; support?: boolean};
+export type Offer = {contacts: {whatsapp?: string; telegram?: string; email?: string; instagram?: string}; packs: Pack[]; pay?: PayMethods; support?: boolean};
+// Включённые способы оплаты: usdt — касса NOWPayments; AnyPay — sbp и card (рубли), card_uah,
+// card_uzs, card_kgs (карта в гривнах, сумах, сомах)
+export type PayMethods = {usdt: boolean; sbp?: boolean; card?: boolean; card_uah?: boolean; card_uzs?: boolean; card_kgs?: boolean};
+export type PayMethod = keyof PayMethods;
 // Оплата тарифа через кассу. status — общий для всех касс (cores/PAYMENTS.md): created — счёт выставлен, waiting,
 // confirming, paid, partial, failed, expired, refunded, abandoned; credited — кредиты начислены
 export type Payment = {
@@ -183,7 +187,7 @@ export const api = {
   ledger: (page = 1) => request<LedgerPage>('GET', `/api/account/ledger?page=${page}`),
   offer: () => request<Offer>('GET', '/api/account/offer'),
   pay: {
-    checkout: (packId: string) => request<{id: string; url: string}>('POST', '/api/payments/checkout', {packId}),
+    checkout: (packId: string, method: PayMethod = 'usdt') => request<{id: string; url: string}>('POST', '/api/payments/checkout', {packId, method}),
     list: () => request<Payment[]>('GET', '/api/account/payments'),
     get: (id: string) => request<Payment>('GET', `/api/account/payments/${encodeURIComponent(id)}`),
   },

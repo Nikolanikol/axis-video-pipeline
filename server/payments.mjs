@@ -12,7 +12,9 @@
 // requestId — по нему одна операция находится целиком.
 //
 // Кассы — независимые модули cores/pay-<id> (контракт cores/PAYMENTS.md), ключи и выбор кассы —
-// server/payKassa.mjs. Сюда приходят только платежи в общем виде.
+// server/payKassa.mjs. Сюда приходят только платежи в общем виде. Кассы две: NOWPayments (USDT,
+// счёт в долларах) и AnyPay (карта; счёт в валюте карты — сумы, гривны; рубли касса пока не принимает).
+// Касса заказа — его provider.
 //
 // Правила безопасности (подробно — CONTEXT.md, «Онлайн-оплата», и cores/PAYMENTS.md, раздел 5):
 //   • цена — только из базы (тариф по id), клиент присылает лишь id тарифа;
@@ -26,9 +28,11 @@ import {db, hasDatabase} from './db/index.mjs';
 import {HttpError} from './store.mjs';
 import {grantPackIn, inTransaction, ownerOf} from './accounts.mjs';
 import {appUrl, paymentMail} from './mailer.mjs';
-import {usdKrw} from './rates.mjs';
-import {esc, notifyPayments} from './telegram.mjs';
-import {PROVIDER, kassa, kassaHttpError, kassaInfo, kassaReady, sandboxForbidden, sandboxMode} from './payKassa.mjs';
+import {rates, usdKrw} from './rates.mjs';
+import {esc, notifyAnypay, notifyPayments} from './telegram.mjs';
+import {
+  METHOD_PROVIDER, PROVIDER, anypayMethods, anypayOption, isAnypayIp, kassa, kassaHttpError, kassaInfo, kassaReady, sandboxForbidden, sandboxMode,
+} from './payKassa.mjs';
 import {toCoreError} from '../cores/kit/errors.mjs';
 import {createLogger, levelFor} from '../cores/kit/log.mjs';
 
@@ -50,6 +54,16 @@ const LOST_AFTER_MS = 24 * 60 * 60_000;
 // двадцать лет вона ходила в 900–1600 за доллар; вышло за 900–2200 — счёт не выставляем, зовём человека
 const RATE_MIN = 900;
 const RATE_MAX = 2200;
+// То же для валют AnyPay: вон за единицу, коридор с запасом вокруг курса 13.10 (₽ ≈ 15,9 ₩, гривна ≈
+// 29,7 ₩, сум ≈ 0,112 ₩, сом ≈ 15,2 ₩). Вышло за коридор — источник курса сломан, счёт не выставляем
+const KRW_PER_UNIT = {rub: [8, 35], uah: [15, 60], uzs: [0.05, 0.25], kgs: [8, 30]};
+// Знак валюты для группы и экрана: рубль, гривна, сум, сом
+const SIGN = {rub: '₽', uah: '₴', uzs: 'сум', kgs: 'сом'};
+// Сумы — целыми: копеек (тийинов) на картах Узбекистана не бывает
+const WHOLE = new Set(['uzs']);
+// Номер заказа у AnyPay: только цифры, до 15 знаков (ANYPAY.md)
+const KASSA_ORDER_RE = /^[1-9]\d{0,14}$/;
+const OUR_ORDER_RE = /^pay-[a-f0-9]{20}$/;
 
 export const newRequestId = () => crypto.randomUUID();
 
@@ -99,10 +113,17 @@ const whoPays = async (o) => {
     `✉️ ${r?.email ? esc(r.email) : '<i>почта не указана</i>'}`,
   ].filter(Boolean).join('\n');
 };
+// Сумма счёта со знаком валюты: $18.56 USDT или 1 990,00 ₽ · СБП
+const sum = (o) => {
+  const c = String(o.currency).toLowerCase();
+  if (c === 'usd') return `$${Number(o.amount).toFixed(2)} USDT`;
+  const d = WHOLE.has(c) ? 0 : 2;
+  return `${Number(o.amount).toLocaleString('ru-RU', {minimumFractionDigits: d, maximumFractionDigits: d})} ${SIGN[c] ?? c.toUpperCase()} · ${payMethod(o.pay_currency) ?? 'AnyPay'}`;
+};
 // Что купили и за сколько
 const what = (o) => [
   `💳 ${o.kind === 'plan' ? `Тариф «${esc(o.title)}»` : `Докупка «${esc(o.title ?? o.pack_id)}»`}`,
-  `💵 <b>$${Number(o.amount).toFixed(2)}</b> USDT · ${won(o.price_krw)}`,
+  `💵 <b>${esc(sum(o))}</b> · ${won(o.price_krw)}`,
 ].join('\n');
 // Номер заказа — моноширинным: в Telegram копируется одним нажатием, с ним ищут журнал заказа
 const orderLine = (o) => `🧾 <code>${esc(o.id)}</code>`;
@@ -133,6 +154,28 @@ const crashAlarm = (where, e, requestId) => {
   void notifyPayments([`🔥 <b>Сбой оплаты у нас</b>`, LINE, esc(where), `<i>${esc(String(e?.message ?? e).slice(0, 300))}</i>`, LINE, `🔎 <code>${esc(requestId)}</code>`].join('\n')).catch(() => {});
 };
 
+/**
+ * Журнал AnyPay в Telegram (13.10, просьба владельца): касса не проверена живым платежом, в отличие
+ * от USDT, поэтому каждый шаг оплаты через AnyPay — строкой в тему «AnyPay — журнал оплат»: заказ,
+ * ответ кассы, оповещения (и отклонённые), сверка, начисление. Это хроника, а не тревоги: тревоги
+ * «нужен человек» по-прежнему идут в «Оплаты». Заказы других касс сюда не пишутся.
+ * o — заказ (или null, если оповещение не нашло заказа), details — строки HTML (текст людей — через esc).
+ * Не ждём отправки и не роняем оплату: notify сам ловит ошибки Telegram, а сбой сборки строки — в лог
+ */
+const trace = (o, title, details = [], {who = false} = {}) => {
+  if (o && o.provider !== 'anypay') return;
+  void (async () => {
+    const head = [`${title}${o?.sandbox ? ' · 🧪' : ''}`];
+    const order = o ? [
+      `🧾 <code>${esc(o.id)}</code>${o.kassa_order ? ` · у кассы <code>${esc(o.kassa_order)}</code>` : ''}`,
+      `💳 ${esc(o.title ?? o.pack_id ?? '')} · ${esc(sum(o))}`,
+    ] : [];
+    // Компания и контакты — только на первом шаге (заказ): дальше по номеру заказа и так понятно, кто это
+    const company = o && who ? [await whoPays(o)] : [];
+    await notifyAnypay([...head, ...company, ...order, ...details.filter(Boolean)].join('\n'));
+  })().catch((e) => log.warn('trace.failed', {order: o?.id ?? null, error: e}));
+};
+
 // ——— Заказ ———
 
 const SELECT = `SELECT p.*, k.title, k.credits, k.kind FROM smmaker_payments p LEFT JOIN smmaker_packs k ON k.id = p.pack_id`;
@@ -146,7 +189,10 @@ const view = (o) => ({
 });
 
 /** Какие способы оплаты включены — интерфейс показывает только их */
-export const paymentMethods = () => ({usdt: hasDatabase() && kassaReady()});
+export const paymentMethods = () => {
+  const any = hasDatabase() && kassaReady('anypay') ? anypayMethods() : [];
+  return {usdt: hasDatabase() && kassaReady('nowpayments'), ...Object.fromEntries(any.map((m) => [m, true]))};
+};
 
 /**
  * Адрес сайта для кассы: куда вернуть клиента и куда слать уведомления. Берём хост запроса —
@@ -171,11 +217,15 @@ export const publicOrigin = (req) => {
 
 /**
  * Заказ: счёт у кассы на тариф или докупку. Возвращает {id, url} — url страницы оплаты кассы.
- * Цена — из базы по id тарифа; от клиента приходит только id.
+ * Цена — из базы по id тарифа; от клиента приходят только id тарифа и способ оплаты
+ * (usdt — NOWPayments, sbp/card — AnyPay).
  */
-export const startCheckout = async ({workspaceId, userId, packId, origin, requestId = newRequestId()}) => {
+export const startCheckout = async ({workspaceId, userId, packId, method = 'usdt', origin, requestId = newRequestId()}) => {
   if (!hasDatabase()) throw new HttpError(400, 'Оплата работает только с базой');
   if (!workspaceId) throw new HttpError(400, 'Оплата — из кабинета компании');
+  const provider = METHOD_PROVIDER[method];
+  if (!provider) throw new HttpError(400, 'Нет такого способа оплаты');
+  if (provider === 'anypay') return startAnypay({workspaceId, userId, packId, method, origin, requestId});
   if (!kassaReady()) throw new HttpError(503, 'Оплата USDT пока не подключена — напишите нам, подключим вручную');
   const {rows: [pack]} = await db().query('SELECT * FROM smmaker_packs WHERE id = $1 AND active', [String(packId ?? '').slice(0, 40)]);
   if (!pack) throw new HttpError(404, 'Нет такого тарифа');
@@ -201,7 +251,7 @@ export const startCheckout = async ({workspaceId, userId, packId, origin, reques
   await db().query(
     `INSERT INTO smmaker_payments (id, workspace_id, created_by, provider, sandbox, pack_id, price_krw, amount, currency, pay_currency)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-    [id, workspaceId, userId ?? null, PROVIDER, sandbox, pack.id, pack.price_krw, amount, kassaInfo.priceCurrency, kassaInfo.payCurrency]);
+    [id, workspaceId, userId ?? null, PROVIDER, sandbox, pack.id, pack.price_krw, amount, kassaInfo().priceCurrency, kassaInfo().payCurrency]);
   const order = {id, workspace_id: workspaceId, created_by: userId, sandbox, pack_id: pack.id, price_krw: pack.price_krw, amount, title: pack.title, kind: pack.kind};
 
   try {
@@ -227,6 +277,89 @@ export const startCheckout = async ({workspaceId, userId, packId, origin, reques
   }
 };
 
+/** Активный тариф по id из запроса — или 404. Цена — только отсюда */
+const activePack = async (packId) => {
+  const {rows: [pack]} = await db().query('SELECT * FROM smmaker_packs WHERE id = $1 AND active', [String(packId ?? '').slice(0, 40)]);
+  if (!pack) throw new HttpError(404, 'Нет такого тарифа');
+  if (!(pack.price_krw > 0)) throw new HttpError(400, 'У тарифа нет цены — напишите нам');
+  return pack;
+};
+
+/**
+ * Заказ через AnyPay (13.10): рубли (СБП, карта) или карта в гривнах, сумах, сомах (card_uah …) —
+ * рубли касса пока не принимает. Отличия от USDT — номер заказа у кассы
+ * только цифрами (kassa_order), касса требует почту плательщика, а платёж сразу получает номер у
+ * кассы — его сразу пишем в payment_id, и сверка может переспрашивать кассу, не дожидаясь оповещения.
+ * Адрес оповещений AnyPay берёт из своего кабинета, а не из запроса (ANYPAY.md)
+ */
+const startAnypay = async ({workspaceId, userId, packId, method, origin, requestId}) => {
+  const option = anypayOption(method);
+  if (!option || !kassaReady('anypay') || !anypayMethods().includes(method)) {
+    throw new HttpError(503, 'Этот способ оплаты пока не подключён — напишите нам, подключим вручную');
+  }
+  const {method: kassaMethod, currency} = option;
+  const pack = await activePack(packId);
+  const rlog = log.child({requestId});
+
+  // Тариф в вонах → валюта счёта по курсу дня: вон за единицу = (вон за $1) / (единиц за $1)
+  const r = await rates();
+  const krwPerUnit = Number(r.usdRates?.KRW) / Number(r.usdRates?.[currency.toUpperCase()]);
+  const [lo, hi] = KRW_PER_UNIT[currency];
+  if (r.stale) rlog.warn('rate.stale', {fetchedAt: r.fetchedAt});
+  if (!(krwPerUnit >= lo && krwPerUnit <= hi)) {
+    rlog.error('rate.implausible', {currency, krwPerUnit, fetchedAt: r.fetchedAt});
+    crashAlarm(`курс воны ${krwPerUnit} за 1 ${currency.toUpperCase()} — неправдоподобный, счета в этой валюте не выставляются`, new Error('проверьте open.er-api и data/rates.json'), requestId);
+    throw new HttpError(503, 'Оплата временно недоступна — напишите нам, подключим вручную');
+  }
+  const amount = WHOLE.has(currency) ? Math.round(pack.price_krw / krwPerUnit) : Math.round((pack.price_krw / krwPerUnit) * 100) / 100;
+  if (!(amount >= 1)) throw new HttpError(400, 'Сумма тарифа слишком мала для оплаты — напишите нам');
+
+  // Почта плательщика — обязательна у AnyPay: того, кто нажал «Оплатить», иначе владельца кабинета
+  const {rows: [me]} = userId ? await db().query('SELECT email FROM smmaker_users WHERE id = $1', [userId]) : {rows: []};
+  const email = me?.email ?? (await ownerOf(workspaceId))?.email;
+  if (!email) throw new HttpError(400, 'Для оплаты нужна почта в профиле — напишите нам');
+
+  const id = `pay-${crypto.randomBytes(10).toString('hex')}`;
+  // 15 цифр без ведущего нуля: ~50 бит, не угадать и не перебрать. Совпадение с прежним номером
+  // поймает уникальный индекс — тогда просто ошибка, клиент нажмёт ещё раз
+  const kassaOrder = (100_000_000_000_000n + crypto.randomBytes(8).readBigUInt64BE() % 900_000_000_000_000n).toString();
+  await db().query(
+    `INSERT INTO smmaker_payments (id, workspace_id, created_by, provider, sandbox, pack_id, price_krw, amount, currency, pay_currency, kassa_order)
+     VALUES ($1, $2, $3, 'anypay', false, $4, $5, $6, $7, $8, $9)`,
+    [id, workspaceId, userId ?? null, pack.id, pack.price_krw, amount, currency, kassaMethod, kassaOrder]);
+  const order = {id, provider: 'anypay', kassa_order: kassaOrder, workspace_id: workspaceId, created_by: userId, sandbox: false,
+    pack_id: pack.id, price_krw: pack.price_krw, amount, currency, pay_currency: kassaMethod, title: pack.title, kind: pack.kind};
+  trace(order, '🟡 <b>Клиент начал оплату</b>', [`📈 курс: ${krwPerUnit.toFixed(4)} ₩ за 1 ${currency.toUpperCase()} · ${won(pack.price_krw)}`, `🌐 ${esc(origin)}`], {who: true});
+
+  // Куда вернуть клиента. AnyPay принимает адрес только на домене проекта (зарегистрирован боевой
+  // сайт) и, видимо, без «#»: 13.10 на http://localhost:3210/#/account/… касса ответила 213 «Incorrect
+  // success url». Поэтому адрес — путь /pay-return/<заказ> (сервер перенаправит на экран заказа) и
+  // только с боевого сайта; с Mac и превью не передаём — касса вернёт на адрес из своего кабинета
+  const prodSite = /^https:\/\//.test(appUrl()) && origin === appUrl();
+  try {
+    const {invoiceId, paymentId, url} = await kassa(false, 'anypay').createInvoice({
+      orderId: kassaOrder, amount, currency, method: kassaMethod, email, description: `KOK · ${pack.title} · ${pack.credits} кр.`,
+      returnUrl: prodSite ? `${origin}/pay-return/${id}` : undefined,
+    });
+    await db().query('UPDATE smmaker_payments SET invoice_id = $2, payment_id = $3, updated_at = now() WHERE id = $1', [id, invoiceId, paymentId]);
+    await event(id, 'checkout', {status: 'created', data: {invoiceId, kassaOrder, amount, currency, method: kassaMethod, krwPerUnit, origin}, requestId});
+    rlog.info('checkout.ok', {order: id, provider: 'anypay', pack: pack.id, amount, currency, method: kassaMethod});
+    trace(order, '🔗 <b>Касса выдала ссылку на оплату</b> — клиент ушёл платить', [`🏦 платёж кассы <code>${esc(paymentId)}</code>`]);
+    return {id, url};
+  } catch (e) {
+    const err = toCoreError(e);
+    rlog[levelFor(err.code)]('checkout.failed', {order: id, provider: 'anypay', code: err.code, error: err});
+    await db().query(`UPDATE smmaker_payments SET status = 'failed', error = $2, updated_at = now() WHERE id = $1`,
+      [id, `${err.code}: ${err.message}`.slice(0, 500)]);
+    await event(id, 'checkout', {status: 'failed', data: {code: err.code, message: err.message, details: err.details}, requestId});
+    trace(order, '❌ <b>Касса отказала в счёте</b>', [`${esc(err.message)}${err.details?.kassaCode ? ` (код ${err.details.kassaCode})` : ''}`, `🔎 <code>${esc(requestId)}</code>`]);
+    // Сумма вне лимитов и «способ недоступен» клиент обходит сам — другим способом; остальное
+    // постоянное (ключи, проект, API выключен) — нужен человек
+    if (!err.retryable && ![204, 205, 208, 311].includes(err.details?.kassaCode)) await alarm(order, `касса не выставила счёт: ${err.message}`, requestId);
+    throw kassaHttpError(err);
+  }
+};
+
 /**
  * Записать то, что касса сказала о платеже. Статус начисленного заказа не трогаем —
  * уведомления приходят не по порядку, и запоздавшее «подтверждается» не должно затереть «оплачено»
@@ -245,11 +378,15 @@ const record = (orderId, p, raw) => db().query(
  * касса знает о платеже, с тем, что мы выставили в счёте
  */
 const mismatch = (o, live) => {
+  // У AnyPay номер заказа у кассы — свой, числовой (kassa_order)
+  const orderKey = o.kassa_order ?? o.id;
   if (live.status !== 'paid') return `касса говорит «${live.providerStatus}»`;
-  if (live.orderId !== o.id) return `платёж ${live.paymentId} от другого заказа (${live.orderId})`;
+  if (live.orderId !== orderKey) return `платёж ${live.paymentId} от другого заказа (${live.orderId})`;
   if (Math.round(Number(live.priceAmount) * 100) !== Math.round(Number(o.amount) * 100)) return `сумма счёта у кассы ${live.priceAmount}, у нас ${o.amount}`;
   if (live.priceCurrency !== o.currency) return `валюта счёта у кассы ${live.priceCurrency}, у нас ${o.currency}`;
-  if (live.payCurrency !== o.pay_currency) return `оплачено в ${live.payCurrency}, а ждали ${o.pay_currency}`;
+  // Монета важна только для USDT: другая монета — другие деньги. У AnyPay сумма и валюта счёта уже сверены, и способ
+  // (СБП или карта) на сумму, которую мы получаем, не влияет — его не сверяем, чтобы не держать оплату
+  if (o.provider !== 'anypay' && live.payCurrency !== o.pay_currency) return `оплачено в ${live.payCurrency}, а ждали ${o.pay_currency}`;
   return null;
 };
 
@@ -266,12 +403,13 @@ const credit = async (o, paymentId, requestId) => {
   }
   let live;
   try {
-    live = await kassa(o.sandbox).getPayment(paymentId);
+    live = await kassa(o.sandbox, o.provider).getPayment(paymentId);
   } catch (e) {
     const err = toCoreError(e);
     rlog[levelFor(err.code)]('verify.failed', {paymentId, code: err.code, error: err});
     if (err.retryable) throw err;
     await event(o.id, 'reject', {data: {reason: 'сверка с кассой не удалась', code: err.code, message: err.message}, requestId});
+    trace(o, '⛔ <b>Сверка с кассой не удалась</b> — кредиты не начислены', [esc(err.message)]);
     await alarm(o, `не смог сверить платёж ${paymentId} с кассой: ${err.message}`, requestId);
     return false;
   }
@@ -280,6 +418,7 @@ const credit = async (o, paymentId, requestId) => {
     rlog.error('verify.mismatch', {paymentId, problem});
     await db().query('UPDATE smmaker_payments SET error = $2, updated_at = now() WHERE id = $1', [o.id, problem]);
     await event(o.id, 'reject', {status: live.status, data: {reason: problem, live}, requestId});
+    trace(o, '⛔ <b>Сверка не сошлась</b> — кредиты не начислены', [esc(problem)]);
     await alarm(o, `оплата не сходится с заказом: ${problem}`, requestId);
     return false;
   }
@@ -291,7 +430,7 @@ const credit = async (o, paymentId, requestId) => {
     const {rows: [pack]} = await client.query('SELECT * FROM smmaker_packs WHERE id = $1', [row.pack_id]);
     const lot = await grantPackIn(client, {
       workspaceId: row.workspace_id, pack, priceKrw: row.price_krw, createdBy: row.created_by,
-      note: `оплата USDT${row.sandbox ? ' (песочница)' : ''} · ${paymentId}`,
+      note: `оплата ${row.provider === 'anypay' ? `AnyPay · ${payMethod(row.pay_currency)}, ${String(row.currency).toUpperCase()}` : 'USDT'}${row.sandbox ? ' (песочница)' : ''} · ${paymentId}`,
     });
     await client.query(
       `UPDATE smmaker_payments SET status = 'paid', provider_status = $4, credited_at = now(), lot_id = $2,
@@ -302,6 +441,7 @@ const credit = async (o, paymentId, requestId) => {
   });
   if (!done) return false;
   rlog.info('credit.ok', {paymentId, pack: done.pack.id, credits: done.pack.credits});
+  trace(o, '✅ <b>Кредиты начислены</b>', [`🎟 +${done.pack.credits} кр. до ${dayKst(done.lot.expires_at)}`, `🏦 платёж кассы <code>${esc(paymentId)}</code>`]);
   // Сообщение — после фиксации транзакции: откатившееся начисление не должно успеть «прийти»
   void whoPays(o)
     .then((who) => notifyPayments([`✅ <b>Оплата пришла</b>${tag(o)}`, LINE, who, LINE, what({...o, title: done.pack.title, kind: done.pack.kind}),
@@ -314,7 +454,7 @@ const credit = async (o, paymentId, requestId) => {
 /**
  * Подтверждение оплаты на почту владельца кабинета (решение владельца 13.10: адрес — почта, с которой
  * кабинет зарегистрирован, а не того, кто нажал «Оплатить», — ownerOf). Сумма и валюта — из заказа, как
- * их записала касса: письмо одно для всех касс (USDT, рубли). Зовётся один раз на заказ: credit доходит сюда только
+ * их записала касса: письмо одно для всех касс (USDT, AnyPay в любой валюте). Зовётся один раз на заказ: credit доходит сюда только
  * у того вызова, который сам начислил.
  *
  * Письмо не держит оплату: кредиты уже зачислены, ответ кассе не ждёт Resend. Не ушло — повторять не
@@ -323,7 +463,7 @@ const credit = async (o, paymentId, requestId) => {
  */
 // Чем платил клиент — словами для письма. Касса пишет в заказ свой код способа (pay_currency); новая
 // касса — новые строки сюда, незнакомый код выйдет в письме как есть, заглавными
-const PAY_METHODS = {usdttrc20: 'USDT TRC20'};
+const PAY_METHODS = {usdttrc20: 'USDT TRC20', sbp: 'СБП', card: 'банковская карта'};
 const payMethod = (code) => (code ? PAY_METHODS[code] ?? String(code).toUpperCase() : null);
 
 const receipt = async (o, {pack, lot}, paymentId, requestId) => {
@@ -383,27 +523,51 @@ const apply = async (o, p, source, raw, requestId) => {
 /**
  * Уведомление кассы. Неверная подпись — 400 (касса не станет повторять, подделка — тем более).
  * Заказ не наш (заказ превью пришёл на прод) — спокойно игнорируем. Сбой у нас — 500: касса
- * повторит уведомление, а фоновая сверка подстрахует
+ * повторит уведомление, а фоновая сверка подстрахует.
+ * provider — какая касса пишет (адрес /api/payments/<касса>/notify). У AnyPay подпись — в теле,
+ * номер заказа — свой числовой (kassa_order), а адрес отправителя обязан быть из списка кассы
  */
-export const handleNotification = async ({body, signature, requestId = newRequestId()}) => {
-  const rlog = log.child({requestId});
+export const handleNotification = async ({provider = PROVIDER, body, signature, ip, requestId = newRequestId()}) => {
+  const rlog = log.child({requestId, provider});
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new HttpError(400, 'Пустое уведомление');
-  const orderId = String(body.order_id ?? '');
+  const anypay = provider === 'anypay';
+  // На Mac оповещения кассы не доходят вовсе — проверяем вручную с 127.0.0.1, поэтому IP только в бою
+  if (anypay && PRODUCTION && !isAnypayIp(ip)) {
+    rlog.warn('notify.foreign_ip', {ip});
+    trace(null, '🚫 <b>Оповещение с чужого адреса</b> — отклонено', [`IP ${esc(ip)} · заказ у кассы ${esc(body.pay_id ?? '—')}`]);
+    throw new HttpError(403, 'Уведомление отклонено');
+  }
+  const orderId = String((anypay ? body.pay_id : body.order_id) ?? '');
+  let o = null;
   try {
-    const o = /^pay-[a-f0-9]{20}$/.test(orderId) ? await readOrder('p.id = $1 AND p.provider = $2', [orderId, PROVIDER]) : null;
+    if (anypay ? KASSA_ORDER_RE.test(orderId) : OUR_ORDER_RE.test(orderId)) {
+      o = await readOrder(anypay ? 'p.kassa_order = $1 AND p.provider = $2' : 'p.id = $1 AND p.provider = $2', [orderId, provider]);
+    }
     // Подпись проверяем ключами того режима, в котором выставлен заказ; чужой заказ — ключами
     // текущего режима: так подделка и «чужое» различаются в логе
     let p;
     try {
-      p = await kassa(o ? o.sandbox : sandboxMode()).readNotification(body, signature);
+      p = await kassa(o ? o.sandbox : sandboxMode(provider), provider).readNotification(body, signature);
     } catch (e) {
       const err = toCoreError(e);
-      rlog.warn('notify.rejected', {order: orderId || null, code: err.code, error: err});
-      if (o) await event(o.id, 'reject', {data: {reason: 'подпись уведомления не сходится'}, requestId});
+      rlog.warn('notify.rejected', {order: o?.id ?? (orderId || null), code: err.code, error: err});
+      if (o) await event(o.id, 'reject', {data: {reason: `уведомление отклонено: ${err.message}`}, requestId});
+      if (anypay) trace(o, '🚫 <b>Оповещение отклонено</b>', [esc(err.message), !o && `заказ у кассы ${esc(orderId || '—')} — у нас такого нет`]);
       throw new HttpError(400, 'Уведомление отклонено');
+    }
+    // Тестовое оповещение из кабинета AnyPay («Тестирование»): подпись и адрес проверены — этого и
+    // ждали. Заказ не трогаем: настоящего платежа за ним нет, сверка бы не сошлась и позвала человека
+    if (p.test) {
+      rlog.info('notify.test', {order: o?.id ?? null, kassaOrder: orderId, status: p.status});
+      if (o) await event(o.id, 'notify', {status: p.status, data: {test: true, paymentId: p.paymentId}, requestId});
+      trace(o, '🧪 <b>Тестовое оповещение из кабинета AnyPay</b> — подпись и адрес верны, заказ не трогаем',
+        [`статус «${esc(p.providerStatus)}» · ${esc(p.priceAmount)} ${esc(String(p.priceCurrency ?? '').toUpperCase())}`, !o && `заказ у кассы ${esc(orderId || '—')}`]);
+      return {ok: true, test: true};
     }
     if (!o) {
       rlog.warn('notify.foreign_order', {order: orderId, paymentId: p.paymentId});
+      if (anypay) trace(null, '❔ <b>Оповещение по незнакомому заказу</b> — подпись верна, пропускаем',
+        [`заказ у кассы ${esc(orderId || '—')} · платёж ${esc(p.paymentId)} · «${esc(p.providerStatus)}»`, 'Обычно это заказ превью или Mac: адрес оповещений у AnyPay один']);
       return {ok: true};
     }
     if (o.invoice_id && p.invoiceId && p.invoiceId !== o.invoice_id) {
@@ -412,18 +576,23 @@ export const handleNotification = async ({body, signature, requestId = newReques
       throw new HttpError(400, 'Уведомление отклонено');
     }
     rlog.info('notify', {order: o.id, paymentId: p.paymentId, status: p.status});
+    trace(o, `📩 <b>Оповещение кассы:</b> «${esc(p.providerStatus)}»`,
+      [p.profit != null && `💰 к зачислению нам: ${esc(p.profit)} ₽`, p.status === 'paid' && !o.credited_at && 'Сверяю с кассой и начисляю…',
+        o.credited_at && 'Уже начислено раньше — повтор, ничего не делаем']);
     await apply(o, p, 'notify', body, requestId);
     return {ok: true};
   } catch (e) {
     if (e instanceof HttpError) throw e;
     // Касса не ответила на сверку — временно, не наш сбой: 503, касса повторит уведомление
     if (e?.name === 'CoreError' && e.retryable) {
-      rlog.warn('notify.retry_later', {order: orderId || null, code: e.code});
+      rlog.warn('notify.retry_later', {order: o?.id ?? (orderId || null), code: e.code});
       throw new HttpError(503, 'Касса недоступна для сверки — повторите');
     }
-    rlog.error('notify.crashed', {order: orderId || null, error: e});
+    rlog.error('notify.crashed', {order: o?.id ?? (orderId || null), error: e});
+    if (anypay) trace(o, '🔥 <b>Сбой у нас при разборе оповещения</b> — касса повторит', [esc(String(e?.message ?? e).slice(0, 200)), `🔎 <code>${esc(requestId)}</code>`]);
     crashAlarm('уведомление кассы', e, requestId);
-    if (/^pay-[a-f0-9]{20}$/.test(orderId)) await event(orderId, 'error', {data: {message: String(e?.message ?? e)}, requestId});
+    const ours = o?.id ?? (OUR_ORDER_RE.test(orderId) ? orderId : null);
+    if (ours) await event(ours, 'error', {data: {message: String(e?.message ?? e)}, requestId});
     throw new HttpError(500, 'Сбой обработки — повторите');
   }
 };
@@ -437,8 +606,11 @@ const syncOrder = async (o, requestId = newRequestId(), {force = false} = {}) =>
   if (o.credited_at || !o.payment_id || FINAL.has(o.status)) return;
   if (!force && Date.now() - new Date(o.updated_at).getTime() < SYNC_EVERY_MS) return;
   try {
-    const p = await kassa(o.sandbox).getPayment(o.payment_id);
-    if (p.status !== o.status) log.info('sync.changed', {requestId, order: o.id, from: o.status, to: p.status});
+    const p = await kassa(o.sandbox, o.provider).getPayment(o.payment_id);
+    if (p.status !== o.status) {
+      log.info('sync.changed', {requestId, order: o.id, from: o.status, to: p.status});
+      trace(o, `🔄 <b>Сверка:</b> статус «${esc(o.status)}» → «${esc(p.status)}»`, [p.status === 'paid' && !o.credited_at && 'Оповещения не было — начисляю по сверке']);
+    }
     await apply(o, p, 'sync', null, requestId);
   } catch (e) {
     const err = toCoreError(e);
@@ -452,7 +624,8 @@ const syncOrder = async (o, requestId = newRequestId(), {force = false} = {}) =>
         await db().query(`UPDATE smmaker_payments SET status = 'abandoned', updated_at = now() WHERE id = $1 AND credited_at IS NULL`, [o.id]);
         await event(o.id, 'sync', {status: 'abandoned', data: {reason: 'касса не знает платежа', paymentId: o.payment_id}, requestId});
         log.warn('sync.lost', {requestId, order: o.id, paymentId: o.payment_id, sandbox: o.sandbox});
-        if (!o.sandbox) await alarm(o, `касса не знает платёж ${o.payment_id} — заказ закрыт брошенным, проверьте в кабинете NOWPayments`, requestId);
+        trace(o, '❔ <b>Касса не знает платёж</b> — заказ закрыт брошенным', [`платёж кассы <code>${esc(o.payment_id)}</code>`]);
+        if (!o.sandbox) await alarm(o, `касса не знает платёж ${o.payment_id} — заказ закрыт брошенным, проверьте в кабинете ${o.provider === 'anypay' ? 'AnyPay' : 'NOWPayments'}`, requestId);
         return;
       } catch (e2) {
         log.error('sync.abandon_failed', {requestId, order: o.id, error: e2});
@@ -502,15 +675,22 @@ export const paymentsOf = async (workspaceId) => {
   return rows.map(view);
 };
 
-/** Жива ли касса и принимает ли наш ключ — для сотрудников (server/app.mjs) */
-export const kassaHealth = async () => {
-  const sandbox = sandboxMode();
+/**
+ * Жива ли касса и принимает ли наш ключ — для сотрудников (server/app.mjs). Поля NOWPayments — как
+ * раньше, на верхнем уровне; AnyPay — в поле anypay (включённые способы, баланс, настоящие ставки)
+ */
+const healthOf = async (provider) => {
+  const sandbox = sandboxMode(provider);
   try {
-    return {sandbox, ready: kassaReady(), ...(await kassa(sandbox).checkUpstream())};
+    return {sandbox, ready: kassaReady(provider), ...(await kassa(sandbox, provider).checkUpstream())};
   } catch (e) {
     const err = toCoreError(e);
-    return {sandbox, ready: kassaReady(), ok: false, code: err.code, message: err.message};
+    return {sandbox, ready: kassaReady(provider), ok: false, code: err.code, message: err.message};
   }
+};
+export const kassaHealth = async () => {
+  const [now, any] = await Promise.all([healthOf('nowpayments'), healthOf('anypay')]);
+  return {...now, anypay: {...any, methods: anypayMethods()}};
 };
 
 /** Журнал заказа — для разбора спора или сбоя (сотрудникам, см. server/app.mjs) */
