@@ -4,6 +4,9 @@ import {Player, PlayerRef} from '@remotion/player';
 import {FORMAT_COMPONENTS} from '../src/formats';
 import type {AdProps, FormatMeta} from '../src/shared/types';
 import {withoutMusic} from '../src/shared/nomusic.js';
+import {backdropSrc, photoSrc} from '../src/shared/ui';
+import {preloadPhotos} from '../src/shared/photoPreload';
+import {RecMark} from './Loading';
 
 // autoPlay — основной экран лота: превью само проигрывает ролик ОДИН раз и встаёт на последнем
 // кадре (владелец 12.10: бесконечный повтор рисовал 1080×1920 по 30 кадров в секунду, пока
@@ -13,6 +16,15 @@ export const Preview: React.FC<{input: AdProps; format: FormatMeta; autoPlay?: b
   {input, format, autoPlay, loop = false},
 ) => {
   const ref = useRef<PlayerRef>(null);
+  // Все фото объявления и их размытые фоны — сразу при открытии превью, а не когда до сцены
+  // дойдёт воспроизведение: иначе на мобильной сети сцены стояли «чёрными заглушками»
+  // (src/shared/photoPreload.ts). Смена формата фото не меняет — повторно не качаем
+  const photos = JSON.stringify((input.lot?.photos ?? []).filter(Boolean).flatMap((p) => {
+    const url = photoSrc(p);
+    const bg = backdropSrc(url);
+    return bg ? [url, bg] : [url];
+  }));
+  useEffect(() => preloadPhotos(JSON.parse(photos)), [photos]);
   const box = useRef<HTMLDivElement>(null);
   // Пауза, пока плеер не видно: уехал из видимой области (листаем ручные настройки ниже) или окно
   // не в фокусе (переключились в другое приложение, вкладку). Играющий плеер рисует кадры и тогда,
@@ -75,6 +87,11 @@ export const Preview: React.FC<{input: AdProps; format: FormatMeta; autoPlay?: b
           // Вернётся музыка в превью — убрать эту строку, иначе звук в плеере не заиграет
           numberOfSharedAudioTags={0}
           clickToPlay
+          // Фото не успело загрузиться (медленная сеть) — плеер ждёт его, а не показывает тёмный
+          // кадр, и поверх — знак ожидания. Не раньше чем через 0,3 с: на быстрой сети не мелькает
+          showPosterWhenBuffering
+          bufferStateDelayInMilliseconds={300}
+          renderPoster={({isBuffering}) => (isBuffering ? <div className="player-buffering"><RecMark /></div> : null)}
         />
       </div>
       <div className="scenes">

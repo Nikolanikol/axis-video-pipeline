@@ -1,6 +1,6 @@
 // Общие детали роликов AXIS: тема, шрифты, медь, фото, затемнение, логотип.
 import React, {createContext, useContext, useEffect, useState} from 'react';
-import {AbsoluteFill, Easing, Img, continueRender, delayRender, interpolate, staticFile, useCurrentFrame} from 'remotion';
+import {AbsoluteFill, Easing, Img, continueRender, delayRender, interpolate, staticFile, useBufferState, useCurrentFrame} from 'remotion';
 import '@fontsource/oswald/cyrillic-700.css';
 import '@fontsource/oswald/latin-700.css';
 import '@fontsource/oswald/cyrillic-500.css';
@@ -10,6 +10,7 @@ import '@fontsource/montserrat/latin-500.css';
 import '@fontsource/montserrat/cyrillic-600.css';
 import '@fontsource/montserrat/latin-600.css';
 import {BRAND} from './model';
+import {knownRatio, preloadedSrc, rememberRatio} from './photoPreload';
 import type {Theme} from './types';
 
 /**
@@ -162,17 +163,40 @@ export const Metal: React.FC<{style?: React.CSSProperties; children?: React.Reac
     backgroundSize: 'cover', backgroundBlendMode: 'overlay', ...style}}>{children}</div>
 );
 
-// Соотношение сторон фото (ждём загрузку, чтобы выбрать раскладку)
+/**
+ * Соотношение сторон фото (ждём загрузку, чтобы выбрать раскладку).
+ *
+ * Рендер ждёт его через delayRender. Плеер превью delayRender не ждёт — там сцена до загрузки
+ * стояла тёмным фоном, «чёрной заглушкой». Поэтому: фото, загруженное заранее (photoPreload.ts),
+ * знает пропорцию сразу, с первого кадра; не успело — плеер встаёт на паузу (delayPlayback) и
+ * показывает ожидание, а не тёмный кадр. На рендере delayPlayback ни на что не влияет.
+ */
 const usePhotoRatio = (url: string) => {
-  const [ratio, setRatio] = useState<number | null>(null);
+  const [ratio, setRatio] = useState<number | null>(() => (url ? knownRatio(url) : null));
   const [handle] = useState(() => delayRender(`photo ${url}`));
+  const buffer = useBufferState();
   useEffect(() => {
-    if (!url) { continueRender(handle); return; }
+    const known = url ? knownRatio(url) : null;
+    if (!url || known !== null) {
+      if (known !== null) setRatio(known);
+      continueRender(handle);
+      return;
+    }
+    const wait = buffer.delayPlayback();
+    let waiting = true;
+    const done = (r: number) => {
+      rememberRatio(url, r);
+      setRatio(r);
+      continueRender(handle);
+      if (waiting) { waiting = false; wait.unblock(); }
+    };
     const img = new Image();
-    img.onload = () => { setRatio(img.naturalWidth / img.naturalHeight); continueRender(handle); };
-    img.onerror = () => { setRatio(1.5); continueRender(handle); };
-    img.src = url;
-  }, [url, handle]);
+    img.onload = () => done(img.naturalWidth / img.naturalHeight);
+    img.onerror = () => done(1.5);
+    img.src = preloadedSrc(url);
+    // Сцена ушла раньше, чем фото загрузилось, — плеер не должен остаться на паузе
+    return () => { if (waiting) { waiting = false; wait.unblock(); } };
+  }, [url, handle, buffer]);
   return ratio;
 };
 
@@ -204,7 +228,7 @@ export const Landscape: React.FC<{src: string; w: number; h: number; zoom?: numb
   const iw = Math.round(w / (1 - TOP_CROP));
   return (
     <div style={{position: 'relative', width: w, height: h, overflow: 'hidden'}}>
-      <Img src={url} style={{position: 'absolute', top: h - ih, left: Math.round((w - iw) / 2), width: iw, height: ih,
+      <Img src={url} pauseWhenLoading style={{position: 'absolute', top: h - ih, left: Math.round((w - iw) / 2), width: iw, height: ih,
         objectFit: 'cover', transform: `scale(${zoom})`, transformOrigin: '50% 70%'}} />
     </div>
   );
@@ -225,7 +249,7 @@ export const Photo: React.FC<{src?: string; dur: number}> = ({src: s, dur}) => {
       <Backdrop src={url} />
       {ratio < 1 ? (
         <div style={{position: 'absolute', top: 0, left: 0, width: 1080, height: Math.min(1920, Math.round(1080 / ratio)), overflow: 'hidden'}}>
-          <Img src={url} style={{width: '100%', height: '100%', objectFit: 'cover', transform: `scale(${zoom})`}} />
+          <Img src={url} pauseWhenLoading style={{width: '100%', height: '100%', objectFit: 'cover', transform: `scale(${zoom})`}} />
         </div>
       ) : (
         <div style={{position: 'absolute', top: 0, left: 0}}>
@@ -261,7 +285,7 @@ export const backdropSrc = (url: string) => {
 export const Backdrop: React.FC<{src: string}> = ({src: url}) => {
   const ready = backdropSrc(url);
   return (
-    <Img src={ready ?? url} style={{position: 'absolute', inset: -80, width: 'calc(100% + 160px)', height: 'calc(100% + 160px)',
+    <Img src={ready ?? url} pauseWhenLoading style={{position: 'absolute', inset: -80, width: 'calc(100% + 160px)', height: 'calc(100% + 160px)',
       objectFit: 'cover', filter: ready ? 'brightness(0.35)' : 'blur(50px) brightness(0.35)'}} />
   );
 };
