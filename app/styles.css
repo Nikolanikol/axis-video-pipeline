@@ -301,6 +301,8 @@ input:disabled { opacity: .5; }
 .track-info a, .link { color: var(--accent-text); }
 .link { background: none; border: none; padding: 0; font-size: 11px; cursor: pointer; text-decoration: underline; }
 .job-actions + .job-actions { margin-top: 6px; }
+.player-buffering { position: absolute; inset: 0; display: grid; place-items: center; background: #0006; pointer-events: none; }
+.player-buffering .rec { width: 56px; height: 56px; }
 .job-hint { margin-top: 6px; font-size: 12px; color: var(--muted); }
 /* Телефон доезжает до готового ролика scrollIntoView — с зазором сверху, не впритык к краю */
 .job { scroll-margin-top: 12px; }

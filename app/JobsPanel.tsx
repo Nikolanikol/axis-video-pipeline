@@ -4,7 +4,7 @@ import {api, ApiError, Job, JobQuery} from './api';
 import {useCost, useSession} from './auth';
 import {useConfig} from './config';
 import {useIsPhone} from './MobileTabs';
-import {canSaveToGallery, shareFiles, usePreparedFiles} from './saveFiles';
+import {canSaveToGallery, phoneKind, shareFiles, usePreparedFilesProgress} from './saveFiles';
 
 type Props = {
   query: JobQuery;
@@ -60,7 +60,7 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
   // качалось уже после нажатия, и на iPhone меню не открывалось
   const latestDone = jobs.find((j) => j.status === 'done');
   const galleryJob = jobs.find((j) => j.status === 'done' && j.id === galleryPick) ?? latestDone;
-  const video = usePreparedFiles(galleryJob?.id ?? null, galleryJob
+  const {files: video, progress: videoProgress} = usePreparedFilesProgress(galleryJob?.id ?? null, galleryJob
     ? [{url: `/api/renders/${galleryJob.id}/download`, name: `${galleryJob.title || 'ролик'}.mp4`, type: 'video/mp4'}] : []);
 
   // Телефон: ролик досчитался — плавно доезжаем до его карточки (кнопки «В галерею», «Смотреть»).
@@ -115,6 +115,17 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
     try { await api.deleteRender(id); setJobs((js) => js.filter((j) => j.id !== id)); } catch (e) { onError(e); }
   };
 
+  // Кнопка «Поделиться» с готовым файлом. Файл качается в память заранее — iPhone открывает
+  // меню только сразу после нажатия (saveFiles.ts); пока качается — процент на кнопке. У прежнего
+  // ролика первое нажатие выбирает его и начинает загрузку, второе открывает меню
+  const shareButton = (j: Job, label: string, kind = '') => (j.id === galleryJob?.id
+    ? (
+      <button className={`btn ${kind}`} disabled={!video} onClick={() => video && shareFiles(video).catch(onError)}>
+        {video ? label : `Загружаю на телефон…${videoProgress === null ? '' : ` ${videoProgress}%`}`}
+      </button>
+    )
+    : <button className={`btn ${kind}`} onClick={() => setGalleryPick(j.id)}>{label}</button>);
+
   return (
     <div className="render">
       {/* Пока задание в очереди или считается — кнопка закрыта: рендер обзора занимает четверть
@@ -150,25 +161,28 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
               ошибка или отменён — пересобрать/удалить */}
           <div className="job-actions">
             {active(j) && <button className="btn ghost" onClick={() => cancel(j.id)}>Отменить</button>}
-            {j.status === 'done' && (canSaveToGallery ? (
-              // Телефон: главное — в галерею. Ссылка на mp4 на iPhone кладёт ролик в «Файлы», откуда
-              // его не выложить в соцсети (владелец 13.10). «Поделиться» с файлом даёт «Сохранить
-              // видео» — прямо в «Фото», — а заодно Instagram и TikTok. Скачать файлом — запасной путь
-              <>
-                {j.id === galleryJob?.id
-                  ? (
-                    <button className="btn primary" disabled={!video} onClick={() => video && shareFiles(video).catch(onError)}>
-                      {video ? 'Сохранить в галерею' : 'Готовлю видео…'}
-                    </button>
-                  )
-                  : <button className="btn primary" onClick={() => setGalleryPick(j.id)}>В галерею</button>}
-                <a className="btn ghost" href={j.video} target="_blank" rel="noreferrer">Смотреть</a>
-                <a className="btn ghost" href={`/api/renders/${j.id}/download`}>Скачать файл</a>
-              </>
-            ) : (
+            {j.status === 'done' && (!canSaveToGallery ? (
               <>
                 <a className="btn primary" href={`/api/renders/${j.id}/download`}>Скачать mp4</a>
                 <a className="btn ghost" href={j.video} target="_blank" rel="noreferrer">Смотреть</a>
+              </>
+            ) : phoneKind === 'android' ? (
+              // Android: обычное скачивание кладёт ролик в «Загрузки», и галерея показывает его сама —
+              // это и есть «в галерею». «Поделиться» — рядом, для Instagram, TikTok, Telegram: пункта
+              // «Сохранить» в меню Android обычно нет, и главной кнопкой оно путало бы (владелец 13.10)
+              <>
+                <a className="btn primary" href={`/api/renders/${j.id}/download`}>Скачать в галерею</a>
+                {shareButton(j, 'Поделиться')}
+                <a className="btn ghost" href={j.video} target="_blank" rel="noreferrer">Смотреть</a>
+              </>
+            ) : (
+              // iPhone (и всё прочее с «Поделиться»): ссылка на mp4 кладёт ролик в «Файлы», откуда его
+              // не выложить в соцсети (владелец 13.10). «Поделиться» с файлом даёт «Сохранить видео» —
+              // прямо в «Фото», — а заодно Instagram и TikTok. Скачать файлом — запасной путь
+              <>
+                {shareButton(j, 'Сохранить в галерею', 'primary')}
+                <a className="btn ghost" href={j.video} target="_blank" rel="noreferrer">Смотреть</a>
+                <a className="btn ghost" href={`/api/renders/${j.id}/download`}>Скачать файл</a>
               </>
             ))}
             {(j.status === 'done' || j.status === 'error' || j.status === 'cancelled') && (
@@ -178,8 +192,10 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
               </>
             )}
           </div>
-          {canSaveToGallery && j.status === 'done' && j.id === galleryJob?.id && video && (
-            <div className="job-hint">В открывшемся меню — «Сохранить видео» или сразу Instagram, TikTok</div>
+          {canSaveToGallery && j.status === 'done' && j.id === galleryJob?.id && (
+            <div className="job-hint">{phoneKind === 'android'
+              ? 'Ролик сохранится в «Загрузки» — галерея покажет его в папке Download'
+              : 'В открывшемся меню — «Сохранить видео» или сразу Instagram, TikTok'}</div>
           )}
         </div>
       ))}

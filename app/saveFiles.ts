@@ -20,24 +20,69 @@ export const canSaveToGallery = (() => {
 })();
 
 /**
- * Скачать файлы в память заранее (только на телефоне — на компьютере архив). null — ещё
- * готовятся или не нужны. key — чтобы при смене карусели не отдать слайды прежней.
+ * Какой телефон: сохранение ролика в галерею устроено по-разному (владелец 13.10).
+ * iPhone: ссылка на mp4 кладёт ролик в «Файлы», в «Фото» его нет — путь только через
+ * «Поделиться» → «Сохранить видео». Android: обычное скачивание кладёт ролик в «Загрузки», и
+ * галерея (Google Фото, Samsung) сама показывает папку Download; а в «Поделиться» пункта
+ * «Сохранить» обычно нет — там приложения. iPad с iPadOS 13+ называет себя Mac — узнаём по касанию.
  */
-export const usePreparedFiles = (key: string | null, urls: {url: string; name: string; type: string}[]) => {
+export const phoneKind: 'ios' | 'android' | null = (() => {
+  if (typeof navigator === 'undefined') return null;
+  const ua = navigator.userAgent;
+  if (/Android/i.test(ua)) return 'android';
+  if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return 'ios';
+  return null;
+})();
+
+// Скачать файл в память, сообщая, сколько байт пришло: ролик весит 6–7 МБ, и без процента
+// кнопка «Готовлю видео…» пару секунд выглядела зависшей (владелец 13.10)
+const fetchFile = async ({url, name, type}: {url: string; name: string; type: string}, onBytes: (loaded: number, total: number) => void) => {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const total = Number(res.headers.get('content-length') || 0);
+  if (!res.body || !total) return new File([await res.blob()], name, {type});
+  const reader = res.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let loaded = 0;
+  for (;;) {
+    const {done, value} = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    loaded += value.length;
+    onBytes(loaded, total);
+  }
+  return new File(chunks as BlobPart[], name, {type});
+};
+
+/**
+ * Скачать файлы в память заранее (только на телефоне — на компьютере архив). files: null — ещё
+ * готовятся или не нужны; progress — 0…100 или null, если сервер не сказал размер.
+ * key — чтобы при смене карусели не отдать слайды прежней.
+ */
+export const usePreparedFilesProgress = (key: string | null, urls: {url: string; name: string; type: string}[]) => {
   const [files, setFiles] = useState<File[] | null>(null);
+  const [progress, setProgress] = useState<number | null>(null);
   const list = JSON.stringify(urls);
   useEffect(() => {
     setFiles(null);
+    setProgress(null);
     if (!canSaveToGallery || !key || !urls.length) return;
     let alive = true;
-    Promise.all(urls.map(async ({url, name, type}) => new File([await (await fetch(url)).blob()], name, {type})))
-      .then((f) => { if (alive) setFiles(f); })
-      .catch(() => { if (alive) setFiles(null); });
+    const bytes = urls.map(() => ({loaded: 0, total: 0}));
+    const report = () => {
+      const total = bytes.reduce((a, b) => a + b.total, 0);
+      // Пока не все файлы назвали размер — процент врал бы, показываем без него
+      if (alive && total && bytes.every((b) => b.total)) setProgress(Math.min(99, Math.floor(bytes.reduce((a, b) => a + b.loaded, 0) / total * 100)));
+    };
+    Promise.all(urls.map((u, i) => fetchFile(u, (loaded, total) => { bytes[i] = {loaded, total}; report(); })))
+      .then((f) => { if (alive) { setFiles(f); setProgress(100); } })
+      .catch(() => { if (alive) { setFiles(null); setProgress(null); } });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, list]);
-  return files;
+  return {files, progress};
 };
+export const usePreparedFiles = (key: string | null, urls: {url: string; name: string; type: string}[]) => usePreparedFilesProgress(key, urls).files;
 
 /** Открыть «Поделиться» с готовыми файлами. Отмена в окне — не ошибка */
 export const shareFiles = async (files: File[]) => {
