@@ -3,6 +3,7 @@ import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {api, ApiError, Job, JobQuery} from './api';
 import {useCost, useSession} from './auth';
 import {useConfig} from './config';
+import {useIsPhone} from './MobileTabs';
 import {canSaveToGallery, shareFiles, usePreparedFiles} from './saveFiles';
 
 type Props = {
@@ -35,10 +36,19 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
   // перезапустился посреди сборки (выкладка, падение) — ролик просто исчезал из списка, и
   // человек не понимал, куда он делся. Кредит за него вернёт сторож (server/billing.mjs)
   const activeIds = useRef<string[]>([]);
+  // Ролик, который только что досчитался на глазах у человека (готов или с ошибкой), —
+  // к его карточке телефон доезжает сам, см. ниже
+  const [finished, setFinished] = useState<string | null>(null);
+  // Какой ролик держим наготове: по умолчанию последний, а нажали «В галерею» у прежнего —
+  // его. Тогда первое нажатие только качает файл, второе открывает «Поделиться»
+  const [galleryPick, setGalleryPick] = useState<string | null>(null);
   const refresh = useCallback(() => api.jobs(JSON.parse(key)).then((list) => {
     const lost = activeIds.current.filter((id) => !list.some((j) => j.id === id));
+    const ended = list.find((j) => activeIds.current.includes(j.id) && (j.status === 'done' || j.status === 'error'));
     activeIds.current = list.filter(active).map((j) => j.id);
     if (lost.length) onError(new ApiError('Сборка прервалась: сервер перезапускался. Кредиты вернутся сами в течение 10–15 минут — запустите сборку ещё раз', 0));
+    // Новый ролик готов — «В галерею» снова держит наготове его, а не выбранный раньше
+    if (ended) { setFinished(ended.id); setGalleryPick(null); }
     setJobs(list);
   }).catch(onError), [key, onError]);
   useEffect(() => { activeIds.current = []; setJobs([]); refresh(); }, [refresh]);
@@ -49,8 +59,33 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
   // открывает «Поделиться» только сразу после нажатия (см. saveFiles.ts). Раньше видео
   // качалось уже после нажатия, и на iPhone меню не открывалось
   const latestDone = jobs.find((j) => j.status === 'done');
-  const video = usePreparedFiles(latestDone?.id ?? null, latestDone
-    ? [{url: `/api/renders/${latestDone.id}/download`, name: `${latestDone.title || 'ролик'}.mp4`, type: 'video/mp4'}] : []);
+  const galleryJob = jobs.find((j) => j.status === 'done' && j.id === galleryPick) ?? latestDone;
+  const video = usePreparedFiles(galleryJob?.id ?? null, galleryJob
+    ? [{url: `/api/renders/${galleryJob.id}/download`, name: `${galleryJob.title || 'ролик'}.mp4`, type: 'video/mp4'}] : []);
+
+  // Телефон: ролик досчитался — плавно доезжаем до его карточки (кнопки «В галерею», «Смотреть»).
+  // Карточка появлялась ниже края экрана, под закреплённой кнопкой сборки, и готовый ролик
+  // приходилось искать прокруткой (владелец 13.10). Только на телефоне: на компьютере список
+  // виден в своей колонке целиком. Человек ушёл в другой раздел — карточка скрыта, не дёргаем
+  const phone = useIsPhone();
+  const cards = useRef(new Map<string, HTMLDivElement>());
+  useEffect(() => {
+    if (!finished || !phone) return;
+    const card = cards.current.get(finished);
+    setFinished(null);
+    if (!card || !card.getClientRects().length) return;
+    const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Ждём раскадровку: пока она грузится, карточка низкая, и прокрутка упиралась в конец
+    // списка — а потом картинка вырастала и уводила кнопки под закреплённую «Собрать ролик».
+    // Дольше 3 с не ждём: медленная сеть не повод оставить человека без прокрутки
+    const img = card.querySelector('img');
+    const loaded = !img || img.complete ? Promise.resolve() : new Promise<void>((done) => {
+      img.addEventListener('load', () => done(), {once: true});
+      img.addEventListener('error', () => done(), {once: true});
+      setTimeout(done, 3000);
+    });
+    loaded.then(() => requestAnimationFrame(() => card.scrollIntoView({behavior: calm ? 'auto' : 'smooth', block: 'start'})));
+  }, [finished, phone, jobs]);
   // Рендер закончился — остаток в шапке мог измениться: при неудаче кредит вернулся
   useEffect(() => { if (!running) refreshAccess(); }, [running, refreshAccess]);
   useEffect(() => {
@@ -97,7 +132,8 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
       <div className={showAll ? 'jobs-list' : 'jobs-list collapsed'}>
       {!jobs.length && <div className="empty small">Пока пусто</div>}
       {jobs.map((j) => (
-        <div key={j.id} className={`job job-${j.status}`}>
+        <div key={j.id} className={`job job-${j.status}`}
+          ref={(el) => { if (el) cards.current.set(j.id, el); else cards.current.delete(j.id); }}>
           <div className="job-head">
             <b>{time(j.createdAt)} · {j.formatTitle ?? j.format ?? 'Авто с ценой'}</b>
             <span>{j.stage}{active(j) && j.status === 'running' ? ` · ${j.progress}%` : ''}</span>
@@ -114,17 +150,27 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
               ошибка или отменён — пересобрать/удалить */}
           <div className="job-actions">
             {active(j) && <button className="btn ghost" onClick={() => cancel(j.id)}>Отменить</button>}
-            {j.status === 'done' && (
+            {j.status === 'done' && (canSaveToGallery ? (
+              // Телефон: главное — в галерею. Ссылка на mp4 на iPhone кладёт ролик в «Файлы», откуда
+              // его не выложить в соцсети (владелец 13.10). «Поделиться» с файлом даёт «Сохранить
+              // видео» — прямо в «Фото», — а заодно Instagram и TikTok. Скачать файлом — запасной путь
+              <>
+                {j.id === galleryJob?.id
+                  ? (
+                    <button className="btn primary" disabled={!video} onClick={() => video && shareFiles(video).catch(onError)}>
+                      {video ? 'Сохранить в галерею' : 'Готовлю видео…'}
+                    </button>
+                  )
+                  : <button className="btn primary" onClick={() => setGalleryPick(j.id)}>В галерею</button>}
+                <a className="btn ghost" href={j.video} target="_blank" rel="noreferrer">Смотреть</a>
+                <a className="btn ghost" href={`/api/renders/${j.id}/download`}>Скачать файл</a>
+              </>
+            ) : (
               <>
                 <a className="btn primary" href={`/api/renders/${j.id}/download`}>Скачать mp4</a>
-                {canSaveToGallery && j.id === latestDone?.id && (
-                  <button className="btn" disabled={!video} onClick={() => video && shareFiles(video).catch(onError)}>
-                    {video ? 'В галерею' : 'Готовлю…'}
-                  </button>
-                )}
                 <a className="btn ghost" href={j.video} target="_blank" rel="noreferrer">Смотреть</a>
               </>
-            )}
+            ))}
             {(j.status === 'done' || j.status === 'error' || j.status === 'cancelled') && (
               <>
                 <button className="btn" onClick={() => retry(j.id)}>Пересобрать</button>
@@ -132,6 +178,9 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
               </>
             )}
           </div>
+          {canSaveToGallery && j.status === 'done' && j.id === galleryJob?.id && video && (
+            <div className="job-hint">В открывшемся меню — «Сохранить видео» или сразу Instagram, TikTok</div>
+          )}
         </div>
       ))}
       </div>
