@@ -13,6 +13,7 @@ import {BusyModal} from '../BusyModal';
 import {Copy, ExternalLink, Link2, Search, Trash2} from 'lucide-react';
 import {lotIsBlank} from '../../src/shared/lotFromCar';
 import {thumb} from '../thumb';
+import {SourcesStrip} from '../Sources';
 
 /** Где сейчас загрузка лота по ссылке: шаг 0 — поиск машины, 1 — лот, 2 — фото */
 export type ImportStage = {step: 0 | 1 | 2; photos?: number} | null;
@@ -58,6 +59,10 @@ export const QuickLink: React.FC<{
         <button className="btn primary link-go" disabled={busy}><Search size={17} aria-hidden />Найти</button>
       </form>
       {!busy && error && <div className="error" style={{margin: '8px 0 0'}}>{error}</div>}
+      {/* Откуда брать ссылки — логотипы площадок со ссылками на их сайты (владелец 13.10). На широком
+          экране их показывает шапка (.top-sources), здесь — только на узких: см. .quick-sources. Без подписи
+          «Площадки:» — на телефоне место дороже, а логотипы узнают и так (владелец 13.10) */}
+      <SourcesStrip compact title="" countries={false} className="quick-sources" />
     </div>
   );
 };

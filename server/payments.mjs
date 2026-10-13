@@ -382,7 +382,13 @@ const mismatch = (o, live) => {
   const orderKey = o.kassa_order ?? o.id;
   if (live.status !== 'paid') return `касса говорит «${live.providerStatus}»`;
   if (live.orderId !== orderKey) return `платёж ${live.paymentId} от другого заказа (${live.orderId})`;
-  if (Math.round(Number(live.priceAmount) * 100) !== Math.round(Number(o.amount) * 100)) return `сумма счёта у кассы ${live.priceAmount}, у нас ${o.amount}`;
+  const kassaCents = Math.round(Number(live.priceAmount) * 100);
+  const ourCents = Math.round(Number(o.amount) * 100);
+  // AnyPay: комиссию кассы платит покупатель (решение владельца 13.10 — тарифы и так самые дешёвые).
+  // Какую сумму касса тогда пишет в платёж — цену счёта или цену с комиссией сверху, — живым платежом
+  // ещё не проверено. Поэтому для AnyPay «не меньше счёта»: больше — это комиссия клиента, начисляем;
+  // меньше — недоплата, не начисляем. Для USDT — точное совпадение, как было
+  if (o.provider === 'anypay' ? !(kassaCents >= ourCents) : kassaCents !== ourCents) return `сумма счёта у кассы ${live.priceAmount}, у нас ${o.amount}`;
   if (live.priceCurrency !== o.currency) return `валюта счёта у кассы ${live.priceCurrency}, у нас ${o.currency}`;
   // Монета важна только для USDT: другая монета — другие деньги. У AnyPay сумма и валюта счёта уже сверены, и способ
   // (СБП или карта) на сумму, которую мы получаем, не влияет — его не сверяем, чтобы не держать оплату
@@ -440,8 +446,10 @@ const credit = async (o, paymentId, requestId) => {
     return {pack, lot};
   });
   if (!done) return false;
-  rlog.info('credit.ok', {paymentId, pack: done.pack.id, credits: done.pack.credits});
-  trace(o, '✅ <b>Кредиты начислены</b>', [`🎟 +${done.pack.credits} кр. до ${dayKst(done.lot.expires_at)}`, `🏦 платёж кассы <code>${esc(paymentId)}</code>`]);
+  rlog.info('credit.ok', {paymentId, pack: done.pack.id, credits: done.pack.credits, kassaAmount: live.priceAmount, profit: live.profit});
+  trace(o, '✅ <b>Кредиты начислены</b>', [`🎟 +${done.pack.credits} кр. до ${dayKst(done.lot.expires_at)}`, `🏦 платёж кассы <code>${esc(paymentId)}</code>`,
+    // Что касса записала в платёж: так с первого живого платежа видно, как она считает комиссию покупателя
+    `🧮 у кассы: ${esc(live.priceAmount)} ${esc(String(live.priceCurrency ?? '').toUpperCase())}${Number(live.priceAmount) > Number(o.amount) ? ' — больше счёта (комиссия клиента)' : ''}${live.profit != null ? ` · нам ${esc(live.profit)} ₽` : ''}`]);
   // Сообщение — после фиксации транзакции: откатившееся начисление не должно успеть «прийти»
   void whoPays(o)
     .then((who) => notifyPayments([`✅ <b>Оплата пришла</b>${tag(o)}`, LINE, who, LINE, what({...o, title: done.pack.title, kind: done.pack.kind}),

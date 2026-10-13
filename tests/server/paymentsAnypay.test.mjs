@@ -205,6 +205,18 @@ suite('оплата через AnyPay', () => {
     expect((await order(id)).error).toMatch(/сумма счёта у кассы/);
   });
 
+  it('комиссию платит покупатель: касса знает сумму больше счёта — начисляем; меньше — нет (выше)', async () => {
+    const {id} = await checkout('card_uah');
+    const body = await paidNotification(id);
+    // Счёт 1641,97 ₴, с комиссией 6,9% сверху касса могла записать 1755,27 ₴
+    kassa.get((await order(id)).payment_id).amount = '1755.27';
+    const before = (await lots()).length;
+    await notify({...body});
+    await settle();
+    expect(await lots()).toHaveLength(before + 1);
+    expect(journal.some((t) => t.startsWith('✅ Кредиты начислены') && t.includes(id) && t.includes('комиссия клиента'))).toBe(true);
+  });
+
   it('тестовое оповещение из кабинета AnyPay (test=1) — принято, но заказ не трогает', async () => {
     const {id} = await checkout('card_uzs');
     const body = await paidNotification(id, {test: '1'});

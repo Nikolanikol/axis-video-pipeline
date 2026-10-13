@@ -9,6 +9,7 @@ import React, {useEffect, useState} from 'react';
 import {Instagram, Mail, MessageCircle, Send} from 'lucide-react';
 import {api, PublicOffer} from './api';
 import {contactLinks} from './Legal';
+import {SourcesStrip} from './Sources';
 
 export type FooterLink = {label: string; href: string; onClick?: (e: React.MouseEvent) => void};
 
@@ -41,7 +42,7 @@ export const SiteFooter: React.FC<Props> = ({service, offer: given, className}) 
       <div className="land-foot-grid">
         <div className="land-foot-brand">
           <img src="/kok/wordmark.svg" alt="KOK" className="land-logo" />
-          <p className="muted">Контент одной кнопкой: рекламные ролики и карусели для автодилеров по объявлениям Encar.</p>
+          <p className="muted">Контент одной кнопкой: рекламные ролики и карусели для автодилеров по объявлениям Encar, che168 и Carsensor.</p>
           {links.length > 0 && (
             <div className="land-socials">
               {links.map((c) => (
@@ -54,6 +55,11 @@ export const SiteFooter: React.FC<Props> = ({service, offer: given, className}) 
           <b>Сервис</b>
           {service.map((s) => <a key={s.href} href={s.href} onClick={s.onClick}>{s.label}</a>)}
         </nav>
+        {/* Откуда KOK берёт объявления — логотипы-ссылки на площадки (13.10, app/Sources.tsx) */}
+        <div className="land-foot-col land-foot-sources">
+          <b>Площадки</b>
+          <SourcesStrip compact title="" />
+        </div>
         <nav className="land-foot-col" aria-label="Документы">
           <b>Документы</b>
           <a href="#/offer">Публичная оферта</a>

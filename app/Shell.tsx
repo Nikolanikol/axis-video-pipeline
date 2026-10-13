@@ -16,6 +16,7 @@ import {Toasts} from './Toast';
 import {reportError} from './errorReport';
 import {errorText} from './api';
 import {SiteFooter} from './SiteFooter';
+import {SourcesStrip} from './Sources';
 
 export const Shell: React.FC = () => {
   const [error, setError] = useState('');
@@ -87,6 +88,9 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
           {pipeline && <><span>›</span><a href={href(pipeline.id)}>{pipeline.title}</a></>}
           {pipeline && tool && <><span>›</span><b>{tool.title}</b></>}
         </nav>
+        {/* Площадки-источники — в свободном месте шапки, слева от вкладок пайплайнов (владелец 13.10).
+            Только на широком экране; уже — строка под полем ссылки (QuickLink), стили — .top-sources */}
+        <SourcesStrip compact title="" countries={false} className="top-sources" />
         <nav className="tabs">
           {navItems.map((i) => <a key={i.key} href={i.to} className={i.active ? 'tab active' : 'tab'}>{i.label}</a>)}
         </nav>

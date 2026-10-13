@@ -24,6 +24,7 @@ import {api, PublicOffer} from './api';
 import {AuthCard, AuthMode} from './auth';
 import {Preview} from './Preview';
 import {SiteFooter} from './SiteFooter';
+import {SourcesStrip} from './Sources';
 
 type Samples = {
   videos: {title: string; year: number; format: string; palette: string; video: string; poster: string}[];
@@ -72,8 +73,8 @@ export const Landing: React.FC<{signup: {credits: number; days: number}; notice:
 
       <section className="land-hero">
         <div className="land-hero-text">
-          <span className="land-eyebrow"><Sparkles size={15} aria-hidden /> Для автодилеров, продающих машины из Кореи</span>
-          <h1>Ролик и карусель по&nbsp;объявлению Encar — <span className="land-accent">одной кнопкой</span></h1>
+          <span className="land-eyebrow"><Sparkles size={15} aria-hidden /> Для автодилеров, продающих машины из Кореи, Китая и Японии</span>
+          <h1>Ролик и карусель по&nbsp;ссылке на&nbsp;объявление — <span className="land-accent">одной кнопкой</span></h1>
           <p className="land-lead">
             Вставляете ссылку — KOK сам подбирает фото, характеристики и цену и собирает рекламный ролик
             для Reels и TikTok и карусель для Instagram в вашем фирменном стиле. Минута вместо вечера в монтаже.
@@ -89,6 +90,8 @@ export const Landing: React.FC<{signup: {credits: number; days: number}; notice:
             <li><Check size={16} aria-hidden /> Без карты и без звонков менеджера</li>
             <li><Check size={16} aria-hidden /> Ролик — {credits(costs.ads ?? 3)}, карусель — {credits(costs.carousels ?? 1)}</li>
           </ul>
+          {/* Какие площадки поддерживаем — сразу на первом экране, логотипы ведут на сайты (владелец 13.10) */}
+          <SourcesStrip className="land-sources" />
         </div>
         <LiveDemo />
       </section>
@@ -96,7 +99,7 @@ export const Landing: React.FC<{signup: {credits: number; days: number}; notice:
       <section id="how" className="land-section">
         <h2 className="land-h2">Три шага — и пост готов</h2>
         <div className="land-steps">
-          <Step n={1} icon={<Link2 size={22} />} title="Вставьте ссылку" text="Любое объявление с Encar. Марку, пробег, цену и лучшие фото KOK возьмёт сам — переводить и выписывать ничего не нужно." />
+          <Step n={1} icon={<Link2 size={22} />} title="Вставьте ссылку" text="Любое объявление с Encar, che168 или Carsensor. Марку, пробег, цену и лучшие фото KOK возьмёт сам — переводить и выписывать ничего не нужно." />
           <Step n={2} icon={<Palette size={22} />} title="Выберите формат" text="Ролик с ценой в конце, галерея фото или цена в первую секунду. Логотип, цвета и шрифты — ваши, настраиваются один раз." />
           <Step n={3} icon={<Download size={22} />} title="Скачайте и публикуйте" text="Ролик 1080×1920 для Reels, TikTok и Shorts, карусель для Instagram. С телефона — сразу в галерею." />
         </div>
@@ -104,7 +107,7 @@ export const Landing: React.FC<{signup: {credits: number; days: number}; notice:
 
       <section id="samples" className="land-section">
         <h2 className="land-h2">Так это выглядит</h2>
-        <p className="land-sub">Всё ниже собрано KOK по настоящим объявлениям Encar — без ручного монтажа. Название, цвета и контакты здесь демо, у вас будут ваши.</p>
+        <p className="land-sub">Всё ниже собрано KOK по настоящим объявлениям с площадок — без ручного монтажа. Название, цвета и контакты здесь демо, у вас будут ваши.</p>
         {samples ? <>
           <h3 className="land-h3">Рекламные ролики</h3>
           <div className="land-videos">
@@ -146,7 +149,7 @@ export const Landing: React.FC<{signup: {credits: number; days: number}; notice:
         <div className="land-faq">
           <details><summary>Нужна ли карта, чтобы попробовать?</summary><p>Нет. Регистрация и пробные кредиты — без оплаты. Решите продолжить — выберете тариф в кабинете и оплатите онлайн, кредиты придут сами.</p></details>
           <details><summary>Можно вернуть деньги?</summary><p>Да, в течение 3 суток после оплаты, если кредиты из покупки ещё не тратились: напишите нам заявление на возврат в Telegram. Сбой при сборке ролика — кредит возвращается сам. Подробно — в <a href="#/offer">оферте</a>.</p></details>
-          <details><summary>Что будет, если объявление на Encar снимут?</summary><p>Ничего: фото копируются к нам при создании, готовый ролик и карусель от объявления не зависят.</p></details>
+          <details><summary>Что будет, если объявление на площадке снимут?</summary><p>Ничего: фото копируются к нам при создании, готовый ролик и карусель от объявления не зависят.</p></details>
           <details><summary>Можно поставить свой логотип и цвета?</summary><p>Да. В настройках бренда — логотип, палитра, шрифты и контакты. Один раз — и они на всех роликах и каруселях.</p></details>
           <details><summary>На каком языке тексты?</summary><p>На языке вашего профиля: характеристики и подписи переводятся сами. Карусели — на русском или английском.</p></details>
         </div>
