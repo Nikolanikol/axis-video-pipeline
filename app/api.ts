@@ -40,6 +40,10 @@ export type ReviewEntry = Review & {id: string};
 export type CarouselEntry = {id: string; car: CarouselCar; slides: string[]; updatedAt: string; format?: string; seed?: number;
   // Своя цена клиента на слайде цены (в валюте профиля)
   priceOverride?: number;
+  // Тексты по слайдам (для «Редактировать текст») и свои правки клиента: слайд → поле → текст.
+  // У каруселей, собранных до 19.10, текстов нет — править можно после «Пересобрать»
+  texts?: {slide: string; fields: Record<string, string>}[];
+  textOverrides?: Record<string, Record<string, string>>;
   // Только у каруселей по лотам аукционов: откуда собрана (для «Пересобрать» и кнопки «Открыть лот»)
   lot?: {house: string; id: string; url: string}};
 export type CarouselFormat = {id: string; title: string; note: string; width: number; height: number; slides: string[]};
@@ -289,6 +293,8 @@ export const api = {
   carousels: () => request<CarouselEntry[]>('GET', '/api/carousels'),
   // Пересобрать со своей ценой — бесплатно: машина, формат и вариант прежние; null — вернуть расчёт
   repriceCarousel: (id: string, price: number | null) => request<CarouselEntry>('POST', `/api/carousels/${id}/price`, {price}),
+  editCarouselTexts: (id: string, slide: string, fields: Record<string, string>) =>
+    request<CarouselEntry>('POST', `/api/carousels/${id}/texts`, {slide, fields}),
   deleteCarousel: (id: string) => request<{id: string; deleted: boolean}>('DELETE', `/api/carousels/${id}`),
   renderReview: (id: string) => request<Job>('POST', `/api/reviews/${id}/render`, {}),
   reprocessVideo: (id: string) => request<ReviewEntry>('POST', `/api/reviews/${id}/reprocess`),

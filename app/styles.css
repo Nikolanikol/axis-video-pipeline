@@ -780,6 +780,12 @@ a.tab { text-decoration: none; }
 .slide-arrow.right { right: 8px; }
 .slide-bar { display: flex; gap: 14px; align-items: baseline; font-size: 13px; }
 .slide-thumbs { display: flex; gap: 6px; max-width: 100%; overflow-x: auto; padding-bottom: 4px; }
+/* Правка текста под слайдом: ширина — как у слайда, поля во всю ширину */
+.slide-texts { width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 6px;
+  padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.slide-texts .field { margin-bottom: 4px; }
+.slide-texts textarea { width: 100%; }
+.slide-texts .btn-row { margin: 4px 0 0; }
 .slide-thumb { flex: none; height: 64px; padding: 0; border-radius: 5px; overflow: hidden; cursor: pointer;
   border: 2px solid transparent; background: var(--panel-2); opacity: .6; }
 .slide-thumb.on { border-color: var(--accent-line); opacity: 1; }

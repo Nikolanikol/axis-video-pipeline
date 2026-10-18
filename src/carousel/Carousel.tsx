@@ -16,7 +16,8 @@ import {BODY, CopperText, HEAD, Logo, ThemeProvider, radius, useAsset, useTheme}
 import {Bullets, NumberCard, PAD, PhotoBand, Row, SAFE, Slide, Title, TOTAL} from './Slides';
 import {CarouselText, carouselLang, carouselText} from './i18n';
 import {Deck} from './deck/Deck';
-import {carouselFormat, carouselSlides} from './formats';
+import {carouselFormat} from './formats';
+import {carouselTexts} from './texts';
 import {isDesign} from '../shared/design.js';
 import {DesignCarousel} from '../design/DesignCarousel';
 
@@ -32,9 +33,10 @@ const fullName = (car: CarouselProps['car']) =>
 // index и total на каждый слайд задаёт Carousel ниже: число слайдов не фиксировано
 // (на проде нет истории), поэтому и номер «NN / total» приходит сверху, а не зашит в слайде
 // tx — язык слайдов: подписи, перевод данных и числа (см. ./i18n)
-type SlideProps = CarouselProps & {brandName: string; index: number; total: number; tx: CarouselText};
+// t — тексты слайда из ./texts.ts (вариант фразы или своя правка клиента)
+type SlideProps = CarouselProps & {brandName: string; index: number; total: number; tx: CarouselText; t: Record<string, string>};
 
-const Cover: React.FC<SlideProps> = ({car, brandName, index, total, tx}) => {
+const Cover: React.FC<SlideProps> = ({car, brandName, index, total, tx, t}) => {
   const C = useTheme();
   const sub = [car.year, tx.value(car.fuel), tx.value(car.transmission)].filter(Boolean).join(' · ');
   return (
@@ -64,6 +66,13 @@ const Cover: React.FC<SlideProps> = ({car, brandName, index, total, tx}) => {
           )}
           <div style={{fontFamily: BODY, fontWeight: 500, fontSize: 38, color: C.grey, marginTop: 22,
             letterSpacing: 2}}>{sub}</div>
+          {/* Надпись-довод — вариант фразы, часто от данных машины («Малый пробег»). Под строкой
+              «год · топливо», а не над названием: там середина кадра светлая (решётка, капот),
+              и медь на ней не читалась — проверено на Rexton 19.10 */}
+          {t.tagline && (
+            <CopperText style={{fontFamily: BODY, fontWeight: 700, fontSize: 32, letterSpacing: 9,
+              textTransform: 'uppercase', display: 'block', marginTop: 26, whiteSpace: 'pre-line'}}>{t.tagline}</CopperText>
+          )}
           <div style={{display: 'flex', gap: 20, marginTop: 44}}>
             {[tx.km(car.mileageKm), car.history ? tx.s.ownerChanges(car.history.ownerChanges) : null]
               .filter(Boolean).map((t) => (
@@ -72,14 +81,14 @@ const Cover: React.FC<SlideProps> = ({car, brandName, index, total, tx}) => {
               ))}
           </div>
           <div style={{fontFamily: BODY, fontWeight: 600, fontSize: 30, letterSpacing: 6, color: C.copperLight,
-            textTransform: 'uppercase', marginTop: 54}}>{tx.s.swipe}</div>
+            textTransform: 'uppercase', marginTop: 54, whiteSpace: 'pre-line'}}>{t.swipe}</div>
         </div>
       </AbsoluteFill>
     </AbsoluteFill>
   );
 };
 
-const History: React.FC<SlideProps> = ({car, brandName, index, total, tx}) => {
+const History: React.FC<SlideProps> = ({car, brandName, index, total, tx, t}) => {
   const {s} = tx;
   const C = useTheme();
   const h = car.history;
@@ -89,9 +98,9 @@ const History: React.FC<SlideProps> = ({car, brandName, index, total, tx}) => {
       <Slide index={index} total={total} brandName={brandName}>
         <div style={{marginTop: 52}}>
           <CopperText style={{fontFamily: BODY, fontWeight: 700, fontSize: 32, letterSpacing: 9,
-            textTransform: 'uppercase'}}>{s.history}</CopperText>
-          <div style={{fontFamily: HEAD, fontWeight: 600, fontSize: 72, marginTop: 24, color: C.white}}>
-            {s.reportOnRequest}
+            textTransform: 'uppercase'}}>{t.section}</CopperText>
+          <div style={{fontFamily: HEAD, fontWeight: 600, fontSize: 72, marginTop: 24, color: C.white, whiteSpace: 'pre-line'}}>
+            {t.title}
           </div>
         </div>
       </Slide>
@@ -101,7 +110,7 @@ const History: React.FC<SlideProps> = ({car, brandName, index, total, tx}) => {
   if (!h.accidentsTotal) {
     return (
       <Slide index={index} total={total} brandName={brandName}>
-        <Title kicker={s.history}>{s.noAccidents}</Title>
+        <Title kicker={t.section}>{t.title}</Title>
         <div style={{display: 'flex', gap: 22, marginTop: 64}}>
           <NumberCard value="0" label={s.insuranceClaims} />
           <NumberCard value={String(h.ownerChanges)} label={s.ownerChangesLabel} />
@@ -111,8 +120,8 @@ const History: React.FC<SlideProps> = ({car, brandName, index, total, tx}) => {
           <NumberCard value={String(h.flood)} label={s.flood} />
         </div>
         <div style={{marginTop: 'auto', fontFamily: BODY, fontWeight: 500, fontSize: 30, lineHeight: 1.5,
-          color: C.grey, borderTop: `1px solid ${C.line}`, paddingTop: 32}}>
-          {s.cleanNote}
+          color: C.grey, borderTop: `1px solid ${C.line}`, paddingTop: 32, whiteSpace: 'pre-line'}}>
+          {t.note}
         </div>
       </Slide>
     );
@@ -124,7 +133,7 @@ const History: React.FC<SlideProps> = ({car, brandName, index, total, tx}) => {
   const rest = h.claims.length - shown.length;
   return (
     <Slide index={index} total={total} brandName={brandName}>
-      <Title kicker={s.history}>{s.nothingHidden}</Title>
+      <Title kicker={t.section}>{t.title}</Title>
       <div style={{display: 'flex', gap: 22, marginTop: 44}}>
         <NumberCard value={String(h.accidentsTotal)} label={s.insuranceClaims} alarm />
         <NumberCard value={String(h.ownerChanges)} label={s.ownerChangesLabel} />
@@ -190,10 +199,10 @@ const BandSlide: React.FC<{
   );
 };
 
-const Interior: React.FC<SlideProps> = ({car, brandName, index, total, tx}) => {
+const Interior: React.FC<SlideProps> = ({car, brandName, index, total, tx, t}) => {
   const C = useTheme();
   return (
-    <BandSlide index={index} total={total} brandName={brandName} kicker={tx.s.interior} photo={car.photos.interiorShot}
+    <BandSlide index={index} total={total} brandName={brandName} kicker={t.section} photo={car.photos.interiorShot}
       label="фото салона не пришло">
       {car.options.comfort.length > 0
         ? <Bullets items={car.options.comfort.slice(0, 5).map(tx.option)} size={44} />
@@ -208,14 +217,14 @@ const Interior: React.FC<SlideProps> = ({car, brandName, index, total, tx}) => {
   );
 };
 
-const Technology: React.FC<SlideProps> = ({car, brandName, index, total, tx}) => (
-  <BandSlide index={index} total={total} brandName={brandName} kicker={tx.s.technology} photo={car.photos.dashboard}
+const Technology: React.FC<SlideProps> = ({car, brandName, index, total, tx, t}) => (
+  <BandSlide index={index} total={total} brandName={brandName} kicker={t.section} photo={car.photos.dashboard}
     label="фото приборки не пришло" focus="50% 50%">
     <Bullets items={car.options.safety.slice(0, 5).map(tx.option)} size={44} />
   </BandSlide>
 );
 
-const Specs: React.FC<SlideProps> = ({car, brandName, index, total, tx}) => {
+const Specs: React.FC<SlideProps> = ({car, brandName, index, total, tx, t}) => {
   const {s} = tx;
   const rows: [string, string][] = [
     [s.year, dash(car.year)],
@@ -226,7 +235,7 @@ const Specs: React.FC<SlideProps> = ({car, brandName, index, total, tx}) => {
     [s.seats, dash(car.seats)],
   ];
   return (
-    <BandSlide index={index} total={total} brandName={brandName} kicker={s.specs} photo={car.photos.rear}
+    <BandSlide index={index} total={total} brandName={brandName} kicker={t.section} photo={car.photos.rear}
       label="фото сзади не пришло" height={1000} trimTop={0.16}>
       <div style={{marginTop: 30}}>
         {rows.map(([k, v], i) => <Row key={k} k={k} v={v} first={i === 0} />)}
@@ -235,7 +244,7 @@ const Specs: React.FC<SlideProps> = ({car, brandName, index, total, tx}) => {
   );
 };
 
-const Price: React.FC<SlideProps> = ({car, market, priceOverride, brandName, index, total, tx}) => {
+const Price: React.FC<SlideProps> = ({car, market, priceOverride, brandName, index, total, tx, t}) => {
   const C = useTheme();
   const label = tx.money(carouselPrice(car, market, priceOverride), market.currency);
   // Кегль по длине: «3 828 197 ₽» вдвое длиннее прежнего «$10 349» и в 168 не влез бы в рамку
@@ -245,14 +254,14 @@ const Price: React.FC<SlideProps> = ({car, market, priceOverride, brandName, ind
     <Slide index={index} total={total} brandName={brandName}>
       <div style={{marginTop: 52}}>
         <CopperText style={{fontFamily: BODY, fontWeight: 700, fontSize: 32, letterSpacing: 9,
-          textTransform: 'uppercase'}}>{tx.s.price}</CopperText>
+          textTransform: 'uppercase'}}>{t.section}</CopperText>
       </div>
       <div style={{
         marginTop: 64, border: `3px solid ${C.copper}`, borderRadius: radius(C, 22), padding: '72px 56px',
         textAlign: 'center',
       }}>
         <div style={{fontFamily: BODY, fontWeight: 600, fontSize: 30, letterSpacing: 6,
-          textTransform: 'uppercase', color: C.grey}}>{tx.s.priceInKorea}</div>
+          textTransform: 'uppercase', color: C.grey}}>{t.label}</div>
         <div style={{fontFamily: HEAD, fontWeight: 700, fontSize: size, lineHeight: 1.05, color: C.white,
           marginTop: 18, whiteSpace: 'nowrap'}}>{label}</div>
       </div>
@@ -261,7 +270,7 @@ const Price: React.FC<SlideProps> = ({car, market, priceOverride, brandName, ind
   );
 };
 
-const Cta: React.FC<SlideProps> = ({car, market, brandName, index, total, tx}) => {
+const Cta: React.FC<SlideProps> = ({car, market, brandName, index, total, t}) => {
   const C = useTheme();
   return (
     <Slide index={index} total={total} brandName={brandName}>
@@ -269,10 +278,10 @@ const Cta: React.FC<SlideProps> = ({car, market, brandName, index, total, tx}) =
         justifyContent: 'center', padding: 96}}>
         <Logo asset="logoStacked" height={240} />
         <div style={{fontFamily: HEAD, fontWeight: 600, fontSize: 72, color: C.white, marginTop: 64,
-          textAlign: 'center', lineHeight: 1.2}}>{tx.s.ctaTitle}</div>
+          textAlign: 'center', lineHeight: 1.2, whiteSpace: 'pre-line'}}>{t.title}</div>
         <div style={{fontFamily: BODY, fontWeight: 500, fontSize: 36, color: C.grey, marginTop: 24,
-          textAlign: 'center', lineHeight: 1.5}}>
-          {tx.s.ctaText}
+          textAlign: 'center', lineHeight: 1.5, whiteSpace: 'pre-line'}}>
+          {t.text}
         </div>
         <div style={{marginTop: 56, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20}}>
           {market.whatsapp && (
@@ -302,27 +311,28 @@ export const Carousel: React.FC<CarouselProps> = (props) => {
   const withHistory = props.includeHistory !== false;
   // Язык слайдов — из профиля клиента; не английский и не русский → английский
   const tx = carouselText(carouselLang(props.market?.language), props.car?.origin);
-  if (isDesign(theme.design)) return <DesignCarousel {...props} />;
+  // Тексты и список слайдов — из одного места (./texts.ts): то же самое сервер отдаёт в окно правки.
+  // У пресетов оформления (src/design) вёрстка своя, а слова — те же
+  const texts = carouselTexts({...props, includeHistory: withHistory});
+  if (isDesign(theme.design)) return <DesignCarousel {...props} texts={texts} />;
   // Новые форматы («Витрина», «Разворот», «Полная») собираются из библиотеки слайдов
-  // (./deck); «Классика» — прежняя вёрстка ниже, как была
+  // (./deck); «Классика» — прежняя вёрстка ниже
   if (carouselFormat(props.format).id !== 'classic') {
     return (
       <ThemeProvider value={theme}>
-        <Deck {...props} frame={frame} tx={tx} brandName={brandName} seed={props.seed ?? 1}
-          slides={carouselSlides(props.format, withHistory, props.skip)} />
+        <Deck {...props} frame={frame} tx={tx} texts={texts} />
       </ThemeProvider>
     );
   }
   const byName: Record<string, React.FC<SlideProps>> = {
     cover: Cover, history: History, interior: Interior, technology: Technology, specs: Specs, price: Price, cta: Cta,
   };
-  const slides = carouselSlides('classic', withHistory, props.skip).map((name) => byName[name]);
-  const total = slides.length;
+  const total = texts.slides.length;
   const i = Math.min(total - 1, Math.max(0, frame));
-  const Current = slides[i];
+  const Current = byName[texts.slides[i].slide];
   return (
     <ThemeProvider value={theme}>
-      <Current {...props} brandName={brandName} index={i + 1} total={total} tx={tx} />
+      <Current {...props} brandName={brandName} index={i + 1} total={total} tx={tx} t={texts.slides[i].fields} />
     </ThemeProvider>
   );
 };

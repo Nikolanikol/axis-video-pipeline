@@ -14,6 +14,7 @@ import {bundle} from '@remotion/bundler';
 import {openBrowser, renderStill, selectComposition} from '@remotion/renderer';
 import {LOT_SKIP_SLIDES, carFromLot, lotPageUrl, missingForCarousel, parseCarouselSource} from '../src/shared/kmotorsLot.js';
 import {brandForRender} from './brand.mjs';
+import {serverLog} from './log.mjs';
 import {fetchLot} from './kmotorsLot.mjs';
 import {fetchEncarCar} from './encar.mjs';
 import {fetchChe168Car} from './che168.mjs';
@@ -147,6 +148,41 @@ const getServeUrl = async () => {
   return bundled.serveUrl;
 };
 
+// ——— Память дилера: какие фразы он уже получал ———
+// Владелец 19.10: «у каруселей все тексты одинаковые». Варианты фраз выбирает вёрстка
+// (src/carousel/i18n/copy.ts, choose): сначала те, которых у компании ещё не было, потом самые
+// давние. Сама память — здесь, файлом в папке каруселей компании: ключ фразы → варианты, последний
+// в конце. Десять на ключ — больше самого длинного списка вариантов (восемь), иначе по кругу
+// вернулась бы фраза раньше, чем прошли все.
+const log = serverLog('carousel');
+const RECENT_KEEP = 10;
+const recentFile = () => path.join(carouselsDir(), '.recent.json');
+const readRecent = async () => {
+  const file = recentFile();
+  return (await readJson(file).catch(skipUnreadable('память фраз карусели', file)))?.recent ?? {};
+};
+// Записи памяти по очереди: две сборки разом прочитали бы один файл, и одна затёрла бы другую
+let recentChain = Promise.resolve();
+const rememberPicks = (picked) => {
+  const task = recentChain.then(async () => {
+    const recent = await readRecent();
+    for (const [key, id] of Object.entries(picked ?? {})) {
+      recent[key] = [...(recent[key] ?? []).filter((x) => x !== id), id].slice(-RECENT_KEEP);
+    }
+    await writeJson(recentFile(), {recent});
+  });
+  recentChain = task.catch(() => {});
+  return task;
+};
+// Свой текст клиента на слайде: как TEXT_MAX в src/carousel/texts.ts — длиннее не влезает в вёрстку
+const TEXT_MAX = 300;
+// Снимок памяти (recent) нужен только для пересборки — интерфейсу его не отдаём
+const publicMeta = (meta) => {
+  if (!meta) return meta;
+  const {recent: _recent, ...rest} = meta;
+  return rest;
+};
+
 // Одна карусель на машину за раз: рендер кадров занимает секунды, но повторное
 // нажатие запускало бы браузер второй раз поверх первого
 // Ключ — компания и номер: одну и ту же машину две компании собирают независимо
@@ -156,10 +192,12 @@ const runKey = (id) => `${currentWorkspace()}:${id}`;
 /**
  * Собрать карусель по ссылке или номеру.
  * @param {string} link — ссылка Encar / che168 / Carsensor, голый номер Encar или наш id («ch-60154824», «cs-au…», «km-…»)
- * @param {{format?: string, seed?: number, priceOverride?: number | null}} [opts] — формат из
+ * @param {{format?: string, seed?: number, priceOverride?: number | null, textOverrides?: object}} [opts] — формат из
  *   реестра и зерно варианта: то же зерно — те же компоновка и фразы; нет зерна — случайное
  *   («Другой вариант»). priceOverride — своя цена клиента на слайде цены; не передана —
- *   остаётся прежняя из carousel.json: «Другой вариант» не должен сбрасывать цену клиента
+ *   остаётся прежняя из carousel.json: «Другой вариант» не должен сбрасывать цену клиента.
+ *   textOverrides — свои тексты клиента (слайд → поле → текст); не переданы — остаются прежние,
+ *   пока это тот же вариант: у нового варианта другие фразы, и правки к прежним к нему не относятся
  * @returns {Promise<{id: string, car: object, slides: string[], updatedAt: string, format: string, seed: number}>}
  */
 export const buildCarousel = async (link, opts = {}) => {
@@ -184,6 +222,12 @@ export const buildCarousel = async (link, opts = {}) => {
     const prevFile = path.join(carouselsDir(), id, 'carousel.json');
     const prev = await readJson(prevFile).catch(skipUnreadable('прежняя карусель', prevFile));
     const priceOverride = opts.priceOverride !== undefined ? opts.priceOverride : prev?.priceOverride ?? null;
+    // Тот же вариант («Пересобрать», своя цена, правка текста) — те же фразы: память дилера
+    // берём ту, с которой карусель собрали тогда, а не нынешнюю — в нынешней уже лежат фразы
+    // этой самой карусели, и она обошла бы их. Новый вариант — по нынешней памяти
+    const sameVariant = Boolean(prev && Number.isInteger(opts.seed) && prev.seed === seed && (prev.format ?? 'classic') === format);
+    const recent = sameVariant ? prev.recent : await readRecent();
+    const textOverrides = opts.textOverrides !== undefined ? opts.textOverrides : sameVariant ? prev.textOverrides : undefined;
     // Контакты и компанию берём из профиля клиента: бренд и подпись должны быть его. Профиль —
     // до машины: по его языку ядро che168 отдаёт названия опций
     const [profileMarket, brand] = await Promise.all([renderMarket(), getBrand().then(brandForRender)]);
@@ -216,7 +260,8 @@ export const buildCarousel = async (link, opts = {}) => {
     // У лота нет цены, истории и опций: эти слайды не рисуем, а не заполняем прочерками.
     // У машины из Китая нет истории: лист осмотра в рекламу не идёт (решение владельца 11.10)
     const inputProps = {car, market, theme: {...theme, assets}, includeHistory: INCLUDE_HISTORY, format, seed,
-      skip: lot ? LOT_SKIP_SLIDES : china ? CHE168_SKIP_SLIDES : japan ? CARSENSOR_SKIP_SLIDES : [], priceOverride};
+      skip: lot ? LOT_SKIP_SLIDES : china ? CHE168_SKIP_SLIDES : japan ? CARSENSOR_SKIP_SLIDES : [], priceOverride,
+      recent, textOverrides};
     // Старые кадры убираем перед сборкой: та же машина, пересобранная на проде, даёт шесть
     // слайдов вместо прежних семи, и осиротевший slide-7.png остался бы на диске — со старой
     // историей. Ответ ссылается только на новые шесть, но файл-призрак в томе ни к чему.
@@ -226,9 +271,12 @@ export const buildCarousel = async (link, opts = {}) => {
     const serveUrl = await getServeUrl();
     const browser = await openBrowser('chrome', {browserExecutable: process.env.CHROME_PATH || null});
     let count = 0;
+    let texts = null;
     try {
       const composition = await selectComposition({serveUrl, id: 'carousel', inputProps, puppeteerInstance: browser});
       count = composition.durationInFrames;
+      // Тексты по слайдам кладёт calculateMetadata (src/Root.tsx) — по ним окно правки под слайдом
+      texts = composition.props?.resolvedTexts ?? null;
       for (let frame = 0; frame < count; frame++) {
         await renderStill({
           composition, serveUrl, frame, inputProps, puppeteerInstance: browser,
@@ -246,11 +294,20 @@ export const buildCarousel = async (link, opts = {}) => {
       updatedAt: new Date().toISOString(),
       format, seed,
       ...(priceOverride ? {priceOverride} : {}),
+      // Тексты слайдов — для окна правки; свои правки клиента; снимок памяти — для пересборки тем же вариантом
+      ...(texts ? {texts: texts.slides} : {}),
+      ...(textOverrides && Object.keys(textOverrides).length ? {textOverrides} : {}),
+      ...(recent ? {recent} : {}),
       // Откуда лот: «Пересобрать» идёт по нему, кнопка «Открыть лот» — по адресу
       ...(lot ? {lot: {...lot, url: lotPageUrl(lot.house, lot.id)}} : {}),
     };
     await writeJson(path.join(dir, 'carousel.json'), meta);
-    return meta;
+    // Новый вариант — в память дилера: следующая карусель обойдёт эти фразы. Сбой памяти не
+    // должен ронять готовую карусель — за неё уже заплачено; худшее — повтор фразы
+    if (!sameVariant && texts?.picked) {
+      await rememberPicks(texts.picked).catch((e) => log.warn('recent.save', {error: e.message}));
+    }
+    return publicMeta(meta);
   } finally {
     running.delete(key);
   }
@@ -283,6 +340,32 @@ export const repriceCarousel = async (id, price) => {
   return buildCarousel(id, {format: saved.format, seed: saved.seed, priceOverride: v ? Math.round(v) : null});
 };
 
+/**
+ * Свой текст на слайде — бесплатно, как своя цена: машина, формат и вариант те же, меняются только
+ * поля этого слайда. fields — {поле: текст}; пустой текст — вернуть фразу варианта.
+ * Поля — только те, что у слайда есть (texts в carousel.json): что угодно в файл не пишем
+ */
+export const editCarouselTexts = async (id, slide, fields) => {
+  const file = path.join(carouselsDir(), checkId(id), 'carousel.json');
+  const saved = await readJson(file).catch(skipUnreadable('карусель', file));
+  if (!saved) throw new HttpError(404, 'Карусель не найдена — соберите её по ссылке');
+  if (!Array.isArray(saved.texts)) throw new HttpError(409, 'Эту карусель собрали до правки текста — нажмите «Пересобрать», и текст можно будет менять');
+  const own = saved.texts.find((s) => s.slide === slide);
+  if (!own) throw new HttpError(400, 'В этой карусели нет такого слайда');
+  if (!fields || typeof fields !== 'object' || Array.isArray(fields)) throw new HttpError(400, 'Нет текстов для слайда');
+  const next = {...(saved.textOverrides?.[slide] ?? {})};
+  for (const [key, value] of Object.entries(fields)) {
+    if (!(key in own.fields)) throw new HttpError(400, `У этого слайда нет поля «${key}»`);
+    if (typeof value !== 'string') throw new HttpError(400, 'Текст — строкой');
+    const v = value.replace(/\r\n/g, '\n').trim();
+    if (v.length > TEXT_MAX) throw new HttpError(400, `Слишком длинный текст: до ${TEXT_MAX} знаков, иначе он не поместится на слайд`);
+    if (v) next[key] = v; else delete next[key];
+  }
+  const textOverrides = {...(saved.textOverrides ?? {})};
+  if (Object.keys(next).length) textOverrides[slide] = next; else delete textOverrides[slide];
+  return buildCarousel(id, {format: saved.format, seed: saved.seed, textOverrides});
+};
+
 export const deleteCarousel = async (id) => {
   checkId(id);
   if (running.has(runKey(id))) throw new HttpError(409, 'Эта карусель сейчас собирается — дождись');
@@ -298,5 +381,5 @@ export const listCarousels = async () => {
     const file = path.join(carouselsDir(), d.name, 'carousel.json');
     return readJson(file).catch(skipUnreadable('карусель', file));
   }));
-  return all.filter(Boolean).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+  return all.filter(Boolean).map(publicMeta).sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
 };

@@ -71,7 +71,8 @@ export const Lead: React.FC<{children: React.ReactNode; style?: React.CSSPropert
   const tall = useTall();
   return (
     <div style={{fontFamily: BODY, fontWeight: 500, fontSize: tall ? 32 : 29, lineHeight: 1.45, color: C.white,
-      opacity: 0.86, marginTop: 22, maxWidth: 820, ...style}}>{children}</div>
+      // pre-line: клиент может разбить свой текст на строки (правка текста под слайдом)
+      opacity: 0.86, marginTop: 22, maxWidth: 820, whiteSpace: 'pre-line', ...style}}>{children}</div>
   );
 };
 

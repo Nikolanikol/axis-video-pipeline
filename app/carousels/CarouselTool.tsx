@@ -21,6 +21,7 @@ import {api, CarouselEntry, CarouselFormat, errorText} from '../api';
 import {useConfig} from '../config';
 import {useCost, useSession} from '../auth';
 import {carouselLang} from '../../src/carousel/i18n';
+import {TEXT_FIELDS, TEXT_MAX, accentField} from '../../src/carousel/texts';
 import {BusyModal} from '../BusyModal';
 import {carouselPrice} from '../../src/carousel/price';
 import {currencySign} from '../../src/shared/currencies';
@@ -310,13 +311,60 @@ const CarouselsPanel: React.FC<{
 };
 
 /**
+ * Свой текст на слайде (владелец 19.10): под слайдом — «Редактировать текст», поля этого слайда
+ * с текущими словами, «Сохранить» пересобирает карусель бесплатно — как своя цена. Пустое поле —
+ * вернуть фразу варианта. Править можно слова, а не данные: опции, цифры и цену здесь не меняют
+ */
+const SlideTextEditor: React.FC<{entry: CarouselEntry; at: number; busy: boolean;
+  onSave: (slide: string, fields: Record<string, string>) => Promise<void>}> = ({entry, at, busy, onSave}) => {
+  const own = entry.texts?.[at];
+  const [draft, setDraft] = useState<Record<string, string>>({});
+  useEffect(() => setDraft(own ? {...own.fields} : {}), [own]);
+  if (!entry.texts) {
+    return <div className="slide-texts"><span className="hint">Эту карусель собрали до правки текста — нажмите «Пересобрать», и текст можно будет менять.</span></div>;
+  }
+  if (!own) return null;
+  const fields = TEXT_FIELDS.filter((f) => f.key in own.fields);
+  if (!fields.length) return <div className="slide-texts"><span className="hint">На этом слайде только данные машины — текста для правки нет.</span></div>;
+  const edited = entry.textOverrides?.[own.slide] ?? {};
+  const changed = fields.filter((f) => (draft[f.key] ?? '') !== own.fields[f.key]);
+  const save = (out: Record<string, string>) => onSave(own.slide, out);
+  return (
+    <div className="slide-texts">
+      {fields.map((f) => (
+        <label key={f.key} className="field">
+          <span className="label">{f.label}{edited[f.key] ? ' · свой текст' : ''}</span>
+          <textarea rows={Math.min(4, Math.max(1, (draft[f.key] ?? '').split('\n').length))} maxLength={TEXT_MAX}
+            value={draft[f.key] ?? ''} onChange={(e) => setDraft((d) => ({...d, [f.key]: e.target.value}))} />
+          {accentField(entry.format, f.key) && <span className="hint">Слово в {'{фигурных скобках}'} — цветом акцента; новая строка — Enter</span>}
+        </label>
+      ))}
+      <div className="btn-row">
+        <button className="btn primary" disabled={busy || !changed.length}
+          onClick={() => save(Object.fromEntries(changed.map((f) => [f.key, draft[f.key] ?? ''])))}>Сохранить и пересобрать · бесплатно</button>
+        {Object.keys(edited).length > 0 && (
+          <button className="btn ghost" disabled={busy} title="Вернуть фразы, которые подобрала карусель"
+            onClick={() => save(Object.fromEntries(Object.keys(edited).map((k) => [k, ''])))}>Вернуть исходный текст</button>
+        )}
+      </div>
+      <span className="hint">Пустое поле — вернуть исходную фразу. Пересобирается та же карусель: формат, фразы других слайдов и цена остаются.</span>
+    </div>
+  );
+};
+
+/**
  * Слайды по центру: один большой, как в ленте Instagram, стрелки и полоса миниатюр.
  * Раньше — сетка по два в ряд, где слайд был «размером с ноготь». Клик по большому —
  * во весь экран (решения по дизайну принимаются по мелочам).
  */
-const SlideViewer: React.FC<{entry: CarouselEntry; ratio: string; onZoom: (i: number) => void}> = ({entry, ratio, onZoom}) => {
+const SlideViewer: React.FC<{entry: CarouselEntry; ratio: string; busy: boolean; onZoom: (i: number) => void;
+  onEditTexts: (slide: string, fields: Record<string, string>) => Promise<void>}> = ({entry, ratio, busy, onZoom, onEditTexts}) => {
   const [at, setAt] = useState(0);
-  useEffect(() => setAt(0), [entry.id, entry.updatedAt]);
+  const [editing, setEditing] = useState(false);
+  // Другая машина — с первого слайда; пересборка той же (своя цена, свой текст) — на том же
+  // слайде: человек только что правил его и хочет увидеть результат, а не обложку
+  useEffect(() => { setAt(0); setEditing(false); }, [entry.id]);
+  useEffect(() => setAt((i) => Math.min(i, entry.slides.length - 1)), [entry.updatedAt, entry.slides.length]);
   const n = entry.slides.length;
   const go = (d: number) => setAt((i) => Math.min(n - 1, Math.max(0, i + d)));
   const v = `?v=${encodeURIComponent(entry.updatedAt)}`;
@@ -335,7 +383,11 @@ const SlideViewer: React.FC<{entry: CarouselEntry; ratio: string; onZoom: (i: nu
       <div className="slide-bar">
         <span className="muted">{at + 1} / {n}</span>
         <a className="link" href={`/api/carousels/${entry.id}/slide/${at + 1}/download`}>скачать этот слайд</a>
+        <button type="button" className="link" aria-expanded={editing} onClick={() => setEditing((v) => !v)}>
+          {editing ? 'скрыть правку текста' : 'редактировать текст'}
+        </button>
       </div>
+      {editing && <SlideTextEditor entry={entry} at={at} busy={busy} onSave={onEditTexts} />}
       <div className="slide-thumbs">
         {entry.slides.map((src, i) => (
           <button key={src} className={i === at ? 'slide-thumb on' : 'slide-thumb'} onClick={() => setAt(i)} style={{aspectRatio: ratio}}>
@@ -421,6 +473,18 @@ export const CarouselTool: React.FC = () => {
     } catch (e) { report(e); } finally { setBusy(false); }
   };
 
+  // Свой текст на слайде — тоже пересборка без кредита (server/carousel.mjs, editCarouselTexts)
+  const editTexts = async (slide: string, fields: Record<string, string>) => {
+    if (!entry) return;
+    setBusy(true);
+    try {
+      const made = await api.editCarouselTexts(entry.id, slide, fields);
+      setEntry(made);
+      setHistory((h) => h.map((x) => (x.id === made.id ? made : x)));
+      toast(Object.values(fields).every((v) => !v.trim()) ? 'Вернули исходный текст, слайды пересобраны' : 'Слайды пересобраны с вашим текстом');
+    } catch (e) { report(e); } finally { setBusy(false); }
+  };
+
   const remove = async (id: string) => {
     const c = history.find((h) => h.id === id);
     const name = c ? [c.car.brand, c.car.model].filter(Boolean).join(' ') || `№ ${id}` : `№ ${id}`;
@@ -487,7 +551,7 @@ export const CarouselTool: React.FC = () => {
 
         <section className="quick-preview">
           {entry
-            ? <SlideViewer entry={entry} ratio={ratio} onZoom={setOpen} />
+            ? <SlideViewer entry={entry} ratio={ratio} busy={busy} onZoom={setOpen} onEditTexts={editTexts} />
             : <div className="empty">Вставьте ссылку на объявление Encar, che168 или Carsensor — слайды появятся здесь.</div>}
         </section>
 

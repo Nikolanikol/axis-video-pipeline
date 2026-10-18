@@ -274,6 +274,23 @@ export type CarouselCar = {
 // то же зерно даёт те же компоновку и фразы, «Другой вариант» — новое зерно
 export type CarouselProps = {car: CarouselCar; market: Market; theme?: Partial<Theme>; includeHistory?: boolean; skip?: string[]; format?: string; seed?: number;
   // Своя цена клиента на слайде цены, в валюте профиля (src/carousel/price.ts)
-  priceOverride?: number | null};
+  priceOverride?: number | null;
+  // Память дилера: какие фразы он уже получал (src/carousel/i18n/copy.ts, choose) — их
+  // карусель обходит. Хранит сервер (server/carousel.mjs); у карусели — снимок на момент сборки
+  recent?: Record<string, string[]>;
+  // Свои тексты клиента: слайд → поле → текст (кнопка «Редактировать текст» под слайдом)
+  textOverrides?: TextOverrides;
+  // Тексты, разложенные по слайдам, — их кладёт calculateMetadata, сервер забирает из
+  // selectComposition и отдаёт интерфейсу для правки. Вёрстка считает их сама (carouselTexts)
+  resolvedTexts?: CarouselTexts};
+
+export type TextOverrides = Record<string, Record<string, string>>;
+/** Тексты карусели: по слайду — поля (рубрика, заголовок, текст…), плюс выбранные компоновки
+ *  и что выбрано из вариантов (picked: ключ → вариант — уходит в память дилера) */
+export type CarouselTexts = {
+  slides: {slide: string; fields: Record<string, string>}[];
+  layout: Record<string, string>;
+  picked: Record<string, string>;
+};
 
 export type ReviewProps = {review: Review; lot?: Lot | null; market: Market; theme?: Partial<Theme>};

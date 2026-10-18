@@ -23,7 +23,7 @@ import {
 import {apiSettings, resolveSpeaker, voiceConfig} from '../src/shared/voices.js';
 import {hasKey, hasVoice, synthesize} from './speech.mjs';
 import {hasSeparator} from './ambience.mjs';
-import {clientCarouselFormats, carouselsDir, buildCarousel, deleteCarousel, listCarousels, repriceCarousel, slideFileName} from './carousel.mjs';
+import {clientCarouselFormats, carouselsDir, buildCarousel, deleteCarousel, editCarouselTexts, listCarousels, repriceCarousel, slideFileName} from './carousel.mjs';
 import {ICON_RULES, LOGO_RULES, brandForRender, saveIcon, saveLogo, setIconVariant, setLogoVariant} from './brand.mjs';
 import {balanceOf, billed, creditCosts, ledgerOf, ledgerPage, signupCredits} from './billing.mjs';
 import {parseCarouselSource} from '../src/shared/kmotorsLot.js';
@@ -607,6 +607,8 @@ export const createApp = ({photoOrigin}) => {
     () => buildCarousel(req.body?.link, {format: req.body?.format, seed: req.body?.seed}))));
   // Пересобрать со своей ценой — бесплатно: та же машина, формат и вариант (repriceCarousel)
   api.post('/carousels/:id/price', wrap((req) => repriceCarousel(checkId(req.params.id), req.body?.price)));
+  // Свой текст на слайде — тоже бесплатно: та же машина, формат и вариант, меняются только слова
+  api.post('/carousels/:id/texts', wrap((req) => editCarouselTexts(checkId(req.params.id), req.body?.slide, req.body?.fields)));
   api.get('/carousels', wrap(() => listCarousels()));
   api.delete('/carousels/:id', wrap((req) => deleteCarousel(checkId(req.params.id))));
   api.get('/carousels/:id/slide/:n/download', async (req, res, next) => {

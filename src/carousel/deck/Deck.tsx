@@ -1,9 +1,9 @@
 // Новые форматы карусели: слайд — тип из библиотеки, формат — список типов и размер кадра.
 //
 // Реестр форматов — config/carousel-formats.json. Типы слайдов ниже; у части из них по два
-// варианта компоновки, и вариант, как и фразы, выбирается зерном карусели: кнопка
-// «Другой вариант» пересобирает ту же машину по-другому, а пересборка с тем же зерном
-// даёт те же слайды.
+// варианта компоновки. Компоновку и фразы выбирает ../texts.ts (зерно карусели и память
+// дилера): кнопка «Другой вариант» пересобирает ту же машину по-другому, а пересборка с тем
+// же зерном даёт те же слайды. Тексты слайд берёт оттуда готовыми — со своими правками клиента.
 //
 // Фото — только реальные снимки Encar. Сгенерированные «студийные» кадры из образцов не
 // делаем намеренно: покупатель приехал бы за другой машиной. Опции на слайдах — только
@@ -12,9 +12,8 @@ import {carouselPrice} from '../price';
 import React from 'react';
 import {AbsoluteFill} from 'remotion';
 import {TbBolt, TbGauge, TbManualGearbox} from 'react-icons/tb';
-import type {CarouselProps} from '../../shared/types';
+import type {CarouselProps, CarouselTexts} from '../../shared/types';
 import {BODY, HEAD, radius, useTheme} from '../../shared/ui';
-import {fill, pick} from '../i18n/copy';
 import type {CarouselText} from '../i18n';
 import {
   BOTTOM, CONTACT_ICONS, Fade, Frame, Grid2, Headline, Icon, IconCard, IconRow, Lead, PAD, Shot, Stat, TOP,
@@ -28,8 +27,9 @@ const EXTERIOR_CODES = new Set(['010', '029', '075', '017', '062', '024', '059',
 
 type IconType = React.ComponentType<{size?: number | string; color?: string; strokeWidth?: number}>;
 
-export type DeckProps = CarouselProps & {slides: string[]; seed: number; tx: CarouselText; brandName: string};
-type Ctx = DeckProps & {index: number; total: number; photos: Photos; vars: Record<string, string>};
+export type DeckProps = CarouselProps & {texts: CarouselTexts; tx: CarouselText};
+// t — тексты этого слайда (рубрика, заголовок, текст…), layout — выбранные компоновки
+type Ctx = DeckProps & {index: number; total: number; photos: Photos; t: Record<string, string>; layout: Record<string, string>};
 type Photos = {hero: string | null; exterior: string | null; interior: string | null; dashboard: string | null;
   rear: string | null; engine: string | null; gallery: string[]; details: string[]};
 
@@ -85,10 +85,10 @@ const Cover: React.FC<Ctx> = (c) => {
   const copy = c.tx.copy.cover;
   const {car, tx} = c;
   const sub = [car.grade, car.trim, tx.value(car.fuel), car.year].filter(Boolean).join(' ');
-  const variant = pick(['side', 'full'], c.seed, 'cover');
-  const benefits = pick(copy.benefits, c.seed, 'cover-b').map((b) => ({icon: benefitIcon(b.icon), text: b.text}));
+  const variant = c.layout.cover;
+  const benefits = (copy.benefits[Number(c.layout.coverBenefits)] ?? copy.benefits[0]).map((b) => ({icon: benefitIcon(b.icon), text: b.text}));
   return (
-    <Frame section={pick(copy.tagline, c.seed, 'cover-t')} index={c.index} total={c.total}>
+    <Frame section={c.t.section} index={c.index} total={c.total}>
       {variant === 'full'
         ? <><Shot src={c.photos.hero} style={{position: 'absolute', inset: 0}} veil={0} /><Fade to="top" /><Fade to="bottom" strength={0.95} /></>
         : <Shot src={c.photos.hero} style={{position: 'absolute', left: 0, right: 0, bottom: 0, height: '60%'}} sink={0.95} />}
@@ -100,7 +100,7 @@ const Cover: React.FC<Ctx> = (c) => {
       <div style={{position: 'absolute', left: PAD, right: PAD, bottom: BOTTOM + 8}}>
         {variant === 'side'
           ? <div style={{fontFamily: BODY, fontWeight: 600, fontSize: 22, letterSpacing: 6, textTransform: 'uppercase', color: C.white, opacity: 0.8}}>
-            {pick(copy.strap, c.seed, 'cover-s')}</div>
+            {c.t.strap}</div>
           : <IconRow items={benefits} size={46} />}
       </div>
     </Frame>
@@ -110,24 +110,23 @@ const Cover: React.FC<Ctx> = (c) => {
 /** Раздел с фото и опциями: экстерьер и салон устроены одинаково, различаются набором */
 const Section: React.FC<Ctx & {kind: 'exterior' | 'interior'}> = (c) => {
   const tall = useTall();
-  const copy = c.tx.copy[c.kind];
   const comfort = c.car.options.comfort;
   const all = [...comfort, ...c.car.options.safety, ...c.car.options.other];
   const exteriorOpts = all.filter((o) => EXTERIOR_CODES.has(OPTION_CODE[o]));
   const opts = c.kind === 'exterior' ? exteriorOpts : comfort.filter((o) => !EXTERIOR_CODES.has(OPTION_CODE[o]));
   const photo = c.kind === 'exterior' ? (c.photos.exterior ?? c.photos.hero) : (c.photos.interior ?? c.photos.dashboard);
-  const variant = pick(['band', 'tiles'], c.seed, c.kind);
+  const variant = c.layout[c.kind];
   const tiles = c.kind === 'exterior' ? c.photos.details.slice(0, 3) : [];
   // Три, а не четыре и на вытянутом кадре: русские названия длинные, и четвёртая колонка
   // выходила в четыре строки
   const items = optionItems(opts, c.tx, 3);
   const photoTop = tall ? 470 : 420;
   return (
-    <Frame section={pick(copy.kicker, c.seed, `${c.kind}-k`)} index={c.index} total={c.total}>
+    <Frame section={c.t.section} index={c.index} total={c.total}>
       <Shot src={photo} style={{position: 'absolute', left: 0, right: 0, top: photoTop, bottom: 0}} sink={0.95} />
       <div style={{position: 'absolute', top: TOP, left: PAD, right: PAD}}>
-        <Headline text={fill(pick(copy.title, c.seed, `${c.kind}-t`), c.vars)} />
-        <Lead>{fill(pick(copy.text, c.seed, `${c.kind}-x`), c.vars)}</Lead>
+        <Headline text={c.t.title} />
+        <Lead>{c.t.text}</Lead>
       </div>
       <div style={{position: 'absolute', left: PAD, right: PAD, bottom: BOTTOM + 10}}>
         {variant === 'tiles' && tiles.length === 3
@@ -140,13 +139,12 @@ const Section: React.FC<Ctx & {kind: 'exterior' | 'interior'}> = (c) => {
 
 const Details: React.FC<Ctx> = (c) => {
   const C = useTheme();
-  const copy = c.tx.copy.details;
   const opts = optionItems([...c.car.options.comfort, ...c.car.options.safety], c.tx, 4).map((o) => o.text);
   const shots = c.photos.details;
   return (
-    <Frame section={pick(copy.kicker, c.seed, 'det-k')} index={c.index} total={c.total}>
+    <Frame section={c.t.section} index={c.index} total={c.total}>
       <div style={{position: 'absolute', top: TOP, left: PAD, width: 420}}>
-        <Headline text={pick(copy.title, c.seed, 'det-t')} size={64} />
+        <Headline text={c.t.title} size={64} />
         <div style={{marginTop: 34}}>
           {opts.map((o, i) => (
             <div key={o} style={{display: 'flex', gap: 18, alignItems: 'baseline', padding: '12px 0', borderTop: i ? `1px solid ${C.line}` : undefined}}>
@@ -175,12 +173,12 @@ const Engine: React.FC<Ctx> = (c) => {
     {icon: TbGauge as IconType, value: tx.km(car.mileageKm), label: copy.engineRows.mileage},
   ];
   return (
-    <Frame section={pick(copy.engine.kicker, c.seed, 'eng-k')} index={c.index} total={c.total}>
+    <Frame section={c.t.section} index={c.index} total={c.total}>
       <Shot src={c.photos.engine} style={{position: 'absolute', top: 0, bottom: 0, right: 0, width: '62%'}} focus="40% 70%" />
       <Fade to="left" />
       <div style={{position: 'absolute', top: TOP, left: PAD, width: 620}}>
-        <Headline text={fill(pick(copy.engine.title, c.seed, 'eng-t'), c.vars)} />
-        <Lead style={{maxWidth: 560}}>{pick(copy.engine.text, c.seed, 'eng-x')}</Lead>
+        <Headline text={c.t.title} />
+        <Lead style={{maxWidth: 560}}>{c.t.text}</Lead>
         <div style={{marginTop: tall ? 56 : 40, display: 'flex', flexDirection: 'column', gap: tall ? 34 : 24}}>
           {rows.map((r) => (
             <div key={r.label} style={{display: 'flex', alignItems: 'center', gap: 26}}>
@@ -198,15 +196,14 @@ const Engine: React.FC<Ctx> = (c) => {
 };
 
 const Safety: React.FC<Ctx> = (c) => {
-  const copy = c.tx.copy.safety;
   const items = optionItems(c.car.options.safety, c.tx, 4);
   return (
-    <Frame section={pick(copy.kicker, c.seed, 'saf-k')} index={c.index} total={c.total}>
+    <Frame section={c.t.section} index={c.index} total={c.total}>
       <Shot src={c.photos.dashboard} style={{position: 'absolute', inset: 0}} focus="50% 50%" veil={0} />
       <AbsoluteFill style={{background: `${useTheme().bg}d9`}} />
       <div style={{position: 'absolute', top: TOP, left: PAD, right: PAD}}>
-        <Headline text={pick(copy.title, c.seed, 'saf-t')} />
-        <Lead>{pick(copy.text, c.seed, 'saf-x')}</Lead>
+        <Headline text={c.t.title} />
+        <Lead>{c.t.text}</Lead>
       </div>
       <div style={{position: 'absolute', left: PAD, right: PAD, bottom: BOTTOM + 14}}>
         <Grid2>{items.map((it) => <IconCard key={it.text} icon={it.icon} text={it.text} />)}</Grid2>
@@ -219,14 +216,12 @@ const History: React.FC<Ctx> = (c) => {
   const C = useTheme();
   const tall = useTall();
   const h = c.car.history;
-  const all = c.tx.copy;
-  const copy = !h ? all.historyNone : h.accidentsTotal ? all.historyClaims : all.historyClean;
   const s = c.tx.s;
   return (
-    <Frame section={pick(copy.kicker, c.seed, 'his-k')} index={c.index} total={c.total}>
+    <Frame section={c.t.section} index={c.index} total={c.total}>
       <div style={{position: 'absolute', top: TOP, left: PAD, right: PAD}}>
-        <Headline text={pick(copy.title, c.seed, 'his-t')} />
-        <Lead>{copy.text[0]}</Lead>
+        <Headline text={c.t.title} />
+        <Lead>{c.t.text}</Lead>
       </div>
       {h && (
         <div style={{position: 'absolute', left: PAD, right: PAD, bottom: BOTTOM + 14}}>
@@ -249,13 +244,12 @@ const History: React.FC<Ctx> = (c) => {
 
 const Rear: React.FC<Ctx> = (c) => {
   const C = useTheme();
-  const copy = c.tx.copy.rear;
   return (
-    <Frame section={pick(copy.kicker, c.seed, 'rear-k')} index={c.index} total={c.total}>
+    <Frame section={c.t.section} index={c.index} total={c.total}>
       <Shot src={c.photos.rear} style={{position: 'absolute', left: 0, right: 0, top: 330, bottom: 0}} sink={0.9} />
       <div style={{position: 'absolute', top: TOP, left: PAD, right: PAD}}>
-        <Headline text={fill(copy.title[0], c.vars)} size={72} />
-        <div style={{fontFamily: BODY, fontWeight: 500, fontSize: 34, color: C.white, marginTop: 12}}>{pick(copy.text, c.seed, 'rear-x')}</div>
+        <Headline text={c.t.title} size={72} />
+        <div style={{fontFamily: BODY, fontWeight: 500, fontSize: 34, color: C.white, marginTop: 12, whiteSpace: 'pre-line'}}>{c.t.text}</div>
       </div>
     </Frame>
   );
@@ -264,7 +258,7 @@ const Rear: React.FC<Ctx> = (c) => {
 const Gallery: React.FC<Ctx> = (c) => {
   const g = c.photos.gallery;
   return (
-    <Frame section={pick(c.tx.copy.gallery.kicker, c.seed, 'gal-k')} index={c.index} total={c.total}>
+    <Frame section={c.t.section} index={c.index} total={c.total}>
       <div style={{position: 'absolute', top: TOP, bottom: BOTTOM, left: PAD, right: PAD, display: 'flex', gap: 16}}>
         <Shot src={g[0]} round={14} veil={0.75} style={{flex: 1.6, height: '100%'}} />
         <div style={{flex: 1, display: 'flex', flexDirection: 'column', gap: 16}}>
@@ -278,15 +272,14 @@ const Gallery: React.FC<Ctx> = (c) => {
 const Price: React.FC<Ctx> = (c) => {
   const C = useTheme();
   const tall = useTall();
-  const copy = c.tx.copy.price;
   const {car, tx} = c;
   const label = tx.money(carouselPrice(car, c.market, c.priceOverride), c.market.currency);
   // Кегль по длине (внутри рамки ~860 px: 1080 − 2×PAD − 2×40); цифра Oswald ≈0,5 кегля
   const size = Math.min(tall ? 150 : 132, Math.floor(860 / (label.length * 0.5)));
   return (
-    <Frame section={pick(copy.kicker, c.seed, 'pr-k')} index={c.index} total={c.total}>
+    <Frame section={c.t.section} index={c.index} total={c.total}>
       <div style={{position: 'absolute', top: TOP, left: PAD, right: PAD}}>
-        <Headline text={copy.title[0]} />
+        <Headline text={c.t.title} />
         <div style={{marginTop: tall ? 60 : 40, border: `3px solid ${C.copper}`, borderRadius: radius(C, 22),
           padding: tall ? '60px 40px' : '44px 40px', textAlign: 'center'}}>
           {/* Валюта компании по курсу дня или своя цена клиента; вон на слайде нет (владелец 11.10) */}
@@ -307,11 +300,11 @@ const Price: React.FC<Ctx> = (c) => {
 
 const Why: React.FC<Ctx> = (c) => {
   const copy = c.tx.copy.why;
-  const items = pick(copy.benefits, c.seed, 'why-b');
+  const items = copy.benefits[Number(c.layout.whyBenefits)] ?? copy.benefits[0];
   return (
-    <Frame section={fill(pick(copy.kicker, c.seed, 'why-k'), c.vars)} index={c.index} total={c.total}>
+    <Frame section={c.t.section} index={c.index} total={c.total}>
       <div style={{position: 'absolute', top: TOP, left: PAD, right: PAD}}>
-        <Headline text={pick(copy.title, c.seed, 'why-t')} />
+        <Headline text={c.t.title} />
       </div>
       <div style={{position: 'absolute', left: PAD, right: PAD, bottom: BOTTOM + 14}}>
         <Grid2>{items.map((b) => <IconCard key={b.text} icon={benefitIcon(b.icon)} text={b.text} style={{padding: '34px 26px'}} />)}</Grid2>
@@ -330,16 +323,16 @@ const Cta: React.FC<Ctx> = (c) => {
   const whatsapp = m.whatsapp?.trim();
   const channel = (m.contactPrimary === 'telegram' && telegram) || !whatsapp ? 'telegram' : 'whatsapp';
   const handle = channel === 'telegram' ? telegram : whatsapp;
-  const guarantees = pick(copy.guarantees, c.seed, 'cta-g').map((g) => ({icon: benefitIcon(g.icon), text: g.text}));
+  const guarantees = (copy.guarantees[Number(c.layout.ctaGuarantees)] ?? copy.guarantees[0]).map((g) => ({icon: benefitIcon(g.icon), text: g.text}));
   return (
-    <Frame section={pick(copy.kicker, c.seed, 'cta-k')} index={c.index} total={c.total}>
+    <Frame section={c.t.section} index={c.index} total={c.total}>
       <Shot src={c.photos.rear ?? c.photos.hero} style={{position: 'absolute', right: 0, bottom: 0, width: '50%', height: tall ? '46%' : '42%'}} sink={0.9} />
       {/* Левый край фото уводим в фон: значки гарантий стоят рядом, не поверх */}
       <div style={{position: 'absolute', right: 0, bottom: 0, width: '50%', height: tall ? '46%' : '42%',
         background: `linear-gradient(to right, ${C.bg} 0%, ${C.bg}00 35%)`}} />
       <div style={{position: 'absolute', top: TOP, left: PAD, right: PAD}}>
-        <Headline text={fill(pick(copy.title, c.seed, 'cta-t'), c.vars)} />
-        <Lead>{pick(copy.text, c.seed, 'cta-x')}</Lead>
+        <Headline text={c.t.title} />
+        <Lead>{c.t.text}</Lead>
         {handle && (
           <div style={{marginTop: 34, display: 'inline-flex', alignItems: 'center', gap: 18, padding: '20px 40px',
             borderRadius: radius(C, 999), background: C.copper}}>
@@ -378,13 +371,9 @@ export const DECK_SLIDES = Object.keys(SLIDES);
 /** Один слайд колоды: frame — номер кадра композиции = номер слайда */
 export const Deck: React.FC<DeckProps & {frame: number}> = ({frame, ...props}) => {
   const photos = pickPhotos(props.car);
-  const total = props.slides.length;
+  const slides = props.texts.slides;
+  const total = slides.length;
   const i = Math.min(total - 1, Math.max(0, frame));
-  const Slide = SLIDES[props.slides[i]] ?? Cover;
-  const vars = {
-    model: [props.car.brand, props.car.model].filter(Boolean).join(' '),
-    brand: props.brandName,
-    engine: props.tx.liters(props.car.displacementCc),
-  };
-  return <Slide {...props} index={i + 1} total={total} photos={photos} vars={vars} />;
+  const Slide = SLIDES[slides[i].slide] ?? Cover;
+  return <Slide {...props} index={i + 1} total={total} photos={photos} t={slides[i].fields} layout={props.texts.layout} />;
 };
