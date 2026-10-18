@@ -45,6 +45,10 @@ export const sitemapXml = async () => {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>\n`;
 };
 
+// Версия картинки превью в адресе: Telegram и WhatsApp кэшируют превью по адресу картинки неделями.
+// Пересобрал public/kok/og.png (tools/og-image.mjs) — подними число
+const OG_IMAGE = '/kok/og.png?v=2';
+
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 // JSON внутри <script>: «</script>» в тексте закрыл бы тег раньше времени
 const jsonScript = (v) => JSON.stringify(v).replace(/</g, '\\u003c');
@@ -106,8 +110,8 @@ export const renderPage = async (html, req, {landing = null} = {}) => {
     `<link rel="canonical" href="${site}${page && page !== '/' ? page : '/'}" />`,
     `<meta name="keywords" content="${esc(keywords)}" />`,
     `<meta property="og:url" content="${site}${page && page !== '/' ? page : '/'}" />`,
-    `<meta property="og:image" content="${site}/kok/og.png" />`,
-    `<meta name="twitter:image" content="${site}/kok/og.png" />`,
+    `<meta property="og:image" content="${site}${OG_IMAGE}" />`,
+    `<meta name="twitter:image" content="${site}${OG_IMAGE}" />`,
     // Неиндексируемые адреса: превью, копии, кабинетные пути вне списка — подстраховка к robots.txt
     ...(!primary || !page ? ['<meta name="robots" content="noindex, nofollow" />'] : []),
     // Коды подтверждения владения — config/seo.json или окружение Coolify

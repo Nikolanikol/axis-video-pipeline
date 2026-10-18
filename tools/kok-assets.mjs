@@ -32,6 +32,21 @@ const copies = {
 };
 for (const [name, rel] of Object.entries(copies)) fs.writeFileSync(path.join(OUT, name), read(rel));
 
+// ICO — заголовок, каталог по 16 байт и PNG подряд (так ICO умеет с Windows Vista; sharp ICO не пишет)
+const ico = (images) => {
+  const head = Buffer.alloc(6 + 16 * images.length);
+  head.writeUInt16LE(0, 0); head.writeUInt16LE(1, 2); head.writeUInt16LE(images.length, 4);
+  let offset = head.length;
+  images.forEach(([size, data], i) => {
+    const at = 6 + 16 * i;
+    head.writeUInt8(size % 256, at); head.writeUInt8(size % 256, at + 1);
+    head.writeUInt16LE(1, at + 4); head.writeUInt16LE(32, at + 6);
+    head.writeUInt32LE(data.length, at + 8); head.writeUInt32LE(offset, at + 12);
+    offset += data.length;
+  });
+  return Buffer.concat([head, ...images.map(([, data]) => data)]);
+};
+
 const png = (svg, size) => sharp(Buffer.from(svg), {density: 300}).resize(size, size).png();
 // iOS и Android сами скругляют углы иконки — квадрат должен быть без скругления
 await png(read('ios/kok_ios_button_180.svg'), 180).toFile(path.join(OUT, 'apple-touch-icon.png'));
@@ -48,7 +63,15 @@ const onDark = async (svgRel, logoW, w, h) => {
 // Показывается 120×38 — рисуем в 2,5 раза крупнее для ретины. Впритык, без полей:
 // отступ задаёт письмо, иначе логотип съезжает относительно текста
 await (await onDark('master/kok_wordmark_darkbg.svg', 300, 300, 96)).toFile(path.join(OUT, 'email-logo.png'));
-// Превью ссылки: 1200×630 — размер, который WhatsApp, Telegram и Facebook не обрезают
-await (await onDark('master/kok_full_darkbg.svg', 720, 1200, 630)).toFile(path.join(OUT, 'og.png'));
+// Превью ссылки (og.png) с 19.10 собирает tools/og-image.mjs: карточка с продуктом, а не один логотип —
+// по логотипу получатель ссылки не понимал, что это за сервис
+
+// favicon.ico в корне сайта (19.10): Яндекс берёт значок для выдачи именно с /favicon.ico, его же
+// по старинке запрашивают мессенджеры и старые браузеры. Раньше там отвечала страница приложения.
+// Внутри — PNG 16, 32 и 48 из своих SVG пакета: у мелких размеров своя прорисовка, не уменьшенная.
+// 48 отдельно ещё и PNG: Google просит значок кратный 48 px
+const favs = await Promise.all([16, 32, 48].map((n) => png(read(`web/kok_favicon_${n}.svg`), n).toBuffer()));
+await sharp(favs[2]).toFile(path.join(OUT, 'favicon-48.png'));
+fs.writeFileSync(path.join(ROOT, 'public', 'favicon.ico'), ico([[16, favs[0]], [32, favs[1]], [48, favs[2]]]));
 
 console.log('Готово:', fs.readdirSync(OUT).join(', '));

@@ -1591,6 +1591,13 @@ Google: Search Console (ресурс с префиксом `https://app.axis-bea
 `GA_MEASUREMENT_ID`, `YANDEX_METRIKA_ID` перекрывают файл — сменить без выкладки. Готовый сниппет gtag
 в `index.html` не вставлять: он ставил бы cookie без согласия — тег с режимом согласия собирает сервер.
 
+**Превью ссылки и значки (19.10).** `public/kok/og.png` собирает `tools/og-image.mjs`: слева H1 витрины и
+площадки, справа кадр ролика и слайд карусели с витрины; снимок — Chrome из Remotion (Manrope и тени sharp
+не умеет). Палитра 256 цветов — ~120 КБ, WhatsApp надёжно показывает превью до ~300 КБ. В адресе —
+`?v=N` (`OG_IMAGE` в `server/seo.mjs`): мессенджеры кэшируют превью по адресу, пересобрал — подними N.
+`/favicon.ico` (16/32/48) и `favicon-48.png` — из `tools/kok-assets.mjs`: Яндекс берёт значок выдачи с
+`/favicon.ico`, а там раньше отвечала страница приложения.
+
 **Cookie счётчиков — только с согласия** (`app/analytics.tsx`, плашка `ConsentBar`). Google — **Consent
 Mode v2** (19.10): тег gtag стоит в HTML у всех (`googleTag` в `server/seo.mjs`), по умолчанию всё `denied` —
 без cookie, обезличенные сигналы; «Принять» открывает только `analytics_storage`, рекламные — закрыты
