@@ -8,7 +8,8 @@ import {BODY, HEAD, Logo, clamp, useTheme} from '../shared/ui';
 export type DesignFact = {label?: string; value: string};
 export type DesignContent = {
   kind: 'cover' | 'facts' | 'gallery' | 'price' | 'cta';
-  title: string; eyebrow?: string; subtitle?: string; photo?: string | null; photos?: string[];
+  // kicker — рубрика мелко над заголовком, когда заголовок — фраза, а не название раздела
+  title: string; kicker?: string; eyebrow?: string; subtitle?: string; photo?: string | null; photos?: string[];
   previousPhotos?: string[]; photoProgress?: number; collage?: boolean;
   facts?: DesignFact[]; lines?: string[]; price?: string; priceLabel?: string;
   contact?: {label: string; value: string; secondary?: string};
@@ -37,8 +38,18 @@ export const DesignSlide: React.FC<{content: DesignContent; design: DesignId; in
   const move: React.CSSProperties = animated ? {opacity: entrance, transform: design === 'catalog'
     ? `translateX(${(1 - entrance) * -32}px)` : `translateY(${(1 - entrance) * 24}px)`} : {};
   const safe: React.CSSProperties = {position: 'absolute', left, right, top, bottom};
-  const titleSize = fit(c.title, areaW, c.kind === 'cover' ? (compact ? 122 : 160) : (compact ? 76 : 94), 36);
+  // Заголовок-фраза («Салон, в котором хочется ехать») идёт в две строки: подбор под одну строку
+  // ужал бы его до 42 px. Название модели и рубрика — по-прежнему в одну
+  const titleSize = fit(c.title, areaW * (c.kicker && c.kind !== 'cover' ? 1.9 : 1), c.kind === 'cover' ? (compact ? 122 : 160) : (compact ? 76 : 94), 36);
   const bodySize = compact ? 30 : 38;
+  // Высота рубрики и заголовка: в «Редакционном» фото стоит под ними, и при заголовке-фразе в две
+  // строки (или с рубрикой) прежний отступ 265/335 px давал наезд текста на фото (проба 19.10).
+  // 0,55 — средняя ширина буквы заголовочных шрифтов пресетов в долях кегля
+  const kickerH = c.kicker ? (compact ? 24 : 28) * 1.2 + (compact ? 12 : 18) : 0;
+  const titleLines = Math.max(1, Math.ceil(c.title.length * titleSize * .55 / areaW));
+  const headingH = kickerH + titleLines * titleSize * 1.06;
+  // Без рубрики — прежние отступы, чтобы ролик и старые слайды не сдвинулись
+  const below = (base: number) => c.kicker ? Math.max(base, 115 + headingH + (compact ? 30 : 45)) : base;
   const photos = (c.photos?.length ? c.photos : c.photo ? [c.photo] : []).filter(Boolean);
   const hasImageLogo = C.assets?.logoHorizontal !== '';
   const header = (
@@ -57,9 +68,11 @@ export const DesignSlide: React.FC<{content: DesignContent; design: DesignId; in
       <span style={{whiteSpace: 'nowrap'}}>{String(index).padStart(2, '0')} / {String(total).padStart(2, '0')}</span>
     </div>
   );
-  const heading = (size = titleSize, color = C.white) => (
+  const heading = (size = titleSize, color = C.white) => <>
+    {c.kicker && <div style={{fontFamily: BODY, fontWeight: 600, fontSize: compact ? 24 : 28, letterSpacing: '.08em', textTransform: 'uppercase',
+      color: C.copper, marginBottom: compact ? 12 : 18, overflowWrap: 'anywhere'}}>{c.kicker}</div>}
     <div style={{fontFamily: HEAD, fontWeight: 600, fontSize: size, lineHeight: 1.06, color, overflowWrap: 'anywhere'}}>{c.title}</div>
-  );
+  </>;
   const image = (style: React.CSSProperties, collage = false) => {
     const block = (list: string[], opacity = 1) => <div style={{position: 'absolute', inset: 0, opacity}}>
       {(collage || c.collage) && list.length > 1 ? <div style={{display: 'grid', gridTemplateColumns: direction ? '1fr 1fr' : '2fr 1fr',
@@ -79,7 +92,8 @@ export const DesignSlide: React.FC<{content: DesignContent; design: DesignId; in
         <div style={{fontFamily: BODY, fontSize: compact ? 25 : 30, color: C.grey, marginBottom: 15}}>{c.priceLabel}</div>
         <div style={{fontFamily: HEAD, fontWeight: 700, fontSize: fit(c.price, availableWidth, compact ? 118 : 162, 42), lineHeight: 1.05, color: C.copper, whiteSpace: 'nowrap'}}>{c.price}</div>
       </div>}
-      {(c.facts ?? []).slice(0, dense ? 4 : 5).map((fact, i) => <div key={`${i}-${fact.value}`} style={{borderBottom: `1px solid ${C.line}`, paddingBottom: compact ? 14 : 22,
+      {/* Под фразой — три опции, на квадрате две: с заголовком в две строки и текстом остальные уходили на подвал */}
+      {(c.facts ?? []).slice(0, (dense ? 4 : 5) - (c.kicker && c.lines?.length ? (compact ? 2 : 1) : 0)).map((fact, i) => <div key={`${i}-${fact.value}`} style={{borderBottom: `1px solid ${C.line}`, paddingBottom: compact ? 14 : 22,
         ...(design === 'catalog' ? {display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 24} : {})}}>
         {fact.label && <div style={{fontFamily: BODY, fontSize: compact ? 25 : 29, color: C.grey, marginBottom: design === 'catalog' ? 0 : 7}}>{fact.label}</div>}
         <div style={{fontFamily: design === 'editorial' ? HEAD : BODY, fontWeight: 500,
@@ -112,11 +126,11 @@ export const DesignSlide: React.FC<{content: DesignContent; design: DesignId; in
       </> : design === 'editorial' ? <>
         <div style={{...safe, top: top + 115, ...move}}>{heading(titleSize, C.copper)}</div>
         {cover || gallery ? <>
-          {image({left: direction ? left + areaW * .1 : left, right, top: top + (compact ? 275 : 335), bottom: bottom + (c.price ? 390 : c.lines?.length ? 210 : 125)}, gallery || Boolean(direction))}
+          {image({left: direction ? left + areaW * .1 : left, right, top: top + below(compact ? 275 : 335), bottom: bottom + (c.price ? 390 : c.lines?.length ? 210 : 125)}, gallery || Boolean(direction))}
           <div style={{position: 'absolute', left, right, bottom: bottom + 100}}>{details(areaW, true)}</div>
         </> : <>
-          {image({left: direction ? left + areaW * .59 : left, width: areaW * .42, top: top + 265, bottom: bottom + 110})}
-          <div style={{position: 'absolute', top: top + 265, left: direction ? left : left + areaW * .47, width: areaW * .53,
+          {image({left: direction ? left + areaW * .59 : left, width: areaW * .42, top: top + below(265), bottom: bottom + 110})}
+          <div style={{position: 'absolute', top: top + below(265), left: direction ? left : left + areaW * .47, width: areaW * .53,
             borderLeft: `3px solid ${C.copper}`, paddingLeft: 25}}>{details(areaW * .53 - 25, true)}</div>
         </>}
       </> : <>

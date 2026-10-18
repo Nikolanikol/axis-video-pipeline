@@ -170,7 +170,10 @@ const RU: Copy = {
   gallery: {kicker: ['Галерея', 'Фото', 'Больше фото']},
   price: {
     kicker: ['Цена', 'Стоимость'],
-    title: ['Цена\n{в Корее}', 'Стоимость\n{в Корее}'],
+    // Пять подписей, а не две: в пресетах подпись цены — единственные слова слайда цены, и с двумя
+    // вариантами у дилера она повторялась уже с третьей карусели (проба 19.10). Только «в Корее»:
+    // цену клиент может вписать свою (с маржой), поэтому «без доставки» и подобное не обещаем
+    title: ['Цена\n{в Корее}', 'Стоимость\n{в Корее}', 'Цена машины\n{в Корее}', 'Стоимость авто\n{в Корее}', 'Цена на рынке\n{Кореи}'],
     text: [''],
   },
   why: {
@@ -214,7 +217,7 @@ const RU: Copy = {
     technology: ['Технологии и безопасность', 'Безопасность и помощники', 'Электроника'],
     specs: ['Характеристики', 'Коротко о машине', 'В цифрах'],
     price: ['Цена', 'Стоимость'],
-    priceLabel: ['Цена в Корее', 'Стоимость в Корее'],
+    priceLabel: ['Цена в Корее', 'Стоимость в Корее', 'Цена машины в Корее', 'Стоимость авто в Корее', 'Цена на рынке Кореи'],
     historyClean: ['Страховых случаев нет', 'Чистая история', '[oneOwner] Чисто и без смены владельца'],
     historyClaims: ['Ничего не скрываем', 'Честная история', 'Всё по-честному'],
     historyNone: ['Отчёт — по запросу', 'Историю пришлём до покупки'],
@@ -342,7 +345,7 @@ const EN: Copy = {
     ],
   },
   gallery: {kicker: ['Gallery', 'Photos', 'More photos']},
-  price: {kicker: ['Price', 'Cost'], title: ['Price\n{in Korea}', 'Cost\n{in Korea}'], text: ['']},
+  price: {kicker: ['Price', 'Cost'], title: ['Price\n{in Korea}', 'Cost\n{in Korea}', 'Vehicle price\n{in Korea}', 'Car price\n{in Korea}', 'Market price\n{in Korea}'], text: ['']},
   why: {
     kicker: ['Why %brand%?', 'How we work', 'Our approach'],
     title: ['Simple\n{and safe}', 'We work\n{honestly}', 'A turnkey\n{deal}'],
@@ -384,7 +387,7 @@ const EN: Copy = {
     technology: ['Technology & safety', 'Safety & assistance', 'Electronics'],
     specs: ['Specifications', 'At a glance', 'By the numbers'],
     price: ['Price', 'Cost'],
-    priceLabel: ['Price in Korea', 'Cost in Korea'],
+    priceLabel: ['Price in Korea', 'Cost in Korea', 'Vehicle price in Korea', 'Car price in Korea', 'Market price in Korea'],
     historyClean: ['No accident record', 'A clean record', '[oneOwner] Clean, no owner changes'],
     historyClaims: ['Nothing hidden', 'An honest history', 'All above board'],
     historyNone: ['Report available on request', 'History sent before purchase'],

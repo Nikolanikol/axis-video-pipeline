@@ -37,9 +37,12 @@ export const TEXT_MAX = 300;
 // Пресеты оформления (src/design) рисуют не всё: заголовок у них — короткая рубрика, текстов под
 // ним нет. В окно правки — только то, что пресет показывает, иначе правка «ничего не меняла бы».
 // Слайда нет в списке — у него в пресете только данные (обложка: марка, модель, год)
+// Обложка, экстерьер, салон, двигатель и безопасность — с заголовком и текстом фразы (владелец 19.10):
+// с одной рубрикой из трёх вариантов карусели дилера повторялись уже с четвёртой
 const DESIGN_FIELDS: Record<string, string[]> = {
-  history: ['title'], price: ['label', 'title'], cta: ['title', 'text'], why: ['section'],
-  exterior: ['section'], interior: ['section'], details: ['section'], engine: ['section'], safety: ['section'],
+  cover: ['section', 'strap'], history: ['title'], price: ['label', 'title'], cta: ['title', 'text'], why: ['section'],
+  exterior: ['section', 'title', 'text'], interior: ['section', 'title', 'text'], details: ['section'],
+  engine: ['section', 'title', 'text'], safety: ['section', 'title', 'text'],
   rear: ['section'], gallery: ['section'], technology: ['section'], specs: ['section'],
 };
 // У цены в «Классике» подпись — label, в новых форматах — title: пресет берёт что есть, одно
@@ -105,8 +108,10 @@ export const carouselTexts = (props: CarouselProps): CarouselTexts => {
   const set = (key: string, items: unknown[]) => { layout[key] = variant(items, key, (_t, i) => String(i)).id; };
 
   const h = car.history;
-  const classic = carouselFormat(props.format).id === 'classic';
   const design = isDesign(themeOf(props.theme).design);
+  // Пресет берёт фразы новых форматов и при «Классике»: у классических слайдов салона нет ни
+  // заголовка, ни текста — только рубрика, а пресету нужны оба
+  const classic = carouselFormat(props.format).id === 'classic' && !design;
   const names = carouselSlides(props.format, props.includeHistory !== false, props.skip);
   const slides = names.map((slide) => {
     const f: Record<string, string> = {};
@@ -124,7 +129,10 @@ export const carouselTexts = (props: CarouselProps): CarouselTexts => {
       if (slide === 'price') { f.section = say(k.price, 'c-pr-k'); f.label = say(k.priceLabel, 'c-pr-l'); }
       if (slide === 'cta') { f.title = say(k.ctaTitle, 'c-cta-t'); f.text = say(k.ctaText, 'c-cta-x'); }
     } else {
-      if (slide === 'cover') {
+      if (slide === 'cover' && design) {
+        // У пресета одна раскладка обложки: надпись над названием и довод под ним — оба сразу
+        f.section = say(copy.cover.tagline, 'cover-t'); f.strap = say(copy.cover.strap, 'cover-s');
+      } else if (slide === 'cover') {
         f.section = say(copy.cover.tagline, 'cover-t');
         layout.cover = variant(['side', 'full'], 'cover').item;
         // Подпись внизу есть только у раскладки «сбоку»; у «во весь кадр» там значки
@@ -144,6 +152,9 @@ export const carouselTexts = (props: CarouselProps): CarouselTexts => {
         f.section = say(c.kicker, 'his-k'); f.title = say(c.title, 'his-t'); f.text = say(c.text, 'his-x');
       }
       if (slide === 'rear') { const c = copy.rear; f.section = say(c.kicker, 'rear-k'); f.title = fill(c.title[0], vars); f.text = say(c.text, 'rear-x'); }
+      // Слайды «Классики», которые пресет рисует своей вёрсткой: рубрика — из классических вариантов
+      if (slide === 'technology') f.section = say(copy.classic.technology, 'c-tech-k');
+      if (slide === 'specs') f.section = say(copy.classic.specs, 'c-specs-k');
       if (slide === 'gallery') f.section = say(copy.gallery.kicker, 'gal-k');
       if (slide === 'price') { f.section = say(copy.price.kicker, 'pr-k'); f.title = say(copy.price.title, 'pr-t'); }
       if (slide === 'why') { f.section = say(copy.why.kicker, 'why-k'); f.title = say(copy.why.title, 'why-t'); set('whyBenefits', copy.why.benefits); }
