@@ -26,8 +26,10 @@
     <!--seo-->
   </head>
   <body>
+    <!-- Сюда сервер кладёт готовую витрину для гостя (#prerender, server/seo.mjs) — её видят поисковики -->
     <!--prerender-->
     <div id="root"></div>
+    <!-- Абсолютный адрес: со страницы /offer/refunds относительный ./main.tsx искался в /offer/ и не грузился -->
     <script type="module" src="/main.tsx"></script>
   </body>
 </html>

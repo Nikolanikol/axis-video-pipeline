@@ -231,7 +231,9 @@ export const AuthCard: React.FC<{signup: {credits: number; days: number}; notice
       if (mode === 'login') await api.login(form.email, form.password);
       else {
         await api.register(form);
-        // Цель «регистрация» в GA4 и Метрике (app/analytics.tsx) — только если гость согласился на cookie
+        // Событие «регистрация» (app/analytics.tsx): в GA4 уходит всегда (без согласия — без cookie,
+        // Consent Mode), в Метрику — целью, только если гость нажал «Принять». Сразу перед reload:
+        // gtag и Метрика шлют через sendBeacon, перезагрузка запрос не обрывает
         track('sign_up');
         // Новый кабинет — сразу на «Первые шаги»: подтвердить почту и настроиться
         // (app/Onboarding.tsx), а не в пустой кабинет с тонкой полосой сверху

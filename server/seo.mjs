@@ -9,7 +9,16 @@
 //
 // Индексируется только боевой адрес (legal.site в config/platform.json). Превью PR, копии на Mac и
 // любые чужие адреса, которые смотрят на этот сервер, получают «Disallow: /» и noindex — иначе
-// в поиск попали бы копии прода с тестовой меткой. Счётчики и коды подтверждения — тоже только там.
+// в поиск попали бы копии прода с тестовой меткой. Счётчики и коды подтверждения — тоже только там:
+// превью — копия прода, и его визиты испортили бы статистику, а подтверждение владения — чужим адресом.
+//
+// Что здесь собирается и где тексты:
+// - robots.txt, sitemap.xml — маршруты в server/app.mjs, до статики;
+// - страница (renderPage) — в бою и на Mac одинаково (server/index.mjs): заголовки, Open Graph,
+//   Schema.org, коды Search Console и Вебмастера, тег Google в режиме согласия, витрина для гостя;
+// - тексты, ключевые слова, вопросы витрины, коды и номера счётчиков — config/seo.json;
+// - картинка превью — tools/og-image.mjs, значки — tools/kok-assets.mjs.
+// Подробно и с причинами — CONTEXT.md, «Поисковики и счётчики».
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {CONFIG_DIR, readJson} from './store.mjs';
@@ -24,7 +33,8 @@ const siteUrl = async () => {
 // Страницы, которые пускаем в поиск. Оферта и политика — на настоящих адресах (/offer, /privacy):
 // адрес с «#» для поисковика — та же главная, отдельной страницей он его не увидит
 export const INDEXED = ['/', '/offer', '/privacy'];
-// /offer/refunds — та же оферта с прокруткой к разделу: каноническим адресом у неё остаётся /offer
+// /offer/refunds — та же оферта с прокруткой к разделу: каноническим адресом у неё остаётся /offer.
+// /index.html — та же главная (так её иногда запрашивают напрямую). null — адрес вне списка: noindex
 const pageOf = (p) => INDEXED.find((x) => x !== '/' && (p === x || p.startsWith(`${x}/`))) ?? (p === '/' || p === '/index.html' ? '/' : null);
 
 /** Свой ли это боевой адрес: только его пускаем в поиск и только на нём включаем счётчики */
@@ -39,6 +49,7 @@ export const robotsTxt = async (req) => {
     `Sitemap: ${site}/sitemap.xml`, ''].join('\n');
 };
 
+// lastmod не пишем: точной даты правки страницы у нас нет, а неверную Google учится игнорировать
 export const sitemapXml = async () => {
   const site = await siteUrl();
   const urls = INDEXED.map((p) => `  <url><loc>${site}${p === '/' ? '/' : p}</loc><changefreq>${p === '/' ? 'weekly' : 'monthly'}</changefreq><priority>${p === '/' ? '1.0' : '0.3'}</priority></url>`);
@@ -101,7 +112,8 @@ export const renderPage = async (html, req, {landing = null} = {}) => {
   const {pages, keywords, counters = {}} = await seoConfig();
   const page = pageOf(req.path);
   const meta = pages[page ?? '/'];
-  // Окружение перекрывает config/seo.json — поменять код без выкладки
+  // Окружение Coolify перекрывает config/seo.json — так код или номер меняют без выкладки. Коды не секрет:
+  // их видно в коде страницы любому, поэтому основное место — файл в репозитории
   const pick = (name, field) => process.env[name]?.trim() || counters[field]?.trim() || '';
   const env = {GOOGLE_SITE_VERIFICATION: pick('GOOGLE_SITE_VERIFICATION', 'googleVerification'),
     YANDEX_VERIFICATION: pick('YANDEX_VERIFICATION', 'yandexVerification'),
@@ -117,7 +129,8 @@ export const renderPage = async (html, req, {landing = null} = {}) => {
     // Коды подтверждения владения — config/seo.json или окружение Coolify
     ...(primary && env.GOOGLE_SITE_VERIFICATION ? [`<meta name="google-site-verification" content="${esc(env.GOOGLE_SITE_VERIFICATION)}" />`] : []),
     ...(primary && env.YANDEX_VERIFICATION ? [`<meta name="yandex-verification" content="${esc(env.YANDEX_VERIFICATION)}" />`] : []),
-    // Номера счётчиков интерфейсу (app/analytics.ts). Сами счётчики грузятся только после согласия
+    // Номера счётчиков интерфейсу (app/analytics.tsx): по ним он решает, показывать ли плашку согласия,
+    // и инициализирует Метрику после «Принять». Тег Google — следующей строкой, у всех, в режиме «denied»
     ...(primary && (env.GA_MEASUREMENT_ID || env.YANDEX_METRIKA_ID) ? [`<script>window.__KOK_ANALYTICS=${jsonScript({
       ga: env.GA_MEASUREMENT_ID, ym: env.YANDEX_METRIKA_ID})}</script>`] : []),
     ...(primary && env.GA_MEASUREMENT_ID ? googleTag(env.GA_MEASUREMENT_ID) : []),

@@ -51,7 +51,8 @@ const start = () => {
       ym.l = Date.now();
       window.ym = ym;
     }
-    // Вебвизор не включаем: он записывает экран кабинета вместе с данными клиента
+    // Вебвизор не включаем: он записывает экран кабинета вместе с данными клиента. ecommerce из готового
+    // кода Метрики тоже нет: он читал бы dataLayer — а это очередь тега Google, не покупки
     window.ym(Number(a.ym), 'init', {clickmap: true, trackLinks: true, accurateTrackBounce: true});
     addScript('https://mc.yandex.ru/metrika/tag.js');
   }
@@ -67,7 +68,10 @@ export const track = (name: string) => {
   if (started && a?.ym) window.ym?.(Number(a.ym), 'reachGoal', name);
 };
 
-/** Плашка согласия внизу экрана. Видна, пока посетитель не выбрал; согласие уже было — сразу запускает счётчики */
+/**
+ * Плашка согласия внизу экрана. Видна, пока посетитель не выбрал; согласие уже было — сразу запускает
+ * счётчики. «Отказаться» запоминаем тоже: иначе плашка вставала бы на каждой странице
+ */
 export const ConsentBar: React.FC = () => {
   const [choice, setChoice] = useState(readChoice);
   useEffect(() => { if (choice === 'yes') start(); }, [choice]);

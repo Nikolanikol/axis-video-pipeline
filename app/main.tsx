@@ -21,4 +21,6 @@ import './styles.css';
 // Ошибки страницы — в журнал сервера и тревогой в «Сбои» (app/errorReport.ts)
 installErrorReports();
 
+// Плашка согласия на cookie счётчиков — рядом с оболочкой, а не внутри: она нужна на любом экране
+// (витрина, кабинет, документы), и смена экрана не должна её прятать (app/analytics.tsx)
 createRoot(document.getElementById('root')!).render(<><Shell /><ConsentBar /></>);

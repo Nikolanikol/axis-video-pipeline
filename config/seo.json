@@ -14,7 +14,7 @@
       "description": "Какие данные собирает сервис KOK, зачем, кому передаёт и как их удалить."
     }
   },
-  "_counters": "Коды подтверждения и счётчики — не секрет (их видно в коде страницы любому), поэтому здесь, а не в Coolify. Переменные окружения GOOGLE_SITE_VERIFICATION, YANDEX_VERIFICATION, GA_MEASUREMENT_ID, YANDEX_METRIKA_ID перекрывают эти поля. Работают только на боевом адресе (server/seo.mjs), счётчики — только после согласия (app/analytics.tsx).",
+  "_counters": "Коды подтверждения и счётчики — не секрет (их видно в коде страницы любому), поэтому здесь, а не в Coolify. Переменные окружения GOOGLE_SITE_VERIFICATION, YANDEX_VERIFICATION, GA_MEASUREMENT_ID, YANDEX_METRIKA_ID перекрывают эти поля. Работают только на боевом адресе (server/seo.mjs). Cookie счётчиков — только после согласия (app/analytics.tsx): Google до согласия работает без cookie (Consent Mode v2), Метрика не грузится. Готовые коды из кабинетов Google и Метрики в index.html не вставлять — они ставят cookie без согласия, а Метрика ещё и с Вебвизором.",
   "counters": {
     "googleVerification": "eo_LCcuB4kM54bE9cRS8ZAqSkaNxFQyaZoJJstl0w1s",
     "yandexVerification": "f911b93e30ecfedf",

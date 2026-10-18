@@ -461,7 +461,13 @@ Chrome `brand_assets.py` ищет сам: обычные места устано
 - Оферта и политика — на адресах `/offer`, `/offer/refunds`, `/privacy` (старые `#/offer` работают).
 - Коды подтверждения сайта и номера счётчиков — `counters` в `config/seo.json` (Google и Яндекс вписаны).
   Перекрыть без выкладки — переменными `GOOGLE_SITE_VERIFICATION`, `YANDEX_VERIFICATION`,
-  `GA_MEASUREMENT_ID`, `YANDEX_METRIKA_ID`. Счётчики грузятся только после согласия на плашке.
+  `GA_MEASUREMENT_ID`, `YANDEX_METRIKA_ID`.
+- Плашка cookie внизу экрана: cookie GA4 и Метрики — только после «Принять». Google до согласия
+  считает без cookie (Consent Mode v2), Метрика не загружается — её цифры будут ниже, чем в GA4.
+- Картинка превью ссылки — `node tools/og-image.mjs` (`public/kok/og.png`); пересобрал — подними `?v=`
+  в `OG_IMAGE` (`server/seo.mjs`). Значки, включая `/favicon.ico`, — `node tools/kok-assets.mjs`.
+- Подключено: Google Search Console, GA4, Яндекс Вебмастер, Яндекс Метрика (ресурс
+  `https://app.axis-beauty.com/`, sitemap — `/sitemap.xml`).
 
 ## Контейнер и сервер
 
