@@ -12,6 +12,7 @@ import {Eye, SlidersHorizontal} from 'lucide-react';
 import {MobileTabs, useIsPhone} from '../MobileTabs';
 import {BrandPreview} from '../../src/brand/BrandPreview';
 import {Preview} from '../Preview';
+import {DesignSampler} from '../../src/design/DesignAd';
 import {href, lastLot} from '../router';
 import {AdTextsForm, BrandForm, ProfileForm} from '../SettingsForms';
 
@@ -51,7 +52,8 @@ const PreviewPanel: React.FC<{lot: LotEntry | null | undefined; market: MarketEn
             : <>Превью: <a href={href('ads', 'lot')}>{lotTitle(lot)}</a> · {format.title}</>}
         </span>
       </div>
-      <Preview input={{lot: {...lot, market: market.id}, market: market as Market, theme: {...brand, name: market.name}}} format={format} />
+      <Preview input={{lot: {...lot, market: market.id, ...(lot.id === DEMO_ID ? {krwPerUsd: lot.krwPerUsd ?? market.krwPerUsdToday} : {})},
+        market: market as Market, theme: {...brand, name: market.name}}} format={format} />
     </>
   );
 };
@@ -119,7 +121,11 @@ export const BrandTool: React.FC = () => {
   const market = {...(marketFromProfile(profile, config.copy) as Market), id: profile.id};
   // Образец по умолчанию: на нём все настройки видны разом, а в ролике акцент мелькает
   // на второй секунде, плашка на седьмой — подбирать цвета по нему мучительно
-  const [mode, setMode] = useState<'sampler' | 'ad'>('sampler');
+  const [mode, setMode] = useState<'sampler' | 'ad' | 'design'>('sampler');
+  const [scene, setScene] = useState('hook');
+  // Образец пресета — 9:16, как экран телефона в Instagram и TikTok: выбор пропорций здесь только мешал
+  const sample = {width: 1080, height: 1920};
+  const liveMarket = useTodayMarket(market);
   return (
     <SettingsLayout
       editor={
@@ -135,6 +141,9 @@ export const BrandTool: React.FC = () => {
             <button className={`btn ${mode === 'ad' ? 'primary' : 'ghost'}`} onClick={() => setMode('ad')}>
               Ролик
             </button>
+            {/* «Карусель» — только при выбранном пресете: у «Исходного» вид карусели задаёт её формат, а не бренд.
+                Сам режим не включается — владелец выбирает превью руками */}
+            {brand.design && <button className={`btn ${mode === 'design' ? 'primary' : 'ghost'}`} onClick={() => setMode('design')}>Карусель</button>}
           </div>
         </div>
         {mode === 'sampler'
@@ -154,7 +163,18 @@ export const BrandTool: React.FC = () => {
               </div>
             </div>
           )
-          : <PreviewPanel lot={lot} market={market} />}
+          : mode === 'design' && brand.design ? <>
+            {lot ? <div className="design-player-wrap" style={{'--design-ratio': sample.width / sample.height} as React.CSSProperties}><Player component={DesignSampler}
+              inputProps={{lot: lot.id === DEMO_ID ? {...lot, krwPerUsd: lot.krwPerUsd ?? liveMarket.krwPerUsdToday} : lot,
+                market: liveMarket, theme: {...brand, name: market.name}, scene}}
+              durationInFrames={1} fps={1} compositionWidth={sample.width} compositionHeight={sample.height}
+              style={{width: '100%', aspectRatio: `${sample.width}/${sample.height}`}} /></div>
+              : <div className="empty">Загрузка образца…</div>}
+            <div className="design-sample-controls" aria-label="Слайд образца">
+              {[['hook', 'Обложка'], ['specs', 'Характеристики'], ['price', 'Цена'], ['cta', 'Контакты']].map(([id, label]) => <button key={id} type="button"
+                className={`btn ${scene === id ? 'primary' : 'ghost'}`} aria-pressed={scene === id} onClick={() => setScene(id)}>{label}</button>)}
+            </div>
+          </> : <PreviewPanel lot={lot} market={market} />}
       </>} />
   );
 };

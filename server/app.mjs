@@ -28,6 +28,7 @@ import {ICON_RULES, LOGO_RULES, brandForRender, saveIcon, saveLogo, setIconVaria
 import {balanceOf, billed, creditCosts, ledgerOf, ledgerPage, signupCredits} from './billing.mjs';
 import {parseCarouselSource} from '../src/shared/kmotorsLot.js';
 import {PALETTE_KEYS, isHex} from '../src/shared/contrast.js';
+import {isDesign} from '../src/shared/design.js';
 import {withoutMusic} from '../src/shared/nomusic.js';
 import {
   accountOf, cancelEmailChange, requestDeletion, restoreAccount, changePassword, closeOtherSessions, closeSession, confirmEmailChange, dropSession,
@@ -102,6 +103,12 @@ const checkBrand = (theme) => {
   // Цвет попадает прямо в стили вёрстки рендера — только #RRGGBB, никаких строк со стороны
   for (const k of PALETTE_KEYS) {
     if (theme[k] !== undefined && !isHex(theme[k])) throw new HttpError(400, `Цвет «${k}» — в виде #RRGGBB`);
+  }
+  if (theme.design !== undefined && !isDesign(theme.design)) {
+    throw new HttpError(400, 'Выберите дизайн из списка');
+  }
+  if (theme.designVariant !== undefined && theme.designVariant !== 0 && theme.designVariant !== 1) {
+    throw new HttpError(400, 'Компоновка — основная или альтернативная');
   }
   const url = theme.fonts?.url ?? '';
   if (url && !/^https:\/\/fonts\.googleapis\.com\//.test(url)) {

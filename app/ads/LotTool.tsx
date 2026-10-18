@@ -12,6 +12,7 @@ import {useTodayMarket} from '../rates';
 import type {Market} from '../../src/shared/types';
 import {api, errorText, LotEntry} from '../api';
 import {useConfig} from '../config';
+import {DESIGNS} from '../../src/shared/designs';
 import {LotForm} from '../LotForm';
 import {EncarImport} from './EncarImport';
 import {Preview} from '../Preview';
@@ -322,6 +323,8 @@ export const LotTool: React.FC = () => {
             </div>
             <div className="quick-label">Формат ролика</div>
             <FormatChips value={format.id} onChange={chooseFormat} />
+            {/* Пресет меняет вёрстку всех форматов — видно здесь, чтобы не искать причину «чужого» вида в настройках */}
+            <div className="design-summary">Пресет: {DESIGNS.find((d) => d.id === brand.design)?.title ?? 'Исходный'} · <a href="#/settings/brand">Настроить</a></div>
             <RenderPanel
               lot={lot}
               format={format}

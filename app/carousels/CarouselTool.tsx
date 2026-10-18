@@ -10,6 +10,7 @@
 // кнопкой, а ссылка на уже собранную машину открывает готовую карусель, а не собирает заново.
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {encarAdUrl, sourceName} from '../../src/shared/encarLink.js';
+import {DESIGNS} from '../../src/shared/designs';
 import {thumb} from '../thumb';
 import {parseCarouselSource} from '../../src/shared/kmotorsLot.js';
 import {QuickLink} from '../ads/QuickLot';
@@ -354,7 +355,7 @@ const savedFormat = () => { try { return localStorage.getItem(FORMAT_KEY); } cat
 const CAROUSEL_PANELS = {list: 'left'} as const;
 
 export const CarouselTool: React.FC = () => {
-  const {config, profile, report} = useConfig();
+  const {config, profile, brand, report} = useConfig();
   // Язык слайдов — из профиля: виден здесь, чтобы не удивляться английской карусели
   const slidesLang = carouselLang(profile.language) === 'ru' ? 'русском' : 'английском';
   const {refresh: refreshAccess} = useSession();
@@ -499,6 +500,8 @@ export const CarouselTool: React.FC = () => {
           )}
           <div className="quick-label">Формат карусели</div>
           <FormatList formats={formats} value={format} built={entry ? (entry.format ?? 'classic') : undefined} onChange={setFormat} />
+          {/* Пресет меняет вёрстку всех форматов — видно здесь, чтобы не искать причину «чужого» вида в настройках */}
+          <div className="design-summary">Пресет: {DESIGNS.find((d) => d.id === brand.design)?.title ?? 'Исходный'} · <a href="#/settings/brand">Настроить</a></div>
 
           {entry && (
             <div className="carousel-actions">
@@ -529,7 +532,7 @@ export const CarouselTool: React.FC = () => {
               {!otherFormat && canSaveToGallery && <span className="hint">В меню выберите «Сохранить изображения» — слайды попадут в «Фото». Там же можно сразу в Instagram.</span>}
               {!otherFormat && <PriceBox entry={entry} busy={busy} onReprice={reprice} />}
               <div className="btn-row">
-                {!otherFormat && entry.format !== 'classic' && (
+                {!otherFormat && (entry.format !== 'classic' || brand.design) && (
                   <button className="btn" onClick={() => run(entry.id)} disabled={busy}
                     title="Та же машина, другие компоновка и фразы">Другой вариант{cost}</button>
                 )}

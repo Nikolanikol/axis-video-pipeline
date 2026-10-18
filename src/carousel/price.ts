@@ -6,7 +6,7 @@
 import type {CarouselCar, Market} from '../shared/types';
 
 /** Число для слайда в валюте market.currency; null — цены нет (прочерк) */
-export const carouselPrice = (car: CarouselCar, market: Pick<Market, 'currency' | 'krwPerUnitToday' | 'krwPerUsdToday'>, priceOverride?: number | null): number | null => {
+export const carouselPrice = (car: Pick<CarouselCar, 'price'>, market: Pick<Market, 'currency' | 'krwPerUnitToday' | 'krwPerUsdToday'>, priceOverride?: number | null): number | null => {
   if (priceOverride) return priceOverride;
   const currency = market.currency || 'USD';
   const usd = car.price?.usd ?? null;

@@ -1,0 +1,22 @@
+.design-list { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:14px 0; }
+.design-choice { min-width:0; border:1px solid var(--line); background:var(--panel-2); color:var(--text); border-radius:10px; padding:12px; text-align:left; font:inherit; cursor:pointer; }
+.design-choice.on { border-color:var(--accent); box-shadow:inset 0 0 0 1px var(--accent); }
+.design-choice-title { display:block; font-size:14px; font-weight:600; margin:8px 0 5px; }
+.design-choice-note { display:block; color:var(--muted); font-size:12px; line-height:1.4; overflow-wrap:anywhere; }
+.design-mini { display:block; position:relative; height:100px; overflow:hidden; border-radius:5px; background:#292b30; color:#faf6f0; }
+.design-mini i { position:absolute; left:10%; right:10%; top:15%; height:47%; background:linear-gradient(145deg,#737a81,#3e444b); }
+.design-mini b { position:absolute; left:10%; top:66%; font-size:20px; line-height:1; font-weight:600; }
+.design-mini em { position:absolute; left:10%; bottom:10%; width:40%; height:2px; background:#b99473; }
+.design-mini-cinema i { inset:0; height:auto; background:linear-gradient(160deg,#6f7b85 0%,#343a40 38%,#151619 78%); }
+.design-mini-editorial { background:#f2eadf; color:#552e38; }
+.design-mini-editorial b { top:12%; font-family:Georgia,serif; font-weight:400; }
+.design-mini-editorial i { top:42%; height:42%; }
+.design-mini-catalog { background:#f5f7fa; color:#1d2734; }
+.design-mini-catalog i { top:12%; left:0; right:0; height:47%; }
+.design-mini-catalog em { background:#315ac1; }
+.design-sample-controls { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0; }
+.design-player-wrap { width:min(100%,420px,calc((100dvh - 360px) * var(--design-ratio, .8))); margin-inline:auto; }
+@media (max-width:600px) { .design-list { gap:7px; } .design-choice { padding:8px; } .design-choice-note { font-size:11px; } .design-mini { height:76px; } }
+@media (max-width:900px) { .design-player-wrap { width:min(100%,420px,calc((100dvh - 390px) * var(--design-ratio, .8))); } }
+@media (max-width:380px) { .design-list { grid-template-columns:minmax(0,1fr); } .design-choice { display:grid; grid-template-columns:68px minmax(0,1fr); gap:0 12px; align-items:center; } .design-mini { grid-row:1 / 3; height:72px; } .design-choice-title { margin:0; } }
+@media (pointer:coarse) { .design-choice { min-height:44px; } }

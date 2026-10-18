@@ -11,11 +11,12 @@ import {CURRENCIES, currencyCode, currencySign, isKnownCurrency} from '../src/sh
 import {contrastIssues, matchPalette} from '../src/shared/contrast.js';
 import {Field} from './LotForm';
 import {useConfig} from './config';
+import {DesignField} from './DesignField';
 
 
 // Только цветовые поля темы: в ней теперь есть ещё имя, шрифты и файлы бренда,
 // и без сужения форма пыталась бы засунуть объект в поле ввода
-type ColorKey = {[K in keyof Theme]: Theme[K] extends string ? K : never}[keyof Theme];
+type ColorKey = {[K in keyof Theme]-?: Theme[K] extends string ? K : never}[keyof Theme];
 
 // Ключи в теме исторические (copper — со времён брендбука AXIS), а в интерфейсе — «акцент»:
 // у клиента он бывает синим или зелёным
@@ -276,6 +277,8 @@ export const BrandForm: React.FC<BrandProps> = ({theme, saved, pairs, palettes, 
     <div className="form">
       <h2>Логотип</h2>
       <LogoField theme={theme} onSaved={onSaved} onError={onError} />
+
+      <DesignField theme={theme} onChange={onChange} />
 
       <h2>Шрифты</h2>
       <p className="note">

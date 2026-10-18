@@ -17,6 +17,8 @@ import {Bullets, NumberCard, PAD, PhotoBand, Row, SAFE, Slide, Title, TOTAL} fro
 import {CarouselText, carouselLang, carouselText} from './i18n';
 import {Deck} from './deck/Deck';
 import {carouselFormat, carouselSlides} from './formats';
+import {isDesign} from '../shared/design.js';
+import {DesignCarousel} from '../design/DesignCarousel';
 
 export const CAROUSEL_SLIDES = TOTAL;
 
@@ -300,6 +302,7 @@ export const Carousel: React.FC<CarouselProps> = (props) => {
   const withHistory = props.includeHistory !== false;
   // Язык слайдов — из профиля клиента; не английский и не русский → английский
   const tx = carouselText(carouselLang(props.market?.language), props.car?.origin);
+  if (isDesign(theme.design)) return <DesignCarousel {...props} />;
   // Новые форматы («Витрина», «Разворот», «Полная») собираются из библиотеки слайдов
   // (./deck); «Классика» — прежняя вёрстка ниже, как была
   if (carouselFormat(props.format).id !== 'classic') {

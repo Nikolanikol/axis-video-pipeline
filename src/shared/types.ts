@@ -2,7 +2,8 @@
 // Общие для ролика, интерфейса и сервера.
 import type brandTheme from '../../config/brand.json';
 
-export type Theme = typeof brandTheme;
+export type DesignId = typeof import('./design.js').DESIGN_IDS[number];
+export type Theme = typeof brandTheme & {design?: DesignId; designVariant?: 0 | 1};
 
 // Тексты рынка (язык ролика). Какие ключи нужны — описывает формат в config/formats.json.
 export type Texts = Record<string, string>;
