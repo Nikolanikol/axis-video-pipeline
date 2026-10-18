@@ -17,9 +17,9 @@
   "_counters": "Коды подтверждения и счётчики — не секрет (их видно в коде страницы любому), поэтому здесь, а не в Coolify. Переменные окружения GOOGLE_SITE_VERIFICATION, YANDEX_VERIFICATION, GA_MEASUREMENT_ID, YANDEX_METRIKA_ID перекрывают эти поля. Работают только на боевом адресе (server/seo.mjs), счётчики — только после согласия (app/analytics.tsx).",
   "counters": {
     "googleVerification": "eo_LCcuB4kM54bE9cRS8ZAqSkaNxFQyaZoJJstl0w1s",
-    "yandexVerification": "",
+    "yandexVerification": "f911b93e30ecfedf",
     "gaMeasurementId": "G-WCTP7HX037",
-    "yandexMetrikaId": ""
+    "yandexMetrikaId": "113666993"
   },
   "keywords": "реклама автосалона, SMM для автосалона, продвижение автосалона, контент для автосалона, ролики для автосалона, карусель Instagram для автосалона, видео для продажи авто, авто из Кореи, авто из Китая, авто из Японии, Encar, che168, Carsensor",
   "faq": [

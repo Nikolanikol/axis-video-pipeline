@@ -1586,7 +1586,8 @@ HTTP-сервисом со своим процессом — владелец о
 
 **Коды и счётчики — `counters` в `config/seo.json`** (не секрет: их видно в коде страницы). 19.10 вписаны
 Google: Search Console (ресурс с префиксом `https://app.axis-beauty.com/`, способ «HTML-тег») и GA4
-`G-WCTP7HX037`; Яндекс — ждём. Переменные Coolify `GOOGLE_SITE_VERIFICATION`, `YANDEX_VERIFICATION`,
+`G-WCTP7HX037`; Яндекс: Вебмастер (метатег) и Метрика `113666993`. Готовый код Метрики не вставлять:
+в нём Вебвизор и `ecommerce:"dataLayer"` (читал бы очередь gtag), и грузится он без согласия. Переменные Coolify `GOOGLE_SITE_VERIFICATION`, `YANDEX_VERIFICATION`,
 `GA_MEASUREMENT_ID`, `YANDEX_METRIKA_ID` перекрывают файл — сменить без выкладки. Готовый сниппет gtag
 в `index.html` не вставлять: он ставил бы cookie без согласия — тег с режимом согласия собирает сервер.
 
