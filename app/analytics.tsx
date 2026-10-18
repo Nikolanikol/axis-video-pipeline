@@ -1,10 +1,12 @@
-// Счётчики посещаемости (19.10): Google Analytics 4 и Яндекс Метрика — только с согласия посетителя.
+// Счётчики посещаемости (19.10): Google Analytics 4 и Яндекс Метрика — cookie только с согласия посетителя.
 //
 // Номера счётчиков кладёт в страницу сервер (window.__KOK_ANALYTICS, server/seo.mjs) и только на
 // боевом адресе: превью и копии на Mac не пишут в статистику прода. Нет номеров — нет и плашки.
-// Скрипты Google и Яндекса грузятся лишь после «Принять»: до согласия аналитических cookie нет
-// вовсе — так требует и политика (app/Legal.tsx, раздел «Какие данные»), и закон для гостей из ЕС.
-// Выбор помнит этот браузер (localStorage) — переспрашивать на каждой странице незачем.
+// Google — Consent Mode v2: тег стоит в HTML у всех (server/seo.mjs, googleTag) в режиме «denied» —
+// без cookie, обезличенные сигналы. «Принять» открывает analytics_storage. Так проверка установки
+// в GA4 видит тег, а отказавшийся всё равно остаётся без cookie. Метрика такого режима не имеет —
+// она грузится лишь после «Принять». Так описано в политике (app/Legal.tsx, «Какие данные»).
+// Выбор помнит этот браузер (localStorage, ключ читает и тег Google в HTML) — не переспрашиваем.
 import React, {useEffect, useState} from 'react';
 
 type Ids = {ga: string; ym: string};
@@ -37,15 +39,9 @@ const start = () => {
   const a = ids();
   if (!a || started) return;
   started = true;
-  if (a.ga) {
-    window.dataLayer = window.dataLayer || [];
-    // gtag обязан класть в dataLayer именно arguments, а не массив — так устроен загрузчик Google
-    // eslint-disable-next-line prefer-rest-params
-    window.gtag = function gtag() { window.dataLayer!.push(arguments); };
-    window.gtag('js', new Date());
-    window.gtag('config', a.ga);
-    addScript(`https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(a.ga)}`);
-  }
+  // Тег Google уже в странице в режиме «denied» — согласие только открывает cookie аналитики.
+  // Рекламные хранилища не трогаем: рекламы нет, и согласия на неё посетитель не давал
+  if (a.ga) window.gtag?.('consent', 'update', {analytics_storage: 'granted'});
   if (a.ym) {
     // Очередь вызовов до загрузки tag.js — как в официальном коде Метрики
     // (tag.js читает очередь ym.a как список arguments и время ym.l)
@@ -61,12 +57,14 @@ const start = () => {
   }
 };
 
-/** Событие в обе системы: в GA4 — событием, в Метрике — целью с тем же именем. Без согласия — ничего */
+/**
+ * Событие в обе системы: в GA4 — событием, в Метрике — целью с тем же именем. В GA4 уходит и без
+ * согласия — тег сам шлёт его без cookie (Consent Mode); в Метрику — только после «Принять»
+ */
 export const track = (name: string) => {
-  if (!started) return;
-  const a = ids();
   window.gtag?.('event', name);
-  if (a?.ym) window.ym?.(Number(a.ym), 'reachGoal', name);
+  const a = ids();
+  if (started && a?.ym) window.ym?.(Number(a.ym), 'reachGoal', name);
 };
 
 /** Плашка согласия внизу экрана. Видна, пока посетитель не выбрал; согласие уже было — сразу запускает счётчики */

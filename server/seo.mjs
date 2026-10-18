@@ -51,6 +51,24 @@ const jsonScript = (v) => JSON.stringify(v).replace(/</g, '\\u003c');
 // Ответ витрины в разметке — без ссылок-скобок: [оферте](/offer) → «оферте»
 const plain = (s) => s.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
 
+/**
+ * Тег Google в самой странице — в режиме согласия Consent Mode v2 (19.10). Раньше gtag.js грузился
+ * только после «Принять», и проверка установки в GA4 не находила тег в HTML: «добавьте тег на сайт».
+ * Теперь тег стоит у всех, но по умолчанию всё «denied»: без cookie и без идентификатора посетителя,
+ * Google получает лишь обезличенные сигналы и по ним достраивает статистику. «Принять» на плашке
+ * (app/analytics.tsx) открывает только analytics_storage; рекламные хранилища закрыты всегда —
+ * рекламы у нас нет. Порядок важен: consent default — до config, иначе первый просмотр уйдёт с cookie.
+ * Согласие, данное раньше, читаем из того же ключа localStorage до config — вернувшийся посетитель
+ * не теряет первый просмотр
+ */
+const googleTag = (id) => [
+  `<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}`
+  + `gtag('consent','default',{ad_storage:'denied',ad_user_data:'denied',ad_personalization:'denied',analytics_storage:'denied'});`
+  + `try{if(localStorage.getItem('kok:analytics-consent')==='yes')gtag('consent','update',{analytics_storage:'granted'});}catch(e){}`
+  + `gtag('js',new Date());gtag('config',${jsonScript(id)});</script>`,
+  `<script async src="https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(id)}"></script>`,
+];
+
 const structuredData = async (site) => {
   const [{pages, faq}, platform, credits] = await Promise.all([
     seoConfig(), readJson(path.join(CONFIG_DIR, 'platform.json')), readJson(path.join(CONFIG_DIR, 'credits.json'))]);
@@ -98,6 +116,7 @@ export const renderPage = async (html, req, {landing = null} = {}) => {
     // Номера счётчиков интерфейсу (app/analytics.ts). Сами счётчики грузятся только после согласия
     ...(primary && (env.GA_MEASUREMENT_ID || env.YANDEX_METRIKA_ID) ? [`<script>window.__KOK_ANALYTICS=${jsonScript({
       ga: env.GA_MEASUREMENT_ID, ym: env.YANDEX_METRIKA_ID})}</script>`] : []),
+    ...(primary && env.GA_MEASUREMENT_ID ? googleTag(env.GA_MEASUREMENT_ID) : []),
     ...(page === '/' ? [`<script type="application/ld+json">${jsonScript(await structuredData(site))}</script>`] : []),
   ].map((l) => `    ${l}`).join('\n');
   let out = html
