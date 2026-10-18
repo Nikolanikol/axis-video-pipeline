@@ -453,6 +453,16 @@ Chrome `brand_assets.py` ищет сам: обычные места устано
 
 Механизм музыки не удалён, а оставлен дремать: `src/shared/music.tsx`, `config/music.json`, `public/music/`. Если появится лицензионная музыка — вернуть выбор в интерфейс несложно. Пока `BackgroundMusic` без трека просто ничего не рисует.
 
+## Поисковики и счётчики
+
+- `robots.txt`, `sitemap.xml`, заголовки и разметка страниц — `server/seo.mjs`, тексты и ключевые
+  слова — `config/seo.json`. В поиск пускается только app.axis-beauty.com; превью и копии закрыты.
+- `npm run build` кладёт готовую витрину `dist/app/landing.html` — её видят роботы.
+- Оферта и политика — на адресах `/offer`, `/offer/refunds`, `/privacy` (старые `#/offer` работают).
+- Коды подтверждения сайта и номера счётчиков — `counters` в `config/seo.json` (Google уже вписан).
+  Перекрыть без выкладки — переменными `GOOGLE_SITE_VERIFICATION`, `YANDEX_VERIFICATION`,
+  `GA_MEASUREMENT_ID`, `YANDEX_METRIKA_ID`. Счётчики грузятся только после согласия на плашке.
+
 ## Контейнер и сервер
 
 ```bash

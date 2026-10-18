@@ -1521,7 +1521,7 @@ a.tab { text-decoration: none; }
   .lift:hover, .lift:focus-visible, .account-page .btn:hover { transform: none !important; }
 }
 
-/* Контакты и подвал витрины, документы (#/offer, #/privacy — app/Legal.tsx) */
+/* Контакты и подвал витрины, документы (/offer, /privacy — app/Legal.tsx) */
 .land-foot { border-top: 1px solid var(--line); background: #ffffff05; }
 .land-foot-grid { display: grid; grid-template-columns: minmax(0, 1.6fr) repeat(4, minmax(0, 1fr)); gap: 32px;
   max-width: 1160px; margin: 0 auto; padding: 44px 20px 32px; }
@@ -1634,3 +1634,21 @@ a.tab { text-decoration: none; }
 /* Страна не ломается посередине; в узкой колонке подвала на телефоне она уходит под плашку, а не сжимается */
 .source-country { white-space: nowrap; }
 .land-foot-sources .source { flex-wrap: wrap; row-gap: 4px; }
+
+/* Витрина, отрисованная сервером для поисковиков (#prerender, server/seo.mjs). Пока она на экране,
+   экран загрузки React под ней не показываем — иначе под витриной мелькал бы знак «Загрузка…» */
+#prerender ~ #root .boot { display: none; }
+
+/* Плашка согласия на счётчики (app/analytics.tsx). Снизу по центру, не во всю ширину на компьютере:
+   не перекрывает кнопку сборки и не прячет витрину. Над окнами входа (z-index 60) не встаёт */
+.consent { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 55;
+  width: min(720px, calc(100% - 32px)); display: flex; align-items: center; gap: 16px;
+  padding: 14px 16px; background: var(--panel-2); border: 1px solid var(--line); border-radius: 12px;
+  box-shadow: 0 12px 28px #00000080; }
+.consent p { margin: 0; font-size: 14px; line-height: 1.45; color: var(--muted); }
+.consent a { color: var(--accent-text); }
+.consent-actions { display: flex; gap: 8px; flex-shrink: 0; }
+@media (max-width: 600px) {
+  .consent { flex-direction: column; align-items: stretch; bottom: 12px; }
+  .consent-actions > * { flex: 1; }
+}

@@ -62,9 +62,10 @@ export const SiteFooter: React.FC<Props> = ({service, offer: given, className}) 
         </div>
         <nav className="land-foot-col" aria-label="Документы">
           <b>Документы</b>
-          <a href="#/offer">Публичная оферта</a>
-          <a href="#/offer/refunds">Возврат денег</a>
-          <a href="#/privacy">Персональные данные</a>
+          {/* Настоящие адреса, а не «#/offer»: по ним документы находят поисковики (server/seo.mjs) */}
+          <a href="/offer">Публичная оферта</a>
+          <a href="/offer/refunds">Возврат денег</a>
+          <a href="/privacy">Персональные данные</a>
         </nav>
         <div className="land-foot-col">
           <b>Связаться</b>

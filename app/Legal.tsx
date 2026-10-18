@@ -1,4 +1,5 @@
-// Публичная оферта (#/offer) и политика персональных данных (#/privacy) — открыты всем, без входа.
+// Публичная оферта (/offer) и политика персональных данных (/privacy) — открыты всем, без входа.
+// Старые адреса #/offer и #/privacy тоже работают: по ним приходят из касс и старых писем.
 //
 // Зачем (12.10): платёжные сервисы (AnyPay, Lava) пускают сайт к приёму денег только после
 // модерации, а модератор ищет оферту, правила возврата, контакты и описание услуги. Клиенту
@@ -12,8 +13,9 @@ import React, {useEffect, useState} from 'react';
 import {ArrowLeft} from 'lucide-react';
 import {api, Offer, PublicOffer} from './api';
 
-// Дата редакции: меняется вместе с условиями. Клиент, купивший раньше, живёт по редакции дня оплаты
-const EDITION = '12 октября 2026 г.';
+// Дата редакции: меняется вместе с условиями. Клиент, купивший раньше, живёт по редакции дня оплаты.
+// Политика — 19.10: появились счётчики посещаемости (app/analytics.tsx) с согласия посетителя
+const EDITION = '19 октября 2026 г.';
 // Оферта поменялась в тот же день (возврат 14 дней → 3 суток, вечер 12.10) — вторая редакция того же
 // числа. Клиент, оплативший до неё, вправе требовать возврат по первой (14 дней)
 const OFFER_EDITION = '12 октября 2026 г. (вторая, возврат — 3 суток)';
@@ -53,7 +55,7 @@ export const LegalPage: React.FC<{kind: LegalKind; anchor?: string}> = ({kind, a
   const [offer, setOffer] = useState<PublicOffer | null>(null);
   const [loaded, setLoaded] = useState(false);
   useEffect(() => { api.publicOffer().then(setOffer).catch(() => setOffer(null)).finally(() => setLoaded(true)); }, []);
-  // #/offer/refunds — сразу к разделу (ссылка «Возврат денег» в подвале). Ждём ответа сервера:
+  // /offer/refunds — сразу к разделу (ссылка «Возврат денег» в подвале). Ждём ответа сервера:
   // таблица тарифов приходит с ним и сдвигает разделы ниже
   useEffect(() => { if (loaded && anchor) document.getElementById(anchor)?.scrollIntoView(); }, [loaded, anchor]);
   // Заголовок вкладки — свой у документа, при уходе на витрину возвращаем прежний
@@ -65,12 +67,12 @@ export const LegalPage: React.FC<{kind: LegalKind; anchor?: string}> = ({kind, a
   return (
     <div className="landing legal">
       <header className="land-top">
-        <a href="#/" aria-label="KOK — на главную"><img src="/kok/wordmark.svg" alt="KOK" className="land-logo" /></a>
+        <a href="/" aria-label="KOK — на главную"><img src="/kok/wordmark.svg" alt="KOK" className="land-logo" /></a>
         <nav className="legal-tabs">
-          <a href="#/offer" className={kind === 'offer' ? 'on' : ''}>Оферта</a>
-          <a href="#/privacy" className={kind === 'privacy' ? 'on' : ''}><span className="legal-long">Персональные данные</span><span className="legal-short">Политика</span></a>
+          <a href="/offer" className={kind === 'offer' ? 'on' : ''}>Оферта</a>
+          <a href="/privacy" className={kind === 'privacy' ? 'on' : ''}><span className="legal-long">Персональные данные</span><span className="legal-short">Политика</span></a>
         </nav>
-        <a className="btn ghost" href="#/"><ArrowLeft size={16} aria-hidden /><span className="legal-back">На главную</span></a>
+        <a className="btn ghost" href="/"><ArrowLeft size={16} aria-hidden /><span className="legal-back">На главную</span></a>
       </header>
       <article className="legal-body">
         {kind === 'offer' ? <OfferText offer={offer} /> : <PrivacyText offer={offer} />}
@@ -200,7 +202,7 @@ const OfferText: React.FC<{offer: PublicOffer | null}> = ({offer}) => {
       </p>
 
       <h2>8. Персональные данные</h2>
-      <p>Как Продавец обрабатывает данные Клиента — в <a href="#/privacy">политике персональных данных</a>.</p>
+      <p>Как Продавец обрабатывает данные Клиента — в <a href="/privacy">политике персональных данных</a>.</p>
 
       <h2>9. Споры и изменения</h2>
       <ul>
@@ -229,7 +231,8 @@ const PrivacyText: React.FC<{offer: PublicOffer | null}> = ({offer}) => {
         <li><b>Профиль компании:</b> название, контакты для роликов, логотип, цвета — то, что Клиент вписывает сам.</li>
         <li><b>Работа в сервисе:</b> ссылки на объявления, загруженные фото и видео, готовые ролики и карусели, история кредитов.</li>
         <li><b>Оплаты:</b> тариф, сумма, способ и статус оплаты. Номера карт и данные кошельков Продавец не получает.</li>
-        <li><b>Технические:</b> cookie сессии (чтобы не входить заново), IP-адрес и время запросов в журналах сервера. Рекламных и аналитических счётчиков на сайте нет.</li>
+        <li><b>Технические:</b> cookie сессии (чтобы не входить заново), IP-адрес и время запросов в журналах сервера.</li>
+        <li><b>Статистика посещений:</b> cookie Google Analytics и Яндекс Метрики — как посетитель нашёл сайт и какие страницы открывал, без имени и почты. Только если посетитель нажал «Принять» на плашке внизу экрана; «Отказаться» — счётчики не загружаются вовсе. Записи экрана (Вебвизор) нет.</li>
       </ul>
 
       <h2>2. Зачем</h2>
@@ -246,6 +249,7 @@ const PrivacyText: React.FC<{offer: PublicOffer | null}> = ({offer}) => {
         <li>хостинг — серверы сервиса в Германии;</li>
         <li>Resend — отправка писем с кодом подтверждения и ссылкой сброса пароля (адрес почты);</li>
         <li>платёжные сервисы — сумма и номер заказа; данные, которые Клиент вводит на странице оплаты, обрабатывает сам платёжный сервис по своим правилам;</li>
+        <li>Google и Яндекс — обезличенная статистика посещений, только с согласия посетителя (см. раздел 1);</li>
         <li>ElevenLabs — распознавание речи и озвучка, если Клиент сам запускает их для своего видео (звуковая дорожка);</li>
         <li>сотрудники Продавца — уведомления об оплатах с контактами Клиента во внутреннем рабочем чате, чтобы помочь при сбое.</li>
       </ul>
@@ -260,6 +264,7 @@ const PrivacyText: React.FC<{offer: PublicOffer | null}> = ({offer}) => {
       <ul>
         <li>Посмотреть и исправить свои данные — в кабинете («Профиль»); телефон меняется через поддержку.</li>
         <li>Удалить кабинет и данные — в кабинете или по запросу через контакты ниже.</li>
+        <li>Отозвать согласие на статистику посещений — очистить cookie и данные сайта в браузере: плашка выбора появится снова.</li>
         <li>Узнать, какие данные о нём хранятся, или отозвать согласие — написать по контактам ниже; ответ — в течение 10 рабочих дней.</li>
       </ul>
 
