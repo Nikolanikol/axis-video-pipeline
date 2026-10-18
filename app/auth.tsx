@@ -3,8 +3,9 @@
 // Интерфейс начинает с /api/auth/me. Вход выключен (нет базы — Mac без DATABASE_URL,
 // тесты) — сразу пускаем внутрь, как было. Включён и никто не вошёл — витрина KOK с формой
 // входа и регистрации (app/Landing.tsx).
-import React, {Suspense, createContext, lazy, useCallback, useContext, useEffect, useState} from 'react';
+import React, {Suspense, createContext, lazy, useCallback, useContext, useEffect, useLayoutEffect, useState} from 'react';
 import {Loading} from './Loading';
+import {dropPrerender, track} from './analytics';
 import {Balance, Me, Registration, User, api, errorText} from './api';
 import {Field} from './LotForm';
 import {useRoute} from './router';
@@ -98,14 +99,20 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
       .finally(() => { window.history.replaceState(null, '', '#/account'); load(); });
   }, [link, load]);
 
+  // Серверная витрина (server/seo.mjs) стоит, пока не ясно, гость ли это: гостю её сменит своя
+  // витрина (Landing), всем прочим — кабинет, документ, сброс пароля или ошибка
+  const legal = route.pipeline === 'offer' || route.pipeline === 'privacy';
+  const keep = !error && !legal && link?.kind !== 'reset' && (!me || (me.authRequired && !me.user));
+  useLayoutEffect(() => { if (!keep) dropPrerender(); }, [keep]);
+
   const logout = useCallback(() => {
     api.logout().finally(() => window.location.reload());
   }, []);
 
   if (link?.kind === 'reset') return <ResetScreen token={link.token} />;
   // До проверки входа: документ не зависит от сессии и должен открываться, даже если сервер вход не отдал
-  if (route.pipeline === 'offer' || route.pipeline === 'privacy') {
-    return <Suspense fallback={<Loading />}><LegalPage kind={route.pipeline} anchor={route.tool} /></Suspense>;
+  if (legal) {
+    return <Suspense fallback={<Loading />}><LegalPage kind={route.pipeline as 'offer' | 'privacy'} anchor={route.tool} /></Suspense>;
   }
   if (error) return (
     <div className="boot">
@@ -224,6 +231,8 @@ export const AuthCard: React.FC<{signup: {credits: number; days: number}; notice
       if (mode === 'login') await api.login(form.email, form.password);
       else {
         await api.register(form);
+        // Цель «регистрация» в GA4 и Метрике (app/analytics.tsx) — только если гость согласился на cookie
+        track('sign_up');
         // Новый кабинет — сразу на «Первые шаги»: подтвердить почту и настроиться
         // (app/Onboarding.tsx), а не в пустой кабинет с тонкой полосой сверху
         window.location.hash = '#/start';
@@ -277,8 +286,8 @@ export const AuthCard: React.FC<{signup: {credits: number; days: number}; notice
         {mode === 'login' && <p className="hint"><button type="button" className="link" onClick={() => { setMode('forgot'); setSent(false); }}>Забыли пароль?</button></p>}
         {/* Акцепт оферты — регистрацией (Legal.tsx): клиент должен видеть, с чем соглашается */}
         {mode === 'register' && (
-          <p className="hint">Создавая кабинет, вы принимаете <a href="#/offer" target="_blank" rel="noreferrer">оферту</a> и{' '}
-            <a href="#/privacy" target="_blank" rel="noreferrer">политику персональных данных</a>.</p>
+          <p className="hint">Создавая кабинет, вы принимаете <a href="/offer" target="_blank" rel="noreferrer">оферту</a> и{' '}
+            <a href="/privacy" target="_blank" rel="noreferrer">политику персональных данных</a>.</p>
         )}
         {mode === 'forgot' && <p className="hint"><button type="button" className="link" onClick={() => setMode('login')}>Вернуться ко входу</button></p>}
       </form>

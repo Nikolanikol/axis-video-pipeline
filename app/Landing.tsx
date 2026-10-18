@@ -11,15 +11,17 @@
 // Образцы и демо-объявление — статика в public/landing/, собирает tools/landing-samples.mjs
 // от имени демо-компании «Ваша компания» (src/shared/landingDemo.js): на публичной странице
 // не светим работы настоящего клиента.
-import React, {useEffect, useMemo, useRef, useState} from 'react';
+import React, {useEffect, useLayoutEffect, useMemo, useRef, useState} from 'react';
 import {ArrowRight, Check, ChevronLeft, ChevronRight, Download, Link2, Palette, Sparkles, X} from 'lucide-react';
 import brand from '../config/brand.json';
 import copy from '../config/copy.json';
 import palettes from '../config/palettes.json';
+import seo from '../config/seo.json';
 import {DEMO_PROFILE, demoTheme} from '../src/shared/landingDemo.js';
 import {FORMATS} from '../src/shared/model';
 import {marketFromProfile} from '../src/shared/profile';
 import type {AdProps, Lot, Market, Theme} from '../src/shared/types';
+import {dropPrerender} from './analytics';
 import {api, PublicOffer} from './api';
 import {AuthCard, AuthMode} from './auth';
 import {Preview} from './Preview';
@@ -30,6 +32,9 @@ type Samples = {
   videos: {title: string; year: number; format: string; palette: string; video: string; poster: string}[];
   carousels: {title: string; year: number; format: string; ratio: string; palette: string; slides: string[]}[];
 };
+
+// Витрину рисует и сервер (server/seo.mjs) — там useLayoutEffect не работает и шумит предупреждением
+const useBrowserLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 const won = (n: number) => `${n.toLocaleString('ru-RU')} ₩`;
 // «7 кредитов», «3 кредита», «1 кредит»
@@ -55,6 +60,9 @@ export const Landing: React.FC<{signup: {credits: number; days: number}; notice:
   const gift = offer?.signup ?? signup;
   const costs = offer?.costs ?? {ads: 3, carousels: 1};
   const start = (m: AuthMode) => { setMode(m); setAuthOpen(true); };
+  // Своя витрина нарисована — серверная копия больше не нужна. До отрисовки кадра, чтобы на миг
+  // не стояли обе (server/seo.mjs)
+  useBrowserLayoutEffect(dropPrerender, []);
 
   return (
     <div className="landing">
@@ -74,7 +82,9 @@ export const Landing: React.FC<{signup: {credits: number; days: number}; notice:
       <section className="land-hero">
         <div className="land-hero-text">
           <span className="land-eyebrow"><Sparkles size={15} aria-hidden /> Для автодилеров, продающих машины из Кореи, Китая и Японии</span>
-          <h1>Ролик и карусель по&nbsp;ссылке на&nbsp;объявление — <span className="land-accent">одной кнопкой</span></h1>
+          {/* Слова — как ищет дилер (подсказки Google и Яндекса 19.10, config/seo.json): «реклама / SMM автосалона».
+              Прежний «Ролик и карусель по ссылке на объявление» не содержал ни одного запроса */}
+          <h1>Реклама и SMM для&nbsp;автосалона — ролик и карусель <span className="land-accent">по&nbsp;ссылке</span></h1>
           <p className="land-lead">
             Вставляете ссылку — KOK сам подбирает фото, характеристики и цену и собирает рекламный ролик
             для Reels и TikTok и карусель для Instagram в вашем фирменном стиле. Минута вместо вечера в монтаже.
@@ -146,12 +156,9 @@ export const Landing: React.FC<{signup: {credits: number; days: number}; notice:
 
       <section id="faq" className="land-section">
         <h2 className="land-h2">Вопросы</h2>
+        {/* Вопросы — из config/seo.json: те же уходят в разметку FAQPage для Google (server/seo.mjs) */}
         <div className="land-faq">
-          <details><summary>Нужна ли карта, чтобы попробовать?</summary><p>Нет. Регистрация и пробные кредиты — без оплаты. Решите продолжить — выберете тариф в кабинете и оплатите онлайн, кредиты придут сами.</p></details>
-          <details><summary>Можно вернуть деньги?</summary><p>Да, в течение 3 суток после оплаты, если кредиты из покупки ещё не тратились: напишите нам заявление на возврат в Telegram. Сбой при сборке ролика — кредит возвращается сам. Подробно — в <a href="#/offer">оферте</a>.</p></details>
-          <details><summary>Что будет, если объявление на площадке снимут?</summary><p>Ничего: фото копируются к нам при создании, готовый ролик и карусель от объявления не зависят.</p></details>
-          <details><summary>Можно поставить свой логотип и цвета?</summary><p>Да. В настройках бренда — логотип, палитра, шрифты и контакты. Один раз — и они на всех роликах и каруселях.</p></details>
-          <details><summary>На каком языке тексты?</summary><p>На языке вашего профиля: характеристики и подписи переводятся сами. Карусели — на русском или английском.</p></details>
+          {seo.faq.map((f) => <details key={f.q}><summary>{f.q}</summary><p><Linked text={f.a} /></p></details>)}
         </div>
       </section>
 
@@ -221,6 +228,12 @@ const jump = (id: string) => (e: React.MouseEvent) => {
   e.preventDefault();
   document.getElementById(id)?.scrollIntoView({behavior: 'smooth', block: 'start'});
 };
+
+// «[оферте](/offer)» из config/seo.json — ссылкой, остальное — текстом
+const Linked: React.FC<{text: string}> = ({text}) => <>{text.split(/(\[[^\]]+\]\([^)]+\))/).map((part, i) => {
+  const m = /^\[([^\]]+)\]\(([^)]+)\)$/.exec(part);
+  return m ? <a key={i} href={m[2]}>{m[1]}</a> : part;
+})}</>;
 
 const Step: React.FC<{n: number; icon: React.ReactNode; title: string; text: string}> = ({n, icon, title, text}) => (
   <div className="land-step">

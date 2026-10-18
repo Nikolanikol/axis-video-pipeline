@@ -1,8 +1,9 @@
 <!doctype html>
-<html lang="ru">
+<html lang="ru" prefix="og: https://ogp.me/ns#">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Заголовок, описание и метку seo ниже подставляет сервер по адресу страницы: server/seo.mjs, тексты — config/seo.json -->
     <title>KOK — контент одной кнопкой</title>
     <meta name="description" content="Ролики, обзоры и карусели для автодилеров — одной кнопкой." />
     <meta name="theme-color" content="#0b0b0d" />
@@ -10,14 +11,20 @@
     <link rel="icon" href="/kok/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/kok/apple-touch-icon.png" />
     <link rel="manifest" href="/kok/manifest.webmanifest" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="KOK" />
+    <meta property="og:locale" content="ru_RU" />
     <meta property="og:title" content="KOK — контент одной кнопкой" />
     <meta property="og:description" content="Ролики, обзоры и карусели для автодилеров — одной кнопкой." />
     <meta property="og:image" content="/kok/og.png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <!--seo-->
   </head>
   <body>
+    <!--prerender-->
     <div id="root"></div>
-    <script type="module" src="./main.tsx"></script>
+    <script type="module" src="/main.tsx"></script>
   </body>
 </html>

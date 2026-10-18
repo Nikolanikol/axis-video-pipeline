@@ -46,6 +46,7 @@ import {
 import {isCoreError} from '../cores/kit/errors.mjs';
 import {requestIdMw, serverLog} from './log.mjs';
 import {clientErrorHandler} from './clientErrors.mjs';
+import {robotsTxt, sitemapXml} from './seo.mjs';
 
 const log = serverLog('api');
 // Сколько фото объявления качать и обрабатывать разом (загрузка по ссылке, см. photos/import)
@@ -150,6 +151,10 @@ export const createApp = ({photoOrigin}) => {
   // За Traefik на сервере: верим его X-Forwarded-Proto (для Secure у cookie) и адресу клиента
   // (для ограничения попыток входа) — но только от прокси из внутренней сети, не от кого угодно
   app.set('trust proxy', 'loopback, uniquelocal');
+  // Поисковикам (server/seo.mjs). До статики и до запасного index.html: иначе по этим адресам
+  // уходила страница приложения, и робот не находил ни правил, ни карты сайта
+  app.get('/robots.txt', (req, res, next) => robotsTxt(req).then((t) => res.type('text/plain').send(t)).catch(next));
+  app.get('/sitemap.xml', (_req, res, next) => sitemapXml().then((x) => res.type('application/xml').send(x)).catch(next));
   // Номер запроса — самым первым: он нужен и ошибке разбора тела, и журналу всех шагов ниже
   app.use(requestIdMw);
   app.use(express.json({limit: '2mb'}));

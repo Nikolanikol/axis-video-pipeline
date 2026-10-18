@@ -13,6 +13,8 @@ import {startSupport} from './support.mjs';
 import {DEFAULT_WORKSPACE, ensureWorkspace, legacyDataDirs} from './store.mjs';
 import {serverLog} from './log.mjs';
 import {installAlarms} from './alarm.mjs';
+import {readPrerendered, renderLanding, renderPage, wantsLanding} from './seo.mjs';
+import {sessionToken} from './session.mjs';
 
 const log = serverLog('server');
 // Строки журнала уровня error — ещё и тревогой в Telegram (тема «Сбои», TELEGRAM_ALERTS_TOPIC)
@@ -77,6 +79,9 @@ const server = http.createServer(app);
 // на Mac. Признак именно явный, а не «есть ли dist»: иначе одна сборка на Mac молча
 // отключила бы горячую перезагрузку, и правки в интерфейсе перестали бы появляться.
 const DIST = path.join(ROOT, 'dist', 'app');
+// Готовую витрину кладём только гостю на главной и только там, где главная и есть витрина — с базой
+// (вход обязателен). Без базы на «/» сразу кабинет: витрина мелькнула бы перед ним
+const showLanding = (req) => hasDatabase() && wantsLanding(req, Boolean(sessionToken(req)));
 const production = process.env.NODE_ENV === 'production';
 
 if (production) {
@@ -86,10 +91,16 @@ if (production) {
     process.exit(1);
   });
   const {default: express} = await import('express');
-  app.use(express.static(DIST));
+  // index.html статика не отдаёт сама (index: false): страницу собирает renderPage — заголовки
+  // адреса, canonical, витрина для гостя (server/seo.mjs). Оба файла читаем один раз: сборка в
+  // контейнере не меняется до следующей выкладки
+  app.use(express.static(DIST, {index: false}));
+  const shell = await fs.readFile(path.join(DIST, 'index.html'), 'utf8');
+  const landing = await readPrerendered(DIST);
+  if (!landing) log.warn('seo.no-prerender', {note: 'нет dist/app/landing.html — роботы увидят пустую витрину'});
   // Разделы открываются по прямой ссылке: у одностраничного приложения все пути ведут в index.html
   app.use((req, res, next) => (req.method === 'GET' && !req.path.startsWith('/api/')
-    ? res.sendFile(path.join(DIST, 'index.html'))
+    ? renderPage(shell, req, {landing: showLanding(req) ? landing : null}).then((html) => res.type('html').send(html)).catch(next)
     : next()));
 } else {
   const {createServer: createVite} = await import('vite');
@@ -102,6 +113,18 @@ if (production) {
     appType: 'spa',
     server: {middlewareMode: true, hmr: {server}, fs: {allow: [ROOT]}},
     logLevel: 'warn',
+  });
+  // Страницы приложения — через renderPage, как в бою: на Mac видно то же, что получит робот.
+  // Витрина рисуется заново на каждый запрос — правка Landing.tsx видна без сборки
+  const pages = /^\/(index\.html)?$|^\/(offer|privacy)(\/[\w-]*)?$/;
+  app.use((req, res, next) => {
+    if (req.method !== 'GET' || !pages.test(req.path)) return next();
+    (async () => {
+      const raw = await fs.readFile(path.join(ROOT, 'app', 'index.html'), 'utf8');
+      const shell = await vite.transformIndexHtml(req.originalUrl, raw);
+      const landing = showLanding(req) ? await renderLanding((id) => vite.ssrLoadModule(id)) : null;
+      res.type('html').send(await renderPage(shell, req, {landing}));
+    })().catch(next);
   });
   app.use(vite.middlewares);
 }

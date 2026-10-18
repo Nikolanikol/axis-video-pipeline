@@ -218,7 +218,7 @@ const PayDialog: React.FC<{pack: Pack; offer: Offer; text: string; onClose: () =
         )}
         {!usdt && !anypay && !manager && <p className="hint">Способы оплаты ещё не настроены — напишите нам на почту из подвала сайта.</p>}
         {/* Модерация кассы и сам клиент: перед оплатой видно условия и возврат */}
-        <p className="hint">Оплачивая, вы принимаете <a href="#/offer" target="_blank" rel="noreferrer">оферту</a>: возврат — в течение 3 суток, если кредиты из покупки не тратились.</p>
+        <p className="hint">Оплачивая, вы принимаете <a href="/offer" target="_blank" rel="noreferrer">оферту</a>: возврат — в течение 3 суток, если кредиты из покупки не тратились.</p>
         {error && <div className="auth-error">{error}</div>}
         <button type="button" className="btn ghost" onClick={onClose} disabled={busy}>Отмена</button>
       </div>

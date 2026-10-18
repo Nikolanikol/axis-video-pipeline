@@ -4,7 +4,12 @@ import {useEffect, useState} from 'react';
 export type Route = {pipeline?: string; tool?: string};
 
 const parse = (): Route => {
-  const [pipeline, tool] = window.location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
+  // Оферта и политика живут ещё и на настоящих адресах (/offer, /offer/refunds, /privacy) — их видят
+  // поисковики (server/seo.mjs). Адрес с «#» главнее: переход по разделам меняет только его
+  const hash = window.location.hash.replace(/^#\/?/, '');
+  const doc = /^\/(offer|privacy)(?:\/([\w-]+))?\/?$/.exec(window.location.pathname);
+  if (!window.location.hash && doc) return {pipeline: doc[1], tool: doc[2]};
+  const [pipeline, tool] = hash.split('/').filter(Boolean);
   return {pipeline, tool};
 };
 
