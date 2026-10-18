@@ -6,10 +6,14 @@ import {PriceFirst} from './price-first/PriceFirst';
 import {PriceAd} from './price-ad/PriceAd';
 import {DesignAd} from '../design/DesignAd';
 import {isDesign} from '../shared/design.js';
+import {applyLook} from '../shared/look.js';
 
 // Прежняя тема без design остаётся на прежней композиции, в том числе на витрине гостя.
-const designed = (Legacy: React.FC<AdProps>, formatId: string): React.FC<AdProps> => (props) =>
-  isDesign(props.theme?.design) ? React.createElement(DesignAd, {...props, formatId}) : React.createElement(Legacy, props);
+// Оформление объявления (lot.look) накладывается здесь — одно место для превью и серверного рендера
+const designed = (Legacy: React.FC<AdProps>, formatId: string): React.FC<AdProps> => (input) => {
+  const props = input.lot?.look ? {...input, theme: applyLook(input.theme ?? {}, input.lot.look)} : input;
+  return isDesign(props.theme?.design) ? React.createElement(DesignAd, {...props, formatId}) : React.createElement(Legacy, props);
+};
 
 export const FORMAT_COMPONENTS: Record<string, React.FC<AdProps>> = {
   'price-ad': designed(PriceAd, 'price-ad'),

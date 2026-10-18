@@ -3,7 +3,11 @@
 import type brandTheme from '../../config/brand.json';
 
 export type DesignId = typeof import('./design.js').DESIGN_IDS[number];
-export type Theme = typeof brandTheme & {design?: DesignId; designVariant?: 0 | 1};
+export type TextMotionId = typeof import('./design.js').TEXT_MOTIONS[number];
+export type SlideMotionId = typeof import('./design.js').SLIDE_MOTIONS[number];
+export type LotLook = {design: DesignId | null; designVariant: 0 | 1; fonts: Theme['fonts']; style: Theme['style']}
+  & Pick<Theme, 'bg' | 'panel' | 'line' | 'grey' | 'white' | 'copper' | 'copperLight' | 'copperDark'>;
+export type Theme = typeof brandTheme & {design?: DesignId; designVariant?: 0 | 1; textMotion?: TextMotionId; slideMotion?: SlideMotionId};
 
 // Тексты рынка (язык ролика). Какие ключи нужны — описывает формат в config/formats.json.
 export type Texts = Record<string, string>;
@@ -70,6 +74,11 @@ export type Lot = Partial<Omit<Market, 'texts'>> & {
   market?: string;
   // Последний выбранный формат ролика для этого лота
   format?: string;
+  // Движение ролика именно этого объявления — перебивает выбор в бренде (motion.tsx).
+  // Нет поля — как в бренде; действует только при пресете оформления
+  textMotion?: TextMotionId; slideMotion?: SlideMotionId;
+  // Своё оформление ролика этого объявления — снимок, см. src/shared/look.js. Нет поля — как в бренде
+  look?: LotLook;
   brand: string; model: string; trim?: string; year: number; specs: string[];
   // Цена авто: либо сразу в $, либо в ₩ + курс (₩ за $1). Без цены ролик — черновик с заглушкой.
   carPriceUsd?: number | null; carPriceKrw?: number | null; krwPerUsd?: number | null;

@@ -28,7 +28,7 @@ import {ICON_RULES, LOGO_RULES, brandForRender, saveIcon, saveLogo, setIconVaria
 import {balanceOf, billed, creditCosts, ledgerOf, ledgerPage, signupCredits} from './billing.mjs';
 import {parseCarouselSource} from '../src/shared/kmotorsLot.js';
 import {PALETTE_KEYS, isHex} from '../src/shared/contrast.js';
-import {isDesign} from '../src/shared/design.js';
+import {isDesign, isSlideMotion, isTextMotion} from '../src/shared/design.js';
 import {withoutMusic} from '../src/shared/nomusic.js';
 import {
   accountOf, cancelEmailChange, requestDeletion, restoreAccount, changePassword, closeOtherSessions, closeSession, confirmEmailChange, dropSession,
@@ -86,6 +86,32 @@ const wsOf = (req) => req.ws ?? (authEnabled() ? null : DEFAULT_WORKSPACE);
 const billOf = (req, pipeline) => ({pipeline, userId: req.user?.id ?? null, free: Boolean(req.user?.isStaff)});
 
 /**
+ * Оформление и движение одного объявления (экран ролика, 20.10). Цвета и шрифты идут прямо в
+ * стили рендера, поэтому строже бренда: шрифты — только пара из config/fonts.json, без своих
+ */
+const checkLotLook = async (lot) => {
+  if (lot.textMotion !== undefined && !isTextMotion(lot.textMotion)) throw new HttpError(400, 'Выберите появление текста из списка');
+  if (lot.slideMotion !== undefined && !isSlideMotion(lot.slideMotion)) throw new HttpError(400, 'Выберите смену сцен из списка');
+  const look = lot.look;
+  if (look === undefined || look === null) return;
+  if (typeof look !== 'object' || Array.isArray(look)) throw new HttpError(400, 'Оформление ролика — объект настроек');
+  if (look.design !== null && !isDesign(look.design)) throw new HttpError(400, 'Выберите дизайн из списка');
+  if (look.designVariant !== 0 && look.designVariant !== 1) throw new HttpError(400, 'Компоновка — основная или альтернативная');
+  for (const k of PALETTE_KEYS) if (!isHex(look[k])) throw new HttpError(400, `Цвет «${k}» — в виде #RRGGBB`);
+  // Своя пара бренда (вписанная в brand.json руками) тоже годится: снимок оформления её копирует,
+  // и иначе смена одной палитры у ролика упиралась бы в отказ по шрифтам
+  const pairs = [...await readJson(path.join(CONFIG_DIR, 'fonts.json')), (await getBrand()).fonts ?? {}];
+  const f = look.fonts;
+  if (!f || !pairs.some((p) => p.head === f.head && p.body === f.body && (p.url ?? '') === (f.url ?? ''))) {
+    throw new HttpError(400, 'Шрифты ролика — одна из пар в списке');
+  }
+  const st = look.style;
+  if (!st || typeof st.gradient !== 'boolean' || typeof st.radius !== 'number' || st.radius < 0 || st.radius > 2) {
+    throw new HttpError(400, 'Оформление ролика: акцент и углы — из списка');
+  }
+};
+
+/**
  * Бренд от клиента проверяем: файлы бренда и таблица шрифтов открываются браузером рендера
  * на нашем сервере. Адрес, подставленный вручную, заставил бы его ходить куда угодно —
  * в том числе на внутренние адреса машины. Разрешены встроенные файлы (brand/…), файлы своей
@@ -110,6 +136,8 @@ const checkBrand = (theme) => {
   if (theme.designVariant !== undefined && theme.designVariant !== 0 && theme.designVariant !== 1) {
     throw new HttpError(400, 'Компоновка — основная или альтернативная');
   }
+  if (theme.textMotion !== undefined && !isTextMotion(theme.textMotion)) throw new HttpError(400, 'Выберите появление текста из списка');
+  if (theme.slideMotion !== undefined && !isSlideMotion(theme.slideMotion)) throw new HttpError(400, 'Выберите смену сцен из списка');
   const url = theme.fonts?.url ?? '';
   if (url && !/^https:\/\/fonts\.googleapis\.com\//.test(url)) {
     throw new HttpError(400, 'Шрифты — только из Google Fonts');
@@ -443,6 +471,7 @@ export const createApp = ({photoOrigin}) => {
     const known = new Set(current.photos);
     const sent = [...new Set(Array.isArray(req.body.photos) ? req.body.photos.filter((p) => known.has(p)) : [])];
     const photos = sent.length === current.photos.length ? sent : current.photos;
+    await checkLotLook(req.body);
     return saveLot(current.id, {...req.body, photos, blur: current.blur, sources: current.sources});
   })));
 

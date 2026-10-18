@@ -12,13 +12,15 @@ import {useTodayMarket} from '../rates';
 import type {Market} from '../../src/shared/types';
 import {api, errorText, LotEntry} from '../api';
 import {useConfig} from '../config';
-import {DESIGNS} from '../../src/shared/designs';
 import {LotForm} from '../LotForm';
 import {EncarImport} from './EncarImport';
 import {Preview} from '../Preview';
 import {RenderPanel} from '../RenderPanel';
 import {lastFormat, lastLot} from '../router';
 import {FormatChips, ImportModal, LotsPanel, QuickLink, type ImportStage} from './QuickLot';
+import {MotionChips} from './MotionChips';
+import {LookPanel, lotTheme} from './LookPanel';
+import {PresetChips} from './PresetChips';
 import {toast} from '../Toast';
 import {Clapperboard, List, SlidersHorizontal} from 'lucide-react';
 import {MobileTabs, useIsPhone, usePanelSwipes} from '../MobileTabs';
@@ -97,7 +99,7 @@ export const LotTool: React.FC = () => {
   const selectLot = async (id: string) => {
     if (save === 'dirty') await saveLot();
     const next = lots.find((l) => l.id === id);
-    if (next) { setLot(next); setSave('saved'); setMtab('main'); }
+    if (next) { setLot(next); setSave('saved'); setMtab('main'); setLookOpen(false); }
   };
   const newLot = async () => {
     try {
@@ -140,6 +142,8 @@ export const LotTool: React.FC = () => {
   const [stage, setStage] = useState<ImportStage>(null);
   const [quickError, setQuickError] = useState('');
   const [editing, setEditing] = useState(false);
+  // Оформление ролика открыто в правой колонке вместо формата и сборки — превью остаётся рядом
+  const [lookOpen, setLookOpen] = useState(false);
   // Ручные настройки открываются под первым экраном — подводим к ним, иначе кнопка
   // «Изменить вручную» выглядит так, будто ничего не сделала. Едем сами, за 0,6 с с
   // замедлением к концу: мгновенный прыжок сбивал с толку (владелец 01.10). Своя анимация,
@@ -321,17 +325,21 @@ export const LotTool: React.FC = () => {
                 <span className={`save save-${save}`}>{SAVE_LABEL[save]}</span>
               </div>
             </div>
+            {lookOpen ? <LookPanel lot={lot} brand={brand} pairs={config.fonts} palettes={config.palettes ?? []}
+              onChange={editLot} onClose={() => setLookOpen(false)} /> : <>
             <div className="quick-label">Формат ролика</div>
             <FormatChips value={format.id} onChange={chooseFormat} />
-            {/* Пресет меняет вёрстку всех форматов — видно здесь, чтобы не искать причину «чужого» вида в настройках */}
-            <div className="design-summary">Пресет: {DESIGNS.find((d) => d.id === brand.design)?.title ?? 'Исходный'} · <a href="#/settings/brand">Настроить</a></div>
-            <RenderPanel
+            {/* Пресет ролика — сразу здесь; цвета, шрифты и углы — в «Оформлении ролика», в той же колонке */}
+            <PresetChips lot={lot} theme={lotTheme(brand, lot)} onChange={editLot} onMore={() => setLookOpen(true)} />
+            <MotionChips lot={lot} brand={lotTheme(brand, lot)} onChange={editLot} />
+            </>}
+            {!lookOpen && <RenderPanel
               lot={lot}
               format={format}
               unsavedSettings={unsavedSettings}
               beforeRender={async () => { if (save !== 'saved') await saveLot(); }}
               onError={report}
-            />
+            />}
           </section>
         )}
       </main>

@@ -37,6 +37,15 @@ describe('сохранение дизайна бренда', () => {
     for (const designVariant of [-1, 2, .5, '1']) expect((await put({...brand, designVariant})).status).toBe(400);
   });
 
+  it('сохраняет движение роликов и отклоняет движение не из списка', async () => {
+    const {brand} = await fetch(`${base}/api/config`).then((r) => r.json());
+    expect((await put({...brand, textMotion: 'highlight', slideMotion: 'stack'})).status).toBe(200);
+    const saved = await fs.readFile(path.join(env.config, 'brand.json'), 'utf8').then(JSON.parse);
+    expect([saved.textMotion, saved.slideMotion]).toEqual(['highlight', 'stack']);
+    expect((await put({...brand, textMotion: 'bounce'})).status).toBe(400);
+    expect((await put({...brand, slideMotion: '<script>'})).status).toBe(400);
+  });
+
   it('принимает прежний бренд без новых полей', async () => {
     const {brand} = await fetch(`${base}/api/config`).then((r) => r.json());
     const {design, designVariant, ...legacy} = brand;

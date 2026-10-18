@@ -31,7 +31,7 @@ const COLOR_FIELDS: [ColorKey, string][] = [
  * фиолетовых вместо перелива одного. Каждая палитра реестра прошла проверку контраста.
  * Выбранную узнаём по самим цветам — как пару шрифтов, без отдельного поля id.
  */
-const PaletteField: React.FC<{theme: Theme; palettes: Palette[]; onChange: (t: Theme) => void}> = ({theme, palettes, onChange}) => {
+export const PaletteField: React.FC<{theme: Theme; palettes: Palette[]; onChange: (t: Theme) => void}> = ({theme, palettes, onChange}) => {
   const current = matchPalette(theme, palettes);
   return (
     <>
@@ -63,7 +63,7 @@ const PaletteField: React.FC<{theme: Theme; palettes: Palette[]; onChange: (t: T
  * Тонкая настройка: свои восемь цветов. Свёрнута — большинству она не нужна, — и сразу
  * говорит, что перестанет читаться: предупреждение здесь, а не на готовом ролике.
  */
-const FineColors: React.FC<{theme: Theme; custom: boolean; onChange: (t: Theme) => void}> = ({theme, custom, onChange}) => {
+export const FineColors: React.FC<{theme: Theme; custom: boolean; onChange: (t: Theme) => void}> = ({theme, custom, onChange}) => {
   const issues = contrastIssues(theme);
   return (
     <details className="fine" open={custom && issues.length > 0}>
@@ -192,7 +192,7 @@ const useFontSheets = (pairs: FontPair[]) => {
  * В образце намеренно есть кириллица: все пары реестра её умеют (проверено запросом
  * к Google Fonts), и видеть это надо сразу, а не после первого ролика на македонском.
  */
-const FontField: React.FC<{theme: Theme; pairs: FontPair[]; onChange: (t: Theme) => void}> = ({theme, pairs, onChange}) => {
+export const FontField: React.FC<{theme: Theme; pairs: FontPair[]; onChange: (t: Theme) => void}> = ({theme, pairs, onChange}) => {
   useFontSheets(pairs);
   // Выбранную пару узнаём по самим шрифтам, а не по отдельному полю id: лишнее поле
   // разошлось бы с fonts, стоит один раз поправить brand.json руками
@@ -231,7 +231,7 @@ const FontField: React.FC<{theme: Theme; pairs: FontPair[]; onChange: (t: Theme)
  */
 const RADIUS: [number, string][] = [[0, 'Острые'], [1, 'Мягкие'], [1.8, 'Круглые']];
 
-const StyleField: React.FC<{theme: Theme; onChange: (t: Theme) => void}> = ({theme, onChange}) => {
+export const StyleField: React.FC<{theme: Theme; onChange: (t: Theme) => void}> = ({theme, onChange}) => {
   // Значения по умолчанию те же, что в вёрстке: тема могла прийти без style
   const style = {gradient: theme.style?.gradient ?? true, radius: theme.style?.radius ?? 1};
   const set = (patch: Partial<typeof style>) => onChange({...theme, style: {...style, ...patch}});

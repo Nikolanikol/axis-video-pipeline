@@ -116,6 +116,31 @@ describe('лоты', () => {
     expect(saved.blur).toBeUndefined();
     expect(saved.sources).toBeUndefined();
   });
+
+  it('своё оформление ролика: снимок из списка сохраняется, чужие цвета и шрифты — нет', async () => {
+    const {body: lot} = await call('POST', '/api/lots', {});
+    const {body: config} = await call('GET', '/api/config');
+    const pair = config.fonts[1];
+    const look = {design: 'catalog', designVariant: 1, ...config.palettes[0].colors,
+      fonts: {head: pair.head, body: pair.body, url: pair.url}, style: {gradient: false, radius: 1}};
+    const ok = await call('PUT', `/api/lots/${lot.id}`, {...lot, look, textMotion: 'label', slideMotion: 'detail'});
+    expect(ok.status).toBe(200);
+    expect(ok.body.look).toEqual(look);
+    // «Исходный» у ролика при пресете в бренде — design: null, это не ошибка
+    expect((await call('PUT', `/api/lots/${lot.id}`, {...lot, look: {...look, design: null, designVariant: 0}})).status).toBe(200);
+    const bad = [
+      {...look, bg: 'red; background: url(http://evil)'},
+      {...look, fonts: {head: 'Comic Sans', body: 'Arial', url: 'https://evil.example/x.css'}},
+      {...look, design: 'other'},
+      {...look, style: {gradient: 'yes', radius: 1}},
+    ];
+    for (const b of bad) expect((await call('PUT', `/api/lots/${lot.id}`, {...lot, look: b})).status).toBe(400);
+    expect((await call('PUT', `/api/lots/${lot.id}`, {...lot, textMotion: 'bounce'})).status).toBe(400);
+    // Без поля — «как в бренде»: прежние объявления сохраняются как раньше
+    const back = await call('PUT', `/api/lots/${lot.id}`, {...lot});
+    expect(back.status).toBe(200);
+    expect(back.body.look).toBeUndefined();
+  });
 });
 
 describe('фото', () => {
