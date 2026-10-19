@@ -129,7 +129,7 @@ export const Frame: React.FC<{
       {/* Шапка: логотип слева, рубрика справа — на всех слайдах одинаково */}
       <div style={{position: 'absolute', top: PAD, left: PAD, right: PAD, height: 60, display: 'flex',
         alignItems: 'center', justifyContent: 'space-between'}}>
-        <Logo asset="logoHorizontal" height={52} style={{textAlign: 'left'}} />
+        <Logo asset="logoHorizontal" height={52} width={480} style={{textAlign: 'left', objectPosition: 'left'}} />
         <div style={{display: 'flex', alignItems: 'center', gap: 22}}>
           <div style={{width: 70, height: 2, background: C.copper}} />
           <div style={{fontFamily: BODY, fontWeight: 500, fontSize: 24, color: C.white, opacity: 0.85,

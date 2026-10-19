@@ -110,13 +110,20 @@ export const Logo: React.FC<{asset: LogoAsset; height?: number; width?: number; 
   const theme = useTheme();
   const value = theme.assets?.[asset];
   const url = src(value ?? BRAND.assets[asset]);
+  // Место под знак по ширине — и у картинки, и у текста ниже
+  const box = width ?? (asset === 'logoHorizontal' ? 720 : 900);
   if (value !== '') {
-    return <Img src={url} style={{...(height ? {height} : {}), ...(width ? {width} : {}), ...style}} />;
+    // Картинка вписывается в место «высота × ширина» целиком, пропорции сохраняются (contain).
+    // Раньше задавалась одна высота, а ширина шла от пропорций файла: клиент (ICONAUTO, 20.10)
+    // загрузил широкую надпись, сервер обрезал пустые поля — осталась полоса ~9:1, и на финале
+    // (высота 260) логотип выходил шириной ~2300 px при кадре 1080 и обрезался по краям.
+    // Только ширина (водяной знак) — высота по пропорциям, как и было
+    const fit: React.CSSProperties = height ? {width: box, height, objectFit: 'contain'} : {width: box};
+    return <Img src={url} style={{maxWidth: '100%', ...fit, ...style}} />;
   }
   const name = (theme.name || '').trim();
   // Размер от места под знак: горизонтальный логотип — одна строка во всю высоту,
   // вертикальный (знак над подписью) — текст примерно в треть его высоты
-  const box = width ?? (asset === 'logoHorizontal' ? 720 : 900);
   const byHeight = height ? height * (asset === 'logoHorizontal' ? 0.72 : 0.36) : 110;
   // Oswald узкий: средняя буква заглавными — около 0,5 кегля
   const byWidth = box / Math.max(1, name.length * 0.5);
