@@ -13,6 +13,7 @@ import {withoutMusic} from '../../src/shared/nomusic.js';
 import {FORMATS} from '../../src/shared/model';
 import type {AdProps, FormatMeta, Lot, Theme} from '../../src/shared/types';
 import type {LotEntry} from '../api';
+import type {PreviewControl} from '../Preview';
 import {CarFields, ContactsEditor, Field, PhotosEditor, PriceEditor, SpecsEditor} from '../LotForm';
 import {thumb} from '../thumb';
 import {lotTheme} from './LookPanel';
@@ -147,6 +148,22 @@ const CompositionThumb: React.FC<{input: AdProps; format: FormatMeta; theme: The
 };
 
 export type MotionTab = 'textMotion' | 'photoMotion' | 'sceneTransition';
+/** Вкладки ленты — оформление и три группы анимации на одном уровне (владелец 20.10). Общие у телефона и компьютера */
+export type PaletteTab = 'look' | MotionTab;
+export const PALETTE_TABS: {id: PaletteTab; title: string}[] = [{id: 'look', title: 'Оформление'}, {id: 'textMotion', title: 'Текст'},
+  {id: 'photoMotion', title: 'Фото'}, {id: 'sceneTransition', title: 'Переход'}];
+/**
+ * Показать выбранный приём анимации фрагментом: текст и фото — начало текущей сцены, переход — стык
+ * с соседней сценой; около 2,5 с и пауза. Общий у телефона и компьютера
+ */
+export const playMotion = (player: PreviewControl | null, format: FormatMeta, sceneId: string, field: MotionTab) => {
+  const i = Math.max(0, format.scenes.findIndex((s) => s.id === sceneId));
+  const s = format.scenes[i];
+  if (field === 'sceneTransition') {
+    const next = format.scenes[i + 1] ?? format.scenes[1] ?? s;
+    player?.playFragment(next.from - Math.round(format.fps * .8), 2.4);
+  } else player?.playFragment(s.from, 2.6);
+};
 /** Подпись над лентой анимации: группа и выбранный приём («Появление текста · Из-под строки») */
 export const motionTitle = (brand: Theme, lot: LotEntry, tab: MotionTab) => {
   const theme = lotTheme(brand, lot);

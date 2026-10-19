@@ -920,6 +920,69 @@ a.tab { text-decoration: none; }
   .quick-side.palette-side .palette-foot .jobs-list { flex: none; max-height: 34vh; overflow-y: auto; }
 }
 
+/* ——— Палитра на компьютере — мобильная версия 3, перенесённая на ПК (app/ads/Palette.tsx) ———
+   Превью с «Настройками» поверх и панелью плеера под ним; справа — вкладки «Оформление | Текст |
+   Фото | Переход» и все варианты плитками в сетку (на телефоне — лента). «Настройки» встают на место
+   плиток внутри палитры; шапка, вкладки и низ со сборкой на месте. Классы плиток и панели — общие
+   с телефоном (.mle-*), здесь только отличия компьютера */
+.pd-stage { position: relative; display: flex; flex-direction: column; }
+.pd-stage .mle-bar { padding: 0 2px; }
+.palette.pd { overflow: hidden; }
+.pd-tabs { padding: 0 20px; gap: 18px; }
+.pd-tabs .mle-tabs-list { gap: 22px; }
+.pd-tabs .mle-tab { font-weight: 400; min-height: 46px; }
+.pd-tabs .mle-tab:hover { color: var(--text); }
+.pd-tabs .mle-tab.on { font-weight: 500; }
+.pd-tabs .mle-tab.on { color: var(--accent-text); }
+/* «Настройки» — явной кнопкой справа в строке вкладок (владелец 20.10): своя подложка и рамка,
+   открыта — залита винным бренда */
+.pd-tabs .pd-settings-tab { align-self: center; margin: 0 0 0 auto; min-height: 34px; padding: 0 14px; border: 1px solid var(--line);
+  border-radius: 10px; background: var(--panel-2); color: var(--text); font-weight: 500; }
+.pd-tabs .pd-settings-tab:hover { border-color: var(--accent-line); }
+.pd-tabs .pd-settings-tab.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+/* Сетка плиток: 4 в ряд на 460 px, плитка 3:4 — по ширине колонки */
+.pd-tiles { padding: 16px 20px 20px; }
+.pd-tiles .mle-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 14px 12px; overflow: visible; padding: 0; }
+.pd-tiles .mle-comp { width: auto; min-width: 0; font-size: 13px; font-weight: 400; }
+.pd-tiles .mle-comp.on { font-weight: 500; }
+.pd-tiles .mle-comp-frame { width: 100%; height: auto; aspect-ratio: 3 / 4; border-radius: 14px; transition: border-color .15s; }
+/* Плитки вытянуты 3:4 (владелец 20.10: «чуть подлиннее»): кадр 9:16 по ширине — 133 % высоты плитки, середина */
+.pd-tiles .mle-comp-crop { height: 133.33%; top: -16.67%; }
+.pd-tiles .mle-comp:hover .mle-comp-frame { border-color: var(--accent-line); }
+.pd-tiles .mle-comp.on .mle-comp-frame { border-color: var(--accent); }
+.pd-tiles .mle-comp-color { font-size: 12px; margin-top: -2px; }
+.pd-tiles .mle-motion-title { font-size: 12px; }
+.pd-tiles .mle-strip-note { padding: 0; }
+.pd-tiles .mle-comp:focus-visible { outline: none; }
+.pd-tiles .mle-comp:focus-visible .mle-comp-frame { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+/* «Настройки» в палитре — на месте плиток, во всю ширину колонки, без затемнения */
+.palette.pd .pd-side { position: static; flex: 1; min-height: 0; width: auto; border-left: none; box-shadow: none; background: none;
+  animation: pd-slide .2s cubic-bezier(.2, .8, .2, 1); }
+@keyframes pd-slide { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .palette.pd .pd-side { animation: none; } }
+.pd-side .mle-side-scenes { margin: 14px 20px 10px; }
+.pd-side .mle-side-scenes .mle-scene { cursor: pointer; }
+.pd-side .mle-side-scenes .mle-scene:not(.edit):hover { color: var(--text); }
+.pd-side .mle-body { padding: 12px 20px 20px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.pd-side .look-panel h2 { font-size: 13px; font-weight: 500; margin: 14px 0 6px; }
+.pd-note textarea { height: auto; min-height: 60px; }
+/* Палитре — до 460 px (docs/palette.md): у колонки объявлений класс carousels-panel, и общее правило
+   каруселей сжимало её до 380 — не влезали сцены «Настроек» в одну строку */
+@media (max-width: 1150px) { .pd-tabs { padding: 0 14px; } .pd-tabs .mle-tabs-list { gap: 14px; } .pd-tiles { padding: 14px; } }
+@media (min-width: 1151px) {
+  .quick-main:has(.palette.pd) { grid-template-columns: 300px auto minmax(340px, 460px); }
+}
+/* Сцены, «О ролике», «Оформление» — по ширине надписи; не влезли — переносятся целыми кнопками */
+.pd-side .mle-side-scenes { display: flex; flex-wrap: wrap; }
+.pd-side .mle-side-scenes .mle-scene { flex: 1 1 auto; padding: 0 8px; overflow: visible; }
+@media (min-width: 901px) {
+  /* Под плеером — панель плеера 48 px вместо прежнего ряда кнопок сцен (52 px) */
+  /* !important — перебить старое «.player-box { height: 70vh !important }» окон до 1100 px */
+  .pd-stage .player-box { height: min(calc(100cqh - 52px), 760px) !important; }
+  .palette.pd .pd-tiles { flex: 1; min-height: 0; overflow-y: auto; }
+  .palette.pd .pd-tabs { flex: none; }
+}
+
 /* ——— Мобильная палитра ролика, версия 3 — концепт владельца 20.10 (app/ads/MobileLotEditor.tsx,
    docs/palette-mobile.md) ———
    Свой корневой класс .mle: правила прежней телефонной раскладки (.quick[data-mtab], .mtabs,

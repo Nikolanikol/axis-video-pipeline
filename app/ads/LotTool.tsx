@@ -292,24 +292,17 @@ export const LotTool: React.FC = () => {
         <LotsPanel lots={lots} current={lot?.id} pending={pending} onOpen={selectLot} onBlank={newLot} price={priceOf}
           onCopy={copyLot} onDelete={deleteLot} onDeleteEmpty={deleteEmpty} />
 
-        <section className="quick-preview">
-          {input
-            // Пока открыто это объявление, превью играет по кругу — идёт монтаж (владелец 20.10).
-            // key по объявлению: другое объявление начинает с начала, а ушли с экрана — плеер
-            // размонтирован и остановлен. Без фокуса и за экраном он и так на паузе (Preview)
-            ? <Preview key={lot?.id} input={input} format={format} autoPlay loop onScene={setScene} seek={seek} />
-            : <div className="empty">Вставьте ссылку на объявление Encar — машина, фото и превью появятся сами.</div>}
-        </section>
-
-        {lot && (
-          <section className="quick-side palette-side">
-            <Palette lot={lot} market={market} format={format} brand={brand} pairs={config.fonts} palettes={config.palettes ?? []}
-              save={save} onRetrySave={() => { void saveLot(); }} onChange={editLot} onPhotos={setPhotos} onError={report}
-              onFormat={chooseFormat} scene={scene} onScene={pickScene}
-              photoSource={<EncarImport lot={lot} onApply={applyFromCar} onError={report} />}
-              render={<RenderPanel lot={lot} format={format} unsavedSettings={unsavedSettings} beforeRender={beforeRender} onError={report} folded />} />
-          </section>
-        )}
+        {lot && input
+          // Превью с панелью плеера и палитра — одним компонентом: плитки анимации проигрывают
+          // приём в этом же превью, «Настройки» на превью открывают панель в палитре
+          ? <Palette lot={lot} input={input} market={market} format={format} brand={brand} pairs={config.fonts} palettes={config.palettes ?? []}
+            save={save} onRetrySave={() => { void saveLot(); }} onChange={editLot} onPhotos={setPhotos} onError={report}
+            onFormat={chooseFormat} scene={scene} onScene={pickScene} seek={seek}
+            photoSource={<EncarImport lot={lot} onApply={applyFromCar} onError={report} />}
+            render={<RenderPanel lot={lot} format={format} unsavedSettings={unsavedSettings} beforeRender={beforeRender} onError={report} folded />} />
+          : <section className="quick-preview">
+            <div className="empty">Вставьте ссылку на объявление Encar — машина, фото и превью появятся сами.</div>
+          </section>}
       </main>
       </div>
     </div>

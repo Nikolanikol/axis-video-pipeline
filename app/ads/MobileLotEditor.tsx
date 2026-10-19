@@ -18,7 +18,7 @@ import type {FontPair, LotEntry, Palette as PaletteColors} from '../api';
 import {useConfig} from '../config';
 import {useHeaderSlot} from '../headerSlot';
 import {Preview, type PreviewControl, type SceneSeek} from '../Preview';
-import {compositionTitle, LookStrip, MobileAbout, MobileContent, motionTitle, MotionStrip, type MotionTab} from './MobileBodies';
+import {compositionTitle, LookStrip, MobileAbout, MobileContent, motionTitle, MotionStrip, PALETTE_TABS as TABS, playMotion, type MotionTab, type PaletteTab} from './MobileBodies';
 import {lotTheme} from './LookPanel';
 import {SceneScrubber} from './SceneScrubber';
 import {SaveStatus, type SaveState} from './Palette';
@@ -46,7 +46,7 @@ type Props = {
 // Вкладка ленты, открытый лист, сцена, вкладка анимации; своя позиция прокрутки у каждого листа
 // («Текст» — по сцене). Ключ — компания + объявление; из версии 2 берём сцену и раздел
 // Вкладки ленты: оформление и три группы анимации на одном уровне (владелец 20.10)
-type Tab = 'look' | MotionTab;
+type Tab = PaletteTab;
 type Sheet = 'text';
 // about — в панели открыта группа «О ролике», а не сцена
 type UI = {version: 3; tab: Tab; sheet: Sheet | null; about?: boolean; sceneId?: string; scrollByView: Record<string, number>; expandedGroups: Record<string, boolean>; motionTab?: MotionTab};
@@ -79,9 +79,6 @@ const noFocusZoom = () => {
 
 const editable = (el: Element | null) => !!el && (el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement
   || (el instanceof HTMLInputElement && !['checkbox', 'radio', 'button', 'submit', 'file', 'range'].includes(el.type)));
-
-const TABS: {id: Tab; title: string}[] = [{id: 'look', title: 'Оформление'}, {id: 'textMotion', title: 'Текст'},
-  {id: 'photoMotion', title: 'Фото'}, {id: 'sceneTransition', title: 'Переход'}];
 
 export const MobileLotEditor: React.FC<Props> = (props) => {
   const {lot, input, format, brand, save, onRetrySave, scene, onScene, seek, listOpen, onList, openContent, onContentOpened,
@@ -198,16 +195,8 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
     });
   };
 
-  // Показать выбранный приём анимации фрагментом: текст и фото — начало текущей сцены, переход —
-  // стык с соседней сценой; около 2,5 с и пауза (раздел 8)
-  const showMotion = (field: MotionTab) => {
-    const i = Math.max(0, format.scenes.findIndex((s) => s.id === scene));
-    const s = format.scenes[i];
-    if (field === 'sceneTransition') {
-      const next = format.scenes[i + 1] ?? format.scenes[1] ?? s;
-      player.current?.playFragment(next.from - Math.round(format.fps * .8), 2.4);
-    } else player.current?.playFragment(s.from, 2.6);
-  };
+  // Показать выбранный приём анимации фрагментом (раздел 8)
+  const showMotion = (field: MotionTab) => playMotion(player.current, format, scene, field);
 
   // Клавиатура (раздел 7, раздел 11): не одно условие «видимая область < окна − 120» — на части
   // браузеров уменьшаются оба размера. Сравниваем с наибольшей высотой, виденной при этой
