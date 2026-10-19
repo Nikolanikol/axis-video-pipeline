@@ -755,6 +755,8 @@ a.tab { text-decoration: none; }
 /* Движение у объявления — под форматом, теми же короткими кнопками, что в настройках бренда */
 .motion-chips { display: flex; flex-direction: column; gap: 14px; margin-top: 6px; }
 .motion-row { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Выбор стиля в колонке ролика (StyleChoices look="side"): подпись над кнопками */
+.style-side { display: flex; flex-direction: column; gap: 8px; }
 .motion-summary { font-size: 14px; margin-top: -6px; }
 .motion-row .btn { padding: 7px 11px; font-size: 13px; }
 .motion-reset { align-self: flex-start; background: none; border: none; padding: 0; color: var(--muted); font-size: 12px; text-decoration: underline; cursor: pointer; }

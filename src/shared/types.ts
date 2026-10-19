@@ -3,12 +3,17 @@
 import type brandTheme from '../../config/brand.json';
 
 export type DesignId = typeof import('./design.js').DESIGN_IDS[number];
-export type TextMotionId = typeof import('./design.js').TEXT_MOTIONS[number];
-export type SlideMotionId = typeof import('./design.js').SLIDE_MOTIONS[number];
-export type LotLook = {design: DesignId | null; designVariant: 0 | 1; fonts: Theme['fonts']; style: Theme['style']; plates?: PlatesId}
+// Стиль ролика — варианты из реестра src/design/style/registry.js (там же подписи и умолчания)
+type Registry = typeof import('../design/style/registry.js');
+export type TextMotionId = Registry['TEXT_MOTIONS'][number]['id'];
+export type PhotoMotionId = Registry['PHOTO_MOTIONS'][number]['id'];
+export type SceneTransitionId = Registry['SCENE_TRANSITIONS'][number]['id'];
+export type PlatesId = Registry['PLATES'][number]['id'];
+export type StyleFields = {textMotion?: TextMotionId; photoMotion?: PhotoMotionId; sceneTransition?: SceneTransitionId; plates?: PlatesId};
+export type Theme = typeof brandTheme & {design?: DesignId; designVariant?: 0 | 1} & StyleFields;
+/** Снимок оформления объявления поверх бренда — src/design/style/look.js */
+export type LotLook = {design: DesignId | null; designVariant: 0 | 1; fonts: Theme['fonts']; style: Theme['style']} & StyleFields
   & Pick<Theme, 'bg' | 'panel' | 'line' | 'grey' | 'white' | 'copper' | 'copperLight' | 'copperDark'>;
-export type PlatesId = typeof import('./design.js').PLATES[number];
-export type Theme = typeof brandTheme & {design?: DesignId; designVariant?: 0 | 1; textMotion?: TextMotionId; slideMotion?: SlideMotionId; plates?: PlatesId};
 
 // Тексты рынка (язык ролика). Какие ключи нужны — описывает формат в config/formats.json.
 export type Texts = Record<string, string>;
@@ -75,10 +80,8 @@ export type Lot = Partial<Omit<Market, 'texts'>> & {
   market?: string;
   // Последний выбранный формат ролика для этого лота
   format?: string;
-  // Движение ролика именно этого объявления — перебивает выбор в бренде (motion.tsx).
-  // Нет поля — как в бренде; действует только при пресете оформления
-  textMotion?: TextMotionId; slideMotion?: SlideMotionId;
-  // Своё оформление ролика этого объявления — снимок, см. src/shared/look.js. Нет поля — как в бренде
+  // Своё оформление ролика этого объявления (пресет, цвета, шрифты, движение, подача данных) —
+  // снимок поверх бренда, см. src/design/style/look.js. Нет поля — как в бренде
   look?: LotLook;
   brand: string; model: string; trim?: string; year: number; specs: string[];
   // Цена авто: либо сразу в $, либо в ₩ + курс (₩ за $1). Без цены ролик — черновик с заглушкой.

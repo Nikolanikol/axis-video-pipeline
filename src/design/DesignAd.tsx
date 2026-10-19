@@ -1,7 +1,7 @@
 // Сценарий ролика остаётся из formats.json: оформление меняет только его подачу.
 // Фото по местам и сведения о страховых случаях — те же, что у прежних форматов.
 import React from 'react';
-import {AbsoluteFill, Easing, Sequence, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
+import {AbsoluteFill, Sequence, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
 import {carouselLang, carouselText} from '../carousel/i18n';
 import {carouselPrice} from '../carousel/price';
 import {fmt, getFormat, resolveAd, themeOf, totalInCurrency} from '../shared/model';
@@ -12,8 +12,8 @@ import type {Ad, AdProps, Market} from '../shared/types';
 import {clamp, ThemeProvider, useTheme} from '../shared/ui';
 import {historyLines, priceFirstPhotos} from '../formats/price-first/PriceFirst';
 import {DesignContent, DesignSlide} from './DesignSlide';
-import {isSceneTransition, motionOf, pushOffset, sceneLayer, sceneOverlap} from './motion';
-import type {SlideMotionId} from '../shared/types';
+import {SceneMove, sceneOverlap} from './motion/scene';
+import {resolveStyle} from './style/registry.js';
 
 const contactOf = (ad: Ad) => {
   const telegram = ad.contactPrimary === 'telegram' && ad.telegram;
@@ -63,31 +63,10 @@ const DesignedScene: React.FC<{ad: Ad; scene: string; formatId: string; index: n
     return <DesignSlide content={content} design={theme.design!} index={index} total={total} animated variant={variant} />;
   };
 
-// Смена сцен. Следующая сцена начинается ровно на своём кадре (склейки под темп музыки не
-// сдвигаются), предыдущая живёт на overlap кадров дольше — под ней.
-// «Вертикальная смена» двигает обе сцены с одной скоростью, остальные — растворение
-const SceneMove: React.FC<{slide: SlideMotionId; first: boolean; last: boolean; frames: number; overlap: number; children: React.ReactNode}> =
-  ({slide, first, last, frames, overlap, children}) => {
-    const f = useCurrentFrame();
-    if (slide === 'push') {
-      const y = pushOffset(first ? 1 : f / overlap, last ? 0 : (f - frames) / overlap);
-      return <AbsoluteFill style={{transform: `translateY(${y}%)`}}>{children}</AbsoluteFill>;
-    }
-    if (isSceneTransition(slide)) {
-      // Входящая лежит сверху (следующая Sequence), поэтому шторкам и диафрагме хватает обрезки только её
-      const exiting = !last && f >= frames;
-      const style = exiting ? sceneLayer(slide, 'out', (f - frames) / overlap) : first ? {} : sceneLayer(slide, 'in', f / overlap);
-      return <AbsoluteFill style={style}>{children}</AbsoluteFill>;
-    }
-    const opacity = first ? 1 : interpolate(f, [0, overlap], [0, 1], {...clamp, easing: Easing.inOut(Easing.quad)});
-    return <AbsoluteFill style={{opacity}}>{children}</AbsoluteFill>;
-  };
-
 export const DesignAd: React.FC<AdProps & {formatId: string}> = ({formatId, ...props}) => {
   const ad = resolveAd(props);
-  // Движение, выбранное у объявления, перебивает бренд; дальше его читают сцены из темы
-  const theme = {...themeOf(props.theme), ...(props.lot.textMotion ? {textMotion: props.lot.textMotion} : {}),
-    ...(props.lot.slideMotion ? {slideMotion: props.lot.slideMotion} : {})};
+  // Оформление объявления (lot.look) уже наложено на тему в formats/index.ts — здесь только бренд + снимок
+  const theme = themeOf(props.theme);
   const format = getFormat(formatId);
   const cuts = Math.floor((format.scenes.find((s) => s.id === 'gallery')?.frames ?? 0) / format.fps);
   const layout = photoLayout(ad.photos, props.lot.slots, Math.max(1, cuts));
@@ -99,12 +78,13 @@ export const DesignAd: React.FC<AdProps & {formatId: string}> = ({formatId, ...p
       : scene === 'gallery' ? first.gallery : scene === 'history' ? [first.history].filter(Boolean) as string[] : ad.photos.slice(0, 2);
     return scene === 'specs' ? ad.photos.slice(1, 3).length ? ad.photos.slice(1, 3) : ad.photos.slice(0, 1) : ad.photos.slice(0, 2);
   };
-  const slide = motionOf(theme, theme.design ?? 'catalog').slide;
-  const overlap = sceneOverlap(slide, format.fps);
+  // Переход между сценами — один на весь ролик (motion/scene.tsx)
+  const transition = resolveStyle(theme, theme.design ?? 'catalog').sceneTransition;
+  const overlap = sceneOverlap(transition, format.fps);
   return <ThemeProvider value={theme}><AbsoluteFill style={{background: theme.bg, overflow: 'hidden'}}>
     {format.scenes.map((s, i) => <Sequence key={s.id} name={s.title} from={s.from}
       durationInFrames={s.frames + (i === format.scenes.length - 1 ? 0 : overlap)} premountFor={format.fps}>
-      <SceneMove slide={slide} first={i === 0} last={i === format.scenes.length - 1} frames={s.frames} overlap={overlap}><DesignedScene ad={ad} scene={s.id} formatId={formatId} index={i + 1} total={format.scenes.length}
+      <SceneMove id={transition} first={i === 0} last={i === format.scenes.length - 1} frames={s.frames} overlap={overlap}><DesignedScene ad={ad} scene={s.id} formatId={formatId} index={i + 1} total={format.scenes.length}
         variant={theme.designVariant ?? 0} photos={scenePhotos(s.id)} /></SceneMove>
     </Sequence>)}
     <BackgroundMusic music={ad.music} bpm={format.bpm} />

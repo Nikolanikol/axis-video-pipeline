@@ -2,7 +2,7 @@
 // Как и вся панель оформления, пишет снимок в объявление: бренд и другие ролики не меняются
 import React from 'react';
 import {applyDesignPreset, DESIGNS, matchDesignPreset} from '../../src/shared/designs';
-import {pickLook} from '../../src/shared/look.js';
+import {pickLook} from '../../src/design/style/look.js';
 import type {Lot, Theme} from '../../src/shared/types';
 
 type Props = {lot: Lot; theme: Theme; onChange: (patch: Partial<Lot>) => void; onMore: () => void};

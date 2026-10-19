@@ -2,7 +2,7 @@
 // «чтобы там можно было сразу всё посмотреть и настроить»). Те же поля, что в «Бренде», но
 // выбор пишется в объявление (lot.look) и не трогает бренд и другие ролики.
 import React from 'react';
-import {applyLook, pickLook} from '../../src/shared/look.js';
+import {applyLook, pickLook} from '../../src/design/style/look.js';
 import type {Lot, Theme} from '../../src/shared/types';
 import type {FontPair, Palette} from '../api';
 import {DesignField} from '../DesignField';

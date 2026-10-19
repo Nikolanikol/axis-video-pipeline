@@ -331,7 +331,7 @@ export const LotTool: React.FC = () => {
             <FormatChips value={format.id} onChange={chooseFormat} />
             {/* Пресет ролика — сразу здесь; цвета, шрифты и углы — в «Оформлении ролика», в той же колонке */}
             <PresetChips lot={lot} theme={lotTheme(brand, lot)} onChange={editLot} onMore={() => setLookOpen(true)} />
-            <MotionChips lot={lot} brand={lotTheme(brand, lot)} onChange={editLot} />
+            <MotionChips theme={lotTheme(brand, lot)} onChange={editLot} />
             </>}
             {!lookOpen && <RenderPanel
               lot={lot}

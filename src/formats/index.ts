@@ -6,7 +6,7 @@ import {PriceFirst} from './price-first/PriceFirst';
 import {PriceAd} from './price-ad/PriceAd';
 import {DesignAd} from '../design/DesignAd';
 import {isDesign} from '../shared/design.js';
-import {applyLook} from '../shared/look.js';
+import {applyLook} from '../design/style/look.js';
 
 // Прежняя тема без design остаётся на прежней композиции, в том числе на витрине гостя.
 // Оформление объявления (lot.look) накладывается здесь — одно место для превью и серверного рендера

@@ -121,9 +121,9 @@ describe('лоты', () => {
     const {body: lot} = await call('POST', '/api/lots', {});
     const {body: config} = await call('GET', '/api/config');
     const pair = config.fonts[1];
-    const look = {design: 'catalog', designVariant: 1, plates: 'tiles', ...config.palettes[0].colors,
+    const look = {design: 'catalog', designVariant: 1, plates: 'tiles', textMotion: 'label', photoMotion: 'detail', sceneTransition: 'iris', ...config.palettes[0].colors,
       fonts: {head: pair.head, body: pair.body, url: pair.url}, style: {gradient: false, radius: 1}};
-    const ok = await call('PUT', `/api/lots/${lot.id}`, {...lot, look, textMotion: 'label', slideMotion: 'detail'});
+    const ok = await call('PUT', `/api/lots/${lot.id}`, {...lot, look});
     expect(ok.status).toBe(200);
     expect(ok.body.look).toEqual(look);
     // «Исходный» у ролика при пресете в бренде — design: null, это не ошибка
@@ -134,9 +134,10 @@ describe('лоты', () => {
       {...look, design: 'other'},
       {...look, style: {gradient: 'yes', radius: 1}},
       {...look, plates: 'neon'},
+      {...look, sceneTransition: 'bounce'},
+      {...look, photoMotion: 'iris'},
     ];
     for (const b of bad) expect((await call('PUT', `/api/lots/${lot.id}`, {...lot, look: b})).status).toBe(400);
-    expect((await call('PUT', `/api/lots/${lot.id}`, {...lot, textMotion: 'bounce'})).status).toBe(400);
     // Без поля — «как в бренде»: прежние объявления сохраняются как раньше
     const back = await call('PUT', `/api/lots/${lot.id}`, {...lot});
     expect(back.status).toBe(200);

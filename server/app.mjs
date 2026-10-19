@@ -28,7 +28,8 @@ import {ICON_RULES, LOGO_RULES, brandForRender, saveIcon, saveLogo, setIconVaria
 import {balanceOf, billed, creditCosts, ledgerOf, ledgerPage, signupCredits} from './billing.mjs';
 import {parseCarouselSource} from '../src/shared/kmotorsLot.js';
 import {PALETTE_KEYS, isHex} from '../src/shared/contrast.js';
-import {isDesign, isPlates, isSlideMotion, isTextMotion} from '../src/shared/design.js';
+import {isDesign} from '../src/shared/design.js';
+import {styleError} from '../src/design/style/registry.js';
 import {withoutMusic} from '../src/shared/nomusic.js';
 import {
   accountOf, cancelEmailChange, requestDeletion, restoreAccount, changePassword, closeOtherSessions, closeSession, confirmEmailChange, dropSession,
@@ -86,18 +87,19 @@ const wsOf = (req) => req.ws ?? (authEnabled() ? null : DEFAULT_WORKSPACE);
 const billOf = (req, pipeline) => ({pipeline, userId: req.user?.id ?? null, free: Boolean(req.user?.isStaff)});
 
 /**
- * Оформление и движение одного объявления (экран ролика, 20.10). Цвета и шрифты идут прямо в
- * стили рендера, поэтому строже бренда: шрифты — только пара из config/fonts.json, без своих
+ * Снимок оформления объявления (lot.look, src/design/style/look.js): пресет, цвета, шрифты, движение,
+ * подача данных. Поля стиля — тем же правилом реестра, что у бренда (styleError). Цвета и шрифты
+ * идут прямо в стили рендера, поэтому строже бренда: шрифты — только пара из config/fonts.json
+ * или текущая пара бренда
  */
 const checkLotLook = async (lot) => {
-  if (lot.textMotion !== undefined && !isTextMotion(lot.textMotion)) throw new HttpError(400, 'Выберите появление текста из списка');
-  if (lot.slideMotion !== undefined && !isSlideMotion(lot.slideMotion)) throw new HttpError(400, 'Выберите смену сцен из списка');
   const look = lot.look;
   if (look === undefined || look === null) return;
   if (typeof look !== 'object' || Array.isArray(look)) throw new HttpError(400, 'Оформление ролика — объект настроек');
   if (look.design !== null && !isDesign(look.design)) throw new HttpError(400, 'Выберите дизайн из списка');
   if (look.designVariant !== 0 && look.designVariant !== 1) throw new HttpError(400, 'Компоновка — основная или альтернативная');
-  if (look.plates !== undefined && !isPlates(look.plates)) throw new HttpError(400, 'Подача данных — из списка');
+  const styleProblem = styleError(look);
+  if (styleProblem) throw new HttpError(400, styleProblem);
   for (const k of PALETTE_KEYS) if (!isHex(look[k])) throw new HttpError(400, `Цвет «${k}» — в виде #RRGGBB`);
   // Своя пара бренда (вписанная в brand.json руками) тоже годится: снимок оформления её копирует,
   // и иначе смена одной палитры у ролика упиралась бы в отказ по шрифтам
@@ -137,9 +139,9 @@ const checkBrand = (theme) => {
   if (theme.designVariant !== undefined && theme.designVariant !== 0 && theme.designVariant !== 1) {
     throw new HttpError(400, 'Компоновка — основная или альтернативная');
   }
-  if (theme.textMotion !== undefined && !isTextMotion(theme.textMotion)) throw new HttpError(400, 'Выберите появление текста из списка');
-  if (theme.plates !== undefined && !isPlates(theme.plates)) throw new HttpError(400, 'Подача данных — из списка');
-  if (theme.slideMotion !== undefined && !isSlideMotion(theme.slideMotion)) throw new HttpError(400, 'Выберите смену сцен из списка');
+  // Движение и подача данных — одним правилом реестра стиля, как у снимка объявления
+  const styleProblem = styleError(theme);
+  if (styleProblem) throw new HttpError(400, styleProblem);
   const url = theme.fonts?.url ?? '';
   if (url && !/^https:\/\/fonts\.googleapis\.com\//.test(url)) {
     throw new HttpError(400, 'Шрифты — только из Google Fonts');

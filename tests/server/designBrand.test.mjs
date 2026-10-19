@@ -39,12 +39,13 @@ describe('сохранение дизайна бренда', () => {
 
   it('сохраняет движение роликов и отклоняет движение не из списка', async () => {
     const {brand} = await fetch(`${base}/api/config`).then((r) => r.json());
-    expect((await put({...brand, textMotion: 'highlight', slideMotion: 'stack'})).status).toBe(200);
+    expect((await put({...brand, textMotion: 'highlight', photoMotion: 'stack', sceneTransition: 'whip'})).status).toBe(200);
     const saved = await fs.readFile(path.join(env.config, 'brand.json'), 'utf8').then(JSON.parse);
-    expect([saved.textMotion, saved.slideMotion]).toEqual(['highlight', 'stack']);
+    expect([saved.textMotion, saved.photoMotion, saved.sceneTransition]).toEqual(['highlight', 'stack', 'whip']);
     expect((await put({...brand, textMotion: 'bounce'})).status).toBe(400);
-    expect((await put({...brand, slideMotion: '<script>'})).status).toBe(400);
-    expect((await put({...brand, plates: 'tiles', slideMotion: 'iris'})).status).toBe(200);
+    expect((await put({...brand, sceneTransition: '<script>'})).status).toBe(400);
+    expect((await put({...brand, photoMotion: 'iris'})).status).toBe(400);
+    expect((await put({...brand, plates: 'tiles', sceneTransition: 'iris'})).status).toBe(200);
     expect((await put({...brand, plates: 'neon'})).status).toBe(400);
   });
 

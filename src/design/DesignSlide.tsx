@@ -1,13 +1,19 @@
 // Одна библиотека компоновок для неподвижных слайдов и сцен ролика.
 // Размер и безопасные поля считаются от композиции, поэтому формат не задаёт дизайн.
+// Слайд только раскладывает блоки по сетке компоновки; как они двигаются и выглядят — модули:
+// motion/text (заголовок, цена), motion/photo (фото), plates/Facts (подача данных).
+// Выбор приёмов — стиль темы (style/registry.js); на слайде карусели (animated = false) движения нет.
 import React from 'react';
 import {AbsoluteFill, Img, interpolate, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {DesignId} from '../shared/types';
 import {BODY, HEAD, Logo, clamp, useTheme} from '../shared/ui';
-import {MotionTitle, easeOut, motionOf, photoMotion, priceMotion, textDelay} from './motion';
-import {factIcon, splitDot, splitNumber} from './plates';
+import {fit} from './fit';
+import {PhotoDetail, PhotoStack, photoFallback, photoFrame, textDelay} from './motion/photo';
+import {MotionTitle, priceMotion} from './motion/text';
+import {Facts, type DesignFact} from './plates/Facts';
+import {resolveStyle} from './style/registry.js';
 
-export type DesignFact = {label?: string; value: string};
+export type {DesignFact};
 export type DesignContent = {
   kind: 'cover' | 'facts' | 'gallery' | 'price' | 'cta';
   // kicker — рубрика мелко над заголовком, когда заголовок — фраза, а не название раздела
@@ -20,7 +26,6 @@ export type DesignContent = {
 };
 
 const asset = (url: string) => /^(https?:|data:|blob:|\/)/.test(url) ? url : staticFile(url);
-const fit = (text: string, width: number, max: number, min = 32) => Math.max(min, Math.min(max, width / (Math.max(1, text.length) * 0.59)));
 const light = (hex: string) => parseInt(hex.slice(1, 3), 16) * .2126 + parseInt(hex.slice(3, 5), 16) * .7152 + parseInt(hex.slice(5, 7), 16) * .0722 > 155;
 
 export const DesignSlide: React.FC<{content: DesignContent; design: DesignId; index?: number; total?: number;
@@ -38,12 +43,10 @@ export const DesignSlide: React.FC<{content: DesignContent; design: DesignId; in
   const areaH = h - top - bottom;
   const compact = areaH < 1000;
   const direction = Math.abs(Math.trunc(variant)) % 2;
-  // Движение сцены (motion.tsx): заголовок, цена и фото — свои приёмы, остальное — прежнее
-  // мягкое появление; подписи ждут фото, если оно раскрывается («Окно», «Общий объект»)
-  const motion = motionOf(C, design);
-  // Подача данных: линии (прежняя), плитки, таблетки, колонка на подложке — см. plated ниже
-  const plates = C.plates ?? 'lines';
-  const delay = textDelay(motion.slide);
+  // Стиль сцены: заголовок, цена, фото и подача данных — свои приёмы, остальное — прежнее
+  // мягкое появление (move); подписи ждут фото, если оно раскрывается («Окно», «Общий объект»)
+  const style = resolveStyle(C, design);
+  const delay = textDelay(style.photoMotion);
   const t = frame / fps;
   const entrance = animated ? interpolate(frame, [Math.round(fps * delay), Math.round(fps * (delay + .5))], [0, 1], clamp) : 1;
   const move: React.CSSProperties = animated ? {opacity: entrance, transform: design === 'catalog'
@@ -85,19 +88,15 @@ export const DesignSlide: React.FC<{content: DesignContent; design: DesignId; in
     <div style={{fontFamily: HEAD, fontWeight: 600, fontSize: size, lineHeight: 1.06, color, overflowWrap: 'anywhere'}}>
       {/* Вторая надпись «Смены надписи» — год и комплектация у обложки; в других сценах её нет, и приём сам
           становится построчным появлением. Текст на акцентной плашке — цветом фона, как у кнопки контакта */}
-      {animated ? <MotionTitle text={c.title} kind={motion.text} t={t - delay} size={size} width={areaW}
+      {animated ? <MotionTitle text={c.title} kind={style.textMotion} t={t - delay} size={size} width={areaW}
         colors={{accent: C.copper, onAccent: C.bg, panel: C.panel}} swap={c.kind === 'cover' ? c.subtitle : undefined} /> : c.title}
     </div>
   </>;
-  const image = (style: React.CSSProperties, collage = false) => {
-    // «Стопке» нужны два других снимка, «Деталям» — один; иначе, как советует пакет, — «Окно».
-    // Коллажу и галерее они не подходят: там несколько фото в одной рамке
+  const image = (box: React.CSSProperties, collage = false) => {
     const spare = (c.spare ?? []).filter((url) => !photos.includes(url));
-    const single = !(collage || c.collage) && photos.length > 0;
-    const slide = motion.slide === 'stack' ? (single && spare.length >= 2 ? 'stack' : 'window')
-      : motion.slide === 'detail' ? (single && spare.length >= 1 ? 'detail' : 'window') : motion.slide;
-    const pm = animated ? photoMotion(slide, t) : {frame: {}};
-    // «Тихий проезд» заменяет прежнее приближение «Кино»; у остальных смен «Кино» его сохраняет
+    const photo = photoFallback(style.photoMotion, {single: !(collage || c.collage) && photos.length > 0, spare: spare.length});
+    const pm = animated ? photoFrame(photo, t) : {frame: {}};
+    // «Тихий проезд» заменяет прежнее приближение «Кино»; при других приёмах «Кино» его сохраняет
     const zoom = pm.img ?? (animated && design === 'cinema' ? `scale(${interpolate(frame, [0, Math.max(1, durationInFrames - 1)], [1, 1.045], clamp)})` : undefined);
     const block = (list: string[], opacity = 1) => <div style={{position: 'absolute', inset: 0, opacity}}>
       {(collage || c.collage) && list.length > 1 ? <div style={{display: 'grid', gridTemplateColumns: direction ? '1fr 1fr' : '2fr 1fr',
@@ -107,32 +106,14 @@ export const DesignSlide: React.FC<{content: DesignContent; design: DesignId; in
       </div> : list[0] ? <Img src={asset(list[0])} style={{width: '100%', height: '100%', objectFit: 'cover', objectPosition: '50% 58%',
         transform: zoom}} /> : null}
     </div>;
-    const fill = (url: string, extra: React.CSSProperties = {}) => <Img src={asset(url)} style={{position: 'absolute', inset: 0, width: '100%', height: '100%',
-      objectFit: 'cover', objectPosition: '50% 58%', ...extra}} />;
-    if (animated && slide === 'stack') {
-      // Два снимка лежат сзади под ±4°, главный садится снизу за 0,8 с с мягкой тенью — без отскока
-      const v = easeOut(t / .8);
-      return <div style={{position: 'absolute', overflow: 'hidden', background: C.panel, ...style}}>
-        {[4, -4].map((deg, i) => <div key={deg} style={{position: 'absolute', inset: 0, transform: `scale(.86) rotate(${deg}deg)`,
-          boxShadow: '0 16px 40px rgba(0,0,0,.35)', overflow: 'hidden'}}>{fill(spare[i])}</div>)}
-        <div style={{position: 'absolute', inset: 0, transform: `translateY(${(1 - v) * 38}%)`, boxShadow: v < 1 ? '0 -12px 40px rgba(0,0,0,.35)' : undefined}}>
-          {block(photos, c.photoProgress ?? 1)}
-        </div>
-      </div>;
-    }
-    if (animated && slide === 'detail') {
-      // Общий вид — другое настоящее фото объявления; поверх него из угла раскрывается фото сцены
-      // (с 0,45 с за 0,7 с). Деталь не выдумываем и не увеличиваем кадр — только настоящие снимки
-      const z = easeOut((t - .45) / .7);
-      return <div style={{position: 'absolute', overflow: 'hidden', background: C.panel, ...style}}>
-        {fill(spare[0])}
-        <div style={{position: 'absolute', right: 0, bottom: 0, width: `${z * 100}%`, height: `${z * 100}%`, overflow: 'hidden'}}>
-          {block(photos, c.photoProgress ?? 1)}
-        </div>
-      </div>;
-    }
-    return <div style={{position: 'absolute', overflow: 'hidden', background: C.panel, ...style, ...pm.frame}}>
-      {c.previousPhotos?.length ? block(c.previousPhotos) : null}{block(photos, c.photoProgress ?? 1)}
+    const fill = (url: string) => <Img src={asset(url)} style={{position: 'absolute', inset: 0, width: '100%', height: '100%',
+      objectFit: 'cover', objectPosition: '50% 58%'}} />;
+    const frameStyle: React.CSSProperties = {position: 'absolute', overflow: 'hidden', background: C.panel, ...box};
+    const main = block(photos, c.photoProgress ?? 1);
+    if (animated && photo === 'stack') return <PhotoStack t={t} frame={frameStyle} fill={fill} spare={spare}>{main}</PhotoStack>;
+    if (animated && photo === 'detail') return <PhotoDetail t={t} frame={frameStyle} fill={fill} spare={spare[0]}>{main}</PhotoDetail>;
+    return <div style={{...frameStyle, ...pm.frame}}>
+      {c.previousPhotos?.length ? block(c.previousPhotos) : null}{main}
     </div>;
   };
   // Цена — своим въездом, остальные подробности — общим появлением (move)
@@ -144,110 +125,6 @@ export const DesignSlide: React.FC<{content: DesignContent; design: DesignId; in
     const facts = (c.facts ?? []).slice(0, (dense ? 4 : 5) - (c.kicker && c.lines?.length ? (compact ? 2 : 1) : 0));
     const lines = (c.lines ?? []).slice(0, dense ? 3 : 4).map((line, i) => <div key={i} style={{...rest, fontFamily: BODY, fontSize: dense ? bodySize - 3 : bodySize,
       lineHeight: 1.35, color: C.grey, overflowWrap: 'anywhere'}}>{line}</div>);
-    // Подача данных — плашки из KOK_VISUAL_KIT (20.10). Скругление идёт за множителем углов бренда,
-    // как у остальных плашек: «Острые» дают прямые углы и здесь
-    const round = (px: number) => px * (C.style?.radius ?? 1);
-    // «Карточка собирается» (видеосценарий KOK_VISUAL_KIT): плашки входят по одной — сдвиг 32 px
-    // (в сценарии 24–40), проявление 0,45 с, шаг 0,1 с (0,08–0,12). Один смысловой блок за раз
-    const piece = (i: number): React.CSSProperties => {
-      if (!animated) return {};
-      const v = easeOut((t - delay - .15 - i * .1) / .45);
-      return {opacity: v, transform: `translateY(${(1 - v) * 32}px)`};
-    };
-    const plated = (list: DesignFact[], notes: React.ReactNode[]) => {
-      if (!list.length) return notes;
-      if (plates === 'row') {
-        // «Журнал»: факты в ряд над тонкой линией; главное крупно, после « · » — подпись мелко под ним
-        const cols = Math.min(3, list.length, availableWidth >= 560 ? 3 : 2);
-        return <>
-          <div style={{display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: compact ? '18px 20px' : '26px 28px',
-            borderTop: `1px solid ${C.line}`, paddingTop: compact ? 18 : 26}}>
-            {list.map((fact, i) => { const {main, note} = splitDot(fact.value); return <div key={`${i}-${fact.value}`} style={{...piece(i), minWidth: 0}}>
-              <div style={{fontFamily: HEAD, fontWeight: 700, fontSize: fit(main, availableWidth / cols - 20, dense ? 40 : 50, 24), lineHeight: 1.1,
-                color: C.white, overflowWrap: 'anywhere'}}>{main}</div>
-              {(fact.label || note) && <div style={{fontFamily: BODY, fontSize: compact ? 20 : 24, color: C.grey, marginTop: 8, overflowWrap: 'anywhere'}}>
-                {[fact.label, note].filter(Boolean).join(' · ')}</div>}
-            </div>; })}
-          </div>{notes}</>;
-      }
-      if (plates === 'big') {
-        // Крупные цифры: число отдельно и очень крупно, единица и остальное — подписью под ним.
-        // Факт без числа в начале («Автомат · красный») — тем же местом, но кеглем строки
-        const cols = availableWidth >= 560 && list.length > 1 ? 2 : 1;
-        return <>
-          <div style={{display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: compact ? '20px 24px' : '30px 32px'}}>
-            {list.map((fact, i) => {
-              const n = splitNumber(fact.value);
-              const big = n ? n.number : splitDot(fact.value).main;
-              const small = n ? n.rest : splitDot(fact.value).note;
-              return <div key={`${i}-${fact.value}`} style={{...piece(i), minWidth: 0}}>
-                <div style={{fontFamily: HEAD, fontWeight: 700, lineHeight: 1, color: i === 0 ? C.copper : C.white, overflowWrap: 'anywhere',
-                  fontSize: fit(big, availableWidth / cols - 16, n ? (dense ? 84 : 104) : (dense ? 44 : 54), 28)}}>{big}</div>
-                {(fact.label || small) && <div style={{fontFamily: BODY, fontSize: compact ? 20 : 24, letterSpacing: '.06em', textTransform: 'uppercase',
-                  color: C.grey, marginTop: 10, overflowWrap: 'anywhere'}}>{[fact.label, small].filter(Boolean).join(' · ')}</div>}
-              </div>;
-            })}
-          </div>{notes}</>;
-      }
-      if (plates === 'icons') {
-        // С иконками: значок по смыслу факта (пробег, топливо, коробка, владельцы, история) в круге цвета акцента.
-        // Значки — lucide-react, тот же набор, что у опций карусели
-        const size = compact ? 52 : 64;
-        return <>
-          <div style={{display: 'flex', flexDirection: 'column', gap: compact ? 14 : 20}}>
-            {list.map((fact, i) => { const Icon = factIcon(`${fact.label ?? ''} ${fact.value}`); return <div key={`${i}-${fact.value}`}
-              style={{...piece(i), display: 'flex', alignItems: 'center', gap: compact ? 16 : 22, minWidth: 0}}>
-              <span style={{flex: 'none', width: size, height: size, borderRadius: round(size / 2), background: C.panel, color: C.copper,
-                display: 'flex', alignItems: 'center', justifyContent: 'center'}}><Icon size={size * .5} strokeWidth={1.9} /></span>
-              <div style={{minWidth: 0}}>
-                {fact.label && <div style={{fontFamily: BODY, fontSize: compact ? 20 : 23, color: C.grey, marginBottom: 4}}>{fact.label}</div>}
-                <div style={{fontFamily: BODY, fontWeight: 600, fontSize: fit(fact.value, availableWidth - size - 24, dense ? 40 : 48, 26), lineHeight: 1.15,
-                  color: C.white, overflowWrap: 'anywhere'}}>{fact.value}</div>
-              </div>
-            </div>; })}
-          </div>{notes}</>;
-      }
-      if (plates === 'tiles') {
-        // «Паспорт»: сетка 2×2, плашка 464×145 со скруглением 24 при ширине 1080. В узкой колонке — одна в ряд
-        const cols = availableWidth >= 560 ? 2 : 1;
-        return <>
-          <div style={{display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: compact ? 14 : 24}}>
-            {list.map((fact, i) => <div key={`${i}-${fact.value}`} style={{...piece(i), background: C.panel, borderRadius: round(24), padding: compact ? '16px 20px' : '22px 24px', minWidth: 0}}>
-              {fact.label && <div style={{fontFamily: BODY, fontSize: compact ? 20 : 23, letterSpacing: '.06em', textTransform: 'uppercase', color: C.grey, marginBottom: 8}}>{fact.label}</div>}
-              <div style={{fontFamily: HEAD, fontWeight: 700, fontSize: fit(fact.value, availableWidth / cols - 48, dense ? 44 : 56, 26), lineHeight: 1.1,
-                color: C.white, overflowWrap: 'anywhere'}}>{fact.value}</div>
-            </div>)}
-          </div>{notes}</>;
-      }
-      if (plates === 'pills') {
-        // «Ценник»: короткие «таблетки» высотой 54 и кегль 27 при ширине 1080 — подписи, а не крупные данные
-        return <>
-          <div style={{display: 'flex', flexWrap: 'wrap', gap: compact ? 10 : 14}}>
-            {list.map((fact, i) => <span key={`${i}-${fact.value}`} style={{...piece(i), background: C.panel, borderRadius: round(27), padding: compact ? '10px 20px' : '13px 26px',
-              fontFamily: BODY, fontSize: compact ? 25 : 30, lineHeight: 1.2, color: C.white, maxWidth: '100%', overflowWrap: 'anywhere'}}>
-              {fact.label ? <span style={{color: C.grey}}>{fact.label} </span> : null}{fact.value}</span>)}
-          </div>{notes}</>;
-      }
-      if (plates === 'column') {
-        // «Две колонки»: данные и подписи под ними — на одной подложке; значение крупно, пояснение мелко под ним
-        return <div style={{...rest, background: C.panel, borderRadius: round(24), padding: compact ? '22px 26px' : '32px 32px',
-          display: 'flex', flexDirection: 'column', gap: compact ? 16 : 26}}>
-          {list.map((fact, i) => <div key={`${i}-${fact.value}`} style={piece(i)}>
-            <div style={{fontFamily: HEAD, fontWeight: 700, fontSize: fit(fact.value, availableWidth - 64, dense ? 50 : 62, 28), lineHeight: 1.08,
-              color: i === 0 ? C.copper : C.white, overflowWrap: 'anywhere'}}>{fact.value}</div>
-            {fact.label && <div style={{fontFamily: BODY, fontSize: compact ? 18 : 21, letterSpacing: '.06em', textTransform: 'uppercase', color: C.grey, marginTop: 6}}>{fact.label}</div>}
-          </div>)}
-          {notes}
-        </div>;
-      }
-      return <>{list.map((fact, i) => <div key={`${i}-${fact.value}`} style={{...rest, borderBottom: `1px solid ${C.line}`, paddingBottom: compact ? 14 : 22,
-        ...(design === 'catalog' ? {display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 24} : {})}}>
-        {fact.label && <div style={{fontFamily: BODY, fontSize: compact ? 25 : 29, color: C.grey, marginBottom: design === 'catalog' ? 0 : 7}}>{fact.label}</div>}
-        <div style={{fontFamily: design === 'editorial' ? HEAD : BODY, fontWeight: 500,
-          fontSize: fit(fact.value, availableWidth * (design === 'catalog' && fact.label ? .57 : 1), dense ? 42 : 54, 28),
-          lineHeight: 1.18, color: C.white, overflowWrap: 'anywhere'}}>{fact.value}</div>
-      </div>)}{notes}</>;
-    };
     return (
     <div style={{...(own ? {} : move), display: 'flex', flexDirection: 'column', gap: compact ? 14 : 24, minWidth: 0}}>
       {c.price && <div>
@@ -257,7 +134,8 @@ export const DesignSlide: React.FC<{content: DesignContent; design: DesignId; in
         </div>
       </div>}
       {/* Под фразой — три опции, на квадрате две: с заголовком в две строки и текстом остальные уходили на подвал */}
-      {plated(facts, lines)}
+      <Facts kind={style.plates} facts={facts} notes={lines} width={availableWidth} dense={dense} compact={compact} design={design}
+        rest={rest} animated={animated} t={t} delay={delay} />
       {c.contact && <div style={{...rest, marginTop: 15}}>
         <div style={{fontFamily: BODY, fontSize: compact ? 26 : 32, color: C.grey, marginBottom: 15}}>{c.contact.label}</div>
         <div style={{fontFamily: HEAD, fontWeight: 600, fontSize: fit(c.contact.value, availableWidth - 40, compact ? 60 : 78, 26), lineHeight: 1.2,
