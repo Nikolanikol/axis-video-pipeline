@@ -15,12 +15,15 @@ type Props = {
   onError: (e: unknown) => void;
   // За что списываются кредиты: ads | reviews — цена на кнопке
   pipeline?: string;
+  // Палитра ролика (docs/palette.md): кнопка сборки — в закреплённом низу, а готовые ролики —
+  // под «Ролики (N)», раскрываются по нажатию. Иначе список отъедал бы место у настроек
+  folded?: boolean;
 };
 
 const time = (iso: string) => new Date(iso).toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
 const active = (j: Job) => j.status === 'queued' || j.status === 'running';
 
-export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, start, onError, pipeline}) => {
+export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, start, onError, pipeline, folded = false}) => {
   const {config} = useConfig();
   const {refresh: refreshAccess} = useSession();
   const cost = useCost(pipeline ?? '', config.credits);
@@ -30,6 +33,7 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
   // под «Показать все»: каждая карточка с раскадровкой — пол-экрана. На компьютере список
   // прокручивается внутри колонки, и кнопки там нет (styles.css)
   const [showAll, setShowAll] = useState(false);
+  const [listOpen, setListOpen] = useState(false);
   const key = JSON.stringify(query);
 
   // Идущие задания живут в памяти сервера, на диск ролик пишется только в конце. Сервер
@@ -137,7 +141,11 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
       {starting && <div className="bar wait"><div /></div>}
       {warnings.length > 0 && <ul className="warnings">{warnings.map((w) => <li key={w}>{w}</li>)}</ul>}
 
-      <h2>Ролики</h2>
+      {folded
+        ? <button type="button" className="jobs-toggle" aria-expanded={listOpen} onClick={() => setListOpen(!listOpen)}>
+          Ролики{jobs.length ? ` (${jobs.length})` : ''} {listOpen ? '▴' : '▾'}{running ? ' · собирается…' : ''}</button>
+        : <h2>Ролики</h2>}
+      {(!folded || listOpen) && <>
       {/* Отдельный блок — чтобы в «Ролике по лоту» история прокручивалась внутри колонки,
           а кнопка сборки оставалась на месте (styles.css, .quick-side .jobs-list) */}
       <div className={showAll ? 'jobs-list' : 'jobs-list collapsed'}>
@@ -205,6 +213,7 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
           {showAll ? 'Свернуть' : `Показать все ролики (${jobs.length})`}
         </button>
       )}
+      </>}
     </div>
   );
 };

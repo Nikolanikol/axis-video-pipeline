@@ -1,5 +1,5 @@
 // Превью ролика в браузере (Remotion Player). Обновляется сразу, в том числе с несохранёнными настройками.
-import React, {useEffect, useRef} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {Player, PlayerRef} from '@remotion/player';
 import {FORMAT_COMPONENTS} from '../src/formats';
 import type {AdProps, FormatMeta} from '../src/shared/types';
@@ -8,14 +8,49 @@ import {backdropSrc, photoSrc} from '../src/shared/ui';
 import {preloadPhotos} from '../src/shared/photoPreload';
 import {RecMark} from './Loading';
 
-// autoPlay — основной экран лота: превью само проигрывает ролик ОДИН раз и встаёт на последнем
-// кадре (владелец 12.10: бесконечный повтор рисовал 1080×1920 по 30 кадров в секунду, пока
-// страница открыта, и грел процессор). Дальше — по ▶ или кнопкам сцен. loop — повтор по кругу:
-// только витрине для гостя, там это реклама продукта.
-export const Preview: React.FC<{input: AdProps; format: FormatMeta; autoPlay?: boolean; loop?: boolean}> = (
-  {input, format, autoPlay, loop = false},
+// autoPlay — превью само начинает играть. Без loop — один проигрыш и стоп на последнем кадре
+// (владелец 12.10: бесконечный повтор рисовал 1080×1920 по 30 кадров в секунду, пока страница
+// открыта, и грел процессор). loop — по кругу: витрина гостя (реклама продукта) и палитра ролика
+// на компьютере (владелец 20.10: «пока идёт монтаж — бесконечно»). Пауза без фокуса и за экраном
+// (ниже) работает в обоих случаях — она и не даёт повтору греть процессор впустую.
+// Связь с палитрой (app/ads/Palette.tsx, docs/palette.md): onScene — какая сцена сейчас в кадре
+// (плеер дошёл или перемотали), seek — команда «перейти к сцене» из палитры; n меняется при каждом
+// нажатии, чтобы повторный выбор той же сцены тоже перематывал
+export type SceneSeek = {id: string; n: number};
+export const Preview: React.FC<{input: AdProps; format: FormatMeta; autoPlay?: boolean; loop?: boolean;
+  onScene?: (id: string) => void; seek?: SceneSeek | null}> = (
+  {input, format, autoPlay, loop = false, onScene, seek},
 ) => {
   const ref = useRef<PlayerRef>(null);
+  // Сцена в кадре — по номеру кадра и границам сцен формата. Сообщаем только смену, а не каждый кадр
+  const [current, setCurrent] = useState(format.scenes[0]?.id);
+  const lastScene = useRef<string | undefined>(undefined);
+  const onSceneRef = useRef(onScene);
+  onSceneRef.current = onScene;
+  useEffect(() => {
+    const player = ref.current;
+    if (!player) return;
+    const update = (frame: number) => {
+      const scene = [...format.scenes].reverse().find((s) => frame >= s.from) ?? format.scenes[0];
+      if (!scene || scene.id === lastScene.current) return;
+      lastScene.current = scene.id;
+      setCurrent(scene.id);
+      onSceneRef.current?.(scene.id);
+    };
+    const onFrame = (e: {detail: {frame: number}}) => update(e.detail.frame);
+    player.addEventListener('frameupdate', onFrame);
+    player.addEventListener('seeked', onFrame);
+    return () => { player.removeEventListener('frameupdate', onFrame); player.removeEventListener('seeked', onFrame); };
+  }, [format]);
+  // Перейти к сцене: на её показательный кадр (preview в formats.json) — там сцена уже собрана
+  // и видно, что правишь; с самого начала сцены текст ещё не появился
+  const goTo = (id: string) => {
+    const scene = format.scenes.find((s) => s.id === id);
+    if (!scene) return;
+    ref.current?.pause();
+    ref.current?.seekTo(scene.preview);
+  };
+  useEffect(() => { if (seek) goTo(seek.id); }, [seek?.n]); // eslint-disable-line react-hooks/exhaustive-deps
   // Все фото объявления и их размытые фоны — сразу при открытии превью, а не когда до сцены
   // дойдёт воспроизведение: иначе на мобильной сети сцены стояли «чёрными заглушками»
   // (src/shared/photoPreload.ts). Смена формата фото не меняет — повторно не качаем
@@ -96,7 +131,8 @@ export const Preview: React.FC<{input: AdProps; format: FormatMeta; autoPlay?: b
       </div>
       <div className="scenes">
         {format.scenes.map((s) => (
-          <button key={s.id} className="btn ghost" onClick={() => { ref.current?.pause(); ref.current?.seekTo(s.preview); }}>{s.title}</button>
+          <button key={s.id} className={`btn ${onScene && current === s.id ? 'primary' : 'ghost'}`} aria-pressed={onScene ? current === s.id : undefined}
+            onClick={() => goTo(s.id)}>{s.title}</button>
         ))}
       </div>
     </div>

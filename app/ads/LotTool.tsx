@@ -21,6 +21,8 @@ import {FormatChips, ImportModal, LotsPanel, QuickLink, type ImportStage} from '
 import {MotionChips} from './MotionChips';
 import {LookPanel, lotTheme} from './LookPanel';
 import {PresetChips} from './PresetChips';
+import {Palette} from './Palette';
+import type {SceneSeek} from '../Preview';
 import {toast} from '../Toast';
 import {Clapperboard, List, SlidersHorizontal} from 'lucide-react';
 import {MobileTabs, useIsPhone, usePanelSwipes} from '../MobileTabs';
@@ -58,15 +60,18 @@ export const LotTool: React.FC = () => {
   lotRef.current = lot;
   const saveRef = useRef(save);
   saveRef.current = save;
-  const saveLot = useCallback(async () => {
+  // true — записано. Сборка проверяет ответ: при ошибке она не стартует со старыми значениями
+  // (docs/palette.md, раздел 9)
+  const saveLot = useCallback(async (): Promise<boolean> => {
     const current = lotRef.current;
-    if (!current) return;
+    if (!current) return true;
     setSave('saving');
     try {
       const saved = await api.saveLot(current);
       setLots((ls) => [saved, ...ls.filter((l) => l.id !== saved.id)]);
       setSave(lotRef.current === current ? 'saved' : 'dirty');
-    } catch (e) { setSave('error'); report(e); }
+      return true;
+    } catch (e) { setSave('error'); report(e); return false; }
   }, [report]);
   useEffect(() => {
     if (save !== 'dirty') return;
@@ -143,7 +148,12 @@ export const LotTool: React.FC = () => {
   const [quickError, setQuickError] = useState('');
   const [editing, setEditing] = useState(false);
   // Оформление ролика открыто в правой колонке вместо формата и сборки — превью остаётся рядом
+  // (только телефон: на компьютере всё оформление — в секции палитры)
   const [lookOpen, setLookOpen] = useState(false);
+  // Выбранная сцена — общая для палитры и кнопок под превью; seek — команда превью перейти к ней
+  const [scene, setScene] = useState('hook');
+  const [seek, setSeek] = useState<SceneSeek | null>(null);
+  const pickScene = (id: string) => { setScene(id); setSeek((s) => ({id, n: (s?.n ?? 0) + 1})); };
   // Ручные настройки открываются под первым экраном — подводим к ним, иначе кнопка
   // «Изменить вручную» выглядит так, будто ничего не сделала. Едем сами, за 0,6 с с
   // замедлением к концу: мгновенный прыжок сбивал с толку (владелец 01.10). Своя анимация,
@@ -186,7 +196,13 @@ export const LotTool: React.FC = () => {
   }, [phone, mtab]);
   // На телефоне правка смонтирована всегда, пока есть объявление: выезжающей панели нужно
   // что двигать, а размонтирование на закрытии съедало бы анимацию. На компьютере — как раньше
-  const showEditor = phone || editing;
+  // На компьютере ручные настройки — в «Содержании» палитры, нижней панели правки там больше нет
+  const showEditor = phone;
+  // Перед сборкой — последние правки; не записались — сборка не стартует со старыми значениями
+  const beforeRender = async () => {
+    if (save === 'saved') return;
+    if (!(await saveLot())) throw new Error('Правки не сохранились — сборка не запущена. Нажмите «Не удалось сохранить — повторить» вверху или попробуйте ещё раз');
+  };
   const quickFromLink = async (link: string) => {
     setQuickError('');
     try {
@@ -308,11 +324,24 @@ export const LotTool: React.FC = () => {
               играть и рисовать кадры 1080×1920, и прокрутка «Правки» подлагивала (владелец
               01.10); каждая перестановка фото ещё и перерисовывала его */}
           {input && previewLive
-            ? <Preview input={input} format={format} autoPlay />
+            // На компьютере, пока открыто это объявление, превью играет по кругу — идёт монтаж
+            // (владелец 20.10). key по объявлению: другое объявление начинает с начала, а ушли с
+            // экрана — плеер размонтирован и остановлен. Без фокуса и за экраном он и так на паузе
+            // (Preview). Телефон — отдельный формат, там пока один проигрыш
+            ? <Preview key={phone ? 'phone' : lot?.id} input={input} format={format} autoPlay
+              {...(phone ? {} : {onScene: setScene, seek, loop: true})} />
             : <div className="empty">Вставьте ссылку на объявление Encar — машина, фото и превью появятся сами.</div>}
         </section>
 
-        {lot && (
+        {lot && !phone && (
+          <section className="quick-side palette-side">
+            <Palette lot={lot} market={market} format={format} brand={brand} pairs={config.fonts} palettes={config.palettes ?? []}
+              save={save} onRetrySave={() => { void saveLot(); }} onChange={editLot} onPhotos={setPhotos} onError={report}
+              onFormat={chooseFormat} scene={scene} onScene={pickScene}
+              render={<RenderPanel lot={lot} format={format} unsavedSettings={unsavedSettings} beforeRender={beforeRender} onError={report} folded />} />
+          </section>
+        )}
+        {lot && phone && (
           <section className="quick-side">
             <div className="quick-title">
               <h1>{[lot.brand, lot.model].filter(Boolean).join(' ') || 'Без названия'} <span className="muted">{lot.year || ''}</span></h1>
@@ -337,7 +366,7 @@ export const LotTool: React.FC = () => {
               lot={lot}
               format={format}
               unsavedSettings={unsavedSettings}
-              beforeRender={async () => { if (save !== 'saved') await saveLot(); }}
+              beforeRender={beforeRender}
               onError={report}
             />}
           </section>

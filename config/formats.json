@@ -32,7 +32,7 @@
       },
       {
         "id": "cta",
-        "title": "CTA",
+        "title": "Контакты",
         "from": 345,
         "frames": 105,
         "preview": 440
@@ -133,7 +133,7 @@
       },
       {
         "id": "cta",
-        "title": "CTA",
+        "title": "Контакты",
         "from": 435,
         "frames": 90,
         "preview": 515
@@ -230,7 +230,7 @@
       },
       {
         "id": "cta",
-        "title": "CTA",
+        "title": "Контакты",
         "from": 345,
         "frames": 105,
         "preview": 440

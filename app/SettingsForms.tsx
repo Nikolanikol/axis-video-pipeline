@@ -452,7 +452,7 @@ const AD_SCENES: {id: string; title: string; also?: string; keys: string[]; hint
   {id: 'price', title: 'Цена', keys: ['priceLabel', 'priceNoteIncluded', 'priceNoteExcluded'],
     hints: {priceLabel: '{port} заменится на порт из профиля', priceNoteIncluded: 'под ценой, первой строкой', priceNoteExcluded: 'серым, второй строкой'},
     locked: [{what: 'Цена', where: 'в объявлении: расчёт или «Цена в ролике»'}, {what: 'Маршрут: откуда → порт', where: 'Профиль'}]},
-  {id: 'cta', title: 'CTA', keys: ['ctaTitle', 'ctaAccent', 'ctaBenefit', 'whatsappLabel'],
+  {id: 'cta', title: 'Контакты', keys: ['ctaTitle', 'ctaAccent', 'ctaBenefit', 'whatsappLabel'],
     hints: {ctaAccent: 'последняя строка заголовка, акцентным цветом', ctaBenefit: 'строка с рукопожатием', whatsappLabel: 'над номером на плашке'},
     locked: [{what: 'Номер WhatsApp и сайт', where: 'Профиль'}, {what: 'Логотип', where: 'Бренд'}]},
 ];

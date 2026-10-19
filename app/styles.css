@@ -725,7 +725,9 @@ a.tab { text-decoration: none; }
 .import-steps li.now .import-mark { border-color: var(--accent-line); color: var(--accent-text); }
 .import-steps li.done .import-mark { border-color: var(--ok); color: var(--ok); }
 .import-note { font-size: 12px; text-align: center; }
-.quick-main { display: grid; grid-template-columns: 260px auto minmax(300px, 380px); gap: 24px; align-items: start; justify-content: center; }
+.quick-main { display: grid; grid-template-columns: 260px auto minmax(300px, 460px); gap: 24px; align-items: start; justify-content: center; }
+/* Колонка настроек — до 460 px (docs/palette.md). Превью от этого не сжимается: его ширину задаёт
+   высота окна (9:16), а сетка центрирована и по краям остаётся 110–380 px (замер 20.10) */
 .quick-screen { display: flex; flex-direction: column; gap: 18px; }
 .quick-preview .player-box { height: min(calc(100vh - 250px), 760px); }
 .quick-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
@@ -890,6 +892,51 @@ a.tab { text-decoration: none; }
   .quick-side > * { flex: none; }
   .quick-side .render { display: block; }
   .quick-side .jobs-list { overflow: visible; }
+}
+
+/* ——— Палитра ролика (app/ads/Palette.tsx, docs/palette.md) ———
+   Шапка и низ со сборкой стоят, прокручивается середина с секциями */
+.palette-side { min-height: 0; }
+.palette { display: flex; flex-direction: column; min-height: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+.palette-head { padding: 18px 20px 12px; border-bottom: 1px solid var(--line); }
+.palette-head h1 { margin: 0 0 4px; font: 800 24px var(--font); letter-spacing: -.01em; }
+.palette-scope { font-size: 13px; color: var(--muted); }
+.palette-scope .save { font-size: 13px; }
+.palette-scope .link { background: none; border: none; padding: 0; cursor: pointer; text-decoration: underline; font: inherit; }
+.palette-body { padding: 0 20px; }
+.palette-section { border-bottom: 1px solid var(--line); }
+.palette-section:last-child { border-bottom: none; }
+/* Вся строка секции — кнопка (раздел 2); сводка справа сокращается многоточием, полностью — в подсказке ниже */
+.palette-section-head { width: 100%; display: flex; align-items: center; gap: 8px; padding: 16px 0; background: none; border: none;
+  color: var(--text); cursor: pointer; text-align: left; font: inherit; }
+.palette-section-head:hover .palette-section-title { color: var(--accent-text); }
+.palette-section-title { font: 700 17px var(--font); flex: none; }
+.palette-section-summary { margin-left: auto; min-width: 0; font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.palette-section-body { display: flex; flex-direction: column; gap: 12px; padding: 0 0 20px; }
+.palette-section-body h2 { margin: 8px 0 0; font-size: 15px; }
+.palette-section-body .field { margin-bottom: 0; }
+.palette-scenes { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; margin-top: 4px; }
+.palette-scene { padding: 11px 14px; border-radius: 9px; border: 1px solid var(--line); background: none; color: var(--text); text-align: left;
+  font: 14px var(--font); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.palette-scene:hover { border-color: var(--accent-line); }
+.palette-scene.on { border-color: var(--accent-line); background: #8e0d2c26; box-shadow: inset 0 0 0 1px var(--accent); }
+.palette-scene-body { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 10px; background: var(--panel-2); }
+.palette-scene-body h2 { margin: 0; }
+.palette-foot { display: flex; flex-direction: column; gap: 10px; padding: 14px 20px 16px; border-top: 1px solid var(--line); }
+.palette-foot-line { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--muted); }
+.palette-foot .render h2 { display: none; }
+.jobs-toggle { align-self: flex-start; background: none; border: none; padding: 0; color: var(--muted); font: 13px var(--font); cursor: pointer; text-decoration: underline; }
+.look-panel.embedded { overflow: visible; padding-right: 0; }
+@media (min-width: 901px) {
+  /* Палитра — ровно в высоту колонки: середина прокручивается, шапка и низ на месте.
+     Правила низкого окна для прежней колонки (.quick-side > * { flex: none }) здесь не нужны */
+  .quick-side.palette-side { overflow: hidden; margin-right: 0; padding-right: 0; }
+  .quick-side.palette-side > .palette { flex: 1 1 0; }
+  .palette-body { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  .palette-head, .palette-foot { flex: none; }
+  .quick-side.palette-side .palette-foot .render { flex: none; display: flex; flex-direction: column; gap: 10px; }
+  /* Готовые ролики под «Ролики (N)» — не больше трети окна, дальше прокрутка внутри */
+  .quick-side.palette-side .palette-foot .jobs-list { flex: none; max-height: 34vh; overflow-y: auto; }
 }
 
 /* Узкий ноутбук: колонки лотов и сборки уже, превью посередине остаётся целым */

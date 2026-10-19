@@ -11,6 +11,8 @@ type Props = {
   unsavedSettings: boolean;
   beforeRender: () => Promise<void>;
   onError: (e: unknown) => void;
+  // Список роликов свёрнут под «Ролики (N)» — в закреплённом низу палитры (JobsPanel)
+  folded?: boolean;
 };
 
 const MISSING: Record<Requirement, string> = {
@@ -19,7 +21,7 @@ const MISSING: Record<Requirement, string> = {
   price: 'нет цены — будет «XX XXX $»',
 };
 
-export const RenderPanel: React.FC<Props> = ({lot, format, unsavedSettings, beforeRender, onError}) => {
+export const RenderPanel: React.FC<Props> = ({lot, format, unsavedSettings, beforeRender, onError, folded}) => {
   const warnings = [
     ...missing(lot, format).map((r) => MISSING[r]),
     unsavedSettings && 'настройки профиля/бренда не сохранены — рендер возьмёт сохранённые',
@@ -33,6 +35,7 @@ export const RenderPanel: React.FC<Props> = ({lot, format, unsavedSettings, befo
       start={async () => { await beforeRender(); return api.render(lot.id, format.id); }}
       onError={onError}
       pipeline="ads"
+      folded={folded}
     />
   );
 };
