@@ -5,6 +5,7 @@ import {AbsoluteFill, Img, interpolate, staticFile, useCurrentFrame, useVideoCon
 import type {DesignId} from '../shared/types';
 import {BODY, HEAD, Logo, clamp, useTheme} from '../shared/ui';
 import {MotionTitle, easeOut, motionOf, photoMotion, priceMotion, textDelay} from './motion';
+import {factIcon, splitDot, splitNumber} from './plates';
 
 export type DesignFact = {label?: string; value: string};
 export type DesignContent = {
@@ -40,6 +41,8 @@ export const DesignSlide: React.FC<{content: DesignContent; design: DesignId; in
   // Движение сцены (motion.tsx): заголовок, цена и фото — свои приёмы, остальное — прежнее
   // мягкое появление; подписи ждут фото, если оно раскрывается («Окно», «Общий объект»)
   const motion = motionOf(C, design);
+  // Подача данных: линии (прежняя), плитки, таблетки, колонка на подложке — см. plated ниже
+  const plates = C.plates ?? 'lines';
   const delay = textDelay(motion.slide);
   const t = frame / fps;
   const entrance = animated ? interpolate(frame, [Math.round(fps * delay), Math.round(fps * (delay + .5))], [0, 1], clamp) : 1;
@@ -138,6 +141,113 @@ export const DesignSlide: React.FC<{content: DesignContent; design: DesignId; in
     // При цене общее появление переходит с колонки на строки под ней — иначе оно гасило бы и въезд цены
     const own = Boolean(price && c.price);
     const rest = own ? move : {};
+    const facts = (c.facts ?? []).slice(0, (dense ? 4 : 5) - (c.kicker && c.lines?.length ? (compact ? 2 : 1) : 0));
+    const lines = (c.lines ?? []).slice(0, dense ? 3 : 4).map((line, i) => <div key={i} style={{...rest, fontFamily: BODY, fontSize: dense ? bodySize - 3 : bodySize,
+      lineHeight: 1.35, color: C.grey, overflowWrap: 'anywhere'}}>{line}</div>);
+    // Подача данных — плашки из KOK_VISUAL_KIT (20.10). Скругление идёт за множителем углов бренда,
+    // как у остальных плашек: «Острые» дают прямые углы и здесь
+    const round = (px: number) => px * (C.style?.radius ?? 1);
+    // «Карточка собирается» (видеосценарий KOK_VISUAL_KIT): плашки входят по одной — сдвиг 32 px
+    // (в сценарии 24–40), проявление 0,45 с, шаг 0,1 с (0,08–0,12). Один смысловой блок за раз
+    const piece = (i: number): React.CSSProperties => {
+      if (!animated) return {};
+      const v = easeOut((t - delay - .15 - i * .1) / .45);
+      return {opacity: v, transform: `translateY(${(1 - v) * 32}px)`};
+    };
+    const plated = (list: DesignFact[], notes: React.ReactNode[]) => {
+      if (!list.length) return notes;
+      if (plates === 'row') {
+        // «Журнал»: факты в ряд над тонкой линией; главное крупно, после « · » — подпись мелко под ним
+        const cols = Math.min(3, list.length, availableWidth >= 560 ? 3 : 2);
+        return <>
+          <div style={{display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: compact ? '18px 20px' : '26px 28px',
+            borderTop: `1px solid ${C.line}`, paddingTop: compact ? 18 : 26}}>
+            {list.map((fact, i) => { const {main, note} = splitDot(fact.value); return <div key={`${i}-${fact.value}`} style={{...piece(i), minWidth: 0}}>
+              <div style={{fontFamily: HEAD, fontWeight: 700, fontSize: fit(main, availableWidth / cols - 20, dense ? 40 : 50, 24), lineHeight: 1.1,
+                color: C.white, overflowWrap: 'anywhere'}}>{main}</div>
+              {(fact.label || note) && <div style={{fontFamily: BODY, fontSize: compact ? 20 : 24, color: C.grey, marginTop: 8, overflowWrap: 'anywhere'}}>
+                {[fact.label, note].filter(Boolean).join(' · ')}</div>}
+            </div>; })}
+          </div>{notes}</>;
+      }
+      if (plates === 'big') {
+        // Крупные цифры: число отдельно и очень крупно, единица и остальное — подписью под ним.
+        // Факт без числа в начале («Автомат · красный») — тем же местом, но кеглем строки
+        const cols = availableWidth >= 560 && list.length > 1 ? 2 : 1;
+        return <>
+          <div style={{display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: compact ? '20px 24px' : '30px 32px'}}>
+            {list.map((fact, i) => {
+              const n = splitNumber(fact.value);
+              const big = n ? n.number : splitDot(fact.value).main;
+              const small = n ? n.rest : splitDot(fact.value).note;
+              return <div key={`${i}-${fact.value}`} style={{...piece(i), minWidth: 0}}>
+                <div style={{fontFamily: HEAD, fontWeight: 700, lineHeight: 1, color: i === 0 ? C.copper : C.white, overflowWrap: 'anywhere',
+                  fontSize: fit(big, availableWidth / cols - 16, n ? (dense ? 84 : 104) : (dense ? 44 : 54), 28)}}>{big}</div>
+                {(fact.label || small) && <div style={{fontFamily: BODY, fontSize: compact ? 20 : 24, letterSpacing: '.06em', textTransform: 'uppercase',
+                  color: C.grey, marginTop: 10, overflowWrap: 'anywhere'}}>{[fact.label, small].filter(Boolean).join(' · ')}</div>}
+              </div>;
+            })}
+          </div>{notes}</>;
+      }
+      if (plates === 'icons') {
+        // С иконками: значок по смыслу факта (пробег, топливо, коробка, владельцы, история) в круге цвета акцента.
+        // Значки — lucide-react, тот же набор, что у опций карусели
+        const size = compact ? 52 : 64;
+        return <>
+          <div style={{display: 'flex', flexDirection: 'column', gap: compact ? 14 : 20}}>
+            {list.map((fact, i) => { const Icon = factIcon(`${fact.label ?? ''} ${fact.value}`); return <div key={`${i}-${fact.value}`}
+              style={{...piece(i), display: 'flex', alignItems: 'center', gap: compact ? 16 : 22, minWidth: 0}}>
+              <span style={{flex: 'none', width: size, height: size, borderRadius: round(size / 2), background: C.panel, color: C.copper,
+                display: 'flex', alignItems: 'center', justifyContent: 'center'}}><Icon size={size * .5} strokeWidth={1.9} /></span>
+              <div style={{minWidth: 0}}>
+                {fact.label && <div style={{fontFamily: BODY, fontSize: compact ? 20 : 23, color: C.grey, marginBottom: 4}}>{fact.label}</div>}
+                <div style={{fontFamily: BODY, fontWeight: 600, fontSize: fit(fact.value, availableWidth - size - 24, dense ? 40 : 48, 26), lineHeight: 1.15,
+                  color: C.white, overflowWrap: 'anywhere'}}>{fact.value}</div>
+              </div>
+            </div>; })}
+          </div>{notes}</>;
+      }
+      if (plates === 'tiles') {
+        // «Паспорт»: сетка 2×2, плашка 464×145 со скруглением 24 при ширине 1080. В узкой колонке — одна в ряд
+        const cols = availableWidth >= 560 ? 2 : 1;
+        return <>
+          <div style={{display: 'grid', gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`, gap: compact ? 14 : 24}}>
+            {list.map((fact, i) => <div key={`${i}-${fact.value}`} style={{...piece(i), background: C.panel, borderRadius: round(24), padding: compact ? '16px 20px' : '22px 24px', minWidth: 0}}>
+              {fact.label && <div style={{fontFamily: BODY, fontSize: compact ? 20 : 23, letterSpacing: '.06em', textTransform: 'uppercase', color: C.grey, marginBottom: 8}}>{fact.label}</div>}
+              <div style={{fontFamily: HEAD, fontWeight: 700, fontSize: fit(fact.value, availableWidth / cols - 48, dense ? 44 : 56, 26), lineHeight: 1.1,
+                color: C.white, overflowWrap: 'anywhere'}}>{fact.value}</div>
+            </div>)}
+          </div>{notes}</>;
+      }
+      if (plates === 'pills') {
+        // «Ценник»: короткие «таблетки» высотой 54 и кегль 27 при ширине 1080 — подписи, а не крупные данные
+        return <>
+          <div style={{display: 'flex', flexWrap: 'wrap', gap: compact ? 10 : 14}}>
+            {list.map((fact, i) => <span key={`${i}-${fact.value}`} style={{...piece(i), background: C.panel, borderRadius: round(27), padding: compact ? '10px 20px' : '13px 26px',
+              fontFamily: BODY, fontSize: compact ? 25 : 30, lineHeight: 1.2, color: C.white, maxWidth: '100%', overflowWrap: 'anywhere'}}>
+              {fact.label ? <span style={{color: C.grey}}>{fact.label} </span> : null}{fact.value}</span>)}
+          </div>{notes}</>;
+      }
+      if (plates === 'column') {
+        // «Две колонки»: данные и подписи под ними — на одной подложке; значение крупно, пояснение мелко под ним
+        return <div style={{...rest, background: C.panel, borderRadius: round(24), padding: compact ? '22px 26px' : '32px 32px',
+          display: 'flex', flexDirection: 'column', gap: compact ? 16 : 26}}>
+          {list.map((fact, i) => <div key={`${i}-${fact.value}`} style={piece(i)}>
+            <div style={{fontFamily: HEAD, fontWeight: 700, fontSize: fit(fact.value, availableWidth - 64, dense ? 50 : 62, 28), lineHeight: 1.08,
+              color: i === 0 ? C.copper : C.white, overflowWrap: 'anywhere'}}>{fact.value}</div>
+            {fact.label && <div style={{fontFamily: BODY, fontSize: compact ? 18 : 21, letterSpacing: '.06em', textTransform: 'uppercase', color: C.grey, marginTop: 6}}>{fact.label}</div>}
+          </div>)}
+          {notes}
+        </div>;
+      }
+      return <>{list.map((fact, i) => <div key={`${i}-${fact.value}`} style={{...rest, borderBottom: `1px solid ${C.line}`, paddingBottom: compact ? 14 : 22,
+        ...(design === 'catalog' ? {display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 24} : {})}}>
+        {fact.label && <div style={{fontFamily: BODY, fontSize: compact ? 25 : 29, color: C.grey, marginBottom: design === 'catalog' ? 0 : 7}}>{fact.label}</div>}
+        <div style={{fontFamily: design === 'editorial' ? HEAD : BODY, fontWeight: 500,
+          fontSize: fit(fact.value, availableWidth * (design === 'catalog' && fact.label ? .57 : 1), dense ? 42 : 54, 28),
+          lineHeight: 1.18, color: C.white, overflowWrap: 'anywhere'}}>{fact.value}</div>
+      </div>)}{notes}</>;
+    };
     return (
     <div style={{...(own ? {} : move), display: 'flex', flexDirection: 'column', gap: compact ? 14 : 24, minWidth: 0}}>
       {c.price && <div>
@@ -147,15 +257,7 @@ export const DesignSlide: React.FC<{content: DesignContent; design: DesignId; in
         </div>
       </div>}
       {/* Под фразой — три опции, на квадрате две: с заголовком в две строки и текстом остальные уходили на подвал */}
-      {(c.facts ?? []).slice(0, (dense ? 4 : 5) - (c.kicker && c.lines?.length ? (compact ? 2 : 1) : 0)).map((fact, i) => <div key={`${i}-${fact.value}`} style={{...rest, borderBottom: `1px solid ${C.line}`, paddingBottom: compact ? 14 : 22,
-        ...(design === 'catalog' ? {display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 24} : {})}}>
-        {fact.label && <div style={{fontFamily: BODY, fontSize: compact ? 25 : 29, color: C.grey, marginBottom: design === 'catalog' ? 0 : 7}}>{fact.label}</div>}
-        <div style={{fontFamily: design === 'editorial' ? HEAD : BODY, fontWeight: 500,
-          fontSize: fit(fact.value, availableWidth * (design === 'catalog' && fact.label ? .57 : 1), dense ? 42 : 54, 28),
-          lineHeight: 1.18, color: C.white, overflowWrap: 'anywhere'}}>{fact.value}</div>
-      </div>)}
-      {(c.lines ?? []).slice(0, dense ? 3 : 4).map((line, i) => <div key={i} style={{...rest, fontFamily: BODY, fontSize: dense ? bodySize - 3 : bodySize,
-        lineHeight: 1.35, color: C.grey, overflowWrap: 'anywhere'}}>{line}</div>)}
+      {plated(facts, lines)}
       {c.contact && <div style={{...rest, marginTop: 15}}>
         <div style={{fontFamily: BODY, fontSize: compact ? 26 : 32, color: C.grey, marginBottom: 15}}>{c.contact.label}</div>
         <div style={{fontFamily: HEAD, fontWeight: 600, fontSize: fit(c.contact.value, availableWidth - 40, compact ? 60 : 78, 26), lineHeight: 1.2,

@@ -19,7 +19,7 @@ export const PresetChips: React.FC<Props> = ({lot, theme, onChange, onMore}) => 
     </button>;
   return <div className="preset-chips">
     <div className="preset-head"><span className="quick-label">Пресет</span>
-      <button type="button" className="motion-reset" onClick={onMore}>Цвета, шрифты, углы…</button></div>
+      <button type="button" className="motion-reset" onClick={onMore}>Плашки, цвета, шрифты…</button></div>
     {/* Строка на компоновку, в ней — её сочетания цветов: так семь вариантов занимают четыре
         короткие строки, а «Собрать ролик» остаётся в первом экране */}
     <div className="preset-grid" role="radiogroup" aria-label="Пресет ролика">

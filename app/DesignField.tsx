@@ -3,12 +3,15 @@
 // компоновка при этом остаётся. «Исходный» — наши прежние форматы, не новая ветка поверх них.
 import React from 'react';
 import {applyDesignPreset, DESIGNS, matchDesignPreset} from '../src/shared/designs';
-import {SLIDE_MOTIONS, TEXT_MOTIONS} from '../src/shared/design.js';
+import {PLATES, SLIDE_MOTIONS, TEXT_MOTIONS} from '../src/shared/design.js';
 import {SLIDE_MOTION_TITLES, TEXT_MOTION_TITLES, motionOf} from '../src/design/motion';
 import type {Theme} from '../src/shared/types';
 import './designs.css';
 
 // motion = false — на экране ролика: движение там выбирается отдельными кнопками под форматом
+const PLATE_TITLES = {lines: 'Линии', tiles: 'Плитки', pills: 'Таблетки', column: 'Колонка на подложке',
+  row: 'Журнальная строка', big: 'Крупные цифры', icons: 'С иконками'} as const;
+
 export const DesignField: React.FC<{theme: Theme; onChange: (theme: Theme) => void; motion?: boolean; note?: string}> = ({theme, onChange, motion: showMotion = true, note}) => {
   const design = DESIGNS.find((d) => d.id === theme.design);
   const current = matchDesignPreset(theme);
@@ -44,6 +47,12 @@ export const DesignField: React.FC<{theme: Theme; onChange: (theme: Theme) => vo
         {([0, 1] as const).map((variant) => <button key={variant} type="button" aria-pressed={(theme.designVariant ?? 0) === variant}
           className={`btn ${(theme.designVariant ?? 0) === variant ? 'primary' : 'ghost'}`}
           onClick={() => onChange({...theme, designVariant: variant})}>{variant ? 'Альтернативная' : 'Основная'}</button>)}
+      </div></div>
+      {/* Плашки из KOK_VISUAL_KIT: подача характеристик и подписей под ними — и в роликах, и на слайдах карусели */}
+      <div className="switch-row"><span className="switch-label">Подача данных</span><div className="btn-row">
+        {PLATES.map((id) => <button key={id} type="button" aria-pressed={(theme.plates ?? 'lines') === id}
+          className={`btn ${(theme.plates ?? 'lines') === id ? 'primary' : 'ghost'}`}
+          onClick={() => onChange({...theme, plates: id})}>{PLATE_TITLES[id]}</button>)}
       </div></div>
       {showMotion && <>
       <div className="switch-row"><span className="switch-label">Появление текста</span><div className="btn-row">

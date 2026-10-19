@@ -121,7 +121,7 @@ describe('лоты', () => {
     const {body: lot} = await call('POST', '/api/lots', {});
     const {body: config} = await call('GET', '/api/config');
     const pair = config.fonts[1];
-    const look = {design: 'catalog', designVariant: 1, ...config.palettes[0].colors,
+    const look = {design: 'catalog', designVariant: 1, plates: 'tiles', ...config.palettes[0].colors,
       fonts: {head: pair.head, body: pair.body, url: pair.url}, style: {gradient: false, radius: 1}};
     const ok = await call('PUT', `/api/lots/${lot.id}`, {...lot, look, textMotion: 'label', slideMotion: 'detail'});
     expect(ok.status).toBe(200);
@@ -133,6 +133,7 @@ describe('лоты', () => {
       {...look, fonts: {head: 'Comic Sans', body: 'Arial', url: 'https://evil.example/x.css'}},
       {...look, design: 'other'},
       {...look, style: {gradient: 'yes', radius: 1}},
+      {...look, plates: 'neon'},
     ];
     for (const b of bad) expect((await call('PUT', `/api/lots/${lot.id}`, {...lot, look: b})).status).toBe(400);
     expect((await call('PUT', `/api/lots/${lot.id}`, {...lot, textMotion: 'bounce'})).status).toBe(400);

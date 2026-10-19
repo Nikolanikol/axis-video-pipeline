@@ -3,7 +3,7 @@
 // Тайминги — из data/motions.json пакета, в секундах (правило проекта: не в кадрах).
 // В одном ролике — одно появление заголовков и одна смена сцен: случайной анимации на слово нет.
 import React from 'react';
-import {DEFAULT_MOTION, SLIDE_MOTIONS, TEXT_MOTIONS} from '../shared/design.js';
+import {DEFAULT_MOTION, SCENE_TRANSITIONS, SLIDE_MOTIONS, TEXT_MOTIONS} from '../shared/design.js';
 import type {DesignId, SlideMotionId, TextMotionId, Theme} from '../shared/types';
 
 // ease-out и smoothstep — те же формулы, что в motion-engine.js пакета
@@ -21,6 +21,8 @@ export const TEXT_MOTION_TITLES: Record<TextMotionId, string> = {
 export const SLIDE_MOTION_TITLES: Record<SlideMotionId, string> = {
   pan: 'Тихий проезд', window: 'Окно раскрывается', match: 'Общий объект', push: 'Вертикальная смена',
   stack: 'Стопка снимков', detail: 'Крупнее о деталях',
+  dissolve: 'Мягкое растворение', push_side: 'Толчок вбок', wipe_cut: 'Строгая шторка', diagonal: 'Диагональный срез',
+  iris: 'Диафрагма', depth_zoom: 'Наезд вглубь', whip: 'Резкая панорама', shutters: 'Шторки от центра',
 };
 
 // Не выбранное вручную берётся от компоновки: так сохранённые бренды получают подачу,
@@ -37,7 +39,64 @@ export const textDelay = (slide: SlideMotionId) =>
 
 // Сколько сцены идут внахлёст. Растворению хватает 0,4 с (прежние 12 кадров при 30),
 // вертикальной смене — 0,75 с из пакета: быстрее два слоя читаются как рывок
-export const sceneOverlap = (slide: SlideMotionId, fps: number) => Math.round(fps * (slide === 'push' ? .75 : .4));
+export const sceneOverlap = (slide: SlideMotionId, fps: number) => Math.round(fps * (slide === 'push' ? .75 : isSceneTransition(slide) ? sceneDuration(slide) : .4));
+
+// ——— Переходы между сценами из KOK Motion Studio V3 (lib/transition-core.js, «KOK Originals»).
+// Формулы и кривые — оттуда; сдвиги переведены из пикселей демо-карточки в доли кадра,
+// как советует сама студия («нормализовать к размеру сцены»), иначе на 1080×1920 толчок
+// не доезжал бы до края. Время — от номера кадра: уходящая сцена знает свою долю выхода,
+// входящая — входа, на одном кадре они равны, и два слоя складываются в один переход
+export type SceneTransitionId = typeof SCENE_TRANSITIONS[number];
+export const isSceneTransition = (id: string): id is SceneTransitionId => (SCENE_TRANSITIONS as readonly string[]).includes(id);
+// Длительность — студийная по умолчанию (0,8 с), у резкой панорамы — как у «Motion Blur» (0,65 с)
+const sceneDuration = (id: SlideMotionId) => id === 'whip' ? .65 : .8;
+
+// Кубическая Безье тем же двоичным поиском, что в студии: кривые совпадают с её превью
+// Концы — ровно 0 и 1: поиск сходится к 0,99999…, и сцена недоезжала бы на долю пикселя
+const bezier = (x: number, a: number, b: number, c: number, d: number) => {
+  if (x <= 0) return 0;
+  if (x >= 1) return 1;
+  const f = (t: number, p1: number, p2: number) => 3 * (1 - t) * (1 - t) * t * p1 + 3 * (1 - t) * t * t * p2 + t * t * t;
+  let lo = 0;
+  let hi = 1;
+  for (let i = 0; i < 22; i++) { const m = (lo + hi) / 2; if (f(m, a, c) < cut(x)) lo = m; else hi = m; }
+  return f((lo + hi) / 2, b, d);
+};
+const SCENE_EASE: Record<SceneTransitionId, (t: number) => number> = {
+  dissolve: (t) => bezier(t, .65, 0, .35, 1), push_side: (t) => bezier(t, .65, 0, .35, 1), shutters: (t) => bezier(t, .65, 0, .35, 1),
+  wipe_cut: (t) => bezier(t, .22, 1, .36, 1), iris: (t) => bezier(t, .22, 1, .36, 1), depth_zoom: (t) => bezier(t, .22, 1, .36, 1),
+  diagonal: (t) => bezier(t, .18, .84, .17, 1), whip: (t) => bezier(t, .18, .84, .17, 1),
+};
+
+/**
+ * Стиль слоя сцены в переходе. role: 'in' — входящая (сверху), 'out' — уходящая. raw — доля 0…1.
+ * Размытие у «Резкой панорамы» — только на время перехода (0,65 с): в каждом кадре
+ * оно вдвое замедляло бы рендер на сервере (CLAUDE.md)
+ */
+export const sceneLayer = (id: SceneTransitionId, role: 'in' | 'out', raw: number): React.CSSProperties => {
+  const e = SCENE_EASE[id](raw);
+  const inv = 1 - e;
+  const blur = (px: number) => px > .05 ? {filter: `blur(${px.toFixed(2)}px)`} : {};
+  switch (id) {
+    case 'dissolve': return {opacity: role === 'in' ? e : 1 - e};
+    case 'push_side': return {transform: `translateX(${role === 'in' ? inv * 100 : -e * 100}%)`};
+    case 'wipe_cut': return role === 'in' ? {clipPath: `inset(0 ${100 * inv}% 0 0)`} : {};
+    // В студии срез доходит лишь до 100% сверху и 65% снизу — в конце сцена открывалась скачком;
+    // 135% доводят нижний край ровно до 100%
+    case 'diagonal': return role === 'in' ? {clipPath: `polygon(0 0, ${135 * e}% 0, ${Math.max(0, 135 * e - 35)}% 100%, 0 100%)`} : {};
+    case 'iris': return role === 'in' ? {clipPath: `circle(${e * 75}% at 50% 50%)`} : {};
+    case 'depth_zoom': return role === 'in'
+      ? {transform: `scale(${.78 + .22 * e})`, opacity: cut((e - .07) * 1.4)}
+      : {transform: `scale(${1 + .56 * e})`, opacity: cut(1 - e * 1.2)};
+    case 'whip': {
+      const smear = 12 * Math.sin(Math.PI * e) * .8;
+      return role === 'in'
+        ? {transform: `translateX(${inv * 100}%)`, opacity: cut(e * 2), ...blur(smear)}
+        : {transform: `translateX(${-e * 100}%)`, opacity: cut((1 - e) * 2), ...blur(smear)};
+    }
+    case 'shutters': return role === 'in' ? {clipPath: `inset(${50 * inv}% 0 ${50 * inv}% 0)`} : {};
+  }
+};
 
 // Фото внутри сцены: t — секунды от начала сцены. Возвращает стиль рамки и картинки
 export const photoMotion = (slide: SlideMotionId, t: number): {frame: React.CSSProperties; img?: string} => {

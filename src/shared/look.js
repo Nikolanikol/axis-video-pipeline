@@ -12,6 +12,7 @@ export const pickLook = (theme) => ({
   ...Object.fromEntries(PALETTE_KEYS.map((k) => [k, theme[k]])),
   fonts: theme.fonts,
   style: theme.style,
+  plates: theme.plates ?? 'lines',
 });
 
 /** Тема ролика: бренд, поверх — оформление объявления. Нет снимка — бренд как есть */

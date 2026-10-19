@@ -5,9 +5,10 @@ import type brandTheme from '../../config/brand.json';
 export type DesignId = typeof import('./design.js').DESIGN_IDS[number];
 export type TextMotionId = typeof import('./design.js').TEXT_MOTIONS[number];
 export type SlideMotionId = typeof import('./design.js').SLIDE_MOTIONS[number];
-export type LotLook = {design: DesignId | null; designVariant: 0 | 1; fonts: Theme['fonts']; style: Theme['style']}
+export type LotLook = {design: DesignId | null; designVariant: 0 | 1; fonts: Theme['fonts']; style: Theme['style']; plates?: PlatesId}
   & Pick<Theme, 'bg' | 'panel' | 'line' | 'grey' | 'white' | 'copper' | 'copperLight' | 'copperDark'>;
-export type Theme = typeof brandTheme & {design?: DesignId; designVariant?: 0 | 1; textMotion?: TextMotionId; slideMotion?: SlideMotionId};
+export type PlatesId = typeof import('./design.js').PLATES[number];
+export type Theme = typeof brandTheme & {design?: DesignId; designVariant?: 0 | 1; textMotion?: TextMotionId; slideMotion?: SlideMotionId; plates?: PlatesId};
 
 // Тексты рынка (язык ролика). Какие ключи нужны — описывает формат в config/formats.json.
 export type Texts = Record<string, string>;

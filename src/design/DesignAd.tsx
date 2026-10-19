@@ -12,7 +12,7 @@ import type {Ad, AdProps, Market} from '../shared/types';
 import {clamp, ThemeProvider, useTheme} from '../shared/ui';
 import {historyLines, priceFirstPhotos} from '../formats/price-first/PriceFirst';
 import {DesignContent, DesignSlide} from './DesignSlide';
-import {motionOf, pushOffset, sceneOverlap} from './motion';
+import {isSceneTransition, motionOf, pushOffset, sceneLayer, sceneOverlap} from './motion';
 import type {SlideMotionId} from '../shared/types';
 
 const contactOf = (ad: Ad) => {
@@ -72,6 +72,12 @@ const SceneMove: React.FC<{slide: SlideMotionId; first: boolean; last: boolean; 
     if (slide === 'push') {
       const y = pushOffset(first ? 1 : f / overlap, last ? 0 : (f - frames) / overlap);
       return <AbsoluteFill style={{transform: `translateY(${y}%)`}}>{children}</AbsoluteFill>;
+    }
+    if (isSceneTransition(slide)) {
+      // Входящая лежит сверху (следующая Sequence), поэтому шторкам и диафрагме хватает обрезки только её
+      const exiting = !last && f >= frames;
+      const style = exiting ? sceneLayer(slide, 'out', (f - frames) / overlap) : first ? {} : sceneLayer(slide, 'in', f / overlap);
+      return <AbsoluteFill style={style}>{children}</AbsoluteFill>;
     }
     const opacity = first ? 1 : interpolate(f, [0, overlap], [0, 1], {...clamp, easing: Easing.inOut(Easing.quad)});
     return <AbsoluteFill style={{opacity}}>{children}</AbsoluteFill>;

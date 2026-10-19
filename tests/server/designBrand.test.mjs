@@ -44,6 +44,8 @@ describe('сохранение дизайна бренда', () => {
     expect([saved.textMotion, saved.slideMotion]).toEqual(['highlight', 'stack']);
     expect((await put({...brand, textMotion: 'bounce'})).status).toBe(400);
     expect((await put({...brand, slideMotion: '<script>'})).status).toBe(400);
+    expect((await put({...brand, plates: 'tiles', slideMotion: 'iris'})).status).toBe(200);
+    expect((await put({...brand, plates: 'neon'})).status).toBe(400);
   });
 
   it('принимает прежний бренд без новых полей', async () => {

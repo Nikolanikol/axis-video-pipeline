@@ -28,7 +28,7 @@ import {ICON_RULES, LOGO_RULES, brandForRender, saveIcon, saveLogo, setIconVaria
 import {balanceOf, billed, creditCosts, ledgerOf, ledgerPage, signupCredits} from './billing.mjs';
 import {parseCarouselSource} from '../src/shared/kmotorsLot.js';
 import {PALETTE_KEYS, isHex} from '../src/shared/contrast.js';
-import {isDesign, isSlideMotion, isTextMotion} from '../src/shared/design.js';
+import {isDesign, isPlates, isSlideMotion, isTextMotion} from '../src/shared/design.js';
 import {withoutMusic} from '../src/shared/nomusic.js';
 import {
   accountOf, cancelEmailChange, requestDeletion, restoreAccount, changePassword, closeOtherSessions, closeSession, confirmEmailChange, dropSession,
@@ -97,6 +97,7 @@ const checkLotLook = async (lot) => {
   if (typeof look !== 'object' || Array.isArray(look)) throw new HttpError(400, 'Оформление ролика — объект настроек');
   if (look.design !== null && !isDesign(look.design)) throw new HttpError(400, 'Выберите дизайн из списка');
   if (look.designVariant !== 0 && look.designVariant !== 1) throw new HttpError(400, 'Компоновка — основная или альтернативная');
+  if (look.plates !== undefined && !isPlates(look.plates)) throw new HttpError(400, 'Подача данных — из списка');
   for (const k of PALETTE_KEYS) if (!isHex(look[k])) throw new HttpError(400, `Цвет «${k}» — в виде #RRGGBB`);
   // Своя пара бренда (вписанная в brand.json руками) тоже годится: снимок оформления её копирует,
   // и иначе смена одной палитры у ролика упиралась бы в отказ по шрифтам
@@ -137,6 +138,7 @@ const checkBrand = (theme) => {
     throw new HttpError(400, 'Компоновка — основная или альтернативная');
   }
   if (theme.textMotion !== undefined && !isTextMotion(theme.textMotion)) throw new HttpError(400, 'Выберите появление текста из списка');
+  if (theme.plates !== undefined && !isPlates(theme.plates)) throw new HttpError(400, 'Подача данных — из списка');
   if (theme.slideMotion !== undefined && !isSlideMotion(theme.slideMotion)) throw new HttpError(400, 'Выберите смену сцен из списка');
   const url = theme.fonts?.url ?? '';
   if (url && !/^https:\/\/fonts\.googleapis\.com\//.test(url)) {
