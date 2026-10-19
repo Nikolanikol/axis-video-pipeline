@@ -17,20 +17,68 @@ import {RecMark} from './Loading';
 // (плеер дошёл или перемотали), seek — команда «перейти к сцене» из палитры; n меняется при каждом
 // нажатии, чтобы повторный выбор той же сцены тоже перематывал
 export type SceneSeek = {id: string; n: number};
+// Узкое управление плеером для мобильной палитры («Смотреть целиком» → «Вернуть настройки»,
+// пауза под списком объявлений): кадр, пауза, переход к кадру, проигрыш с начала
+export type PreviewControl = {frame: () => number; pause: () => void; seekFrame: (frame: number) => void; playFromStart: () => void;
+  /** Показать приём: проиграть с кадра frame около seconds секунд и встать (мобильная «Анимация») */
+  playFragment: (frame: number, seconds: number) => void;
+  /** ▶ / пауза своей кнопкой — когда у плеера нет полосы управления (мобильная палитра) */
+  toggle: () => void};
 export const Preview: React.FC<{input: AdProps; format: FormatMeta; autoPlay?: boolean; loop?: boolean;
-  onScene?: (id: string) => void; seek?: SceneSeek | null}> = (
-  {input, format, autoPlay, loop = false, onScene, seek},
+  onScene?: (id: string) => void; seek?: SceneSeek | null;
+  // showScenes = false — без кнопок сцен под плеером (мобильная палитра: перемотка — своей панелью)
+  showScenes?: boolean; control?: React.MutableRefObject<PreviewControl | null>;
+  // controls = false — без полосы управления плеера (своя ▶ у оболочки); onPlaying — играет ли
+  controls?: boolean; onPlaying?: (playing: boolean) => void;
+  // onFrame — каждый кадр (полоса прокрутки мобильной палитры); вызывается часто, без лишней работы
+  onFrame?: (frame: number) => void}> = (
+  {input, format, autoPlay, loop = false, onScene, seek, showScenes = true, control, controls = true, onPlaying, onFrame},
 ) => {
   const ref = useRef<PlayerRef>(null);
+  const fragment = useRef<number | undefined>(undefined);
+  useEffect(() => () => clearTimeout(fragment.current), []);
+  if (control) control.current = {
+    frame: () => ref.current?.getCurrentFrame() ?? 0,
+    pause: () => ref.current?.pause(),
+    seekFrame: (frame) => { ref.current?.pause(); ref.current?.seekTo(frame); },
+    playFromStart: () => { ref.current?.seekTo(0); ref.current?.play(); },
+    playFragment: (frame, seconds) => {
+      clearTimeout(fragment.current);
+      ref.current?.seekTo(Math.max(0, Math.min(frame, format.durationInFrames - 1)));
+      ref.current?.play();
+      fragment.current = window.setTimeout(() => ref.current?.pause(), seconds * 1000);
+    },
+    toggle: () => {
+      const p = ref.current;
+      if (!p) return;
+      if (p.isPlaying()) p.pause();
+      else { if (p.getCurrentFrame() >= format.durationInFrames - 1) p.seekTo(0); p.play(); }
+    },
+  };
+  const onPlayingRef = useRef(onPlaying);
+  onPlayingRef.current = onPlaying;
+  useEffect(() => {
+    const p = ref.current;
+    if (!p) return;
+    const on = () => onPlayingRef.current?.(true);
+    const off = () => onPlayingRef.current?.(false);
+    p.addEventListener('play', on);
+    p.addEventListener('pause', off);
+    p.addEventListener('ended', off);
+    return () => { p.removeEventListener('play', on); p.removeEventListener('pause', off); p.removeEventListener('ended', off); };
+  }, [format]);
   // Сцена в кадре — по номеру кадра и границам сцен формата. Сообщаем только смену, а не каждый кадр
   const [current, setCurrent] = useState(format.scenes[0]?.id);
   const lastScene = useRef<string | undefined>(undefined);
   const onSceneRef = useRef(onScene);
   onSceneRef.current = onScene;
+  const onFrameRef = useRef(onFrame);
+  onFrameRef.current = onFrame;
   useEffect(() => {
     const player = ref.current;
     if (!player) return;
     const update = (frame: number) => {
+      onFrameRef.current?.(frame);
       const scene = [...format.scenes].reverse().find((s) => frame >= s.from) ?? format.scenes[0];
       if (!scene || scene.id === lastScene.current) return;
       lastScene.current = scene.id;
@@ -107,7 +155,7 @@ export const Preview: React.FC<{input: AdProps; format: FormatMeta; autoPlay?: b
           compositionWidth={format.width}
           compositionHeight={format.height}
           style={{width: '100%', height: '100%'}}
-          controls
+          controls={controls}
           loop={loop}
           autoPlay={autoPlay}
           // Почему 0 аудиоэлементов. 12.10 пришла тревога в «Сбои»: InvalidStateError «Failed to start
@@ -129,12 +177,12 @@ export const Preview: React.FC<{input: AdProps; format: FormatMeta; autoPlay?: b
           renderPoster={({isBuffering}) => (isBuffering ? <div className="player-buffering"><RecMark /></div> : null)}
         />
       </div>
-      <div className="scenes">
+      {showScenes && <div className="scenes">
         {format.scenes.map((s) => (
           <button key={s.id} className={`btn ${onScene && current === s.id ? 'primary' : 'ghost'}`} aria-pressed={onScene ? current === s.id : undefined}
             onClick={() => goTo(s.id)}>{s.title}</button>
         ))}
-      </div>
+      </div>}
     </div>
   );
 };

@@ -90,7 +90,7 @@ export const SpecsEditor: React.FC<Pick<Props, 'lot' | 'onChange'>> = ({lot, onC
 };
 
 /** Цена: справка с Encar, фрахт, «Цена в ролике» (вручную / вернуть расчёт), итог и подписи сцены */
-export const PriceEditor: React.FC<Block & Pick<Props, 'format'>> = ({lot, market, format, onChange}) => {
+export const PriceEditor: React.FC<Block & Pick<Props, 'format'> & {mobile?: boolean}> = ({lot, market, format, onChange, mobile = false}) => {
   const car = priceUsd(lot);
   const total = lotTotal(lot, market);
   // Расчёт без ручной цены — подсказка у поля «Цена в ролике»: видно, от чего человек уходит
@@ -117,7 +117,11 @@ export const PriceEditor: React.FC<Block & Pick<Props, 'format'>> = ({lot, marke
   });
   const freight = lot.freightUsd ?? market.freightUsd;
   const port = lot.port ?? market.port;
-  return <>
+  // Телефон: «Рассчитать» / «Указать сумму» (владелец 20.10). Режим — своё состояние: «Указать сумму»
+  // можно открыть и до того, как вписано число; «Рассчитать» сразу снимает ручную цену
+  const [mode, setMode] = useState<'calc' | 'manual'>(manual ? 'manual' : 'calc');
+  useEffect(() => { setMode(lot.priceOverride ? 'manual' : 'calc'); }, [lot.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const source = <>
       {/* Цена авто и курс — не поля, а справка (владелец 11.10: «эту плашку убери»): цена
           приходит с Encar, курс — сам, по валюте из профиля. Свою цену человек вписывает
           в «Цену в ролике» — так он и закладывает маржу. Курс фиксируется в объявлении на день
@@ -132,6 +136,8 @@ export const PriceEditor: React.FC<Block & Pick<Props, 'format'>> = ({lot, marke
           </>
           : <>Цены с Encar нет — подтяните объявление по ссылке выше или впишите «Цену в ролике».</>}
       </div>
+  </>;
+  const freightField = <>
       {/* Фрахт — к цене: он и есть разница между ценой авто и итогом. Раньше прятался в
           «Переопределить для этого объявления» вместе с WhatsApp */}
       {market.pricingMode !== 'domestic' && (
@@ -140,15 +146,19 @@ export const PriceEditor: React.FC<Block & Pick<Props, 'format'>> = ({lot, marke
             onChange={(e) => { const v = num(e.target.value); onChange({freightUsd: v === null || Number.isNaN(v) ? undefined : v}); }} />
         </Field>
       )}
+  </>;
+  const override = <>
       {/* Своя цена — итог как есть, в валюте профиля. Клиенты продают со своей наценкой, и
           закупочная с Encar + фрахт им не годится (11.10). Пусто — считаем, как раньше */}
       <Field label={`Цена в ролике, ${sign}`} wide
         hint={manual
           ? <>задана вручную · расчёт дал бы {computed === null ? '—' : `${fmt(computed)} ${sign}`} · <button type="button" className="link" onClick={() => onChange({priceOverride: null})}>вернуть расчёт</button></>
           : 'пусто — авто + фрахт по курсу; впишите своё число, и в ролике будет ровно оно'}>
-        <input inputMode="decimal" value={lot.priceOverride ?? ''} placeholder={computed === null ? '' : String(computed)}
+        <input inputMode="decimal" value={lot.priceOverride ?? ''} placeholder={computed === null ? '' : fmt(computed)}
           onChange={(e) => { const v = num(e.target.value); onChange({priceOverride: v === null || Number.isNaN(v) ? null : v}); }} />
       </Field>
+  </>;
+  const totalLine = <>
       {/* Итог — ровно то число и та валюта, что будут в ролике (totalInCurrency). Раньше здесь
           всегда были доллары, а ролик при валюте профиля KRW показывал воны — экран и ролик
           говорили разное (30.09) */}
@@ -161,6 +171,8 @@ export const PriceEditor: React.FC<Block & Pick<Props, 'format'>> = ({lot, marke
             ? <>В ролике: <b>{fmt(total)} {sign}</b><span className="muted"> · вписано вручную</span>{port ? <span className="muted"> · до {port}</span> : null}</>
             : <>В ролике: <b>{fmt(total)} {sign}</b>{freight > 0 && car !== null ? <span className="muted"> · с фрахтом {fmt(freight)} $</span> : null}{port ? <span className="muted"> · до {port}</span> : null}</>}
       </div>
+  </>;
+  const labels = <>
       <TextsHint />
       <LotText k="priceLabel" lot={lot} market={market} format={format} onChange={onChange} />
       {/* В «Цене сразу» строк под ценой нет — не даём править то, чего в ролике не будет */}
@@ -169,6 +181,49 @@ export const PriceEditor: React.FC<Block & Pick<Props, 'format'>> = ({lot, marke
         <LotText k="priceNoteExcluded" lot={lot} market={market} format={format} onChange={onChange} />
       </>}
   </>;
+  // Телефон (docs/palette-mobile.md, раздел 4): первой — сама цена в ролике и её состояние, затем
+  // подписи сцены; справка с Encar, курсы и фрахт — в раскрытии «Расчёт цены». Ошибки (цены нет,
+  // курса нет) видны сразу — в строке итога, она стоит над раскрытием. Расчёт тот же, одна формула
+  // Телефон (образец владельца 20.10): переключатель «Рассчитать | Указать сумму» → карточка «Цена в
+  // ролике» с итогом крупно → подписи сцены → раскрытие «Расчёт цены» (Encar, курс, фрахт). Ручная
+  // сумма — поле над карточкой. Расчёт тот же, одна формула (lotTotal)
+  if (mobile) {
+    const pick = (m: 'calc' | 'manual') => { setMode(m); if (m === 'calc' && manual) onChange({priceOverride: null}); };
+    const what = mode === 'manual' && !manual ? 'Впишите сумму — пока в ролике расчёт'
+      : mode === 'manual'
+      ? (computed === null ? 'Вписано вручную' : `Вписано вручную · расчёт дал бы ${fmt(computed)} ${sign}`)
+      : freight > 0 && car !== null && market.pricingMode !== 'domestic' ? `Автомобиль + доставка${port ? ` до ${port}` : ''}` : 'Цена автомобиля';
+    return <>
+      <div className="mprice-mode" role="radiogroup" aria-label="Цена в ролике">
+        {([['calc', 'Рассчитать'], ['manual', 'Указать сумму']] as const).map(([id, title]) => <button key={id} type="button" role="radio"
+          aria-checked={mode === id} className={mode === id ? 'on' : ''} onClick={() => pick(id)}>{title}</button>)}
+      </div>
+      {mode === 'manual' && <Field label={`Сумма в ролике, ${sign}`} wide>
+        {/* Число — с разрядами («30 542 155»), и в подсказке, и во вписанном: сплошные цифры не читались */}
+        <input inputMode="decimal" value={lot.priceOverride != null ? fmt(lot.priceOverride) : ''} placeholder={computed === null ? '' : fmt(computed)} autoFocus={!manual}
+          onChange={(e) => { const v = num(e.target.value); onChange({priceOverride: v === null || Number.isNaN(v) ? null : v}); }} />
+      </Field>}
+      <div className={`mprice-card${total === null ? ' warn' : ''}`}>
+        <span className="mprice-label">Цена в ролике</span>
+        {total === null
+          ? <span className="mprice-warn">{fx && !fxOwn && !fxToday && car !== null
+            ? `Курс ₩ → ${sign} пока недоступен — укажите сумму, иначе в ролике будет «XX XXX ${sign}»`
+            : `Цены нет — в ролике будет «XX XXX ${sign}»`}</span>
+          : <b className="mprice-total">{fmt(total)} {sign}</b>}
+        <span className="mprice-what">{what}</span>
+      </div>
+      <LotText k="priceLabel" lot={lot} market={market} format={format} onChange={onChange} mobile />
+      {format.id !== 'price-first' && <>
+        <LotText k="priceNoteIncluded" lot={lot} market={market} format={format} onChange={onChange} mobile />
+        <LotText k="priceNoteExcluded" lot={lot} market={market} format={format} onChange={onChange} mobile />
+      </>}
+      {mode === 'calc' && <details className="mprice-calc">
+        <summary>Расчёт цены</summary>
+        <div className="mprice-calc-body">{source}{freightField}</div>
+      </details>}
+    </>;
+  }
+  return <>{source}{freightField}{override}{totalLine}{labels}</>;
 };
 
 /** Контакты (финальная сцена): заголовок, акцент, преимущество, подпись и WhatsApp этого ролика */
@@ -267,12 +322,20 @@ const TextsHint: React.FC = () => (
  * Надпись этого ролика поверх текстов компании (Настройки → «Реклама авто»). Пусто — берём
  * оттуда, она видна серым. Подпись и подсказка — из описания формата (config/formats.json)
  */
-const LotText: React.FC<Pick<Props, 'lot' | 'market' | 'format' | 'onChange'> & {k: string}> = ({k, lot, market, format, onChange}) => {
+const LotText: React.FC<Pick<Props, 'lot' | 'market' | 'format' | 'onChange'> & {k: string; mobile?: boolean}> = ({k, lot, market, format, onChange, mobile = false}) => {
   const t = format.texts.find((x) => x.key === k);
   if (!t) return null;
   const value = lot.texts?.[k] ?? '';
-  const fallback = market.texts[k] ?? '';
+  // Надпись из настроек — как в ролике: «{port}» сразу заменён портом объявления («до DURRES»)
+  const fallback = (market.texts[k] ?? '').replace('{port}', lot.port ?? market.port ?? '');
   const set = (v: string) => onChange({texts: {...lot.texts, [k]: v === '' ? undefined : v}});
+  // Телефон: откуда надпись — меткой справа от подписи («Из настроек» / «Своя»), без общей подсказки
+  if (mobile) return <label className="field mfield">
+    <span className="mfield-head"><span className="label">{t.label}</span><span className="mfield-tag">{value ? 'Своя' : 'Из настроек'}</span></span>
+    {t.multiline
+      ? <textarea rows={2} value={value} placeholder={fallback} onChange={(e) => set(e.target.value)} />
+      : <input value={value} placeholder={fallback} onChange={(e) => set(e.target.value)} />}
+  </label>;
   return (
     <Field label={t.label} hint={value ? 'своя для этого ролика · сотрите — вернётся из настроек' : undefined} wide>
       {t.multiline
