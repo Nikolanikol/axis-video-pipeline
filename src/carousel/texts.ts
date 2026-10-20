@@ -14,6 +14,7 @@ import {carouselFormat, carouselSlides} from './formats';
 import {carouselLang, carouselText, type CarouselText} from './i18n';
 import {carFacts, choose, factOf, fill} from './i18n/copy';
 import {isDesign} from '../shared/design.js';
+import {familyById} from './families/registry.js';
 
 /** Подписи полей в окне правки — в том порядке, в каком они стоят на слайде */
 export const TEXT_FIELDS: {key: string; label: string}[] = [
@@ -108,7 +109,9 @@ export const carouselTexts = (props: CarouselProps): CarouselTexts => {
   const set = (key: string, items: unknown[]) => { layout[key] = variant(items, key, (_t, i) => String(i)).id; };
 
   const h = car.history;
-  const design = isDesign(themeOf(props.theme).design);
+  // Семейство (пакет KOK_handoff_v1) берёт фразы как пресеты, но показывает свой набор полей
+  const family = familyById(props.family);
+  const design = Boolean(family) || isDesign(themeOf(props.theme).design);
   // Пресет берёт фразы новых форматов и при «Классике»: у классических слайдов салона нет ни
   // заголовка, ни текста — только рубрика, а пресету нужны оба
   const classic = carouselFormat(props.format).id === 'classic' && !design;
@@ -168,6 +171,11 @@ export const carouselTexts = (props: CarouselProps): CarouselTexts => {
     for (const key of Object.keys(f)) {
       const v = own[key];
       if (typeof v === 'string' && v.trim()) f[key] = v.slice(0, TEXT_MAX);
+    }
+    if (family) {
+      const keys = family.fields[slide] ?? [];
+      const price = slide === 'price' ? ('label' in f ? ['label'] : ['title']) : keys;
+      return {slide, fields: Object.fromEntries(Object.entries(f).filter(([k]) => price.includes(k)))};
     }
     return {slide, fields: design ? designKeep(slide, f) : f};
   });

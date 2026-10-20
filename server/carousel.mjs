@@ -8,6 +8,7 @@
 // Рендерим не видео, а кадры: композиция carousel — кадр на слайд, каждый снимается
 // renderStill; размер кадра и число слайдов композиция берёт из формата. Поэтому карусель живёт в общем движке рядом с роликами и
 // получает тот же брендбук из настроек приложения.
+import {FAMILY_FORMAT, familyById} from '../src/carousel/families/registry.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {bundle} from '@remotion/bundler';
@@ -43,6 +44,18 @@ export const carouselFormats = () => readJson(path.join(ROOT, 'config', 'carouse
  * получил 6 вместо 7, 8 вместо 9, 11 вместо 12 (решение владельца 12.10 — честное число).
  * Поэтому и в note числа нет: его пишет интерфейс по slides.length
  */
+/**
+ * Семейство карусели (пакет KOK_handoff_v1, src/carousel/families/registry.js): пусто — оформление
+ * бренда; иначе только готовое семейство и только в его формате — «Разворот» 4:5 (1:1 и 9:16
+ * в пакете отключены до адаптации макетов)
+ */
+const checkFamily = (id, format) => {
+  if (id === undefined || id === null || id === '') return null;
+  const family = familyById(id);
+  if (!family) throw new HttpError(400, `Нет такого стиля карусели: ${id}`);
+  if (format !== FAMILY_FORMAT) throw new HttpError(400, `Стиль «${family.title}» пока только в формате «Разворот» 4:5`);
+  return family.id;
+};
 export const clientCarouselFormats = async () => (await carouselFormats())
   .map((f) => ({...f, slides: f.slides.filter((s) => INCLUDE_HISTORY || s !== 'history')}));
 const checkFormat = async (id) => {
@@ -204,6 +217,7 @@ export const buildCarousel = async (link, opts = {}) => {
   const src = parseCarouselSource(link);
   const {id} = src;
   const format = await checkFormat(opts.format);
+  const family = checkFamily(opts.family, format);
   const seed = Number.isInteger(opts.seed) && opts.seed > 0 ? opts.seed : 1 + Math.floor(Math.random() * 2 ** 30);
   const key = runKey(id);
   if (running.has(key)) throw new HttpError(409, 'Эта карусель уже собирается');
@@ -225,7 +239,8 @@ export const buildCarousel = async (link, opts = {}) => {
     // Тот же вариант («Пересобрать», своя цена, правка текста) — те же фразы: память дилера
     // берём ту, с которой карусель собрали тогда, а не нынешнюю — в нынешней уже лежат фразы
     // этой самой карусели, и она обошла бы их. Новый вариант — по нынешней памяти
-    const sameVariant = Boolean(prev && Number.isInteger(opts.seed) && prev.seed === seed && (prev.format ?? 'classic') === format);
+    const sameVariant = Boolean(prev && Number.isInteger(opts.seed) && prev.seed === seed && (prev.format ?? 'classic') === format
+      && (prev.family ?? null) === family);
     const recent = sameVariant ? prev.recent : await readRecent();
     const textOverrides = opts.textOverrides !== undefined ? opts.textOverrides : sameVariant ? prev.textOverrides : undefined;
     // Контакты и компанию берём из профиля клиента: бренд и подпись должны быть его. Профиль —
@@ -259,7 +274,7 @@ export const buildCarousel = async (link, opts = {}) => {
     if (lot) car = await localizePhotos(car, dir, id, origin);
     // У лота нет цены, истории и опций: эти слайды не рисуем, а не заполняем прочерками.
     // У машины из Китая нет истории: лист осмотра в рекламу не идёт (решение владельца 11.10)
-    const inputProps = {car, market, theme: {...theme, assets}, includeHistory: INCLUDE_HISTORY, format, seed,
+    const inputProps = {car, market, theme: {...theme, assets}, includeHistory: INCLUDE_HISTORY, format, seed, family,
       skip: lot ? LOT_SKIP_SLIDES : china ? CHE168_SKIP_SLIDES : japan ? CARSENSOR_SKIP_SLIDES : [], priceOverride,
       recent, textOverrides};
     // Старые кадры убираем перед сборкой: та же машина, пересобранная на проде, даёт шесть
@@ -293,6 +308,7 @@ export const buildCarousel = async (link, opts = {}) => {
       slides: Array.from({length: count}, (_, i) => `${workspaceUrl()}/carousels/${id}/slide-${i + 1}.png`),
       updatedAt: new Date().toISOString(),
       format, seed,
+      ...(family ? {family} : {}),
       ...(priceOverride ? {priceOverride} : {}),
       // Тексты слайдов — для окна правки; свои правки клиента; снимок памяти — для пересборки тем же вариантом
       ...(texts ? {texts: texts.slides} : {}),
@@ -337,7 +353,7 @@ export const repriceCarousel = async (id, price) => {
   const v = price === null || price === '' || price === undefined ? null : Number(price);
   if (v !== null && (!Number.isFinite(v) || v <= 0 || v > 1e12)) throw new HttpError(400, 'Цена — положительное число');
   // Папка лота (km-…) сама разбирается как «сохранённый лот», номер Encar — как объявление
-  return buildCarousel(id, {format: saved.format, seed: saved.seed, priceOverride: v ? Math.round(v) : null});
+  return buildCarousel(id, {format: saved.format, seed: saved.seed, family: saved.family ?? null, priceOverride: v ? Math.round(v) : null});
 };
 
 /**
@@ -363,7 +379,7 @@ export const editCarouselTexts = async (id, slide, fields) => {
   }
   const textOverrides = {...(saved.textOverrides ?? {})};
   if (Object.keys(next).length) textOverrides[slide] = next; else delete textOverrides[slide];
-  return buildCarousel(id, {format: saved.format, seed: saved.seed, textOverrides});
+  return buildCarousel(id, {format: saved.format, seed: saved.seed, family: saved.family ?? null, textOverrides});
 };
 
 export const deleteCarousel = async (id) => {

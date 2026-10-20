@@ -20,6 +20,8 @@ import {carouselFormat} from './formats';
 import {carouselTexts} from './texts';
 import {isDesign} from '../shared/design.js';
 import {DesignCarousel} from '../design/DesignCarousel';
+import {FamilyCarousel} from './families/FamilyCarousel';
+import {isFamily} from './families/registry.js';
 
 export const CAROUSEL_SLIDES = TOTAL;
 
@@ -314,6 +316,8 @@ export const Carousel: React.FC<CarouselProps> = (props) => {
   // Тексты и список слайдов — из одного места (./texts.ts): то же самое сервер отдаёт в окно правки.
   // У пресетов оформления (src/design) вёрстка своя, а слова — те же
   const texts = carouselTexts({...props, includeHistory: withHistory});
+  // Семейство карусели (пакет KOK_handoff_v1) — выбор этой карусели, важнее пресета бренда
+  if (isFamily(props.family)) return <FamilyCarousel {...props} texts={texts} />;
   if (isDesign(theme.design)) return <DesignCarousel {...props} texts={texts} />;
   // Новые форматы («Витрина», «Разворот», «Полная») собираются из библиотеки слайдов
   // (./deck); «Классика» — прежняя вёрстка ниже

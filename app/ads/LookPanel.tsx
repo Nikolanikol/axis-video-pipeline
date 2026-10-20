@@ -7,7 +7,7 @@ import type {Lot, Theme} from '../../src/shared/types';
 import type {FontPair, Palette} from '../api';
 import {DesignField} from '../DesignField';
 import {matchPalette} from '../../src/shared/contrast.js';
-import {FineColors, PaletteField, StyleField} from '../SettingsForms';
+import {FineColors, PaletteField, PlateField, StyleField} from '../SettingsForms';
 
 // embedded — внутри секции «Оформление» палитры: без своей шапки и «Готово»; onClose тогда не нужен
 type Props = {lot: Lot; brand: Theme; pairs: FontPair[]; palettes: Palette[]; onChange: (patch: Partial<Lot>) => void; onClose?: () => void; embedded?: boolean};
@@ -34,6 +34,9 @@ export const LookPanel: React.FC<Props> = ({lot, brand, pairs, palettes, onChang
         в «Настройки → Бренд» для всей компании */}
     <h2>Оформление</h2>
     <StyleField theme={theme} onChange={set} />
+    {/* Подложка логотипа — своя у ролика (снимок lot.look), по умолчанию как в бренде */}
+    <h2>Подложка логотипа</h2>
+    <PlateField theme={theme} onChange={set} />
     <h2>Палитра</h2>
     <PaletteField theme={theme} palettes={palettes} onChange={set} />
     <FineColors theme={theme} custom={!matchPalette(theme, palettes)} onChange={set} />

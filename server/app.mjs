@@ -24,10 +24,11 @@ import {apiSettings, resolveSpeaker, voiceConfig} from '../src/shared/voices.js'
 import {hasKey, hasVoice, synthesize} from './speech.mjs';
 import {hasSeparator} from './ambience.mjs';
 import {clientCarouselFormats, carouselsDir, buildCarousel, deleteCarousel, editCarouselTexts, listCarousels, repriceCarousel, slideFileName} from './carousel.mjs';
-import {ICON_RULES, LOGO_RULES, brandForRender, saveIcon, saveLogo, setIconVariant, setLogoVariant} from './brand.mjs';
+import {ICON_RULES, LOGO_RULES, brandForRender, saveIcon, saveLogo, setIconVariant, setLogoVariant, withLogoInk} from './brand.mjs';
 import {balanceOf, billed, creditCosts, ledgerOf, ledgerPage, signupCredits} from './billing.mjs';
 import {parseCarouselSource} from '../src/shared/kmotorsLot.js';
 import {PALETTE_KEYS, isHex} from '../src/shared/contrast.js';
+import {plateError} from '../src/shared/logoPlate.js';
 import {isDesign} from '../src/shared/design.js';
 import {styleError} from '../src/design/style/registry.js';
 import {withoutMusic} from '../src/shared/nomusic.js';
@@ -97,6 +98,8 @@ const checkLotLook = async (lot) => {
   if (look === undefined || look === null) return;
   if (typeof look !== 'object' || Array.isArray(look)) throw new HttpError(400, 'Оформление ролика — объект настроек');
   if (look.design !== null && !isDesign(look.design)) throw new HttpError(400, 'Выберите дизайн из списка');
+  const lookPlate = plateError(look.logoPlate);
+  if (lookPlate) throw new HttpError(400, lookPlate);
   if (look.designVariant !== 0 && look.designVariant !== 1) throw new HttpError(400, 'Компоновка — основная или альтернативная');
   const styleProblem = styleError(look);
   if (styleProblem) throw new HttpError(400, styleProblem);
@@ -120,8 +123,12 @@ const checkLotLook = async (lot) => {
  * в том числе на внутренние адреса машины. Разрешены встроенные файлы (brand/…), файлы своей
  * компании и таблицы стилей Google Fonts — ровно то, что умеет выбрать интерфейс.
  */
-const checkBrand = (theme) => {
-  if (!theme || typeof theme !== 'object' || Array.isArray(theme)) throw new HttpError(400, 'Бренд — объект настроек');
+const checkBrand = (input) => {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) throw new HttpError(400, 'Бренд — объект настроек');
+  // Тон логотипов сервер считает сам по файлу (withLogoInk) — присланный не храним
+  const {logoInk: _ink, ...theme} = input;
+  const plateProblem = plateError(theme.logoPlate);
+  if (plateProblem) throw new HttpError(400, plateProblem);
   const own = `${workspaceUrl()}/brand/`;
   for (const [k, v] of Object.entries(theme.assets ?? {})) {
     // Пустая строка у логотипа — «нет логотипа, пишем название компании»
@@ -359,7 +366,7 @@ export const createApp = ({photoOrigin}) => {
   api.use('/admin', admin);
 
   api.get('/config', wrap(async () => ({
-    brand: await getBrand(), markets: await listMarkets(), defaultMarket: DEFAULT_MARKET, formats: await listFormats(),
+    brand: await getBrand().then(withLogoInk), markets: await listMarkets(), defaultMarket: DEFAULT_MARKET, formats: await listFormats(),
     // Профили клиента идут на смену рынкам (стадия перехода). Пока отдаём и то, и другое:
     // интерфейс переключится на профиль отдельно, пайплайны — отдельно. copy — дефолты
     // текстов платформы, из них профиль берёт готовые подписи.
@@ -391,30 +398,30 @@ export const createApp = ({photoOrigin}) => {
     // Цены генераций в кредитах — интерфейс пишет их на кнопках
     credits: await creditCosts(),
   })));
-  api.put('/brand', wrap(async (req) => { await saveBrand(checkBrand(req.body)); return getBrand(); }));
+  api.put('/brand', wrap(async (req) => { await saveBrand(checkBrand(req.body)); return getBrand().then(withLogoInk); }));
   // Логотип: свой приёмник со своим потолком (10 МБ, LOGO_RULES) — большие фото общего приёмника ему ни к чему
   const logoUpload = multer({storage: multer.memoryStorage(), limits: {fileSize: LOGO_RULES.maxBytes, files: 1}});
   api.post('/brand/logo', logoUpload.single('logo'), wrap(async (req) => {
     const saved = await saveLogo(req.file?.buffer);
-    return {...saved, brand: await getBrand()};
+    return {...saved, brand: await getBrand().then(withLogoInk)};
   }));
   // Вариант логотипа: clean — фон убран, raw — как загружен, none — название компании текстом
   api.put('/brand/logo/variant', wrap(async (req) => {
     const variant = String(req.body?.variant ?? '');
     if (!['clean', 'raw', 'none'].includes(variant)) throw new HttpError(400, 'Вариант — clean, raw или none');
-    return {...(await setLogoVariant(variant)), brand: await getBrand()};
+    return {...(await setLogoVariant(variant)), brand: await getBrand().then(withLogoInk)};
   }));
   // Своя иконка у преимущества в CTA — та же обработка, что у логотипа, свой потолок (ICON_RULES)
   const iconUpload = multer({storage: multer.memoryStorage(), limits: {fileSize: ICON_RULES.maxBytes, files: 1}});
   api.post('/brand/icon', iconUpload.single('icon'), wrap(async (req) => {
     const saved = await saveIcon(req.file?.buffer);
-    return {...saved, brand: await getBrand()};
+    return {...saved, brand: await getBrand().then(withLogoInk)};
   }));
   // clean — фон убран, raw — как загружена, default — встроенное рукопожатие
   api.put('/brand/icon/variant', wrap(async (req) => {
     const variant = String(req.body?.variant ?? '');
     if (!['clean', 'raw', 'default'].includes(variant)) throw new HttpError(400, 'Вариант — clean, raw или default');
-    return {...(await setIconVariant(variant)), brand: await getBrand()};
+    return {...(await setIconVariant(variant)), brand: await getBrand().then(withLogoInk)};
   }));
   // Рынки — платформенный реестр в config/, общий для всех: править может только владелец
   api.put('/markets/:id', requireAdmin, wrap(async (req) => {
@@ -637,7 +644,7 @@ export const createApp = ({photoOrigin}) => {
     {...billOf(req, 'carousels'), workspaceId: req.ws,
       jobId: `carousel-${req.ws}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
       note: String(req.body?.link ?? '').slice(0, 120)},
-    () => buildCarousel(req.body?.link, {format: req.body?.format, seed: req.body?.seed}))));
+    () => buildCarousel(req.body?.link, {format: req.body?.format, seed: req.body?.seed, family: req.body?.family}))));
   // Пересобрать со своей ценой — бесплатно: та же машина, формат и вариант (repriceCarousel)
   api.post('/carousels/:id/price', wrap((req) => repriceCarousel(checkId(req.params.id), req.body?.price)));
   // Свой текст на слайде — тоже бесплатно: та же машина, формат и вариант, меняются только слова

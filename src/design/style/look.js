@@ -24,6 +24,9 @@ export const pickLook = (theme) => ({
   fonts: theme.fonts,
   style: theme.style,
   ...resolveStyle(theme, theme.design),
+  // Подложка логотипа (src/shared/logoPlate.js) — владелец 20.10: управлять ею и в «Оформлении»
+  // ролика. Нет своей у бренда — в снимок не пишем, ролик следует умолчанию
+  ...(theme.logoPlate ? {logoPlate: theme.logoPlate} : {}),
 });
 
 /** Тема ролика: бренд, поверх — снимок объявления. Нет снимка — бренд как есть */

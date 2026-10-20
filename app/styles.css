@@ -532,6 +532,18 @@ a.tab { text-decoration: none; }
 
 /* Логотип в настройках: снимок слева, кнопка и условия справа. Условия рядом с кнопкой
    намеренно — приёмник, который берёт что угодно, а потом отказывает, заставляет гадать. */
+/* Подложка логотипа в «Бренде» (PlateField): режим сегментами, формы плитками с вашим логотипом */
+.plate-field { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.plate-field .seg { display: inline-grid; grid-auto-flow: column; gap: 3px; padding: 3px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); align-self: flex-start; }
+.plate-field .seg button { min-height: 34px; padding: 0 16px; border: none; border-radius: 9px; background: none; color: var(--muted); font: 14px var(--font); cursor: pointer; }
+.plate-field .seg button.on { background: var(--accent); color: #fff; font-weight: 500; }
+.plate-field .hint { margin: 0; }
+.plate-shapes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.plate-shape { display: flex; flex-direction: column; gap: 6px; padding: 0; border: none; background: none; color: var(--muted); font: 13px var(--font); cursor: pointer; text-align: center; }
+.plate-shape-frame { display: grid; place-items: center; height: 96px; border-radius: 12px; border: 2px solid var(--line); overflow: hidden; }
+.plate-shape:hover .plate-shape-frame { border-color: var(--accent-line); }
+.plate-shape.on { color: var(--text); font-weight: 500; }
+.plate-shape.on .plate-shape-frame { border-color: var(--accent); }
 .logo-field { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 12px; }
 .logo-shot {
   width: 120px; height: 120px; flex-shrink: 0;
@@ -806,6 +818,11 @@ a.tab { text-decoration: none; }
 .slide-thumb:hover { opacity: 1; }
 .slide-thumb img { height: 100%; width: 100%; object-fit: cover; display: block; }
 .format-item-name { display: inline-flex; align-items: center; gap: 8px; }
+/* Стиль карусели (StyleList): у семейства — три его цвета кружками перед названием */
+.style-list { margin-bottom: 4px; }
+.style-swatch { display: inline-flex; flex: none; }
+.style-swatch i { width: 14px; height: 14px; border-radius: 50%; border: 1px solid #ffffff33; }
+.style-swatch i + i { margin-left: -4px; }
 /* Формат, в котором карусель уже собрана: зелёная метка (цвет состояния — только в метке,
    текст остаётся обычным) и рамка в тон. Выбранный формат по-прежнему винный: «выбрано» и
    «собрано» — разные вещи, и выбранным может быть как собранный, так и другой формат */
@@ -975,6 +992,10 @@ a.tab { text-decoration: none; }
 /* Сцены, «О ролике», «Оформление» — по ширине надписи; не влезли — переносятся целыми кнопками */
 .pd-side .mle-side-scenes { display: flex; flex-wrap: wrap; }
 .pd-side .mle-side-scenes .mle-scene { flex: 1 1 auto; padding: 0 8px; overflow: visible; }
+/* Выбранный сегмент — той же толщины шрифта: жирнее — шире надпись, и ряд перестраивался (скакал) */
+.pd-side .mle-side-scenes .mle-scene, .pd-side .mle-side-scenes .mle-scene.edit { font-weight: 400; }
+/* «Оформление» — отдельная строка во всю ширину под сценами */
+.pd-side .mle-side-scenes .pd-look-seg { flex: 1 0 100%; }
 @media (min-width: 901px) {
   /* Под плеером — панель плеера 48 px вместо прежнего ряда кнопок сцен (52 px) */
   /* !important — перебить старое «.player-box { height: 70vh !important }» окон до 1100 px */

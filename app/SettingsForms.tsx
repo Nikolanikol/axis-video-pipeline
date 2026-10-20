@@ -9,6 +9,8 @@ import {FORMATS} from '../src/shared/model';
 import {resolveTexts, textsForLanguage} from '../src/shared/profile';
 import {CURRENCIES, currencyCode, currencySign, isKnownCurrency} from '../src/shared/currencies';
 import {contrastIssues, matchPalette} from '../src/shared/contrast.js';
+import {PLATE_MIN_CONTRAST, PLATE_MODES, PLATE_SHAPES, inkContrast, plateSetting} from '../src/shared/logoPlate.js';
+import {Logo, LogoImgContext, ThemeProvider} from '../src/shared/ui';
 import {Field} from './LotForm';
 import {useConfig} from './config';
 import {DesignField} from './DesignField';
@@ -167,6 +169,44 @@ const LogoField: React.FC<{theme: Theme; onSaved: (t: Theme) => void; onError: (
   };
 
 /**
+ * Подложка логотипа (src/shared/logoPlate.js): «Авто» ставит её, только когда логотип плохо виден
+ * на фоне (белый на светлом, чёрный на тёмном); «Всегда»; «Нет» — для брендбуков, где плашки
+ * под логотипом запрещены. Формы — плитками: на каждой ваш логотип на фоне ролика, тем же
+ * компонентом, что и в роликах
+ */
+export const PlateField: React.FC<{theme: Theme; onChange: (t: Theme) => void}> = ({theme, onChange}) => {
+  const setting = plateSetting(theme);
+  const set = (patch: Partial<typeof setting>) => onChange({...theme, logoPlate: {...setting, ...patch}});
+  const logo = theme.assets?.logoStacked;
+  const ink = logo ? theme.logoInk?.[logo] : undefined;
+  if (!logo) return null;
+  const needs = !!ink && inkContrast(ink, theme.bg) < PLATE_MIN_CONTRAST;
+  const status = !ink ? 'Тон логотипа ещё не разобран — сохраните бренд или обновите страницу.'
+    : needs ? 'Логотип плохо виден на фоне роликов — «Авто» поставит подложку.'
+      : 'На фоне роликов логотип читается — «Авто» поставит подложку только там, где фон другой (светлый пресет, тёмная плашка).';
+  return <div className="plate-field">
+    <div className="seg" role="radiogroup" aria-label="Когда ставить подложку">
+      {PLATE_MODES.map((m) => <button key={m.id} type="button" role="radio" aria-checked={setting.mode === m.id}
+        className={setting.mode === m.id ? 'on' : ''} onClick={() => set({mode: m.id})}>{m.title}</button>)}
+    </div>
+    <p className="hint">{status}</p>
+    {setting.mode !== 'off' && ink && <div className="plate-shapes" role="radiogroup" aria-label="Форма подложки">
+      {PLATE_SHAPES.map((sh) => <button key={sh.id} type="button" role="radio" aria-checked={setting.shape === sh.id}
+        className={`plate-shape${setting.shape === sh.id ? ' on' : ''}`} onClick={() => set({shape: sh.id})}>
+        <span className="plate-shape-frame" style={{background: theme.bg}}>
+          <LogoImgContext.Provider value="img">
+            <ThemeProvider value={{...theme, logoPlate: {mode: 'always', shape: sh.id}}}>
+              <Logo asset="logoStacked" height={64} width={150} />
+            </ThemeProvider>
+          </LogoImgContext.Provider>
+        </span>
+        <span>{sh.title}</span>
+      </button>)}
+    </div>}
+  </div>;
+};
+
+/**
  * Таблицы стилей всех пар сразу.
  *
  * Иначе список нечем показать: пара, шрифт которой не загружен, нарисуется системным,
@@ -277,6 +317,8 @@ export const BrandForm: React.FC<BrandProps> = ({theme, saved, pairs, palettes, 
     <div className="form">
       <h2>Логотип</h2>
       <LogoField theme={theme} onSaved={onSaved} onError={onError} />
+      <h2>Подложка логотипа</h2>
+      <PlateField theme={theme} onChange={onChange} />
 
       <DesignField theme={theme} onChange={onChange} />
 

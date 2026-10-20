@@ -38,6 +38,8 @@ export type ReviewEntry = Review & {id: string};
 // Готовая карусель: карточка авто от шлюза и адреса семи картинок
 // format и seed — чем собрана: формат из реестра и зерно варианта (у старых карусель их нет — «Классика»)
 export type CarouselEntry = {id: string; car: CarouselCar; slides: string[]; updatedAt: string; format?: string; seed?: number;
+  // Семейство из пакета KOK_handoff_v1 (src/carousel/families/registry.js); нет — оформление бренда
+  family?: string;
   // Своя цена клиента на слайде цены (в валюте профиля)
   priceOverride?: number;
   // Тексты по слайдам (для «Редактировать текст») и свои правки клиента: слайд → поле → текст.
@@ -289,7 +291,8 @@ export const api = {
   iconVariant: (variant: 'clean' | 'raw' | 'default') =>
     request<{url: string; brand: Theme}>('PUT', '/api/brand/icon/variant', {variant}),
   // Карусели: ссылка Encar → слайды формата; seed — зерно варианта (нет — случайное)
-  buildCarousel: (link: string, format?: string, seed?: number) => request<CarouselEntry>('POST', '/api/carousels', {link, format, seed}),
+  buildCarousel: (link: string, format?: string, seed?: number, family?: string | null) =>
+    request<CarouselEntry>('POST', '/api/carousels', {link, format, seed, family: family ?? null}),
   carousels: () => request<CarouselEntry[]>('GET', '/api/carousels'),
   // Пересобрать со своей ценой — бесплатно: машина, формат и вариант прежние; null — вернуть расчёт
   repriceCarousel: (id: string, price: number | null) => request<CarouselEntry>('POST', `/api/carousels/${id}/price`, {price}),

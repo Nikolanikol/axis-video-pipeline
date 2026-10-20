@@ -11,6 +11,7 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {encarAdUrl, sourceName} from '../../src/shared/encarLink.js';
 import {DESIGNS} from '../../src/shared/designs';
+import {FAMILIES, FAMILY_FORMAT} from '../../src/carousel/families/registry.js';
 import {thumb} from '../thumb';
 import {parseCarouselSource} from '../../src/shared/kmotorsLot.js';
 import {QuickLink} from '../ads/QuickLot';
@@ -399,9 +400,37 @@ const SlideViewer: React.FC<{entry: CarouselEntry; ratio: string; busy: boolean;
   );
 };
 
+/**
+ * Стиль карусели: «Как в бренде» или семейство из пакета KOK_handoff_v1 (согласовано 19.10). Плитка
+ * семейства — три его цвета, по ним стиль узнаётся раньше, чем по названию. Семейство живёт только
+ * в «Развороте» 4:5 — выбор сам переключает формат (CarouselTool)
+ */
+const StyleList: React.FC<{value: string | null; built?: string | null; onChange: (id: string | null) => void}> = ({value, built, onChange}) => {
+  const ready = FAMILIES.filter((f) => f.ready);
+  const item = (id: string | null, title: string, note: string, swatch?: string[]) =>
+    <button key={id ?? 'brand'} type="button" role="radio" aria-checked={value === id}
+      className={`format-item${value === id ? ' on' : ''}${built !== undefined && built === id ? ' built' : ''}`} onClick={() => onChange(id)}>
+      <span className="format-item-head">
+        <span className="format-item-name">
+          {swatch ? <span className="style-swatch">{swatch.map((c) => <i key={c} style={{background: c}} />)}</span> : null}
+          {title}
+        </span>
+        {built !== undefined && built === id && <Check className="format-built-icon" size={15} aria-hidden />}
+      </span>
+      <span className="format-item-sub">{note}</span>
+    </button>;
+  return <div className="format-list style-list" role="radiogroup" aria-label="Стиль карусели">
+    {item(null, 'Как в бренде', 'Оформление из настроек бренда, любой формат')}
+    {ready.map((f) => item(f.id, f.title, `${f.note} · только 4:5`, [f.colors.bg, f.colors.accent, f.colors.light]))}
+  </div>;
+};
+
 // Последний выбранный формат — удобство этого браузера, не настройка
 const FORMAT_KEY = 'axis-video:carousel-format';
 const savedFormat = () => { try { return localStorage.getItem(FORMAT_KEY); } catch { return null; } };
+// Последний выбранный стиль — так же, удобство браузера
+const FAMILY_KEY = 'kok:carousel-family';
+const savedFamily = () => { try { const v = localStorage.getItem(FAMILY_KEY); return FAMILIES.some((f) => f.ready && f.id === v) ? v : null; } catch { return null; } };
 
 // Панель «Собранные» выезжает слева; объект вне компонента — чтобы не менять ссылку на каждый кадр
 const CAROUSEL_PANELS = {list: 'left'} as const;
@@ -414,7 +443,18 @@ export const CarouselTool: React.FC = () => {
   const cost = useCost('carousels', config.credits);
   const formats = config.carouselFormats ?? [];
   const [format, setFormatState] = useState<string>(() => savedFormat() ?? 'showcase');
-  const setFormat = (id: string) => { setFormatState(id); try { localStorage.setItem(FORMAT_KEY, id); } catch { /* приватный режим */ } };
+  const setFormat = (id: string) => {
+    setFormatState(id);
+    try { localStorage.setItem(FORMAT_KEY, id); } catch { /* приватный режим */ }
+    // Семейства — только в «Развороте»: другой формат возвращает оформление бренда
+    if (id !== FAMILY_FORMAT) setFamilyState(null);
+  };
+  const [family, setFamilyState] = useState<string | null>(() => savedFamily());
+  const setFamily = (id: string | null) => {
+    setFamilyState(id);
+    try { if (id) localStorage.setItem(FAMILY_KEY, id); else localStorage.removeItem(FAMILY_KEY); } catch { /* приватный режим */ }
+    if (id) { setFormatState(FAMILY_FORMAT); try { localStorage.setItem(FORMAT_KEY, FAMILY_FORMAT); } catch { /* приватный режим */ } }
+  };
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<Set<string>>(new Set());
   const [linkError, setLinkError] = useState('');
@@ -437,11 +477,11 @@ export const CarouselTool: React.FC = () => {
 
   // fmt — в каком формате собрать: по умолчанию выбранный справа; «Пересобрать» из списка
   // передаёт формат самой карусели, иначе пересборка молча меняла бы её формат
-  const run = async (link: string, seed?: number, fmt: string = format) => {
+  const run = async (link: string, seed?: number, fmt: string = format, fam: string | null = fmt === FAMILY_FORMAT ? family : null) => {
     setBusy(true);
     setLinkError('');
     try {
-      const made = await api.buildCarousel(link, fmt, seed);
+      const made = await api.buildCarousel(link, fmt, seed, fam);
       setEntry(made);
       setMtab('main');
       setHistory((h) => [made, ...h.filter((x) => x.id !== made.id)]);
@@ -529,7 +569,9 @@ export const CarouselTool: React.FC = () => {
   const entryFormat = formats.find((f) => f.id === (entry?.format ?? 'classic'));
   const chosen = formats.find((f) => f.id === format);
   // Выбран другой формат, чем у открытой карусели, — главное действие справа: собрать в нём
-  const otherFormat = !!entry && (entry.format ?? 'classic') !== format;
+  // Стиль — тоже: другое семейство (или «как в бренде») собирается заново, как другой формат
+  const otherFormat = !!entry && ((entry.format ?? 'classic') !== format || (entry.family ?? null) !== family);
+  const chosenFamily = FAMILIES.find((f) => f.id === family);
   const ratio = entryFormat ? `${entryFormat.width} / ${entryFormat.height}` : '9 / 16';
 
   return (
@@ -546,7 +588,7 @@ export const CarouselTool: React.FC = () => {
       <main className="quick-main">
         <CarouselsPanel items={history} current={entry?.id} formats={formats} busy={busy} cost={cost} pending={pending}
           onOpen={(e) => { setEntry(e); setLinkError(''); setMtab('main'); }}
-          onRebuild={(e) => run(e.id, e.seed, e.format ?? 'classic')}
+          onRebuild={(e) => run(e.id, e.seed, e.format ?? 'classic', e.family ?? null)}
           onDelete={(e) => remove(e.id)} />
 
         <section className="quick-preview">
@@ -564,14 +606,17 @@ export const CarouselTool: React.FC = () => {
           )}
           <div className="quick-label">Формат карусели</div>
           <FormatList formats={formats} value={format} built={entry ? (entry.format ?? 'classic') : undefined} onChange={setFormat} />
+          <div className="quick-label">Стиль</div>
+          <StyleList value={family} built={entry ? (entry.family ?? null) : undefined} onChange={setFamily} />
           {/* Пресет меняет вёрстку всех форматов — видно здесь, чтобы не искать причину «чужого» вида в настройках */}
-          <div className="design-summary">Пресет: {DESIGNS.find((d) => d.id === brand.design)?.title ?? 'Исходный'} · <a href="#/settings/brand">Настроить</a></div>
+          {!family && <div className="design-summary">Пресет: {DESIGNS.find((d) => d.id === brand.design)?.title ?? 'Исходный'} · <a href="#/settings/brand">Настроить</a></div>}
 
           {entry && (
             <div className="carousel-actions">
               {otherFormat ? (
                 <button className="btn primary big" onClick={() => run(entry.id)} disabled={busy}>
-                  Собрать в формате «{chosen?.title}»{cost}
+                  {chosenFamily && (entry.family ?? null) !== family ? `Собрать в стиле «${chosenFamily.title}»` : !family && entry.family && (entry.format ?? 'classic') === format
+                    ? 'Собрать в стиле бренда' : `Собрать в формате «${chosen?.title}»`}{cost}
                 </button>
               ) : canSaveToGallery ? (
                 <button className="btn primary big" disabled={busy || !slideFiles}
@@ -585,7 +630,7 @@ export const CarouselTool: React.FC = () => {
               ) : (
                 <a className="btn primary big" href={`/api/carousels/${entry.id}/zip`}>Скачать все {entry.slides.length} · ZIP</a>
               )}
-              {otherFormat && <span className="hint">Сейчас открыта «{entryFormat?.title}» — выбран другой формат. Карусель у машины одна: новая заменит прежнюю.</span>}
+              {otherFormat && <span className="hint">Сейчас открыта «{entryFormat?.title}»{entry.family ? ` в стиле «${FAMILIES.find((f) => f.id === entry.family)?.title ?? entry.family}»` : ''} — выбрано другое. Карусель у машины одна: новая заменит прежнюю.</span>}
               {/* Запасной путь рядом с папкой: архив работает в любом браузере */}
               {!otherFormat && canSaveToFolder && !canSaveToGallery && (
                 <a className="hint" href={`/api/carousels/${entry.id}/zip`}>или одним архивом · ZIP</a>
@@ -596,7 +641,7 @@ export const CarouselTool: React.FC = () => {
               {!otherFormat && canSaveToGallery && <span className="hint">В меню выберите «Сохранить изображения» — слайды попадут в «Фото». Там же можно сразу в Instagram.</span>}
               {!otherFormat && <PriceBox entry={entry} busy={busy} onReprice={reprice} />}
               <div className="btn-row">
-                {!otherFormat && (entry.format !== 'classic' || brand.design) && (
+                {!otherFormat && (entry.format !== 'classic' || brand.design || entry.family) && (
                   <button className="btn" onClick={() => run(entry.id)} disabled={busy}
                     title="Та же машина, другие компоновка и фразы">Другой вариант{cost}</button>
                 )}

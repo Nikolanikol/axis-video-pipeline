@@ -6,7 +6,7 @@
 import React from 'react';
 import {AbsoluteFill, Img, interpolate, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {DesignId} from '../shared/types';
-import {BODY, HEAD, Logo, clamp, useTheme} from '../shared/ui';
+import {BODY, HEAD, Logo, clamp, useLogoPlated, useTheme} from '../shared/ui';
 import {fit} from './fit';
 import {PhotoDetail, PhotoStack, photoFallback, photoFrame, textDelay} from './motion/photo';
 import {MotionTitle, priceMotion} from './motion/text';
@@ -26,7 +26,6 @@ export type DesignContent = {
 };
 
 const asset = (url: string) => /^(https?:|data:|blob:|\/)/.test(url) ? url : staticFile(url);
-const light = (hex: string) => parseInt(hex.slice(1, 3), 16) * .2126 + parseInt(hex.slice(3, 5), 16) * .7152 + parseInt(hex.slice(5, 7), 16) * .0722 > 155;
 
 export const DesignSlide: React.FC<{content: DesignContent; design: DesignId; index?: number; total?: number;
   animated?: boolean; variant?: number}> = ({content: c, design, index = 1, total = 1, animated = false, variant = 0}) => {
@@ -65,12 +64,15 @@ export const DesignSlide: React.FC<{content: DesignContent; design: DesignId; in
   // Без рубрики — прежние отступы, чтобы ролик и старые слайды не сдвинулись
   const below = (base: number) => c.kicker ? Math.max(base, 115 + headingH + (compact ? 30 : 45)) : base;
   const photos = (c.photos?.length ? c.photos : c.photo ? [c.photo] : []).filter(Boolean);
-  const hasImageLogo = C.assets?.logoHorizontal !== '';
+  // Подложку под логотипом решает Logo по контрасту знака с фоном (src/shared/logoPlate.js).
+  // Раньше на светлом фоне под любой логотип ставился тёмный прямоугольник #171719 — и под
+  // чёрный тоже, где он только мешал. Без подложки логотип прежний — 46 px; с ней место 66 px,
+  // как было у старой плашки (46 + поля)
+  const plated = useLogoPlated('logoHorizontal', C.bg);
   const header = (
     <div style={{position: 'absolute', left, right, top, height: 70, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 22, zIndex: 3}}>
-      <div style={{maxWidth: areaW * .57, overflow: 'hidden', ...(light(C.bg) && hasImageLogo
-        ? {background: '#171719', padding: '12px 18px', borderRadius: 4} : {})}}>
-        <Logo asset="logoHorizontal" height={46} width={Math.min(380, areaW * .48)} style={{textAlign: 'left', objectFit: 'contain', objectPosition: 'left'}} />
+      <div style={{maxWidth: areaW * .57, overflow: 'hidden'}}>
+        <Logo asset="logoHorizontal" height={plated ? 66 : 46} width={Math.min(380, areaW * .48)} on={C.bg} style={{textAlign: 'left', objectFit: 'contain', objectPosition: 'left'}} />
       </div>
       <div style={{fontFamily: BODY, fontSize: compact ? 23 : 27, color: C.grey, textAlign: 'right', maxWidth: areaW * .4, overflowWrap: 'anywhere'}}>{c.eyebrow}</div>
     </div>

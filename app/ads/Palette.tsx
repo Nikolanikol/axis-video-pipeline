@@ -121,7 +121,9 @@ export const Palette: React.FC<Props> = (props) => {
               className={`mle-scene${ui.group === 'scene' && i === sceneIndex ? ' edit' : ''}`} onClick={() => pickScene(s.id)}>{s.title}</button>)}
             <button type="button" aria-pressed={ui.group === 'about'} className={`mle-scene${ui.group === 'about' ? ' edit' : ''}`}
               onClick={() => commit({group: 'about'})}>О ролике</button>
-            <button type="button" aria-pressed={ui.group === 'look'} className={`mle-scene${ui.group === 'look' ? ' edit' : ''}`}
+            {/* «Оформление» — всегда отдельной строкой во всю ширину снизу (владелец 20.10: в общем
+                ряду оно переносилось то на вторую строку, то обратно — меню скакало) */}
+            <button type="button" aria-pressed={ui.group === 'look'} className={`mle-scene pd-look-seg${ui.group === 'look' ? ' edit' : ''}`}
               onClick={() => commit({group: 'look'})}>Оформление</button>
           </nav>
           <div className="mle-body">
