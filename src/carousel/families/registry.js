@@ -5,7 +5,7 @@
 // Семейство — выбор у конкретной карусели (как preferred_style в пакете), а не у бренда: бренд
 // задаёт ролики и прежние карусели, семейство — только эту карусель. Логотип и контакты — бренда.
 // Палитра пакета — три цвета (фон, текст, акцент); недостающие роли темы выведены из них.
-// Формат — только «Разворот» 4:5: 1:1 и 9:16 в пакете отключены до адаптации макетов.
+// Формат — «Разворот» 4:5 и «Классика» 9:16 (вёрстка 4:5 в середине кадра); 1:1 — пока нет.
 
 /** @typedef {{id: string, title: string, note: string, ready: boolean, colors: {bg: string, text: string, accent: string, light: string},
  *   fonts: {head: string, body: string, url: string}, fields: Record<string, string[]>}} Family */
@@ -68,5 +68,11 @@ export const FAMILIES = [
 
 export const familyById = (id) => FAMILIES.find((f) => f.id === id && f.ready) ?? null;
 export const isFamily = (id) => Boolean(familyById(id));
-/** Формат карусели, в котором живут семейства */
+/** Формат по умолчанию у семейств — «Разворот» 4:5, под него нарисованы доски пакета */
 export const FAMILY_FORMAT = 'spread';
+/**
+ * Форматы, в которых семейства уже собираются. «Классика» 9:16 (21.10) — та же вёрстка 4:5 в
+ * середине кадра (FamilyCarousel): Instagram режет 9:16 до 4:5, и текст остаётся в его зоне.
+ * «Витрина» и «Полная» 1:1 — пока нет: квадрат требует своей перекомпоновки
+ */
+export const FAMILY_FORMATS = ['spread', 'classic'];

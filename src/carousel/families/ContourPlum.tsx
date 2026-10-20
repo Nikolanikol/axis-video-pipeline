@@ -62,7 +62,7 @@ const Interior: React.FC<FamilySlideProps> = ({car, content, colors}) => {
     <Photo src={p.interior[0]} style={{left: 30, width: 495, top: 130, height: 830, borderRadius: 48}} />
     <Photo src={p.interior[1] ?? p.interior[0]} style={{right: 30, width: 495, top: 130, height: 830, borderRadius: 48}} />
     {label && <div style={{position: 'absolute', left: 30, right: 30, top: 990, bottom: 30, borderRadius: 60, background: colors.accent,
-      display: 'grid', placeItems: 'center'}}><span style={head(fitW(label, 940, 220, 80, K), colors.bg)}>{label}</span></div>}
+      display: 'grid', placeItems: 'center'}}><span style={head(fitW(label, 940, 220, 34, K), colors.bg)}>{label}</span></div>}
   </AbsoluteFill>;
 };
 

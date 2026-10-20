@@ -74,8 +74,11 @@ const Interior: React.FC<FamilySlideProps> = ({car, content, colors}) => {
   const label = upper(content.kicker ?? content.title);
   return <AbsoluteFill style={{background: colors.accent}}>
     <LogoMark colors={colors} on={colors.accent} line={colors.text} />
-    {label && <div style={{position: 'absolute', left: 30, right: 30, top: 70, textAlign: 'center', fontFamily: HEAD, fontWeight: 700, color: colors.text,
-      fontSize: fitW(label, W - 60, 260, 90, .5), lineHeight: .9, whiteSpace: 'nowrap'}}>{label}</div>}
+    {/* Своя полоса под логотипом (110–320 px), слово по центру: короткое «САЛОН» — крупно, длинная
+        рубрика («Технологии и безопасность» в «Классике») — мельче и не наезжает на логотип.
+        0,56 — ширина знака Oswald в кириллице заглавными, при 0,5 последняя буква срезалась */}
+    {label && <div style={{position: 'absolute', left: 30, right: 30, top: 110, height: 210, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontFamily: HEAD, fontWeight: 700, color: colors.text, fontSize: fitW(label, W - 80, 220, 40, .56), lineHeight: .9, whiteSpace: 'nowrap'}}>{label}</div>}
     <Photo src={pool[0]} style={{left: 30, right: 30, top: 330, bottom: 30, borderRadius: 48, border: `6px solid ${colors.text}`}} />
   </AbsoluteFill>;
 };

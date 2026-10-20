@@ -98,7 +98,8 @@ const Facts: React.FC<FamilySlideProps> = ({car, tx, ru, colors}) => {
 const Price: React.FC<FamilySlideProps> = ({car, content, colors}) => {
   const price = content.price ?? '—';
   const label = upper(content.priceLabel);
-  return <AbsoluteFill style={{background: colors.light}}>
+  // data-band-top — цвет полосы над вёрсткой в 9:16 (FamilyCarousel): сверху тёмная плоскость
+  return <AbsoluteFill style={{background: colors.light}} data-band-top={colors.text}>
     {/* Сумма в крупной наклонной тёмной плоскости сверху */}
     <div style={{position: 'absolute', left: 0, right: 0, top: 0, height: 560, background: colors.text, clipPath: 'polygon(0 0, 100% 0, 100% 78%, 0 100%)'}} />
     <LogoCorner on={colors.text} />

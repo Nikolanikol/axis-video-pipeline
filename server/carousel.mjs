@@ -8,7 +8,7 @@
 // Рендерим не видео, а кадры: композиция carousel — кадр на слайд, каждый снимается
 // renderStill; размер кадра и число слайдов композиция берёт из формата. Поэтому карусель живёт в общем движке рядом с роликами и
 // получает тот же брендбук из настроек приложения.
-import {FAMILY_FORMAT, familyById} from '../src/carousel/families/registry.js';
+import {FAMILY_FORMATS, familyById} from '../src/carousel/families/registry.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {bundle} from '@remotion/bundler';
@@ -46,14 +46,14 @@ export const carouselFormats = () => readJson(path.join(ROOT, 'config', 'carouse
  */
 /**
  * Семейство карусели (пакет KOK_handoff_v1, src/carousel/families/registry.js): пусто — оформление
- * бренда; иначе только готовое семейство и только в его формате — «Разворот» 4:5 (1:1 и 9:16
- * в пакете отключены до адаптации макетов)
+ * бренда; иначе только готовое семейство и только в форматах FAMILY_FORMATS (4:5 и 9:16; 1:1 —
+ * ещё не адаптирован)
  */
 const checkFamily = (id, format) => {
   if (id === undefined || id === null || id === '') return null;
   const family = familyById(id);
   if (!family) throw new HttpError(400, `Нет такого стиля карусели: ${id}`);
-  if (format !== FAMILY_FORMAT) throw new HttpError(400, `Стиль «${family.title}» пока только в формате «Разворот» 4:5`);
+  if (!FAMILY_FORMATS.includes(format)) throw new HttpError(400, `Стиль «${family.title}» пока только в форматах «Разворот» 4:5 и «Классика» 9:16`);
   return family.id;
 };
 export const clientCarouselFormats = async () => (await carouselFormats())

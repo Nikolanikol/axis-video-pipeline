@@ -70,7 +70,7 @@ const Interior: React.FC<FamilySlideProps> = ({car, content, colors}) => {
   const label = upper(content.kicker ?? content.title);
   return <AbsoluteFill style={{background: colors.bg}}>
     <Head on={colors.bg} line={colors.text} />
-    {label && <div style={{position: 'absolute', left: 44, right: 44, top: 110, ...head(fitW(label, 990, 210, 80, K), colors.text)}}>{label}</div>}
+    {label && <div style={{position: 'absolute', left: 44, right: 44, top: 110, ...head(fitW(label, 990, 210, 34, K), colors.text)}}>{label}</div>}
     <Photo src={p.interior[0]} style={{left: 30, right: 30, top: 360, bottom: 30, borderRadius: '48px 48px 48px 200px', border: `6px solid ${colors.light}`}} />
   </AbsoluteFill>;
 };

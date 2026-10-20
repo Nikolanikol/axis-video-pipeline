@@ -11,7 +11,7 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {encarAdUrl, sourceName} from '../../src/shared/encarLink.js';
 import {DESIGNS} from '../../src/shared/designs';
-import {FAMILIES, FAMILY_FORMAT} from '../../src/carousel/families/registry.js';
+import {FAMILIES, FAMILY_FORMAT, FAMILY_FORMATS} from '../../src/carousel/families/registry.js';
 import {thumb} from '../thumb';
 import {parseCarouselSource} from '../../src/shared/kmotorsLot.js';
 import {QuickLink} from '../ads/QuickLot';
@@ -233,15 +233,15 @@ const Lightbox: React.FC<{entry: CarouselEntry; at: number; onClose: () => void;
  *  число слайдов и одна строка, зачем этот формат */
 // built — формат, в котором открытая карусель уже собрана (у машины карусель одна, так что
 // «собранный» формат всегда один): помечаем его, чтобы было видно, что готово, ещё до клика
-// only — при выбранном семействе доступен один формат (его): остальные видны, но неактивны.
+// only — при выбранном семействе доступны только его форматы: остальные видны, но неактивны.
 // Раньше выбор формата сбрасывал стиль, а выбор стиля менял формат — списки «боролись за клик»
 // (владелец 21.10), теперь стиль задаёт рамку, формат её не ломает
-const FormatList: React.FC<{formats: CarouselFormat[]; value: string; built?: string; only?: string; onChange: (id: string) => void}> =
+const FormatList: React.FC<{formats: CarouselFormat[]; value: string; built?: string; only?: string[]; onChange: (id: string) => void}> =
   ({formats, value, built, only, onChange}) => (
     <div className="format-list format-grid" role="radiogroup" aria-label="Формат карусели">
       {formats.map((f) => (
-        <button key={f.id} type="button" role="radio" aria-checked={f.id === value} disabled={!!only && f.id !== only}
-          title={only && f.id !== only ? 'Этот формат — только в стиле «Как в бренде»' : undefined}
+        <button key={f.id} type="button" role="radio" aria-checked={f.id === value} disabled={!!only && !only.includes(f.id)}
+          title={only && !only.includes(f.id) ? 'Этот формат — пока только в стиле «Как в бренде»' : undefined}
           className={`format-item${f.id === value ? ' on' : ''}${f.id === built ? ' built' : ''}`} onClick={() => onChange(f.id)}>
           <span className="format-item-head">
             <span className="format-item-name">
@@ -422,7 +422,7 @@ const StyleList: React.FC<{value: string | null; built?: string | null; onChange
     </button>;
   return <div className="style-grid" role="radiogroup" aria-label="Стиль карусели">
     {tile(null, 'Как в бренде', 'Оформление из настроек бренда, любой формат')}
-    {ready.map((f) => tile(f.id, f.title, `${f.note} · только 4:5`, [f.colors.bg, f.colors.accent, f.colors.light]))}
+    {ready.map((f) => tile(f.id, f.title, `${f.note} · форматы 4:5 и 9:16`, [f.colors.bg, f.colors.accent, f.colors.light]))}
   </div>;
 };
 
@@ -444,7 +444,10 @@ export const CarouselTool: React.FC = () => {
   const cost = useCost('carousels', config.credits);
   const formats = config.carouselFormats ?? [];
   // Сохранён стиль-семейство — формат его («Разворот»), иначе выбор открылся бы с неактивным форматом
-  const [format, setFormatState] = useState<string>(() => (savedFamily() ? FAMILY_FORMAT : savedFormat() ?? 'showcase'));
+  const [format, setFormatState] = useState<string>(() => {
+    const saved = savedFormat() ?? 'showcase';
+    return savedFamily() && !FAMILY_FORMATS.includes(saved) ? FAMILY_FORMAT : saved;
+  });
   const setFormat = (id: string) => {
     setFormatState(id);
     try { localStorage.setItem(FORMAT_KEY, id); } catch { /* приватный режим */ }
@@ -453,7 +456,8 @@ export const CarouselTool: React.FC = () => {
   const setFamily = (id: string | null) => {
     setFamilyState(id);
     try { if (id) localStorage.setItem(FAMILY_KEY, id); else localStorage.removeItem(FAMILY_KEY); } catch { /* приватный режим */ }
-    if (id) { setFormatState(FAMILY_FORMAT); try { localStorage.setItem(FORMAT_KEY, FAMILY_FORMAT); } catch { /* приватный режим */ } }
+    // Формат не из числа форматов семейства — на «Разворот»; «Классика» остаётся как есть
+    if (id && !FAMILY_FORMATS.includes(format)) { setFormatState(FAMILY_FORMAT); try { localStorage.setItem(FORMAT_KEY, FAMILY_FORMAT); } catch { /* приватный режим */ } }
   };
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<Set<string>>(new Set());
@@ -477,7 +481,7 @@ export const CarouselTool: React.FC = () => {
 
   // fmt — в каком формате собрать: по умолчанию выбранный справа; «Пересобрать» из списка
   // передаёт формат самой карусели, иначе пересборка молча меняла бы её формат
-  const run = async (link: string, seed?: number, fmt: string = format, fam: string | null = fmt === FAMILY_FORMAT ? family : null) => {
+  const run = async (link: string, seed?: number, fmt: string = format, fam: string | null = FAMILY_FORMATS.includes(fmt) ? family : null) => {
     setBusy(true);
     setLinkError('');
     try {
@@ -608,9 +612,9 @@ export const CarouselTool: React.FC = () => {
               больше не сбрасывает стиль */}
           <div className="quick-label">Стиль</div>
           <StyleList value={family} built={entry ? (entry.family ?? null) : undefined} onChange={setFamily} />
-          <div className="quick-label">Формат карусели{family ? ' · в этом стиле — «Разворот» 4:5' : ''}</div>
+          <div className="quick-label">Формат карусели{family ? ' · в этом стиле — 4:5 и 9:16' : ''}</div>
           <FormatList formats={formats} value={format} built={entry ? (entry.format ?? 'classic') : undefined}
-            only={family ? FAMILY_FORMAT : undefined} onChange={setFormat} />
+            only={family ? FAMILY_FORMATS : undefined} onChange={setFormat} />
           {/* Пресет меняет вёрстку всех форматов — видно здесь, чтобы не искать причину «чужого» вида в настройках */}
           {!family && <div className="design-summary">Пресет: {DESIGNS.find((d) => d.id === brand.design)?.title ?? 'Исходный'} · <a href="#/settings/brand">Настроить</a></div>}
 
