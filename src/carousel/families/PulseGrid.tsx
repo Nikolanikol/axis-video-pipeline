@@ -52,8 +52,9 @@ const Exterior: React.FC<FamilySlideProps> = ({car, content, colors}) => {
       <div style={head(fitW(last, 900, 190, 80, K), colors.accent)}>{last}</div>
     </div>
     {/* Винная плоскость справа — сетка смещена за фото */}
-    <div style={{position: 'absolute', right: 0, top: 560, width: 300, bottom: 0, background: colors.accent, clipPath: 'polygon(30% 0, 100% 0, 100% 100%, 0 100%)'}} />
-    <Photo src={p.exterior[0]} style={{left: 30, right: 70, top: 440, height: 520, borderRadius: 40}} />
+    {/* Заголовок в одно слово — фото выше, без пустоты под ним */}
+    <div style={{position: 'absolute', right: 0, top: first ? 560 : 450, width: 300, bottom: 0, background: colors.accent, clipPath: 'polygon(30% 0, 100% 0, 100% 100%, 0 100%)'}} />
+    <Photo src={p.exterior[0]} style={{left: 30, right: 70, top: first ? 440 : 330, height: first ? 520 : 600, borderRadius: 40}} />
     <Photo src={p.exterior[1] ?? p.exterior[0]} style={{left: 90, width: 560, top: 1010, height: 300, borderRadius: 32, transform: 'rotate(-3deg)', boxShadow: '0 16px 40px #0003'}} />
   </AbsoluteFill>;
 };

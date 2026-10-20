@@ -818,8 +818,17 @@ a.tab { text-decoration: none; }
 .slide-thumb:hover { opacity: 1; }
 .slide-thumb img { height: 100%; width: 100%; object-fit: cover; display: block; }
 .format-item-name { display: inline-flex; align-items: center; gap: 8px; }
-/* Стиль карусели (StyleList): у семейства — три его цвета кружками перед названием */
-.style-list { margin-bottom: 4px; }
+/* Стиль карусели (StyleList): плитки сеткой — кружки цветов и название; выбранная — винной рамкой */
+.style-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 4px; }
+.style-tile { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--panel-2); color: var(--text); font: 14px var(--font); text-align: left; cursor: pointer; min-width: 0; }
+.style-tile:hover { border-color: var(--accent-line); }
+.style-tile.on { border-color: var(--accent-line); box-shadow: inset 0 0 0 1px var(--accent); background: var(--panel); }
+.style-tile.built:not(.on) { border-color: var(--ok-line); }
+.style-tile-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.style-tile .style-swatch:empty { display: none; }
+.format-item:disabled { opacity: .38; cursor: not-allowed; }
+.format-item:disabled:hover { border-color: var(--line); }
 .style-swatch { display: inline-flex; flex: none; }
 .style-swatch i { width: 14px; height: 14px; border-radius: 50%; border: 1px solid #ffffff33; }
 .style-swatch i + i { margin-left: -4px; }

@@ -16,11 +16,13 @@ import {TYPE_DRIVE_SLIDES} from './TypeDrive';
 import {PULSE_GRID_SLIDES} from './PulseGrid';
 import {WIDE_FORM_SLIDES} from './WideForm';
 import {URBAN_OLIVE_SLIDES} from './UrbanOlive';
+import {CONTOUR_PLUM_SLIDES} from './ContourPlum';
 import type {FamilySlideProps} from './kit';
 import {familyById} from './registry.js';
 
 const LAYOUTS: Record<string, Record<string, React.FC<FamilySlideProps>>> = {cobalt_shift: COBALT_SLIDES, type_drive: TYPE_DRIVE_SLIDES,
-  pulse_grid: PULSE_GRID_SLIDES, wide_form: WIDE_FORM_SLIDES, urban_olive: URBAN_OLIVE_SLIDES};
+  pulse_grid: PULSE_GRID_SLIDES, wide_form: WIDE_FORM_SLIDES, urban_olive: URBAN_OLIVE_SLIDES,
+  contour_plum: CONTOUR_PLUM_SLIDES};
 
 export const FamilyCarousel: React.FC<CarouselProps & {texts: CarouselTexts}> = ({texts, ...props}) => {
   const frame = useCurrentFrame();

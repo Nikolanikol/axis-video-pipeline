@@ -233,11 +233,15 @@ const Lightbox: React.FC<{entry: CarouselEntry; at: number; onClose: () => void;
  *  число слайдов и одна строка, зачем этот формат */
 // built — формат, в котором открытая карусель уже собрана (у машины карусель одна, так что
 // «собранный» формат всегда один): помечаем его, чтобы было видно, что готово, ещё до клика
-const FormatList: React.FC<{formats: CarouselFormat[]; value: string; built?: string; onChange: (id: string) => void}> =
-  ({formats, value, built, onChange}) => (
+// only — при выбранном семействе доступен один формат (его): остальные видны, но неактивны.
+// Раньше выбор формата сбрасывал стиль, а выбор стиля менял формат — списки «боролись за клик»
+// (владелец 21.10), теперь стиль задаёт рамку, формат её не ломает
+const FormatList: React.FC<{formats: CarouselFormat[]; value: string; built?: string; only?: string; onChange: (id: string) => void}> =
+  ({formats, value, built, only, onChange}) => (
     <div className="format-list format-grid" role="radiogroup" aria-label="Формат карусели">
       {formats.map((f) => (
-        <button key={f.id} type="button" role="radio" aria-checked={f.id === value}
+        <button key={f.id} type="button" role="radio" aria-checked={f.id === value} disabled={!!only && f.id !== only}
+          title={only && f.id !== only ? 'Этот формат — только в стиле «Как в бренде»' : undefined}
           className={`format-item${f.id === value ? ' on' : ''}${f.id === built ? ' built' : ''}`} onClick={() => onChange(f.id)}>
           <span className="format-item-head">
             <span className="format-item-name">
@@ -407,21 +411,18 @@ const SlideViewer: React.FC<{entry: CarouselEntry; ratio: string; busy: boolean;
  */
 const StyleList: React.FC<{value: string | null; built?: string | null; onChange: (id: string | null) => void}> = ({value, built, onChange}) => {
   const ready = FAMILIES.filter((f) => f.ready);
-  const item = (id: string | null, title: string, note: string, swatch?: string[]) =>
-    <button key={id ?? 'brand'} type="button" role="radio" aria-checked={value === id}
-      className={`format-item${value === id ? ' on' : ''}${built !== undefined && built === id ? ' built' : ''}`} onClick={() => onChange(id)}>
-      <span className="format-item-head">
-        <span className="format-item-name">
-          {swatch ? <span className="style-swatch">{swatch.map((c) => <i key={c} style={{background: c}} />)}</span> : null}
-          {title}
-        </span>
-        {built !== undefined && built === id && <Check className="format-built-icon" size={15} aria-hidden />}
-      </span>
-      <span className="format-item-sub">{note}</span>
+  // Плитки сеткой: кружки цветов и название, описание — в подсказке. Длинный список с описаниями
+  // рядом со списком форматов читался как второй такой же выбор (владелец 21.10)
+  const tile = (id: string | null, title: string, note: string, swatch?: string[]) =>
+    <button key={id ?? 'brand'} type="button" role="radio" aria-checked={value === id} title={note}
+      className={`style-tile${value === id ? ' on' : ''}${built !== undefined && built === id ? ' built' : ''}`} onClick={() => onChange(id)}>
+      <span className="style-swatch">{(swatch ?? []).map((c) => <i key={c} style={{background: c}} />)}</span>
+      <span className="style-tile-name">{title}</span>
+      {built !== undefined && built === id && <Check className="format-built-icon" size={14} aria-hidden />}
     </button>;
-  return <div className="format-list style-list" role="radiogroup" aria-label="Стиль карусели">
-    {item(null, 'Как в бренде', 'Оформление из настроек бренда, любой формат')}
-    {ready.map((f) => item(f.id, f.title, `${f.note} · только 4:5`, [f.colors.bg, f.colors.accent, f.colors.light]))}
+  return <div className="style-grid" role="radiogroup" aria-label="Стиль карусели">
+    {tile(null, 'Как в бренде', 'Оформление из настроек бренда, любой формат')}
+    {ready.map((f) => tile(f.id, f.title, `${f.note} · только 4:5`, [f.colors.bg, f.colors.accent, f.colors.light]))}
   </div>;
 };
 
@@ -442,12 +443,11 @@ export const CarouselTool: React.FC = () => {
   const {refresh: refreshAccess} = useSession();
   const cost = useCost('carousels', config.credits);
   const formats = config.carouselFormats ?? [];
-  const [format, setFormatState] = useState<string>(() => savedFormat() ?? 'showcase');
+  // Сохранён стиль-семейство — формат его («Разворот»), иначе выбор открылся бы с неактивным форматом
+  const [format, setFormatState] = useState<string>(() => (savedFamily() ? FAMILY_FORMAT : savedFormat() ?? 'showcase'));
   const setFormat = (id: string) => {
     setFormatState(id);
     try { localStorage.setItem(FORMAT_KEY, id); } catch { /* приватный режим */ }
-    // Семейства — только в «Развороте»: другой формат возвращает оформление бренда
-    if (id !== FAMILY_FORMAT) setFamilyState(null);
   };
   const [family, setFamilyState] = useState<string | null>(() => savedFamily());
   const setFamily = (id: string | null) => {
@@ -604,10 +604,13 @@ export const CarouselTool: React.FC = () => {
               <CarSummary entry={entry} />
             </div>
           )}
-          <div className="quick-label">Формат карусели</div>
-          <FormatList formats={formats} value={format} built={entry ? (entry.format ?? 'classic') : undefined} onChange={setFormat} />
+          {/* Сначала стиль, потом формат: семейство задаёт формат (только 4:5), и выбор формата
+              больше не сбрасывает стиль */}
           <div className="quick-label">Стиль</div>
           <StyleList value={family} built={entry ? (entry.family ?? null) : undefined} onChange={setFamily} />
+          <div className="quick-label">Формат карусели{family ? ' · в этом стиле — «Разворот» 4:5' : ''}</div>
+          <FormatList formats={formats} value={format} built={entry ? (entry.format ?? 'classic') : undefined}
+            only={family ? FAMILY_FORMAT : undefined} onChange={setFormat} />
           {/* Пресет меняет вёрстку всех форматов — видно здесь, чтобы не искать причину «чужого» вида в настройках */}
           {!family && <div className="design-summary">Пресет: {DESIGNS.find((d) => d.id === brand.design)?.title ?? 'Исходный'} · <a href="#/settings/brand">Настроить</a></div>}
 

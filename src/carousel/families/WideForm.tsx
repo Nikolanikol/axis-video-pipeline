@@ -7,8 +7,9 @@ import {AbsoluteFill} from 'remotion';
 import {BODY, HEAD} from '../../shared/ui';
 import {LogoCorner, Photo, fitW, kmNumber, photosOf, splitLast, upper, type FamilySlideProps} from './kit';
 
-// Unbounded 800 заглавными — очень широкий: около 0,78 кегля на знак
-const K = .78;
+// Unbounded 800 заглавными — очень широкий: около 0,86 кегля на знак (замер 21.10: при 0,78
+// «ЭКСТЕРЬЕР» и «67 842 KM» упирались в край слайда)
+const K = .86;
 const head = (size: number, color: string): React.CSSProperties =>
   ({fontFamily: HEAD, fontWeight: 800, fontSize: size, lineHeight: .95, color, whiteSpace: 'nowrap', letterSpacing: -size * .02});
 
@@ -40,9 +41,9 @@ const Cover: React.FC<FamilySlideProps> = ({car, tx, colors}) => {
     <div style={{position: 'absolute', left: -120, right: -120, top: 960, bottom: -200, background: colors.accent, borderRadius: '50% 50% 0 0 / 22% 22% 0 0'}} />
     <div style={{position: 'absolute', left: -120, right: -120, top: 985, bottom: -200, background: colors.light, borderRadius: '50% 50% 0 0 / 22% 22% 0 0'}} />
     {(year || km) && <div style={{position: 'absolute', left: 60, right: 60, bottom: 70, display: 'flex', alignItems: 'center', gap: 40}}>
-      {year && <div style={head(110, colors.bg)}>{year}</div>}
+      {year && <div style={head(96, colors.bg)}>{year}</div>}
       {year && km && <div style={{width: 4, height: 120, background: colors.bg}} />}
-      {km && <div style={head(fitW(km, 560, 96, 50, K * .9), colors.bg)}>{km}</div>}
+      {km && <div style={head(fitW(km, 520, 90, 40, K), colors.bg)}>{km}</div>}
     </div>}
   </AbsoluteFill>;
 };
