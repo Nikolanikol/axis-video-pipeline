@@ -16,7 +16,8 @@ export const upper = (s?: string) => (s ?? '').toLocaleUpperCase('ru');
 
 export type FamilyColors = {bg: string; text: string; accent: string; light: string};
 // index — номер слайда с 1 (контурный индекс у Contour Plum)
-export type FamilySlideProps = {slide: string; index: number; content: DesignContent; car: CarouselCar; tx: CarouselText; ru: boolean; colors: FamilyColors};
+// h — высота слайда: 1350 (4:5, и 4:5 в середине 9:16) или 1080 (квадрат 1:1, у семейств, которые его умеют)
+export type FamilySlideProps = {slide: string; index: number; h: number; content: DesignContent; car: CarouselCar; tx: CarouselText; ru: boolean; colors: FamilyColors};
 
 /** Логотип бренда слева сверху; on — фон под ним (по нему Logo решает про подложку); line — черта под знаком */
 export const LogoCorner: React.FC<{on: string; line?: string; left?: number; top?: number}> = ({on, line, left = 44, top = 34}) =>

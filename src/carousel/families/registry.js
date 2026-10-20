@@ -8,7 +8,7 @@
 // Формат — «Разворот» 4:5 и «Классика» 9:16 (вёрстка 4:5 в середине кадра); 1:1 — пока нет.
 
 /** @typedef {{id: string, title: string, note: string, ready: boolean, colors: {bg: string, text: string, accent: string, light: string},
- *   fonts: {head: string, body: string, url: string}, fields: Record<string, string[]>}} Family */
+ *   fonts: {head: string, body: string, url: string}, fields: Record<string, string[]>, formats?: string[]}} Family */
 
 /** @type {Family[]} */
 export const FAMILIES = [
@@ -23,6 +23,8 @@ export const FAMILIES = [
   },
   {
     id: 'cobalt_shift', title: 'Cobalt Shift', ready: true,
+    // Первым адаптирован под квадрат (21.10): вёрстка считает высоту слайда (h), «Галерея» и «История» — свои
+    formats: ['spread', 'classic', 'showcase', 'full'],
     note: 'Фото первым, синие плашки и крупные цифры',
     // light — светлый фон слайдов экстерьера, салона, цены и контактов (на доске — белые слайды)
     colors: {bg: '#111925', text: '#EDF2F4', accent: '#2455DE', light: '#F4F7FB'},
@@ -73,6 +75,8 @@ export const FAMILY_FORMAT = 'spread';
 /**
  * Форматы, в которых семейства уже собираются. «Классика» 9:16 (21.10) — та же вёрстка 4:5 в
  * середине кадра (FamilyCarousel): Instagram режет 9:16 до 4:5, и текст остаётся в его зоне.
- * «Витрина» и «Полная» 1:1 — пока нет: квадрат требует своей перекомпоновки
+ * «Витрина» и «Полная» 1:1 — только у семейств со своим formats (перекомпоновка под квадрат)
  */
 export const FAMILY_FORMATS = ['spread', 'classic'];
+/** Форматы конкретного семейства: свои (formats) или общие FAMILY_FORMATS */
+export const familyFormats = (id) => familyById(id)?.formats ?? FAMILY_FORMATS;

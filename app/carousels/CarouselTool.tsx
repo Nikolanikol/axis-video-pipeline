@@ -11,7 +11,7 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {encarAdUrl, sourceName} from '../../src/shared/encarLink.js';
 import {DESIGNS} from '../../src/shared/designs';
-import {FAMILIES, FAMILY_FORMAT, FAMILY_FORMATS} from '../../src/carousel/families/registry.js';
+import {FAMILIES, FAMILY_FORMAT, familyFormats} from '../../src/carousel/families/registry.js';
 import {thumb} from '../thumb';
 import {parseCarouselSource} from '../../src/shared/kmotorsLot.js';
 import {QuickLink} from '../ads/QuickLot';
@@ -422,7 +422,7 @@ const StyleList: React.FC<{value: string | null; built?: string | null; onChange
     </button>;
   return <div className="style-grid" role="radiogroup" aria-label="Стиль карусели">
     {tile(null, 'Как в бренде', 'Оформление из настроек бренда, любой формат')}
-    {ready.map((f) => tile(f.id, f.title, `${f.note} · форматы 4:5 и 9:16`, [f.colors.bg, f.colors.accent, f.colors.light]))}
+    {ready.map((f) => tile(f.id, f.title, `${f.note} · ${(f.formats ?? ['spread', 'classic']).length === 4 ? 'все форматы' : 'форматы 4:5 и 9:16'}`, [f.colors.bg, f.colors.accent, f.colors.light]))}
   </div>;
 };
 
@@ -446,7 +446,8 @@ export const CarouselTool: React.FC = () => {
   // Сохранён стиль-семейство — формат его («Разворот»), иначе выбор открылся бы с неактивным форматом
   const [format, setFormatState] = useState<string>(() => {
     const saved = savedFormat() ?? 'showcase';
-    return savedFamily() && !FAMILY_FORMATS.includes(saved) ? FAMILY_FORMAT : saved;
+    const fam = savedFamily();
+    return fam && !familyFormats(fam).includes(saved) ? FAMILY_FORMAT : saved;
   });
   const setFormat = (id: string) => {
     setFormatState(id);
@@ -457,7 +458,7 @@ export const CarouselTool: React.FC = () => {
     setFamilyState(id);
     try { if (id) localStorage.setItem(FAMILY_KEY, id); else localStorage.removeItem(FAMILY_KEY); } catch { /* приватный режим */ }
     // Формат не из числа форматов семейства — на «Разворот»; «Классика» остаётся как есть
-    if (id && !FAMILY_FORMATS.includes(format)) { setFormatState(FAMILY_FORMAT); try { localStorage.setItem(FORMAT_KEY, FAMILY_FORMAT); } catch { /* приватный режим */ } }
+    if (id && !familyFormats(id).includes(format)) { setFormatState(FAMILY_FORMAT); try { localStorage.setItem(FORMAT_KEY, FAMILY_FORMAT); } catch { /* приватный режим */ } }
   };
   const [busy, setBusy] = useState(false);
   const [pending, setPending] = useState<Set<string>>(new Set());
@@ -481,7 +482,7 @@ export const CarouselTool: React.FC = () => {
 
   // fmt — в каком формате собрать: по умолчанию выбранный справа; «Пересобрать» из списка
   // передаёт формат самой карусели, иначе пересборка молча меняла бы её формат
-  const run = async (link: string, seed?: number, fmt: string = format, fam: string | null = FAMILY_FORMATS.includes(fmt) ? family : null) => {
+  const run = async (link: string, seed?: number, fmt: string = format, fam: string | null = family && familyFormats(family).includes(fmt) ? family : null) => {
     setBusy(true);
     setLinkError('');
     try {
@@ -612,9 +613,9 @@ export const CarouselTool: React.FC = () => {
               больше не сбрасывает стиль */}
           <div className="quick-label">Стиль</div>
           <StyleList value={family} built={entry ? (entry.family ?? null) : undefined} onChange={setFamily} />
-          <div className="quick-label">Формат карусели{family ? ' · в этом стиле — 4:5 и 9:16' : ''}</div>
+          <div className="quick-label">Формат карусели</div>
           <FormatList formats={formats} value={format} built={entry ? (entry.format ?? 'classic') : undefined}
-            only={family ? FAMILY_FORMATS : undefined} onChange={setFormat} />
+            only={family ? familyFormats(family) : undefined} onChange={setFormat} />
           {/* Пресет меняет вёрстку всех форматов — видно здесь, чтобы не искать причину «чужого» вида в настройках */}
           {!family && <div className="design-summary">Пресет: {DESIGNS.find((d) => d.id === brand.design)?.title ?? 'Исходный'} · <a href="#/settings/brand">Настроить</a></div>}
 

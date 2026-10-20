@@ -39,13 +39,20 @@ export const FamilyCarousel: React.FC<CarouselProps & {texts: CarouselTexts}> = 
   const slide = slides[index];
   const lang = carouselLang(props.market.language);
   const layouts = LAYOUTS[family.id] ?? {};
-  // Слайды «Классики», которых нет в пакете: «Технологии» — вёрсткой салона, но с приборной
-  // панелью и деталями первыми (иначе повторились бы фото салона); остальное — вёрсткой фактов
-  const Slide = slide === 'technology' ? layouts.interior : layouts[slide] ?? layouts.engine;
-  const car = slide === 'technology' ? {...props.car, photos: {...props.car.photos,
-    interiorShot: props.car.photos.dashboard ?? props.car.photos.other[0] ?? props.car.photos.interiorShot,
-    interior: [...props.car.photos.other, ...props.car.photos.interior.slice().reverse()]}} : props.car;
-  const slideProps: FamilySlideProps = {slide, index: index + 1, car, tx: carouselText(lang, props.car.origin), ru: lang === 'ru',
+  // Слайды, которых нет в пакете (шесть слайдов 4:5), — вёрсткой того же семейства: «Технологии»,
+  // «Безопасность» и «Детали» — как салон, но со своими фото первыми (иначе повторились бы фото
+  // салона); «Вид сзади» — как экстерьер; «Почему мы» — как контакты; «Галерея» и «История» — свои,
+  // если семейство их нарисовало, иначе экстерьер и факты
+  const alias: Record<string, string> = {technology: 'interior', safety: 'interior', details: 'interior', rear: 'exterior', why: 'cta',
+    gallery: 'exterior', specs: 'engine', history: 'engine'};
+  const Slide = layouts[slide] ?? layouts[alias[slide]] ?? layouts.engine;
+  const ph = props.car.photos;
+  const first = slide === 'technology' || slide === 'safety' ? [ph.dashboard, ...ph.other] : slide === 'details' ? [...ph.other, ph.dashboard] : null;
+  const car = first ? {...props.car, photos: {...ph, interiorShot: first.find(Boolean) ?? ph.interiorShot,
+    interior: [...first, ...ph.interior.slice().reverse()].filter(Boolean) as string[]}} : props.car;
+  // Квадрат (1:1) — вёрстка во весь кадр с высотой 1080; 4:5 и 9:16 — вёрстка 1350 (в 9:16 — в середине)
+  const h = height === W ? height : H;
+  const slideProps: FamilySlideProps = {slide, index: index + 1, h, car, tx: carouselText(lang, props.car.origin), ru: lang === 'ru',
     colors: family.colors, content: carouselDesignContent(props, slide, texts.slides[index]?.fields)};
   // Слайд вызываем как функцию, а не элементом: так видно его корневой фон, им заливаются полосы
   // над и под вёрсткой в 9:16. У слайдов семейств нет своих хуков (только у вложенных элементов),
@@ -60,12 +67,12 @@ export const FamilyCarousel: React.FC<CarouselProps & {texts: CarouselTexts}> = 
   // Вёрстка нарисована на 1080×1350 (4:5). В «Классике» (1080×1920) она стоит в середине кадра —
   // ровно в зоне, которую Instagram оставляет при обрезке 9:16 до 4:5; полосы сверху и снизу —
   // фоном слайда. Владелец 21.10: адаптация форматов, сначала 9:16
-  const top = Math.max(0, Math.round((height - H) / 2));
+  const top = Math.max(0, Math.round((height - h) / 2));
   return <ThemeProvider value={theme}>
     <AbsoluteFill style={{background: band}}>
       {top > 0 && <div style={{position: 'absolute', left: 0, right: 0, top: 0, height: top, background: bandTop}} />}
       {top > 0 && <div style={{position: 'absolute', left: 0, right: 0, bottom: 0, height: top, background: bandBottom}} />}
-      <div style={{position: 'absolute', left: 0, top, width: W, height: H, overflow: 'hidden'}}>{node}</div>
+      <div style={{position: 'absolute', left: 0, top, width: W, height: h, overflow: 'hidden'}}>{node}</div>
     </AbsoluteFill>
   </ThemeProvider>;
 };
