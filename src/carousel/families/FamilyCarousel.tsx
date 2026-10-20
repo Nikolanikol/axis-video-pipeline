@@ -17,7 +17,7 @@ import {PULSE_GRID_SLIDES} from './PulseGrid';
 import {WIDE_FORM_SLIDES} from './WideForm';
 import {URBAN_OLIVE_SLIDES} from './UrbanOlive';
 import {CONTOUR_PLUM_SLIDES} from './ContourPlum';
-import {H, W, type FamilySlideProps} from './kit';
+import {FamilyGallery, FamilyHistory, H, W, type FamilySlideProps} from './kit';
 import {familyById} from './registry.js';
 
 const LAYOUTS: Record<string, Record<string, React.FC<FamilySlideProps>>> = {cobalt_shift: COBALT_SLIDES, type_drive: TYPE_DRIVE_SLIDES,
@@ -45,7 +45,8 @@ export const FamilyCarousel: React.FC<CarouselProps & {texts: CarouselTexts}> = 
   // если семейство их нарисовало, иначе экстерьер и факты
   const alias: Record<string, string> = {technology: 'interior', safety: 'interior', details: 'interior', rear: 'exterior', why: 'cta',
     gallery: 'exterior', specs: 'engine', history: 'engine'};
-  const Slide = layouts[slide] ?? layouts[alias[slide]] ?? layouts.engine;
+  const shared: Record<string, React.FC<FamilySlideProps>> = {gallery: FamilyGallery, history: FamilyHistory};
+  const Slide = layouts[slide] ?? shared[slide] ?? layouts[alias[slide]] ?? layouts.engine;
   const ph = props.car.photos;
   const first = slide === 'technology' || slide === 'safety' ? [ph.dashboard, ...ph.other] : slide === 'details' ? [...ph.other, ph.dashboard] : null;
   const car = first ? {...props.car, photos: {...ph, interiorShot: first.find(Boolean) ?? ph.interiorShot,

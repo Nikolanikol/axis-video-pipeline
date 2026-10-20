@@ -422,7 +422,7 @@ const StyleList: React.FC<{value: string | null; built?: string | null; onChange
     </button>;
   return <div className="style-grid" role="radiogroup" aria-label="Стиль карусели">
     {tile(null, 'Как в бренде', 'Оформление из настроек бренда, любой формат')}
-    {ready.map((f) => tile(f.id, f.title, `${f.note} · ${(f.formats ?? ['spread', 'classic']).length === 4 ? 'все форматы' : 'форматы 4:5 и 9:16'}`, [f.colors.bg, f.colors.accent, f.colors.light]))}
+    {ready.map((f) => tile(f.id, f.title, f.note, [f.colors.bg, f.colors.accent, f.colors.light]))}
   </div>;
 };
 

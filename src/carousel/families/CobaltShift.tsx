@@ -16,10 +16,8 @@
 import React from 'react';
 import {AbsoluteFill} from 'remotion';
 import {BODY, HEAD, Logo} from '../../shared/ui';
-import {H, Photo, W, fitW, kmNumber, upper, type FamilyColors, type FamilySlideProps} from './kit';
+import {Photo, W, fitW, kmNumber, scale, upper, type FamilyColors, type FamilySlideProps} from './kit';
 
-/** Координата доски 4:5 → высота текущего слайда, и коэффициент для кегля, упирающегося в высоту */
-const scale = (h: number) => ({y: (v: number) => Math.round(v * h / H), k: Math.min(1, h / H)});
 
 /** Вкладка с логотипом слева сверху — тёмная, со скруглённым нижним правым углом */
 const LogoTab: React.FC<{colors: FamilyColors; flat?: boolean}> = ({colors, flat}) =>
