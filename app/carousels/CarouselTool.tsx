@@ -241,7 +241,7 @@ const FormatList: React.FC<{formats: CarouselFormat[]; value: string; built?: st
     <div className="format-list format-grid" role="radiogroup" aria-label="Формат карусели">
       {formats.map((f) => (
         <button key={f.id} type="button" role="radio" aria-checked={f.id === value} disabled={!!only && !only.includes(f.id)}
-          title={only && !only.includes(f.id) ? 'Этот формат — пока только в стиле «Как в бренде»' : undefined}
+          title={only && !only.includes(f.id) ? 'Этот формат — пока только в стиле «Как в бренде»' : f.note}
           className={`format-item${f.id === value ? ' on' : ''}${f.id === built ? ' built' : ''}`} onClick={() => onChange(f.id)}>
           <span className="format-item-head">
             <span className="format-item-name">
@@ -409,8 +409,16 @@ const SlideViewer: React.FC<{entry: CarouselEntry; ratio: string; busy: boolean;
  * семейства — три его цвета, по ним стиль узнаётся раньше, чем по названию. Семейство живёт только
  * в «Развороте» 4:5 — выбор сам переключает формат (CarouselTool)
  */
+// На виду — «Как в бренде» и первые три семейства; остальные — под «Ещё стили» (владелец 21.10:
+// временная мера — колонка не помещалась по высоте и прокручивалась). Выбранный или собранный стиль
+// из скрытых виден всегда: список открывается сам
+const MAIN_STYLES = 3;
 const StyleList: React.FC<{value: string | null; built?: string | null; onChange: (id: string | null) => void}> = ({value, built, onChange}) => {
   const ready = FAMILIES.filter((f) => f.ready);
+  const more = ready.slice(MAIN_STYLES);
+  const pinned = more.some((f) => f.id === value || f.id === built);
+  const [open, setOpen] = useState(false);
+  const shown = open || pinned;
   // Плитки сеткой: кружки цветов и название, описание — в подсказке. Длинный список с описаниями
   // рядом со списком форматов читался как второй такой же выбор (владелец 21.10)
   const tile = (id: string | null, title: string, note: string, swatch?: string[]) =>
@@ -420,9 +428,13 @@ const StyleList: React.FC<{value: string | null; built?: string | null; onChange
       <span className="style-tile-name">{title}</span>
       {built !== undefined && built === id && <Check className="format-built-icon" size={14} aria-hidden />}
     </button>;
+  const famTile = (f: typeof ready[number]) => tile(f.id, f.title, f.note, [f.colors.bg, f.colors.accent, f.colors.light]);
   return <div className="style-grid" role="radiogroup" aria-label="Стиль карусели">
-    {tile(null, 'Как в бренде', 'Оформление из настроек бренда, любой формат')}
-    {ready.map((f) => tile(f.id, f.title, f.note, [f.colors.bg, f.colors.accent, f.colors.light]))}
+    {tile(null, 'Как в бренде', 'Оформление из настроек бренда')}
+    {ready.slice(0, MAIN_STYLES).map(famTile)}
+    {more.length > 0 && !pinned && <button type="button" className="style-more" aria-expanded={shown} onClick={() => setOpen(!open)}>
+      {shown ? 'Скрыть' : `Ещё стили · ${more.length}`} <span aria-hidden>{shown ? '▴' : '▾'}</span></button>}
+    {shown && more.map(famTile)}
   </div>;
 };
 
