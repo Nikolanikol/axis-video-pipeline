@@ -32,7 +32,7 @@
       },
       {
         "id": "cta",
-        "title": "CTA",
+        "title": "Контакты",
         "from": 345,
         "frames": 105,
         "preview": 440
@@ -71,13 +71,13 @@
       },
       {
         "key": "ctaTitle",
-        "label": "Заголовок CTA",
+        "label": "Заголовок",
         "hint": "Enter — перенос строки",
         "multiline": true
       },
       {
         "key": "ctaAccent",
-        "label": "Акцент CTA (медью)",
+        "label": "Акцентный текст",
         "hint": "последняя строка заголовка"
       },
       {
@@ -87,7 +87,7 @@
       },
       {
         "key": "whatsappLabel",
-        "label": "Подпись над номером",
+        "label": "Подпись над контактом",
         "hint": "сцена 4"
       }
     ],
@@ -133,7 +133,7 @@
       },
       {
         "id": "cta",
-        "title": "CTA",
+        "title": "Контакты",
         "from": 435,
         "frames": 90,
         "preview": 515
@@ -174,13 +174,13 @@
       },
       {
         "key": "ctaTitle",
-        "label": "Заголовок CTA",
+        "label": "Заголовок",
         "hint": "Enter — перенос строки",
         "multiline": true
       },
       {
         "key": "ctaAccent",
-        "label": "Акцент CTA (медью)",
+        "label": "Акцентный текст",
         "hint": "последняя строка заголовка"
       },
       {
@@ -190,7 +190,7 @@
       },
       {
         "key": "whatsappLabel",
-        "label": "Подпись над номером",
+        "label": "Подпись над контактом",
         "hint": "сцена 4"
       }
     ],
@@ -230,7 +230,7 @@
       },
       {
         "id": "cta",
-        "title": "CTA",
+        "title": "Контакты",
         "from": 345,
         "frames": 105,
         "preview": 440
@@ -268,13 +268,13 @@
       },
       {
         "key": "ctaTitle",
-        "label": "Заголовок CTA",
+        "label": "Заголовок",
         "hint": "Enter — перенос строки",
         "multiline": true
       },
       {
         "key": "ctaAccent",
-        "label": "Акцент CTA (медью)",
+        "label": "Акцентный текст",
         "hint": "последняя строка заголовка"
       },
       {
@@ -284,7 +284,7 @@
       },
       {
         "key": "whatsappLabel",
-        "label": "Подпись над номером",
+        "label": "Подпись над контактом",
         "hint": "сцена 4"
       }
     ],

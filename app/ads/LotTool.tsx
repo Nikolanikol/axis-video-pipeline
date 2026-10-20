@@ -10,26 +10,24 @@ import {FORMATS, fmt, getFormat, lotTotal} from '../../src/shared/model';
 import {marketFromProfile} from '../../src/shared/profile';
 import {useTodayMarket} from '../rates';
 import type {Market} from '../../src/shared/types';
-import {api, errorText, LotEntry} from '../api';
+import {api, ApiError, errorText, LotEntry} from '../api';
 import {useConfig} from '../config';
-import {LotForm} from '../LotForm';
 import {EncarImport} from './EncarImport';
 import {Preview} from '../Preview';
 import {RenderPanel} from '../RenderPanel';
 import {lastFormat, lastLot} from '../router';
-import {FormatChips, ImportModal, LotsPanel, QuickLink, type ImportStage} from './QuickLot';
+import {ImportModal, LotsPanel, QuickLink, type ImportStage} from './QuickLot';
+import {Palette} from './Palette';
+import {MobileLotEditor} from './MobileLotEditor';
+import type {SceneSeek} from '../Preview';
 import {toast} from '../Toast';
-import {Clapperboard, List, SlidersHorizontal} from 'lucide-react';
-import {MobileTabs, useIsPhone, usePanelSwipes} from '../MobileTabs';
+import {useIsPhone} from '../MobileTabs';
 
 type SaveState = 'saved' | 'dirty' | 'saving' | 'error';
-const SAVE_LABEL: Record<SaveState, string> = {saved: 'Сохранено', dirty: 'Есть правки', saving: 'Сохраняю…', error: 'Не сохранено'};
 
 // В интерфейсе лот называется «объявление» (владелец 01.10: «лот» — аукционное слово, клиенту
 // непонятное); в коде, данных и адресах остаётся lot. Без марки и модели — «Без названия»:
 // «Новый…» врало бы про карточку, которая висит неделю
-// Какие разделы телефона — выдвижные панели и с какой стороны (MobileTabs.tsx)
-const LOT_PANELS = {list: 'left', edit: 'right'} as const;
 
 export const lotTitle = (l: LotEntry) => [l.brand, l.model, l.year].filter(Boolean).join(' ') || 'Без названия';
 
@@ -55,15 +53,18 @@ export const LotTool: React.FC = () => {
   lotRef.current = lot;
   const saveRef = useRef(save);
   saveRef.current = save;
-  const saveLot = useCallback(async () => {
+  // true — записано. Сборка проверяет ответ: при ошибке она не стартует со старыми значениями
+  // (docs/palette.md, раздел 9)
+  const saveLot = useCallback(async (): Promise<boolean> => {
     const current = lotRef.current;
-    if (!current) return;
+    if (!current) return true;
     setSave('saving');
     try {
       const saved = await api.saveLot(current);
       setLots((ls) => [saved, ...ls.filter((l) => l.id !== saved.id)]);
       setSave(lotRef.current === current ? 'saved' : 'dirty');
-    } catch (e) { setSave('error'); report(e); }
+      return true;
+    } catch (e) { setSave('error'); report(e); return false; }
   }, [report]);
   useEffect(() => {
     if (save !== 'dirty') return;
@@ -93,14 +94,17 @@ export const LotTool: React.FC = () => {
   const phone = useIsPhone();
   const [mtab, setMtab] = useState<'main' | 'list' | 'edit'>('main');
 
+  // Перед уходом с объявления — его правки. Не записались — остаёмся на нём: переход не выдаётся
+  // за успешный, введённое не теряется, ошибка видна у статуса (docs/palette-mobile.md, раздел 8)
+  const flush = async () => save === 'saved' || await saveLot();
   const selectLot = async (id: string) => {
-    if (save === 'dirty') await saveLot();
+    if (!(await flush())) return;
     const next = lots.find((l) => l.id === id);
     if (next) { setLot(next); setSave('saved'); setMtab('main'); }
   };
   const newLot = async () => {
     try {
-      if (save === 'dirty') await saveLot();
+      if (!(await flush())) return;
       const created = await api.createLot({market: lot?.market ?? config.defaultMarket});
       setLots((ls) => [created, ...ls]);
       setLot(created);
@@ -115,7 +119,7 @@ export const LotTool: React.FC = () => {
   // Возвращает созданный лот: вызывающему он нужен сразу, а состояние React к этому
   // моменту может ещё не обновиться
   const createFromCar = async (fields: Partial<LotEntry>, urls: string[]): Promise<LotEntry> => {
-    if (save === 'dirty') await saveLot();
+    if (!(await flush())) throw new ApiError('Правки текущего объявления не сохранились — новое не создано. Повторите сохранение вверху', 0);
     const created = await api.createLot({market: lot?.market ?? config.defaultMarket});
     let next = await api.saveLot({...created, ...fields});
     setLots((ls) => [next, ...ls]);
@@ -138,50 +142,20 @@ export const LotTool: React.FC = () => {
   // ——— Основной путь: вставил ссылку, и всё сделалось само ———
   const [stage, setStage] = useState<ImportStage>(null);
   const [quickError, setQuickError] = useState('');
-  const [editing, setEditing] = useState(false);
-  // Ручные настройки открываются под первым экраном — подводим к ним, иначе кнопка
-  // «Изменить вручную» выглядит так, будто ничего не сделала. Едем сами, за 0,6 с с
-  // замедлением к концу: мгновенный прыжок сбивал с толку (владелец 01.10). Своя анимация,
-  // а не scrollIntoView({behavior: 'smooth'}): у той скорость выбирает браузер, и её не
-  // остановить, когда человек сам берётся за колесо
-  const editorRef = useRef<HTMLElement>(null);
-  useEffect(() => {
-    const editor = editorRef.current;
-    const box = editor?.parentElement;
-    // На телефоне ручные настройки — отдельный раздел, ехать некуда
-    if (phone || !editing || !editor || !box) return;
-    const from = box.scrollTop;
-    // 12 px воздуха над панелью; дальше конца прокрутки не уехать
-    const to = Math.min(from + editor.getBoundingClientRect().top - box.getBoundingClientRect().top - 12, box.scrollHeight - box.clientHeight);
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) { box.scrollTop = to; return; }
-    const started = performance.now();
-    let frame = requestAnimationFrame(function step(now) {
-      const t = Math.min((now - started) / 600, 1);
-      box.scrollTop = from + (to - from) * (1 - Math.pow(1 - t, 3));
-      if (t < 1) frame = requestAnimationFrame(step);
-    });
-    // Человек сам взялся за колесо или тачпад — не тянем страницу против его руки
-    const stop = () => cancelAnimationFrame(frame);
-    box.addEventListener('wheel', stop, {passive: true});
-    box.addEventListener('touchstart', stop, {passive: true});
-    return () => { stop(); box.removeEventListener('wheel', stop); box.removeEventListener('touchstart', stop); };
-  }, [editing, phone]);
-  // «Ролик» — дом; «Объявления» выезжает слева, «Правка» справа, свайпами и кнопками панели.
-  // Прокрутку разделов не сбрасываем: панели прокручиваются сами, а ролик под ними стоит
-  const quickRef = useRef<HTMLDivElement>(null);
-  usePanelSwipes(quickRef, mtab, 'main', setMtab, LOT_PANELS, loaded);
-  // Плеер живёт, пока открыт «Ролик», и ещё 350 мс после ухода — пока панель наезжает и
-  // картинка под ней не должна пропасть. Потом его нет совсем: играющий под панелью он
-  // рисует кадры 1080×1920 впустую, и прокрутка подлагивает (владелец 01.10)
-  const [previewLive, setPreviewLive] = useState(true);
-  useEffect(() => {
-    if (!phone || mtab === 'main') { setPreviewLive(true); return; }
-    const t = setTimeout(() => setPreviewLive(false), 350);
-    return () => clearTimeout(t);
-  }, [phone, mtab]);
-  // На телефоне правка смонтирована всегда, пока есть объявление: выезжающей панели нужно
-  // что двигать, а размонтирование на закрытии съедало бы анимацию. На компьютере — как раньше
-  const showEditor = phone || editing;
+  // Выбранная сцена — общая для палитры и кнопок под превью; seek — команда превью перейти к ней
+  const [scene, setScene] = useState('hook');
+  const [seek, setSeek] = useState<SceneSeek | null>(null);
+  const pickScene = (id: string) => { setScene(id); setSeek((s) => ({id, n: (s?.n ?? 0) + 1})); };
+  // Мобильная «Собрать» в верхней строке вызывает сборку RenderPanel (одна защита от двойного нажатия)
+  const buildRef = useRef<(() => void) | null>(null);
+  const [building, setBuilding] = useState({starting: false, running: false});
+  // Перед сборкой — последние правки; не записались — сборка не стартует со старыми значениями
+  const beforeRender = async () => {
+    if (save === 'saved') return;
+    // ApiError, а не Error: это ожидаемая ситуация для человека, а не сбой страницы — обычная Error
+    // ушла бы отчётом в тему «Сбои» (errorReport.ts). Причину сохранения сервер уже записал сам
+    if (!(await saveLot())) throw new ApiError('Правки не сохранились — сборка не запущена. Нажмите «Не удалось сохранить — повторить» вверху или попробуйте ещё раз', 0);
+  };
   const quickFromLink = async (link: string) => {
     setQuickError('');
     try {
@@ -283,75 +257,54 @@ export const LotTool: React.FC = () => {
 
   if (!loaded) return <Loading text="Загрузка объявлений…" />;
 
+  // Телефон — мобильная палитра «Секции под превью» (docs/palette-mobile.md). Прежние разделы
+  // «Объявления / Ролик / Правка» с выезжающими панелями здесь больше не рисуются
+  if (phone) return <>
+    <ImportModal stage={stage} />
+    <MobileLotEditor lot={lot} input={input} market={market} format={format} brand={brand} pairs={config.fonts} palettes={config.palettes ?? []}
+      save={save} onRetrySave={() => { void saveLot(); }} onChange={editLot} onPhotos={setPhotos} onError={report}
+      onFormat={chooseFormat} scene={scene} onScene={pickScene} seek={seek}
+      listOpen={mtab === 'list'} onList={(open) => setMtab(open ? 'list' : 'main')}
+      openContent={mtab === 'edit'} onContentOpened={() => setMtab('main')}
+      list={<div className="mle-list-content">
+        <QuickLink onLink={quickFromLink} error={quickError} busy={!!stage} />
+        <LotsPanel lots={lots} current={lot?.id} pending={pending} onOpen={selectLot} onBlank={newLot} price={priceOf}
+          onCopy={copyLot} onDelete={deleteLot} onDeleteEmpty={deleteEmpty} />
+      </div>}
+      render={lot && <RenderPanel lot={lot} format={format} unsavedSettings={unsavedSettings} beforeRender={beforeRender} onError={report}
+        hideButton trigger={buildRef} onState={setBuilding} />}
+      buildRef={buildRef} building={building}
+      photoSource={lot && <EncarImport lot={lot} onApply={applyFromCar} onError={report} />} />
+  </>;
+
+  // Компьютер: ссылка сверху и три колонки — объявления, превью, палитра (docs/palette.md)
   return (
-    <>
-    <div className="quick" data-mtab={mtab} ref={quickRef}>
+    <div className="quick">
       <ImportModal stage={stage} />
       {/* quick-screen — ровно один экран: ссылка и три колонки. Колонки не растут вместе с
           содержимым, длинные списки (лоты, ролики) прокручиваются внутри себя */}
       <div className="quick-screen">
       <QuickLink onLink={quickFromLink} error={quickError} busy={!!stage} />
 
-      {/* Три колонки: лоты — превью — формат и сборка (владелец, 30.09). Ссылка — над ними:
+      {/* Три колонки: лоты — превью — палитра (владелец, 30.09 и 20.10). Ссылка — над ними:
           это первое действие, и новый лот из неё появляется в колонке лотов */}
       <main className="quick-main">
         <LotsPanel lots={lots} current={lot?.id} pending={pending} onOpen={selectLot} onBlank={newLot} price={priceOf}
           onCopy={copyLot} onDelete={deleteLot} onDeleteEmpty={deleteEmpty} />
 
-        <section className="quick-preview">
-          {/* На телефоне плеер живёт только в разделе «Ролик»: скрытый стилями, он продолжал
-              играть и рисовать кадры 1080×1920, и прокрутка «Правки» подлагивала (владелец
-              01.10); каждая перестановка фото ещё и перерисовывала его */}
-          {input && previewLive
-            ? <Preview input={input} format={format} autoPlay />
-            : <div className="empty">Вставьте ссылку на объявление Encar — машина, фото и превью появятся сами.</div>}
-        </section>
-
-        {lot && (
-          <section className="quick-side">
-            <div className="quick-title">
-              <h1>{[lot.brand, lot.model].filter(Boolean).join(' ') || 'Без названия'} <span className="muted">{lot.year || ''}</span></h1>
-              <div className="quick-price">{priceOf(lot) || <span className="warn-inline">цены нет — впишите в «Изменить вручную»</span>}</div>
-              {lot.texts?.hookTagline && <div className="muted">{lot.texts.hookTagline}</div>}
-              <div className="quick-edit">
-                <button className="btn ghost" onClick={() => setEditing(!editing)} aria-expanded={editing}>
-                  {editing ? 'Скрыть ручные настройки' : 'Изменить вручную'}
-                </button>
-                <span className={`save save-${save}`}>{SAVE_LABEL[save]}</span>
-              </div>
-            </div>
-            <div className="quick-label">Формат ролика</div>
-            <FormatChips value={format.id} onChange={chooseFormat} />
-            <RenderPanel
-              lot={lot}
-              format={format}
-              unsavedSettings={unsavedSettings}
-              beforeRender={async () => { if (save !== 'saved') await saveLot(); }}
-              onError={report}
-            />
-          </section>
-        )}
+        {lot && input
+          // Превью с панелью плеера и палитра — одним компонентом: плитки анимации проигрывают
+          // приём в этом же превью, «Настройки» на превью открывают панель в палитре
+          ? <Palette lot={lot} input={input} market={market} format={format} brand={brand} pairs={config.fonts} palettes={config.palettes ?? []}
+            save={save} onRetrySave={() => { void saveLot(); }} onChange={editLot} onPhotos={setPhotos} onError={report}
+            onFormat={chooseFormat} scene={scene} onScene={pickScene} seek={seek}
+            photoSource={<EncarImport lot={lot} onApply={applyFromCar} onError={report} />}
+            render={<RenderPanel lot={lot} format={format} unsavedSettings={unsavedSettings} beforeRender={beforeRender} onError={report} folded />} />
+          : <section className="quick-preview">
+            <div className="empty">Вставьте ссылку на объявление Encar — машина, фото и превью появятся сами.</div>
+          </section>}
       </main>
       </div>
-
-      {lot && showEditor && (
-        <section className="panel quick-editor" ref={editorRef} data-mpanel="edit">
-          {/* На телефоне раздел правки открыт без превью и названия — подписываем, что правим */}
-          <div className="quick-editor-title">
-            <b>{lotTitle(lot)}</b>
-            <span className={`save save-${save}`}>{SAVE_LABEL[save]}</span>
-          </div>
-          <EncarImport lot={lot} onApply={applyFromCar} onError={report} />
-          <LotForm lot={lot} market={market} format={format} onChange={editLot} onPhotos={setPhotos} onError={report} />
-        </section>
-      )}
-      {!lot && <div className="empty mtab-empty">Объявления пока нет — вставьте ссылку в разделе «Ролик».</div>}
     </div>
-    <MobileTabs value={mtab} onChange={setMtab} tabs={[
-      {id: 'list', label: 'Объявления', icon: <List size={20} />, badge: lots.length},
-      {id: 'main', label: 'Ролик', icon: <Clapperboard size={20} />},
-      {id: 'edit', label: 'Правка', icon: <SlidersHorizontal size={20} />},
-    ]} />
-    </>
   );
 };

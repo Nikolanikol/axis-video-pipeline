@@ -15,12 +15,21 @@ type Props = {
   onError: (e: unknown) => void;
   // За что списываются кредиты: ads | reviews — цена на кнопке
   pipeline?: string;
+  // Палитра ролика (docs/palette.md): кнопка сборки — в закреплённом низу, а готовые ролики —
+  // под «Ролики (N)», раскрываются по нажатию. Иначе список отъедал бы место у настроек
+  folded?: boolean;
+  // Мобильная палитра (docs/palette-mobile.md): кнопка «Собрать» стоит в верхней строке экрана, а
+  // список — внизу прокрутки. Та же сборка, что здесь: trigger получает run (защита от двойного
+  // нажатия и проверка сохранения общие), onState сообщает, идёт ли сборка — для подписи кнопки
+  hideButton?: boolean;
+  trigger?: React.MutableRefObject<(() => void) | null>;
+  onState?: (state: {starting: boolean; running: boolean}) => void;
 };
 
 const time = (iso: string) => new Date(iso).toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
 const active = (j: Job) => j.status === 'queued' || j.status === 'running';
 
-export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, start, onError, pipeline}) => {
+export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, start, onError, pipeline, folded = false, hideButton = false, trigger, onState}) => {
   const {config} = useConfig();
   const {refresh: refreshAccess} = useSession();
   const cost = useCost(pipeline ?? '', config.credits);
@@ -30,6 +39,7 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
   // под «Показать все»: каждая карточка с раскадровкой — пол-экрана. На компьютере список
   // прокручивается внутри колонки, и кнопки там нет (styles.css)
   const [showAll, setShowAll] = useState(false);
+  const [listOpen, setListOpen] = useState(false);
   const key = JSON.stringify(query);
 
   // Идущие задания живут в памяти сервера, на диск ролик пишется только в конце. Сервер
@@ -94,7 +104,11 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
     return () => clearInterval(t);
   }, [running, refresh]);
 
+  useEffect(() => { onState?.({starting, running}); }, [starting, running, onState]);
+  // Ролик досчитался — свёрнутый список открывается сам: результат и скачивание сразу видны
+  useEffect(() => { if (finished && folded) setListOpen(true); }, [finished, folded]);
   const run = async () => {
+    if (starting || running || disabled) return;
     setStarting(true);
     try {
       const job = await start();
@@ -103,6 +117,8 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
       refreshAccess();
     } catch (e) { onError(e); } finally { setStarting(false); }
   };
+  // Внешняя кнопка (мобильная верхняя строка) вызывает этот же run — свежий на каждом рендере
+  if (trigger) trigger.current = run;
 
   // Управление роликом в истории: отменить идущий, пересобрать заново, удалить из списка
   const cancel = async (id: string) => {
@@ -131,13 +147,17 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
       {/* Пока задание в очереди или считается — кнопка закрыта: рендер обзора занимает четверть
           часа, и десять нажатий подряд встанут в очередь одинаковыми роликами. На сервере стоит
           такая же проверка — вкладку можно открыть дважды, и тогда эта кнопка ничего не знает. */}
-      <button className="btn primary big" onClick={run} disabled={starting || running || disabled}>
+      {!hideButton && <button className="btn primary big" onClick={run} disabled={starting || running || disabled}>
         {starting ? 'Запускаю…' : running ? 'Уже собирается…' : `${label}${cost}`}
-      </button>
+      </button>}
       {starting && <div className="bar wait"><div /></div>}
       {warnings.length > 0 && <ul className="warnings">{warnings.map((w) => <li key={w}>{w}</li>)}</ul>}
 
-      <h2>Ролики</h2>
+      {folded
+        ? <button type="button" className="jobs-toggle" aria-expanded={listOpen} onClick={() => setListOpen(!listOpen)}>
+          Ролики{jobs.length ? ` (${jobs.length})` : ''} {listOpen ? '▴' : '▾'}{running ? ' · собирается…' : ''}</button>
+        : <h2>Ролики</h2>}
+      {(!folded || listOpen) && <>
       {/* Отдельный блок — чтобы в «Ролике по лоту» история прокручивалась внутри колонки,
           а кнопка сборки оставалась на месте (styles.css, .quick-side .jobs-list) */}
       <div className={showAll ? 'jobs-list' : 'jobs-list collapsed'}>
@@ -205,6 +225,7 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
           {showAll ? 'Свернуть' : `Показать все ролики (${jobs.length})`}
         </button>
       )}
+      </>}
     </div>
   );
 };

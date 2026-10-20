@@ -17,7 +17,8 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import sharp from 'sharp';
-import {HttpError, getBrand, saveBrand, workspaceDir, workspaceUrl} from './store.mjs';
+import {HttpError, ROOT, getBrand, saveBrand, workspaceDir, workspaceUrl} from './store.mjs';
+import {analyzeInk} from '../src/shared/logoPlate.js';
 import {serverLog} from './log.mjs';
 
 const log = serverLog('brand');
@@ -48,7 +49,43 @@ export const brandForRender = async (theme) => {
     log.warn('asset.missing', {note: 'файл бренда не найден — рендер без него', key: k, url: v});
     return LOGO_KEYS.includes(k) ? [k, ''] : null;
   }));
-  return {...theme, assets: Object.fromEntries(entries.filter(Boolean))};
+  return withLogoInk({...theme, assets: Object.fromEntries(entries.filter(Boolean))});
+};
+
+// ——— Тон логотипа для подложки (src/shared/logoPlate.js) ———
+// Не хранится в бренде, а считается по самому файлу при выдаче: так он есть и у логотипов,
+// загруженных до подложек, и не расходится с файлом при «вернуть фон» / новой загрузке.
+// Разбор — по уменьшенной до 512 копии (десятки мс), запоминается по пути и времени файла
+const inkCache = new Map();
+const logoFile = (url) => {
+  if (typeof url !== 'string' || !url) return null;
+  const own = `${workspaceUrl()}/brand/`;
+  const [dir, rel] = url.startsWith(own) ? [brandDir(), url.slice(own.length)]
+    : url.startsWith('brand/') ? [path.join(ROOT, 'public', 'brand'), url.slice('brand/'.length)] : [null, null];
+  if (!dir) return null;
+  const file = path.resolve(dir, rel);
+  return file.startsWith(dir + path.sep) ? file : null;
+};
+const inkOf = async (url) => {
+  const file = logoFile(url);
+  if (!file) return null;
+  try {
+    const {mtimeMs} = await fs.stat(file);
+    const key = `${file}:${mtimeMs}`;
+    if (!inkCache.has(key)) {
+      const {data, info} = await sharp(file, {density: 144}).resize(512, 512, {fit: 'inside', withoutEnlargement: true})
+        .ensureAlpha().raw().toBuffer({resolveWithObject: true});
+      inkCache.set(key, analyzeInk(data, info.width, info.height));
+    }
+    return inkCache.get(key);
+  } catch { return null; }
+};
+/** Бренд с тоном логотипов: logoInk[адрес] = {lo, hi, ratio}. Чужого в logoInk не принимаем */
+export const withLogoInk = async (theme) => {
+  if (!theme?.assets) return theme;
+  const urls = [...new Set(LOGO_KEYS.map((k) => theme.assets[k]).filter(Boolean))];
+  const entries = await Promise.all(urls.map(async (u) => [u, await inkOf(u)]));
+  return {...theme, logoInk: Object.fromEntries(entries.filter(([, v]) => v))};
 };
 
 /** Условия — одним объектом: интерфейс показывает эти же числа, разойтись они не могут */

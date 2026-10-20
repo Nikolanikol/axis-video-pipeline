@@ -1,3 +1,5 @@
+/* Выбранный дизайн виден и при первом открытии роликов или каруселей, до раздела настроек. */
+.design-summary { display:flex; align-items:center; flex-wrap:wrap; gap:6px; font-size:12px; color:var(--muted); margin:12px 0; }
 :root {
   /* Движение (кабинет, 12.10): одна длительность и одна кривая на всё — анимации читаются
      как одна система. Кривая «быстро стартует, мягко садится»: отклик сразу, без рывка в конце */
@@ -530,6 +532,18 @@ a.tab { text-decoration: none; }
 
 /* Логотип в настройках: снимок слева, кнопка и условия справа. Условия рядом с кнопкой
    намеренно — приёмник, который берёт что угодно, а потом отказывает, заставляет гадать. */
+/* Подложка логотипа в «Бренде» (PlateField): режим сегментами, формы плитками с вашим логотипом */
+.plate-field { display: flex; flex-direction: column; gap: 10px; margin-bottom: 12px; }
+.plate-field .seg { display: inline-grid; grid-auto-flow: column; gap: 3px; padding: 3px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); align-self: flex-start; }
+.plate-field .seg button { min-height: 34px; padding: 0 16px; border: none; border-radius: 9px; background: none; color: var(--muted); font: 14px var(--font); cursor: pointer; }
+.plate-field .seg button.on { background: var(--accent); color: #fff; font-weight: 500; }
+.plate-field .hint { margin: 0; }
+.plate-shapes { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.plate-shape { display: flex; flex-direction: column; gap: 6px; padding: 0; border: none; background: none; color: var(--muted); font: 13px var(--font); cursor: pointer; text-align: center; }
+.plate-shape-frame { display: grid; place-items: center; height: 96px; border-radius: 12px; border: 2px solid var(--line); overflow: hidden; }
+.plate-shape:hover .plate-shape-frame { border-color: var(--accent-line); }
+.plate-shape.on { color: var(--text); font-weight: 500; }
+.plate-shape.on .plate-shape-frame { border-color: var(--accent); }
 .logo-field { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 12px; }
 .logo-shot {
   width: 120px; height: 120px; flex-shrink: 0;
@@ -723,7 +737,9 @@ a.tab { text-decoration: none; }
 .import-steps li.now .import-mark { border-color: var(--accent-line); color: var(--accent-text); }
 .import-steps li.done .import-mark { border-color: var(--ok); color: var(--ok); }
 .import-note { font-size: 12px; text-align: center; }
-.quick-main { display: grid; grid-template-columns: 260px auto minmax(300px, 380px); gap: 24px; align-items: start; justify-content: center; }
+.quick-main { display: grid; grid-template-columns: 260px auto minmax(300px, 460px); gap: 24px; align-items: start; justify-content: center; }
+/* Колонка настроек — до 460 px (docs/palette.md). Превью от этого не сжимается: его ширину задаёт
+   высота окна (9:16), а сетка центрирована и по краям остаётся 110–380 px (замер 20.10) */
 .quick-screen { display: flex; flex-direction: column; gap: 18px; }
 .quick-preview .player-box { height: min(calc(100vh - 250px), 760px); }
 .quick-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
@@ -750,6 +766,18 @@ a.tab { text-decoration: none; }
 .format-item.on { border-color: var(--accent-line); box-shadow: inset 3px 0 0 var(--accent); background: var(--panel); }
 .format-item-head { display: flex; justify-content: space-between; gap: 8px; font-size: 15px; }
 .format-item-sub { font-size: 12px; color: var(--muted); line-height: 1.35; }
+.motion-row { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Выбор стиля в палитре (StyleChoices look="side"): подпись над кнопками */
+.style-side { display: flex; flex-direction: column; gap: 8px; }
+.motion-row .btn { padding: 7px 11px; font-size: 13px; }
+.motion-reset { align-self: flex-start; background: none; border: none; padding: 0; color: var(--muted); font-size: 12px; text-decoration: underline; cursor: pointer; }
+.look-panel { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+@media (min-width: 901px) { .look-panel { flex: 1 1 0; min-height: 0; overflow-y: auto; padding-right: 4px; } }
+.look-panel h2 { margin: 10px 0 0; font-size: 15px; }
+.look-panel .note { margin: 0; }
+.look-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 1;
+  padding: 4px 0 8px; background: var(--bg); }
+.look-panel .pairs, .look-panel .design-list { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 /* Лоты — колонка слева: заметная «+ Новый лот», поиск (когда лотов много), список машин.
    Высота — по экрану, список прокручивается внутри: превью и сборка остаются на месте */
 .lots-panel { display: flex; flex-direction: column; gap: 10px; max-height: calc(100vh - 190px); min-height: 0;
@@ -778,12 +806,32 @@ a.tab { text-decoration: none; }
 .slide-arrow.right { right: 8px; }
 .slide-bar { display: flex; gap: 14px; align-items: baseline; font-size: 13px; }
 .slide-thumbs { display: flex; gap: 6px; max-width: 100%; overflow-x: auto; padding-bottom: 4px; }
+/* Правка текста под слайдом: ширина — как у слайда, поля во всю ширину */
+.slide-texts { width: 100%; max-width: 520px; display: flex; flex-direction: column; gap: 6px;
+  padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.slide-texts .field { margin-bottom: 4px; }
+.slide-texts textarea { width: 100%; }
+.slide-texts .btn-row { margin: 4px 0 0; }
 .slide-thumb { flex: none; height: 64px; padding: 0; border-radius: 5px; overflow: hidden; cursor: pointer;
   border: 2px solid transparent; background: var(--panel-2); opacity: .6; }
 .slide-thumb.on { border-color: var(--accent-line); opacity: 1; }
 .slide-thumb:hover { opacity: 1; }
 .slide-thumb img { height: 100%; width: 100%; object-fit: cover; display: block; }
 .format-item-name { display: inline-flex; align-items: center; gap: 8px; }
+/* Стиль карусели (StyleList): плитки сеткой — кружки цветов и название; выбранная — винной рамкой */
+.style-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; margin-bottom: 4px; }
+.style-tile { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line);
+  background: var(--panel-2); color: var(--text); font: 14px var(--font); text-align: left; cursor: pointer; min-width: 0; }
+.style-tile:hover { border-color: var(--accent-line); }
+.style-tile.on { border-color: var(--accent-line); box-shadow: inset 0 0 0 1px var(--accent); background: var(--panel); }
+.style-tile.built:not(.on) { border-color: var(--ok-line); }
+.style-tile-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.style-tile .style-swatch:empty { display: none; }
+.format-item:disabled { opacity: .38; cursor: not-allowed; }
+.format-item:disabled:hover { border-color: var(--line); }
+.style-swatch { display: inline-flex; flex: none; }
+.style-swatch i { width: 14px; height: 14px; border-radius: 50%; border: 1px solid #ffffff33; }
+.style-swatch i + i { margin-left: -4px; }
 /* Формат, в котором карусель уже собрана: зелёная метка (цвет состояния — только в метке,
    текст остаётся обычным) и рамка в тон. Выбранный формат по-прежнему винный: «выбрано» и
    «собрано» — разные вещи, и выбранным может быть как собранный, так и другой формат */
@@ -851,6 +899,402 @@ a.tab { text-decoration: none; }
   .quick-side > * { flex: none; }
   .quick-side .render { display: block; }
   .quick-side .jobs-list { overflow: visible; }
+}
+
+/* ——— Палитра ролика (app/ads/Palette.tsx, docs/palette.md) ———
+   Шапка и низ со сборкой стоят, прокручивается середина с секциями */
+.palette-side { min-height: 0; }
+.palette { display: flex; flex-direction: column; min-height: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+.palette-head { padding: 18px 20px 12px; border-bottom: 1px solid var(--line); }
+.palette-head h1 { margin: 0 0 4px; font: 800 24px var(--font); letter-spacing: -.01em; }
+.palette-scope { font-size: 13px; color: var(--muted); }
+.palette-scope .save { font-size: 13px; }
+.palette-scope .link { background: none; border: none; padding: 0; cursor: pointer; text-decoration: underline; font: inherit; }
+.palette-body { padding: 0 20px; }
+.palette-section { border-bottom: 1px solid var(--line); }
+.palette-section:last-child { border-bottom: none; }
+/* Вся строка секции — кнопка (раздел 2); сводка справа сокращается многоточием, полностью — в подсказке ниже */
+.palette-section-head { width: 100%; display: flex; align-items: center; gap: 8px; padding: 16px 0; background: none; border: none;
+  color: var(--text); cursor: pointer; text-align: left; font: inherit; }
+.palette-section-head:hover .palette-section-title { color: var(--accent-text); }
+.palette-section-title { font: 700 17px var(--font); flex: none; }
+.palette-section-summary { margin-left: auto; min-width: 0; font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.palette-section-body { display: flex; flex-direction: column; gap: 12px; padding: 0 0 20px; }
+.palette-section-body h2 { margin: 8px 0 0; font-size: 15px; }
+.palette-section-body .field { margin-bottom: 0; }
+.palette-scenes { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; margin-top: 4px; }
+.palette-scene { padding: 11px 14px; border-radius: 9px; border: 1px solid var(--line); background: none; color: var(--text); text-align: left;
+  font: 14px var(--font); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.palette-scene:hover { border-color: var(--accent-line); }
+.palette-scene.on { border-color: var(--accent-line); background: #8e0d2c26; box-shadow: inset 0 0 0 1px var(--accent); }
+.palette-scene-body { display: flex; flex-direction: column; gap: 10px; padding: 14px; border-radius: 10px; background: var(--panel-2); }
+.palette-scene-body h2 { margin: 0; }
+.palette-foot { display: flex; flex-direction: column; gap: 10px; padding: 14px 20px 16px; border-top: 1px solid var(--line); }
+.palette-foot-line { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--muted); }
+.palette-foot .render h2 { display: none; }
+.jobs-toggle { align-self: flex-start; background: none; border: none; padding: 0; color: var(--muted); font: 13px var(--font); cursor: pointer; text-decoration: underline; }
+.look-panel.embedded { overflow: visible; padding-right: 0; }
+@media (min-width: 901px) {
+  /* Палитра — ровно в высоту колонки: середина прокручивается, шапка и низ на месте.
+     Правила низкого окна для прежней колонки (.quick-side > * { flex: none }) здесь не нужны */
+  .quick-side.palette-side { overflow: hidden; margin-right: 0; padding-right: 0; }
+  .quick-side.palette-side > .palette { flex: 1 1 0; }
+  .palette-body { flex: 1; min-height: 0; overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+  .palette-head, .palette-foot { flex: none; }
+  .quick-side.palette-side .palette-foot .render { flex: none; display: flex; flex-direction: column; gap: 10px; }
+  /* Готовые ролики под «Ролики (N)» — не больше трети окна, дальше прокрутка внутри */
+  .quick-side.palette-side .palette-foot .jobs-list { flex: none; max-height: 34vh; overflow-y: auto; }
+}
+
+/* ——— Палитра на компьютере — мобильная версия 3, перенесённая на ПК (app/ads/Palette.tsx) ———
+   Превью с «Настройками» поверх и панелью плеера под ним; справа — вкладки «Оформление | Текст |
+   Фото | Переход» и все варианты плитками в сетку (на телефоне — лента). «Настройки» встают на место
+   плиток внутри палитры; шапка, вкладки и низ со сборкой на месте. Классы плиток и панели — общие
+   с телефоном (.mle-*), здесь только отличия компьютера */
+.pd-stage { position: relative; display: flex; flex-direction: column; }
+.pd-stage .mle-bar { padding: 0 2px; }
+.palette.pd { overflow: hidden; }
+.pd-tabs { padding: 0 20px; gap: 18px; }
+.pd-tabs .mle-tabs-list { gap: 22px; }
+.pd-tabs .mle-tab { font-weight: 400; min-height: 46px; }
+.pd-tabs .mle-tab:hover { color: var(--text); }
+.pd-tabs .mle-tab.on { font-weight: 500; }
+.pd-tabs .mle-tab.on { color: var(--accent-text); }
+/* «Настройки» — явной кнопкой справа в строке вкладок (владелец 20.10): своя подложка и рамка,
+   открыта — залита винным бренда */
+.pd-tabs .pd-settings-tab { align-self: center; margin: 0 0 0 auto; min-height: 34px; padding: 0 14px; border: 1px solid var(--line);
+  border-radius: 10px; background: var(--panel-2); color: var(--text); font-weight: 500; }
+.pd-tabs .pd-settings-tab:hover { border-color: var(--accent-line); }
+.pd-tabs .pd-settings-tab.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+/* Сетка плиток: 4 в ряд на 460 px, плитка 3:4 — по ширине колонки */
+.pd-tiles { padding: 16px 20px 20px; }
+.pd-tiles .mle-strip { display: grid; grid-template-columns: repeat(auto-fill, minmax(88px, 1fr)); gap: 14px 12px; overflow: visible; padding: 0; }
+.pd-tiles .mle-comp { width: auto; min-width: 0; font-size: 13px; font-weight: 400; }
+.pd-tiles .mle-comp.on { font-weight: 500; }
+.pd-tiles .mle-comp-frame { width: 100%; height: auto; aspect-ratio: 3 / 4; border-radius: 14px; transition: border-color .15s; }
+/* Плитки вытянуты 3:4 (владелец 20.10: «чуть подлиннее»): кадр 9:16 по ширине — 133 % высоты плитки, середина */
+.pd-tiles .mle-comp-crop { height: 133.33%; top: -16.67%; }
+.pd-tiles .mle-comp:hover .mle-comp-frame { border-color: var(--accent-line); }
+.pd-tiles .mle-comp.on .mle-comp-frame { border-color: var(--accent); }
+.pd-tiles .mle-comp-color { font-size: 12px; margin-top: -2px; }
+.pd-tiles .mle-motion-title { font-size: 12px; }
+.pd-tiles .mle-strip-note { padding: 0; }
+.pd-tiles .mle-comp:focus-visible { outline: none; }
+.pd-tiles .mle-comp:focus-visible .mle-comp-frame { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+/* «Настройки» в палитре — на месте плиток, во всю ширину колонки, без затемнения */
+.palette.pd .pd-side { position: static; flex: 1; min-height: 0; width: auto; border-left: none; box-shadow: none; background: none;
+  animation: pd-slide .2s cubic-bezier(.2, .8, .2, 1); }
+@keyframes pd-slide { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .palette.pd .pd-side { animation: none; } }
+.pd-side .mle-side-scenes { margin: 14px 20px 10px; }
+.pd-side .mle-side-scenes .mle-scene { cursor: pointer; }
+.pd-side .mle-side-scenes .mle-scene:not(.edit):hover { color: var(--text); }
+.pd-side .mle-body { padding: 12px 20px 20px; scrollbar-width: thin; scrollbar-color: var(--line) transparent; }
+.pd-side .look-panel h2 { font-size: 13px; font-weight: 500; margin: 14px 0 6px; }
+.pd-note textarea { height: auto; min-height: 60px; }
+/* Палитре — до 460 px (docs/palette.md): у колонки объявлений класс carousels-panel, и общее правило
+   каруселей сжимало её до 380 — не влезали сцены «Настроек» в одну строку */
+@media (max-width: 1150px) { .pd-tabs { padding: 0 14px; } .pd-tabs .mle-tabs-list { gap: 14px; } .pd-tiles { padding: 14px; } }
+@media (min-width: 1151px) {
+  .quick-main:has(.palette.pd) { grid-template-columns: 300px auto minmax(340px, 460px); }
+}
+/* Сцены, «О ролике», «Оформление» — по ширине надписи; не влезли — переносятся целыми кнопками */
+.pd-side .mle-side-scenes { display: flex; flex-wrap: wrap; }
+.pd-side .mle-side-scenes .mle-scene { flex: 1 1 auto; padding: 0 8px; overflow: visible; }
+/* Выбранный сегмент — той же толщины шрифта: жирнее — шире надпись, и ряд перестраивался (скакал) */
+.pd-side .mle-side-scenes .mle-scene, .pd-side .mle-side-scenes .mle-scene.edit { font-weight: 400; }
+/* «Оформление» — отдельная строка во всю ширину под сценами */
+.pd-side .mle-side-scenes .pd-look-seg { flex: 1 0 100%; }
+@media (min-width: 901px) {
+  /* Под плеером — панель плеера 48 px вместо прежнего ряда кнопок сцен (52 px) */
+  /* !important — перебить старое «.player-box { height: 70vh !important }» окон до 1100 px */
+  .pd-stage .player-box { height: min(calc(100cqh - 52px), 760px) !important; }
+  .palette.pd .pd-tiles { flex: 1; min-height: 0; overflow-y: auto; }
+  .palette.pd .pd-tabs { flex: none; }
+}
+
+/* ——— Мобильная палитра ролика, версия 3 — концепт владельца 20.10 (app/ads/MobileLotEditor.tsx,
+   docs/palette-mobile.md) ———
+   Свой корневой класс .mle: правила прежней телефонной раскладки (.quick[data-mtab], .mtabs,
+   «.quick-preview .player-box» с !important) сюда не достают. Строка ролика — в шапке приложения
+   (headerSlot), здесь: большое превью с «Настройками» → панель плеера → вкладки → одна лента плиток.
+   «Настройки» — панель справа поверх (.mle-side). Выделения — винным бренда, не белым.
+   Высота — от .tool (flex: 1 под шапкой в .app 100dvh) */
+.mle { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; position: relative; background: var(--bg); }
+.mle > * { min-width: 0; }
+/* Строка ролика в шапке приложения: заменяет логотип, бургер с общим меню остаётся справа */
+.top.top-slot { flex-wrap: nowrap; gap: 8px; padding: 6px 10px; }
+.top-slot-content { flex: 1; min-width: 0; }
+.mle-top { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.mle-icon { flex: none; display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--panel-2); color: var(--text); cursor: pointer; }
+.mle-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+/* Длинное название — многоточие; полное — в подсказке, в листе «Ролики» и в «Данных автомобиля» */
+.mle-title b { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mle-title span { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mle-title .save { font-size: 12px; color: var(--muted); }
+/* Статус — с цветной точкой: сохранено — зелёная, сохраняем / есть изменения — янтарная, ошибка — красная */
+.mle-title .save::before { content: ''; display: inline-block; width: 6px; height: 6px; margin: 0 5px 1px 0; border-radius: 50%; background: #5fb98c; vertical-align: middle; }
+.mle-title .save-saving::before, .mle-title .save-dirty::before { background: #d9a441; }
+.mle-title .save-error::before { background: var(--danger-text, #e5484d); }
+.mle-top .save.link, .mle .save.link { background: none; border: none; padding: 0; font: inherit; text-decoration: underline; cursor: pointer; }
+/* «Объявления» и «Т Текст ›» — справа, как в концепте */
+/* Значок списка и бургер в шапке ролика — без рамки и подложки, приглушённые (образец владельца 20.10) */
+.mle-head-btn { flex: none; display: grid; place-items: center; width: 36px; height: 36px; padding: 0; margin-left: -6px;
+  border-radius: 10px; border: none; background: none; color: var(--muted); cursor: pointer; }
+.mle-head-btn.on, .mle-head-btn:active { background: var(--panel-2); color: var(--text); }
+.top.top-slot .burger { width: 36px; height: 36px; border: none; background: none; color: var(--muted); }
+.top.top-slot .burger svg { width: 20px; height: 20px; }
+.top.top-slot .burger[aria-expanded="true"] { background: var(--panel-2); color: var(--text); }
+.mle-top .mle-build { flex: none; min-height: 34px; padding: 0 14px; font-size: 14px; font-weight: 500; border-radius: 10px; letter-spacing: .01em; }
+/* «Настройки» — в правом верхнем углу превью, поверх: серая полупрозрачная плашка и тонкий белый
+   текст (образец владельца 20.10) */
+.mle-text-btn { position: absolute; top: 14px; right: 14px; z-index: 3; display: inline-flex; align-items: center; height: 38px;
+  padding: 0 14px; border-radius: 12px; border: 1px solid #ffffff14; background: #2b2b30e6; color: #fff;
+  font: 400 14px var(--font); cursor: pointer; box-shadow: 0 4px 14px #0006; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
+.mle-text-btn.on { background: #8e0d2c40; }
+/* Превью — главное на экране: всё свободное место. Своя ▶ справа снизу и увеличение справа сверху */
+/* flex-basis 0 — высота сцены определённая, и плеер вписывает кадр в неё целиком, а не по своей
+   пропорции 9:16 (иначе при открытом листе низ кадра обрезался) */
+.mle-stage { flex: 1 1 0; min-height: 140px; position: relative; padding: 8px 12px 4px; display: flex; }
+.mle-stage .player-wrap, .mle-stage .player-box { flex: 1; min-height: 0; height: 100%; width: 100%; aspect-ratio: auto; }
+.mle-stage .player-wrap { display: flex; flex-direction: column; }
+.mle-back { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); z-index: 2; min-height: 44px; padding: 0 18px;
+  box-shadow: 0 6px 20px #000a; }
+/* Панель плеера под превью (образец владельца 20.10): круглая ▶, время, полоса перемотки 6 px,
+   «Смотреть целиком». Область касания полосы — во всю высоту панели */
+.mle-bar { flex: none; display: flex; align-items: center; gap: 12px; height: 48px; padding: 0 14px 0 12px; }
+.mle-bar-play { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; border: none;
+  background: var(--panel-2); color: var(--text); cursor: pointer; }
+.mle-bar-play svg { margin-left: 2px; }
+.mle-bar-time { flex: none; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+.mle-bar-icon { flex: none; display: grid; place-items: center; width: 36px; height: 36px; margin-right: -8px; border: none; background: none;
+  color: var(--muted); cursor: pointer; border-radius: 10px; }
+.mle-scrub { position: relative; flex: 1; min-width: 0; height: 40px; display: flex; align-items: center; touch-action: none; cursor: pointer;
+  -webkit-user-select: none; user-select: none; outline: none; }
+.mle-scrub:focus-visible .mle-scrub-track { outline: 2px solid var(--accent-text); outline-offset: 4px; }
+.mle-scrub-track { position: relative; flex: 1; height: 5px; border-radius: 3px; background: var(--panel-2); transition: height .15s ease-out; }
+.mle-scrub-fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--accent-line); }
+.mle-scrub-knob { position: absolute; top: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border-radius: 50%; background: var(--accent-line);
+  box-shadow: 0 1px 4px #0009; pointer-events: none; transform: scale(0); transition: transform .15s ease-out; }
+.mle-scrub.dragging .mle-scrub-track { height: 7px; }
+.mle-scrub.dragging .mle-scrub-knob { transform: scale(1); }
+.mle-scrub-tip { position: absolute; bottom: 34px; transform: translateX(-50%); padding: 4px 8px; border-radius: 8px; background: #000d; color: #fff;
+  font: 500 12px var(--font); white-space: nowrap; pointer-events: none; z-index: 4; }
+/* Чипы сцен — в панели «Текст»: выбранная залита */
+.mle-scene { min-height: 40px; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 0 6px;
+  border-radius: 999px; border: 1px solid var(--line); background: none; color: var(--text); font: 13px var(--font); cursor: pointer; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mle-scene span { font-size: 11px; color: var(--muted); }
+.mle-scene.edit { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 500; }
+.mle-scene.edit span { color: inherit; opacity: .6; }
+.mle-scene:focus-visible, .mle-tab:focus-visible { outline: 2px solid var(--accent-text); outline-offset: 2px; }
+/* Вкладки подчёркиванием; «Собрать» справа в той же строке */
+.mle-tabs { flex: none; display: flex; align-items: center; gap: 8px; padding: 0 12px; border-bottom: 1px solid var(--line); }
+.mle-tabs-list { flex: 1; min-width: 0; display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; }
+.mle-tabs-list::-webkit-scrollbar { display: none; }
+.mle-tab { flex: none; min-height: 44px; padding: 0; border: none; border-bottom: 2px solid transparent; margin-bottom: -1px; background: none;
+  color: var(--muted); font: 600 15px var(--font); cursor: pointer; }
+.mle-tab.on { color: var(--text); border-bottom-color: var(--accent); }
+.mle-build { flex: none; min-height: 36px; padding: 0 12px; font-size: 14px; }
+/* Лента выбора: строка (заголовок или группы анимации) и одна горизонтальная полоса квадратных
+   плиток. Высота постоянная — при переключении «Оформление ↔ Анимация» превью не прыгает */
+.mle-panel { flex: none; height: calc(128px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 8px;
+  padding: 8px 0 env(safe-area-inset-bottom); box-sizing: border-box; overflow: hidden; }
+.mle-panel-row { flex: none; height: 32px; align-items: center; }
+.mle-panel-head { display: flex; justify-content: space-between; gap: 8px; padding: 0 12px; }
+.mle-panel-head b { min-width: 0; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mle-panel-head span { flex: none; }
+.mle-panel-head span { font-size: 12px; color: var(--muted); }
+.mle-strip { display: flex; gap: 8px; overflow-x: auto; padding: 0 12px 2px; scroll-padding: 12px; scrollbar-width: none; overscroll-behavior-x: contain; }
+.mle-strip::-webkit-scrollbar { display: none; }
+.mle-strip > * { flex: none; }
+.mle-strip-note { padding: 0 12px; }
+/* Плитка: квадрат 80 px и подпись в две строки. У оформления в квадрате — середина кадра 9:16 */
+.mle-comp { display: flex; flex-direction: column; gap: 4px; width: 80px; padding: 0; border: none; background: none; color: var(--muted);
+  font: 12px var(--font); cursor: pointer; text-align: center; }
+.mle-comp-frame { position: relative; display: block; width: 80px; height: 80px; border-radius: 12px; overflow: hidden; border: 2px solid transparent;
+  background: var(--panel-2); box-sizing: border-box; }
+.mle-comp-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.mle-comp-crop { position: absolute; left: 0; width: 100%; height: 177.78%; top: -46%; }
+.mle-comp.on { color: var(--text); font-weight: 600; }
+.mle-comp.on .mle-comp-frame { border-color: var(--accent); }
+.mle-comp-title, .mle-comp-color { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.2; }
+.mle-comp-color { margin-top: -3px; font-size: 11px; color: var(--muted); font-weight: 400; }
+.mle-motion-title { font-size: 11px; line-height: 1.2; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.mle-chips { display: flex; gap: 6px; overflow-x: auto; padding: 0 12px; scrollbar-width: none; }
+.mle-chips::-webkit-scrollbar { display: none; }
+.mle-chips > * { flex: none; }
+.mle-chip { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0 12px; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--panel-2); color: var(--text); font: 13px var(--font); cursor: pointer; white-space: nowrap; }
+.mle-chip.on { border-color: var(--accent-line); box-shadow: inset 0 0 0 1px var(--accent); }
+.mle-chip span { color: var(--muted); }
+/* Тело панели «Текст» — единственная прокрутка внутри неё */
+.mle-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+  padding: 10px 12px calc(16px + env(safe-area-inset-bottom)); }
+.mle-body-inner { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.mle-body-inner .field { margin-bottom: 0; }
+.mle-scene-title { display: none; }
+.mle-scene-photos .mle-thumbs { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.mle-scene-photos img { flex: none; width: 96px; height: 72px; object-fit: cover; border-radius: 8px; }
+.mle-scene-photos .hint { margin: 4px 0 0; }
+.mle-groups { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+/* Закрытые группы: подпись и текущее значение; внутри — прежние поля */
+.mini-group { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.mini-group > summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 44px; padding: 0 12px;
+  cursor: pointer; list-style: none; font-weight: 600; }
+.mini-group > summary::-webkit-details-marker { display: none; }
+.mini-group > summary::after { content: '▾'; color: var(--muted); flex: none; }
+.mini-group[open] > summary::after { content: '▴'; }
+.mini-group-summary { margin-left: auto; min-width: 0; font-weight: 400; font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mini-group-body { display: flex; flex-direction: column; gap: 10px; padding: 4px 12px 12px; min-width: 0; }
+.mle-source { font-size: 13px; color: var(--muted); }
+/* «О ролике» — разделы с заголовком, без свёртывания */
+.mle-sec { display: flex; flex-direction: column; gap: 8px; }
+.mle-sec + .mle-sec { border-top: 1px solid var(--line); padding-top: 12px; }
+.mle-sec h3 { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin: 0; font-size: 13px; font-weight: 500; }
+.mle-sec h3 span { font-size: 11px; font-weight: 400; color: var(--muted); }
+/* Сцены в панели — сегментами в одной тёмной полосе, выбранная — винной плашкой (образец 20.10) */
+.mle-side .mle-side-scenes { padding: 3px; margin: 0 12px 10px; gap: 2px; border: none; border-radius: 12px; background: var(--bg); }
+.mle-side .mle-side-scenes .mle-scene { min-height: 34px; border: none; border-radius: 9px; background: none; color: var(--muted); }
+.mle-side .mle-side-scenes .mle-scene.edit { background: var(--accent); color: #fff; }
+.mle-side .mle-side-scenes .mle-scene span { display: none; }
+/* Цена на телефоне (образец владельца 20.10): «Рассчитать | Указать сумму», карточка итога,
+   подписи с меткой «Из настроек», раскрытие «Расчёт цены». Выделение — винным бренда, не белым */
+.mprice-mode { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; border-radius: 12px; background: var(--bg); border: 1px solid var(--line); }
+.mprice-mode button { min-height: 36px; border: none; border-radius: 9px; background: none; color: var(--muted); font: 400 13px var(--font); cursor: pointer; }
+.mprice-mode button.on { background: var(--accent); color: #fff; font-weight: 500; }
+.mprice-card { display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border-radius: 14px; background: #8e0d2c1f; border: 1px solid #c8304f40; }
+.mprice-card.warn { background: var(--danger-bg); border-color: var(--danger-line); }
+.mprice-label { font-size: 12px; color: var(--muted); }
+.mprice-total { font-size: 28px; font-weight: 500; line-height: 1.15; color: var(--accent-text); letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+.mprice-warn { font-size: 13px; color: var(--danger-text); }
+.mprice-what { font-size: 12px; color: var(--muted); }
+.mfield .mfield-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.mfield .mfield-tag { font-size: 11px; color: var(--muted); }
+.mprice-calc { border-top: 1px solid var(--line); }
+.mprice-calc > summary { display: flex; align-items: center; justify-content: space-between; min-height: 44px; cursor: pointer; list-style: none; font-size: 13px; }
+.mprice-calc > summary::-webkit-details-marker { display: none; }
+.mprice-calc > summary::after { content: '+'; font-size: 18px; color: var(--muted); }
+.mprice-calc[open] > summary::after { content: '–'; }
+.mprice-calc-body { display: flex; flex-direction: column; gap: 8px; padding-bottom: 6px; }
+.mle-body .motion-row .btn { min-height: 44px; }
+/* Панель «Текст» справа: 90 % ширины, слева полоска ролика под затемнением (нажатие закрывает).
+   Своя прокрутка; при клавиатуре — на всю ширину и высоту видимой области */
+.mle-scrim { position: absolute; inset: 0; z-index: 20; border: none; padding: 0; background: #0009; cursor: pointer; animation: mle-fade .2s ease-out; }
+.mle-side { position: absolute; top: 0; right: 0; bottom: 0; z-index: 21; width: 90%; display: flex; flex-direction: column; min-width: 0;
+  background: var(--panel); border-left: 1px solid var(--line); box-shadow: -12px 0 32px #0008; animation: mle-slide .24s cubic-bezier(.2, .8, .2, 1); }
+.mle.kb .mle-side { width: 100%; }
+@keyframes mle-slide { from { transform: translateX(100%); } to { transform: none; } }
+@keyframes mle-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .mle-side, .mle-scrim { animation: none; } }
+.mle-side-head { flex: none; display: flex; align-items: center; gap: 8px; padding: 8px 12px 6px; }
+.mle-side-head b { font-size: 15px; letter-spacing: .01em; }
+.mle-side-head .mle-icon { width: 34px; height: 34px; border-radius: 9px; }
+/* Сцены в панели — в ряд по ширине, как под превью; на узкой панели номер уходит */
+.mle-side-scenes { flex: none; display: grid; grid-template-columns: repeat(auto-fit, minmax(60px, 1fr)); gap: 4px; padding: 0 12px 10px; border-bottom: 1px solid var(--line); }
+.mle-side-scenes .mle-scene { min-height: 32px; padding: 0 4px; font-size: 12px; }
+/* Компактная форма в панели (владелец 20.10: «уменьшить поля, шрифт, аккуратнее»): подписи 11 px,
+   поля 36 px со шрифтом 14 px. Приближения iPhone при касании поля нет — см. noFocusZoom в
+   MobileLotEditor; на Android браузер поле не приближает */
+.mle-side .mle-body { padding: 12px 12px calc(16px + env(safe-area-inset-bottom)); }
+.mle-side .mle-body-inner { gap: 10px; }
+.mle-side .field { gap: 3px; margin: 0; }
+.mle-side .field .label { font-size: 11px; letter-spacing: .02em; }
+.mle-side .hint, .mle-side .field .hint { font-size: 11px; line-height: 1.4; margin: 0; }
+.mle-side input, .mle-side select, .mle-side textarea { font-size: 14px; line-height: 1.35; padding: 7px 10px; border-radius: 8px; background: var(--bg); }
+.mle-side input, .mle-side select { height: 36px; }
+.mle-side textarea { min-height: 36px; resize: none; field-sizing: content; max-height: 120px; }
+.mle-side input::placeholder, .mle-side textarea::placeholder { color: var(--muted); opacity: .7; }
+.mle-side .total { font-size: 13px; padding: 8px 10px; margin: 0; }
+.mle-side .total b { font-size: 14px; }
+.mle-side .price-source { font-size: 12px; margin-bottom: 8px; }
+.mle-side .mini-group { border-radius: 9px; }
+.mle-side .mini-group > summary { min-height: 40px; padding: 0 10px; font-size: 13px; }
+.mle-side .mini-group-summary { font-size: 12px; }
+.mle-side .mini-group-body { gap: 8px; padding: 2px 10px 10px; }
+.mle-side .mle-groups { gap: 6px; }
+.mle-side .btn { min-height: 34px; font-size: 13px; }
+@media (max-width: 430px) { .mle-side-scenes .mle-scene span { display: none; } }
+.mle.kb .mle-side-scenes { display: none; }
+/* Фото в панели: тот же редактор, плитки в 4 колонки — не огромные (владелец 20.10) */
+.mle-photos-edit { scroll-margin-top: 8px; border-top: 1px solid var(--line); padding-top: 12px; }
+.mle-photos-edit h2 { display: flex; flex-direction: column; gap: 2px; margin: 0 0 4px; font-size: 16px; }
+.mle-photos-edit h2 .muted { font-size: 12px; font-weight: 400; }
+.mle-photos-edit .photos { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; padding: 6px; margin: 0 -6px; }
+.mle-photos-edit .thumb { border-radius: 6px; font-size: 10px; }
+.mle-photos-edit .thumb * { font-size: 10px; }
+/* Крестик удаления на мелкой плитке — не меньше 24 px, чтобы попадать пальцем */
+.mle-photos-edit .thumb .del { min-width: 24px; min-height: 24px; font-size: 16px; display: grid; place-items: center; }
+@media (max-width: 359px) { .mle-photos-edit .photos { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* «Смотреть целиком» — всё, кроме ролика, уходит */
+.mle.watch .mle-tabs, .mle.watch .mle-panel { display: none; }
+.mle.watch .mle-stage { padding-bottom: calc(8px + env(safe-area-inset-bottom)); }
+/* Клавиатура: высота — видимая область, превью и сцены уступают место листу */
+.mle.kb { flex: none; height: calc(var(--mle-vvh, 100dvh) - var(--mle-top, 0px)); }
+.mle.kb .mle-stage, .mle.kb .mle-bar { display: none; }
+/* Невысокий телефон (375×667, 320×568): миниатюры меньше — превью остаётся главным */
+@media (max-height: 700px) {
+  .mle-panel { height: calc(112px + env(safe-area-inset-bottom)); }
+  .mle-comp { width: 64px; }
+  .mle-comp-frame { width: 64px; height: 64px; }
+}
+/* Низкий экран (альбомная ориентация): миниатюры и карточки ниже, лист выше */
+@media (max-height: 560px) {
+  .mle-stage { min-height: 90px; padding-top: 4px; }
+  .mle-panel { height: 92px; gap: 6px; padding-top: 6px; }
+  .mle-panel-row { height: 28px; }
+  .mle-comp { width: 52px; font-size: 11px; }
+  .mle-comp-frame { width: 52px; height: 52px; border-radius: 8px; }
+  .mle-comp-color { display: none; }
+  .mle-motion-title { -webkit-line-clamp: 1; }
+  .mle-scene { min-height: 32px; }
+  .mle-tab { min-height: 36px; }
+  .mle-chip { min-height: 28px; }
+}
+/* До 389 px (360, 375, 320): четыре вкладки и «Собрать» в одну строку — шрифт и промежутки меньше;
+   не влезло — строка вкладок прокручивается вбок, кнопка остаётся на месте */
+@media (max-width: 389px) {
+  .mle-tabs { padding: 0 8px; gap: 6px; }
+  .mle-tabs-list { gap: 8px; }
+  .mle-tab { font-size: 13px; letter-spacing: -.01em; }
+}
+/* 320 px: вкладки и «Собрать» в одну строку */
+@media (max-width: 359px) {
+  .mle-top .mle-build { padding: 0 10px; font-size: 13px; }
+  /* Номер сцены уходит — название «Контакты» должно читаться целиком */
+  .mle-scene { padding: 0 4px; font-size: 12px; }
+  .mle-scene span { display: none; }
+}
+.mle-empty { flex: 1; overflow-y: auto; padding: 16px 14px; display: flex; flex-direction: column; gap: 12px; }
+.mle-empty p { margin: 0; color: var(--muted); }
+/* Листы поверх редактора: список объявлений и «Ролики»; превью под ними на паузе */
+.mle-sheet { position: absolute; inset: 0; z-index: 30; display: flex; flex-direction: column; background: var(--bg); }
+.mle-sheet.hidden { display: none; }
+.mle-sheet-head { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--line); font-size: 16px; }
+.mle-sheet-head b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mle-sheet-body { flex: 1; min-height: 0; overflow-y: auto; padding: 12px 14px calc(12px + env(safe-area-inset-bottom)); overscroll-behavior: contain; }
+.mle-sheet-body .render h2 { display: none; }
+.mle-list-content { display: flex; flex-direction: column; gap: 12px; }
+.mle-list-content .lots-panel { position: static; transform: none; visibility: visible; max-height: none; height: auto; padding: 0; border: none; background: none; }
+
+/* Шрифт мобильного редактора ролика (владелец 20.10: «облегчить, слишком акцентные»): тот же Manrope,
+   но толщина 400–500 вместо 600–700. Только экран ролика на телефоне: строка ролика в шапке, редактор,
+   панель «Текст» */
+.mle-title b, .mle-top .mle-build, .mle-tab.on, .mle-panel-head b, .mle-comp.on, .mle-side-head b,
+.mle .mini-group > summary, .mle .btn, .mle-scene.edit, .mle-sheet-head b, .mle-scrub-tip { font-weight: 500; }
+.mle-tab { font-weight: 400; }
+/* Кегль на 1 px меньше (владелец 20.10: «ещё чуть-чуть уменьшить») */
+.mle-title b, .mle-panel-head b, .mle-side-head b { font-size: 14px; }
+.mle-title span, .mle-title .save, .mle-panel-head span, .mle-comp, .mle-motion-title { font-size: 11px; }
+.mle-comp-color { font-size: 10px; }
+.mle-tab { font-size: 14px; }
+.mle-top .mle-build { font-size: 13px; }
+.mle-bar-time, .mle-scene { font-size: 12px; }
+@media (max-width: 389px) {
+  .mle-tab { font-size: 13px; }
+  .mle-top .mle-build { font-size: 12px; }
+  .mle-text-btn { height: 34px; padding: 0 12px; font-size: 13px; }
 }
 
 /* Узкий ноутбук: колонки лотов и сборки уже, превью посередине остаётся целым */
@@ -1062,6 +1506,8 @@ a.tab { text-decoration: none; }
   .menu-link { padding: 13px 12px; border-radius: 10px; color: var(--muted); font-size: 16px; font-weight: 700; text-decoration: none; }
   .menu-link:active { background: var(--panel-2); }
   .menu-link.active { color: var(--accent-text); background: var(--panel-2); }
+  /* Пункт экрана — кнопка, а не ссылка: без серой подложки и рамки браузера, как остальные пункты */
+  button.menu-link { width: 100%; border: none; background: none; text-align: left; font-family: var(--font); cursor: pointer; }
   /* Компания и «Выйти» — внизу листа, отделены чертой; в шапке блок на телефоне скрыт (.top > …) */
   .menu-sheet .account-chip { display: flex; width: 100%; margin: 6px 0 0; padding: 12px 12px 0; border-top: 1px solid var(--line); justify-content: space-between; font-size: 14px; }
   /* В шапке блок в одну строку (nowrap), а в листе меню длинное «K-AXIS MOTORS · владелец платформы»

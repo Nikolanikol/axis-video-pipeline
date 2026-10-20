@@ -1,0 +1,29 @@
+[
+  {
+    "id": "cinema", "title": "Кино", "note": "Фото во весь кадр, крупные акценты и плавное приближение",
+    "presets": [
+      {"id": "graphite-copper", "title": "Медь", "fontPair": "oswald-montserrat",
+        "colors": {"bg":"#111111","panel":"#1F1B18","line":"#62564A","grey":"#B9B0A5","white":"#F5F1EA","copper":"#D49A71","copperLight":"#E8B38A","copperDark":"#B78056"}},
+      {"id": "night-ice", "title": "Лёд", "fontPair": "exo-2-fira-sans",
+        "colors": {"bg":"#0D1827","panel":"#172637","line":"#4A6074","grey":"#A3B1C0","white":"#E8F0F7","copper":"#9ABED8","copperLight":"#C3DDED","copperDark":"#789CB8"}}
+    ]
+  },
+  {
+    "id": "editorial", "title": "Редакционный", "note": "Журнальная сетка, отдельное фото и выразительная типографика",
+    "presets": [
+      {"id": "paper-wine", "title": "Бордо", "fontPair": "cormorant-jost",
+        "colors": {"bg":"#F4EEE5","panel":"#EAE0D5","line":"#C8B7B1","grey":"#6D5B57","white":"#2C2524","copper":"#7B2D42","copperLight":"#914257","copperDark":"#592032"}},
+      {"id": "linen-forest", "title": "Хвоя", "fontPair": "raleway-commissioner",
+        "colors": {"bg":"#EEEFE5","panel":"#E2E7DB","line":"#B9C4B6","grey":"#526159","white":"#1E302A","copper":"#2C5B48","copperLight":"#3E6D57","copperDark":"#1C4132"}}
+    ]
+  },
+  {
+    "id": "catalog", "title": "Каталог", "note": "Широкое фото, чёткие параметры и спокойная подача цены",
+    "presets": [
+      {"id": "porcelain-cobalt", "title": "Кобальт", "fontPair": "roboto-condensed-roboto",
+        "colors": {"bg":"#F6F8FC","panel":"#E6EBF3","line":"#C7CFDB","grey":"#536071","white":"#18212D","copper":"#2457C5","copperLight":"#3F6BD1","copperDark":"#1C4192"}},
+      {"id": "mist-graphite", "title": "Графит", "fontPair": "ibm-plex-sans-inter",
+        "colors": {"bg":"#E9ECEE","panel":"#DCE2E5","line":"#B8C3C8","grey":"#4E5D66","white":"#1C2428","copper":"#354F5A","copperLight":"#4F6B76","copperDark":"#243D47"}}
+    ]
+  }
+]

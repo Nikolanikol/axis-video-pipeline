@@ -1,5 +1,5 @@
 // Превью ролика в браузере (Remotion Player). Обновляется сразу, в том числе с несохранёнными настройками.
-import React, {useEffect, useRef} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {Player, PlayerRef} from '@remotion/player';
 import {FORMAT_COMPONENTS} from '../src/formats';
 import type {AdProps, FormatMeta} from '../src/shared/types';
@@ -8,14 +8,97 @@ import {backdropSrc, photoSrc} from '../src/shared/ui';
 import {preloadPhotos} from '../src/shared/photoPreload';
 import {RecMark} from './Loading';
 
-// autoPlay — основной экран лота: превью само проигрывает ролик ОДИН раз и встаёт на последнем
-// кадре (владелец 12.10: бесконечный повтор рисовал 1080×1920 по 30 кадров в секунду, пока
-// страница открыта, и грел процессор). Дальше — по ▶ или кнопкам сцен. loop — повтор по кругу:
-// только витрине для гостя, там это реклама продукта.
-export const Preview: React.FC<{input: AdProps; format: FormatMeta; autoPlay?: boolean; loop?: boolean}> = (
-  {input, format, autoPlay, loop = false},
+// autoPlay — превью само начинает играть. Без loop — один проигрыш и стоп на последнем кадре
+// (владелец 12.10: бесконечный повтор рисовал 1080×1920 по 30 кадров в секунду, пока страница
+// открыта, и грел процессор). loop — по кругу: витрина гостя (реклама продукта) и палитра ролика
+// на компьютере (владелец 20.10: «пока идёт монтаж — бесконечно»). Пауза без фокуса и за экраном
+// (ниже) работает в обоих случаях — она и не даёт повтору греть процессор впустую.
+// Связь с палитрой (app/ads/Palette.tsx, docs/palette.md): onScene — какая сцена сейчас в кадре
+// (плеер дошёл или перемотали), seek — команда «перейти к сцене» из палитры; n меняется при каждом
+// нажатии, чтобы повторный выбор той же сцены тоже перематывал
+export type SceneSeek = {id: string; n: number};
+// Узкое управление плеером для мобильной палитры («Смотреть целиком» → «Вернуть настройки»,
+// пауза под списком объявлений): кадр, пауза, переход к кадру, проигрыш с начала
+export type PreviewControl = {frame: () => number; pause: () => void; seekFrame: (frame: number) => void; playFromStart: () => void;
+  /** Показать приём: проиграть с кадра frame около seconds секунд и встать (мобильная «Анимация») */
+  playFragment: (frame: number, seconds: number) => void;
+  /** ▶ / пауза своей кнопкой — когда у плеера нет полосы управления (мобильная палитра) */
+  toggle: () => void};
+export const Preview: React.FC<{input: AdProps; format: FormatMeta; autoPlay?: boolean; loop?: boolean;
+  onScene?: (id: string) => void; seek?: SceneSeek | null;
+  // showScenes = false — без кнопок сцен под плеером (мобильная палитра: перемотка — своей панелью)
+  showScenes?: boolean; control?: React.MutableRefObject<PreviewControl | null>;
+  // controls = false — без полосы управления плеера (своя ▶ у оболочки); onPlaying — играет ли
+  controls?: boolean; onPlaying?: (playing: boolean) => void;
+  // onFrame — каждый кадр (полоса прокрутки мобильной палитры); вызывается часто, без лишней работы
+  onFrame?: (frame: number) => void}> = (
+  {input, format, autoPlay, loop = false, onScene, seek, showScenes = true, control, controls = true, onPlaying, onFrame},
 ) => {
   const ref = useRef<PlayerRef>(null);
+  const fragment = useRef<number | undefined>(undefined);
+  useEffect(() => () => clearTimeout(fragment.current), []);
+  if (control) control.current = {
+    frame: () => ref.current?.getCurrentFrame() ?? 0,
+    pause: () => ref.current?.pause(),
+    seekFrame: (frame) => { ref.current?.pause(); ref.current?.seekTo(frame); },
+    playFromStart: () => { ref.current?.seekTo(0); ref.current?.play(); },
+    playFragment: (frame, seconds) => {
+      clearTimeout(fragment.current);
+      ref.current?.seekTo(Math.max(0, Math.min(frame, format.durationInFrames - 1)));
+      ref.current?.play();
+      fragment.current = window.setTimeout(() => ref.current?.pause(), seconds * 1000);
+    },
+    toggle: () => {
+      const p = ref.current;
+      if (!p) return;
+      if (p.isPlaying()) p.pause();
+      else { if (p.getCurrentFrame() >= format.durationInFrames - 1) p.seekTo(0); p.play(); }
+    },
+  };
+  const onPlayingRef = useRef(onPlaying);
+  onPlayingRef.current = onPlaying;
+  useEffect(() => {
+    const p = ref.current;
+    if (!p) return;
+    const on = () => onPlayingRef.current?.(true);
+    const off = () => onPlayingRef.current?.(false);
+    p.addEventListener('play', on);
+    p.addEventListener('pause', off);
+    p.addEventListener('ended', off);
+    return () => { p.removeEventListener('play', on); p.removeEventListener('pause', off); p.removeEventListener('ended', off); };
+  }, [format]);
+  // Сцена в кадре — по номеру кадра и границам сцен формата. Сообщаем только смену, а не каждый кадр
+  const [current, setCurrent] = useState(format.scenes[0]?.id);
+  const lastScene = useRef<string | undefined>(undefined);
+  const onSceneRef = useRef(onScene);
+  onSceneRef.current = onScene;
+  const onFrameRef = useRef(onFrame);
+  onFrameRef.current = onFrame;
+  useEffect(() => {
+    const player = ref.current;
+    if (!player) return;
+    const update = (frame: number) => {
+      onFrameRef.current?.(frame);
+      const scene = [...format.scenes].reverse().find((s) => frame >= s.from) ?? format.scenes[0];
+      if (!scene || scene.id === lastScene.current) return;
+      lastScene.current = scene.id;
+      setCurrent(scene.id);
+      onSceneRef.current?.(scene.id);
+    };
+    const onFrame = (e: {detail: {frame: number}}) => update(e.detail.frame);
+    player.addEventListener('frameupdate', onFrame);
+    player.addEventListener('seeked', onFrame);
+    return () => { player.removeEventListener('frameupdate', onFrame); player.removeEventListener('seeked', onFrame); };
+  }, [format]);
+  // Перейти к сцене: на её показательный кадр (preview в formats.json) — там сцена уже собрана
+  // и видно, что правишь; с самого начала сцены текст ещё не появился
+  const goTo = (id: string) => {
+    const scene = format.scenes.find((s) => s.id === id);
+    if (!scene) return;
+    ref.current?.pause();
+    ref.current?.seekTo(scene.preview);
+  };
+  useEffect(() => { if (seek) goTo(seek.id); }, [seek?.n]); // eslint-disable-line react-hooks/exhaustive-deps
   // Все фото объявления и их размытые фоны — сразу при открытии превью, а не когда до сцены
   // дойдёт воспроизведение: иначе на мобильной сети сцены стояли «чёрными заглушками»
   // (src/shared/photoPreload.ts). Смена формата фото не меняет — повторно не качаем
@@ -72,7 +155,7 @@ export const Preview: React.FC<{input: AdProps; format: FormatMeta; autoPlay?: b
           compositionWidth={format.width}
           compositionHeight={format.height}
           style={{width: '100%', height: '100%'}}
-          controls
+          controls={controls}
           loop={loop}
           autoPlay={autoPlay}
           // Почему 0 аудиоэлементов. 12.10 пришла тревога в «Сбои»: InvalidStateError «Failed to start
@@ -94,11 +177,12 @@ export const Preview: React.FC<{input: AdProps; format: FormatMeta; autoPlay?: b
           renderPoster={({isBuffering}) => (isBuffering ? <div className="player-buffering"><RecMark /></div> : null)}
         />
       </div>
-      <div className="scenes">
+      {showScenes && <div className="scenes">
         {format.scenes.map((s) => (
-          <button key={s.id} className="btn ghost" onClick={() => { ref.current?.pause(); ref.current?.seekTo(s.preview); }}>{s.title}</button>
+          <button key={s.id} className={`btn ${onScene && current === s.id ? 'primary' : 'ghost'}`} aria-pressed={onScene ? current === s.id : undefined}
+            onClick={() => goTo(s.id)}>{s.title}</button>
         ))}
-      </div>
+      </div>}
     </div>
   );
 };

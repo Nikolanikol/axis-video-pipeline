@@ -9,13 +9,16 @@ import {FORMATS} from '../src/shared/model';
 import {resolveTexts, textsForLanguage} from '../src/shared/profile';
 import {CURRENCIES, currencyCode, currencySign, isKnownCurrency} from '../src/shared/currencies';
 import {contrastIssues, matchPalette} from '../src/shared/contrast.js';
+import {PLATE_MIN_CONTRAST, PLATE_MODES, PLATE_SHAPES, inkContrast, plateSetting} from '../src/shared/logoPlate.js';
+import {Logo, LogoImgContext, ThemeProvider} from '../src/shared/ui';
 import {Field} from './LotForm';
 import {useConfig} from './config';
+import {DesignField} from './DesignField';
 
 
 // Только цветовые поля темы: в ней теперь есть ещё имя, шрифты и файлы бренда,
 // и без сужения форма пыталась бы засунуть объект в поле ввода
-type ColorKey = {[K in keyof Theme]: Theme[K] extends string ? K : never}[keyof Theme];
+type ColorKey = {[K in keyof Theme]-?: Theme[K] extends string ? K : never}[keyof Theme];
 
 // Ключи в теме исторические (copper — со времён брендбука AXIS), а в интерфейсе — «акцент»:
 // у клиента он бывает синим или зелёным
@@ -30,7 +33,7 @@ const COLOR_FIELDS: [ColorKey, string][] = [
  * фиолетовых вместо перелива одного. Каждая палитра реестра прошла проверку контраста.
  * Выбранную узнаём по самим цветам — как пару шрифтов, без отдельного поля id.
  */
-const PaletteField: React.FC<{theme: Theme; palettes: Palette[]; onChange: (t: Theme) => void}> = ({theme, palettes, onChange}) => {
+export const PaletteField: React.FC<{theme: Theme; palettes: Palette[]; onChange: (t: Theme) => void}> = ({theme, palettes, onChange}) => {
   const current = matchPalette(theme, palettes);
   return (
     <>
@@ -62,7 +65,7 @@ const PaletteField: React.FC<{theme: Theme; palettes: Palette[]; onChange: (t: T
  * Тонкая настройка: свои восемь цветов. Свёрнута — большинству она не нужна, — и сразу
  * говорит, что перестанет читаться: предупреждение здесь, а не на готовом ролике.
  */
-const FineColors: React.FC<{theme: Theme; custom: boolean; onChange: (t: Theme) => void}> = ({theme, custom, onChange}) => {
+export const FineColors: React.FC<{theme: Theme; custom: boolean; onChange: (t: Theme) => void}> = ({theme, custom, onChange}) => {
   const issues = contrastIssues(theme);
   return (
     <details className="fine" open={custom && issues.length > 0}>
@@ -166,6 +169,44 @@ const LogoField: React.FC<{theme: Theme; onSaved: (t: Theme) => void; onError: (
   };
 
 /**
+ * Подложка логотипа (src/shared/logoPlate.js): «Авто» ставит её, только когда логотип плохо виден
+ * на фоне (белый на светлом, чёрный на тёмном); «Всегда»; «Нет» — для брендбуков, где плашки
+ * под логотипом запрещены. Формы — плитками: на каждой ваш логотип на фоне ролика, тем же
+ * компонентом, что и в роликах
+ */
+export const PlateField: React.FC<{theme: Theme; onChange: (t: Theme) => void}> = ({theme, onChange}) => {
+  const setting = plateSetting(theme);
+  const set = (patch: Partial<typeof setting>) => onChange({...theme, logoPlate: {...setting, ...patch}});
+  const logo = theme.assets?.logoStacked;
+  const ink = logo ? theme.logoInk?.[logo] : undefined;
+  if (!logo) return null;
+  const needs = !!ink && inkContrast(ink, theme.bg) < PLATE_MIN_CONTRAST;
+  const status = !ink ? 'Тон логотипа ещё не разобран — сохраните бренд или обновите страницу.'
+    : needs ? 'Логотип плохо виден на фоне роликов — «Авто» поставит подложку.'
+      : 'На фоне роликов логотип читается — «Авто» поставит подложку только там, где фон другой (светлый пресет, тёмная плашка).';
+  return <div className="plate-field">
+    <div className="seg" role="radiogroup" aria-label="Когда ставить подложку">
+      {PLATE_MODES.map((m) => <button key={m.id} type="button" role="radio" aria-checked={setting.mode === m.id}
+        className={setting.mode === m.id ? 'on' : ''} onClick={() => set({mode: m.id})}>{m.title}</button>)}
+    </div>
+    <p className="hint">{status}</p>
+    {setting.mode !== 'off' && ink && <div className="plate-shapes" role="radiogroup" aria-label="Форма подложки">
+      {PLATE_SHAPES.map((sh) => <button key={sh.id} type="button" role="radio" aria-checked={setting.shape === sh.id}
+        className={`plate-shape${setting.shape === sh.id ? ' on' : ''}`} onClick={() => set({shape: sh.id})}>
+        <span className="plate-shape-frame" style={{background: theme.bg}}>
+          <LogoImgContext.Provider value="img">
+            <ThemeProvider value={{...theme, logoPlate: {mode: 'always', shape: sh.id}}}>
+              <Logo asset="logoStacked" height={64} width={150} />
+            </ThemeProvider>
+          </LogoImgContext.Provider>
+        </span>
+        <span>{sh.title}</span>
+      </button>)}
+    </div>}
+  </div>;
+};
+
+/**
  * Таблицы стилей всех пар сразу.
  *
  * Иначе список нечем показать: пара, шрифт которой не загружен, нарисуется системным,
@@ -191,7 +232,7 @@ const useFontSheets = (pairs: FontPair[]) => {
  * В образце намеренно есть кириллица: все пары реестра её умеют (проверено запросом
  * к Google Fonts), и видеть это надо сразу, а не после первого ролика на македонском.
  */
-const FontField: React.FC<{theme: Theme; pairs: FontPair[]; onChange: (t: Theme) => void}> = ({theme, pairs, onChange}) => {
+export const FontField: React.FC<{theme: Theme; pairs: FontPair[]; onChange: (t: Theme) => void}> = ({theme, pairs, onChange}) => {
   useFontSheets(pairs);
   // Выбранную пару узнаём по самим шрифтам, а не по отдельному полю id: лишнее поле
   // разошлось бы с fonts, стоит один раз поправить brand.json руками
@@ -230,7 +271,7 @@ const FontField: React.FC<{theme: Theme; pairs: FontPair[]; onChange: (t: Theme)
  */
 const RADIUS: [number, string][] = [[0, 'Острые'], [1, 'Мягкие'], [1.8, 'Круглые']];
 
-const StyleField: React.FC<{theme: Theme; onChange: (t: Theme) => void}> = ({theme, onChange}) => {
+export const StyleField: React.FC<{theme: Theme; onChange: (t: Theme) => void}> = ({theme, onChange}) => {
   // Значения по умолчанию те же, что в вёрстке: тема могла прийти без style
   const style = {gradient: theme.style?.gradient ?? true, radius: theme.style?.radius ?? 1};
   const set = (patch: Partial<typeof style>) => onChange({...theme, style: {...style, ...patch}});
@@ -276,6 +317,10 @@ export const BrandForm: React.FC<BrandProps> = ({theme, saved, pairs, palettes, 
     <div className="form">
       <h2>Логотип</h2>
       <LogoField theme={theme} onSaved={onSaved} onError={onError} />
+      <h2>Подложка логотипа</h2>
+      <PlateField theme={theme} onChange={onChange} />
+
+      <DesignField theme={theme} onChange={onChange} />
 
       <h2>Шрифты</h2>
       <p className="note">
@@ -449,7 +494,7 @@ const AD_SCENES: {id: string; title: string; also?: string; keys: string[]; hint
   {id: 'price', title: 'Цена', keys: ['priceLabel', 'priceNoteIncluded', 'priceNoteExcluded'],
     hints: {priceLabel: '{port} заменится на порт из профиля', priceNoteIncluded: 'под ценой, первой строкой', priceNoteExcluded: 'серым, второй строкой'},
     locked: [{what: 'Цена', where: 'в объявлении: расчёт или «Цена в ролике»'}, {what: 'Маршрут: откуда → порт', where: 'Профиль'}]},
-  {id: 'cta', title: 'CTA', keys: ['ctaTitle', 'ctaAccent', 'ctaBenefit', 'whatsappLabel'],
+  {id: 'cta', title: 'Контакты', keys: ['ctaTitle', 'ctaAccent', 'ctaBenefit', 'whatsappLabel'],
     hints: {ctaAccent: 'последняя строка заголовка, акцентным цветом', ctaBenefit: 'строка с рукопожатием', whatsappLabel: 'над номером на плашке'},
     locked: [{what: 'Номер WhatsApp и сайт', where: 'Профиль'}, {what: 'Логотип', where: 'Бренд'}]},
 ];

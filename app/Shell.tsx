@@ -17,6 +17,8 @@ import {reportError} from './errorReport';
 import {errorText} from './api';
 import {SiteFooter} from './SiteFooter';
 import {SourcesStrip} from './Sources';
+import {HeaderSlotProvider, useHeaderSlotValue} from './headerSlot';
+import {useIsPhone} from './MobileTabs';
 
 export const Shell: React.FC = () => {
   const [error, setError] = useState('');
@@ -25,7 +27,9 @@ export const Shell: React.FC = () => {
     <div className="shell">
       <AuthGate>
         <ConfigProvider report={report}>
-          <Frame error={error} clearError={() => setError('')} />
+          <HeaderSlotProvider>
+            <Frame error={error} clearError={() => setError('')} />
+          </HeaderSlotProvider>
         </ConfigProvider>
       </AuthGate>
       <Toasts />
@@ -56,6 +60,10 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
   // прокрутки). Закрывается при переходе, по Escape и по нажатию мимо меню
   const [menuOpen, setMenuOpen] = useState(false);
   useEffect(() => { setMenuOpen(false); }, [route.pipeline, route.tool]);
+  // Своя строка экрана вместо логотипа (headerSlot.tsx) — только на телефоне: на компьютере место есть
+  const phone = useIsPhone();
+  const slot = useHeaderSlotValue();
+  const own = phone && slot;
   useEffect(() => {
     if (!menuOpen) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setMenuOpen(false); };
@@ -77,7 +85,10 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
     <>
     <div className="app">
       <div className={menuOpen ? 'menu-scrim open' : 'menu-scrim'} onClick={() => setMenuOpen(false)} aria-hidden="true" />
-      <header className="top">
+      <header className={own ? 'top top-slot' : 'top'}>
+        {/* Нажали что-то в строке экрана (например, «Ролики») при открытом меню — меню закрывается, а не
+            остаётся висеть поверх (владелец 20.10) */}
+        {own ? <div className="top-slot-content" onClickCapture={() => setMenuOpen(false)}>{slot.content}</div> : <>
         <a href={href()} className="top-home" title="Все пайплайны">
           <img src="/kok/wordmark.svg" alt="KOK" className="top-logo" />
         </a>
@@ -101,11 +112,17 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
             <CircleUserRound size={18} aria-hidden />{session.balance.credits} кр.
           </a>
         )}
+        </>}
         <button className="burger" onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen} aria-controls="menu-sheet"
           aria-label={menuOpen ? 'Закрыть меню' : 'Открыть меню'}>
           {menuOpen ? <X size={22} /> : <Menu size={22} />}
         </button>
         <div id="menu-sheet" className={menuOpen ? 'menu-sheet open' : 'menu-sheet'}>
+          {/* Пункты экрана (например, «Ролики» у мобильной палитры) — первыми, над разделами */}
+          {own && slot.menu?.length ? <nav className="menu-links" aria-label="Этот экран">
+            <a href={href()} className="menu-link">Главная</a>
+            {slot.menu.map((m) => <button key={m.label} type="button" className="menu-link" onClick={() => { setMenuOpen(false); m.onClick(); }}>{m.label}</button>)}
+          </nav> : null}
           <nav className="menu-links" aria-label="Разделы">
             {navItems.map((i) => <a key={i.key} href={i.to} className={i.active ? 'menu-link active' : 'menu-link'}>{i.label}</a>)}
           </nav>

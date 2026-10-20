@@ -2,7 +2,25 @@
 // Общие для ролика, интерфейса и сервера.
 import type brandTheme from '../../config/brand.json';
 
-export type Theme = typeof brandTheme;
+export type DesignId = typeof import('./design.js').DESIGN_IDS[number];
+// Стиль ролика — варианты из реестра src/design/style/registry.js (там же подписи и умолчания)
+type Registry = typeof import('../design/style/registry.js');
+export type TextMotionId = Registry['TEXT_MOTIONS'][number]['id'];
+export type PhotoMotionId = Registry['PHOTO_MOTIONS'][number]['id'];
+export type SceneTransitionId = Registry['SCENE_TRANSITIONS'][number]['id'];
+export type PlatesId = Registry['PLATES'][number]['id'];
+export type StyleFields = {textMotion?: TextMotionId; photoMotion?: PhotoMotionId; sceneTransition?: SceneTransitionId; plates?: PlatesId};
+/** Тон логотипа по файлу (сервер, withLogoInk): тёмный и светлый край яркости и пропорция */
+export type LogoInk = {lo: number; hi: number; ratio: number};
+export type Theme = typeof brandTheme & {design?: DesignId; designVariant?: 0 | 1} & StyleFields & {
+  /** Тон логотипов по адресу файла — считает сервер, в бренде не хранится */
+  logoInk?: Record<string, LogoInk>;
+  /** Подложка логотипа (src/shared/logoPlate.js): когда ставить и какой формы */
+  logoPlate?: {mode: string; shape: string};
+};
+/** Снимок оформления объявления поверх бренда — src/design/style/look.js */
+export type LotLook = {design: DesignId | null; designVariant: 0 | 1; fonts: Theme['fonts']; style: Theme['style']; logoPlate?: Theme['logoPlate']} & StyleFields
+  & Pick<Theme, 'bg' | 'panel' | 'line' | 'grey' | 'white' | 'copper' | 'copperLight' | 'copperDark'>;
 
 // Тексты рынка (язык ролика). Какие ключи нужны — описывает формат в config/formats.json.
 export type Texts = Record<string, string>;
@@ -69,6 +87,9 @@ export type Lot = Partial<Omit<Market, 'texts'>> & {
   market?: string;
   // Последний выбранный формат ролика для этого лота
   format?: string;
+  // Своё оформление ролика этого объявления (пресет, цвета, шрифты, движение, подача данных) —
+  // снимок поверх бренда, см. src/design/style/look.js. Нет поля — как в бренде
+  look?: LotLook;
   brand: string; model: string; trim?: string; year: number; specs: string[];
   // Цена авто: либо сразу в $, либо в ₩ + курс (₩ за $1). Без цены ролик — черновик с заглушкой.
   carPriceUsd?: number | null; carPriceKrw?: number | null; krwPerUsd?: number | null;
@@ -272,7 +293,26 @@ export type CarouselCar = {
 // format — id из config/carousel-formats.json (нет — «Классика»); seed — зерно варианта:
 // то же зерно даёт те же компоновку и фразы, «Другой вариант» — новое зерно
 export type CarouselProps = {car: CarouselCar; market: Market; theme?: Partial<Theme>; includeHistory?: boolean; skip?: string[]; format?: string; seed?: number;
+  // Семейство из пакета KOK_handoff_v1 (src/carousel/families/registry.js) — своя вёрстка карусели; нет — бренд
+  family?: string | null;
   // Своя цена клиента на слайде цены, в валюте профиля (src/carousel/price.ts)
-  priceOverride?: number | null};
+  priceOverride?: number | null;
+  // Память дилера: какие фразы он уже получал (src/carousel/i18n/copy.ts, choose) — их
+  // карусель обходит. Хранит сервер (server/carousel.mjs); у карусели — снимок на момент сборки
+  recent?: Record<string, string[]>;
+  // Свои тексты клиента: слайд → поле → текст (кнопка «Редактировать текст» под слайдом)
+  textOverrides?: TextOverrides;
+  // Тексты, разложенные по слайдам, — их кладёт calculateMetadata, сервер забирает из
+  // selectComposition и отдаёт интерфейсу для правки. Вёрстка считает их сама (carouselTexts)
+  resolvedTexts?: CarouselTexts};
+
+export type TextOverrides = Record<string, Record<string, string>>;
+/** Тексты карусели: по слайду — поля (рубрика, заголовок, текст…), плюс выбранные компоновки
+ *  и что выбрано из вариантов (picked: ключ → вариант — уходит в память дилера) */
+export type CarouselTexts = {
+  slides: {slide: string; fields: Record<string, string>}[];
+  layout: Record<string, string>;
+  picked: Record<string, string>;
+};
 
 export type ReviewProps = {review: Review; lot?: Lot | null; market: Market; theme?: Partial<Theme>};

@@ -71,7 +71,8 @@ export const Lead: React.FC<{children: React.ReactNode; style?: React.CSSPropert
   const tall = useTall();
   return (
     <div style={{fontFamily: BODY, fontWeight: 500, fontSize: tall ? 32 : 29, lineHeight: 1.45, color: C.white,
-      opacity: 0.86, marginTop: 22, maxWidth: 820, ...style}}>{children}</div>
+      // pre-line: клиент может разбить свой текст на строки (правка текста под слайдом)
+      opacity: 0.86, marginTop: 22, maxWidth: 820, whiteSpace: 'pre-line', ...style}}>{children}</div>
   );
 };
 
@@ -128,7 +129,7 @@ export const Frame: React.FC<{
       {/* Шапка: логотип слева, рубрика справа — на всех слайдах одинаково */}
       <div style={{position: 'absolute', top: PAD, left: PAD, right: PAD, height: 60, display: 'flex',
         alignItems: 'center', justifyContent: 'space-between'}}>
-        <Logo asset="logoHorizontal" height={52} style={{textAlign: 'left'}} />
+        <Logo asset="logoHorizontal" height={52} width={480} style={{textAlign: 'left', objectPosition: 'left'}} />
         <div style={{display: 'flex', alignItems: 'center', gap: 22}}>
           <div style={{width: 70, height: 2, background: C.copper}} />
           <div style={{fontFamily: BODY, fontWeight: 500, fontSize: 24, color: C.white, opacity: 0.85,

@@ -41,7 +41,7 @@ const plural = (n: number, one: string, few: string, many: string) => {
 const STRINGS = {
   en: {
     swipe: 'Swipe →',
-    ownerChanges: (n: number) => `${n} owner changes`,
+    ownerChanges: (n: number) => `${n} owner change${n === 1 ? '' : 's'}`,
     history: 'Vehicle history',
     reportOnRequest: 'Report available on request',
     noAccidents: 'No accident record',

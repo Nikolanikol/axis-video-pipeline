@@ -38,8 +38,14 @@ export type ReviewEntry = Review & {id: string};
 // Готовая карусель: карточка авто от шлюза и адреса семи картинок
 // format и seed — чем собрана: формат из реестра и зерно варианта (у старых карусель их нет — «Классика»)
 export type CarouselEntry = {id: string; car: CarouselCar; slides: string[]; updatedAt: string; format?: string; seed?: number;
+  // Семейство из пакета KOK_handoff_v1 (src/carousel/families/registry.js); нет — оформление бренда
+  family?: string;
   // Своя цена клиента на слайде цены (в валюте профиля)
   priceOverride?: number;
+  // Тексты по слайдам (для «Редактировать текст») и свои правки клиента: слайд → поле → текст.
+  // У каруселей, собранных до 19.10, текстов нет — править можно после «Пересобрать»
+  texts?: {slide: string; fields: Record<string, string>}[];
+  textOverrides?: Record<string, Record<string, string>>;
   // Только у каруселей по лотам аукционов: откуда собрана (для «Пересобрать» и кнопки «Открыть лот»)
   lot?: {house: string; id: string; url: string}};
 export type CarouselFormat = {id: string; title: string; note: string; width: number; height: number; slides: string[]};
@@ -285,10 +291,13 @@ export const api = {
   iconVariant: (variant: 'clean' | 'raw' | 'default') =>
     request<{url: string; brand: Theme}>('PUT', '/api/brand/icon/variant', {variant}),
   // Карусели: ссылка Encar → слайды формата; seed — зерно варианта (нет — случайное)
-  buildCarousel: (link: string, format?: string, seed?: number) => request<CarouselEntry>('POST', '/api/carousels', {link, format, seed}),
+  buildCarousel: (link: string, format?: string, seed?: number, family?: string | null) =>
+    request<CarouselEntry>('POST', '/api/carousels', {link, format, seed, family: family ?? null}),
   carousels: () => request<CarouselEntry[]>('GET', '/api/carousels'),
   // Пересобрать со своей ценой — бесплатно: машина, формат и вариант прежние; null — вернуть расчёт
   repriceCarousel: (id: string, price: number | null) => request<CarouselEntry>('POST', `/api/carousels/${id}/price`, {price}),
+  editCarouselTexts: (id: string, slide: string, fields: Record<string, string>) =>
+    request<CarouselEntry>('POST', `/api/carousels/${id}/texts`, {slide, fields}),
   deleteCarousel: (id: string) => request<{id: string; deleted: boolean}>('DELETE', `/api/carousels/${id}`),
   renderReview: (id: string) => request<Job>('POST', `/api/reviews/${id}/render`, {}),
   reprocessVideo: (id: string) => request<ReviewEntry>('POST', `/api/reviews/${id}/reprocess`),

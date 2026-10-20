@@ -11,7 +11,8 @@ import '@fontsource/montserrat/cyrillic-600.css';
 import '@fontsource/montserrat/latin-600.css';
 import {BRAND} from './model';
 import {knownRatio, preloadedSrc, rememberRatio} from './photoPreload';
-import type {Theme} from './types';
+import type {LogoInk, Theme} from './types';
+import {platePlan} from './logoPlate.js';
 
 /**
  * Шрифты подставляются переменными CSS, а не именами семейств.
@@ -93,6 +94,12 @@ export const useAsset = (key: keyof typeof BRAND.assets): string => {
   return src(theme.assets?.[key] ?? BRAND.assets[key]);
 };
 
+/**
+ * Чем рисовать картинку логотипа. В ролике — Img Remotion (ждёт загрузки кадра); вне плеера
+ * (плитки подложки в «Бренде») Img Remotion падает — там провайдер подставляет обычный img
+ */
+export const LogoImgContext = createContext<React.ElementType>(Img);
+
 /** Знаки бренда, которые у клиента может заменить название компании */
 export type LogoAsset = 'logoStacked' | 'logoHorizontal' | 'sign';
 
@@ -106,17 +113,31 @@ export type LogoAsset = 'logoStacked' | 'logoHorizontal' | 'sign';
  * и ужимается под длину названия, чтобы длинное имя не вылезало за место логотипа.
  * height и width — место под знак, как у картинки: текст вписывается в него.
  */
-export const Logo: React.FC<{asset: LogoAsset; height?: number; width?: number; style?: React.CSSProperties}> = ({asset, height, width, style}) => {
+export const Logo: React.FC<{asset: LogoAsset; height?: number; width?: number; style?: React.CSSProperties;
+  /** Цвет фона под логотипом — по нему решается, нужна ли подложка. Нет — фон темы */
+  on?: string}> = ({asset, height, width, style, on}) => {
   const theme = useTheme();
+  const Image = useContext(LogoImgContext);
   const value = theme.assets?.[asset];
   const url = src(value ?? BRAND.assets[asset]);
+  // Место под знак по ширине — и у картинки, и у текста ниже
+  const box = width ?? (asset === 'logoHorizontal' ? 720 : 900);
   if (value !== '') {
-    return <Img src={url} style={{...(height ? {height} : {}), ...(width ? {width} : {}), ...style}} />;
+    // Подложка — только у логотипа на своём месте (есть высота); водяной знак (только ширина) — без неё
+    const ink = theme.logoInk?.[value ?? BRAND.assets[asset]];
+    const plan = height && ink ? platePlan(theme, ink, on ?? theme.bg) : null;
+    if (plan && height && ink) return <PlatedLogo url={url} box={box} height={height} ink={ink} plan={plan} style={style} />;
+    // Картинка вписывается в место «высота × ширина» целиком, пропорции сохраняются (contain).
+    // Раньше задавалась одна высота, а ширина шла от пропорций файла: клиент (ICONAUTO, 20.10)
+    // загрузил широкую надпись, сервер обрезал пустые поля — осталась полоса ~9:1, и на финале
+    // (высота 260) логотип выходил шириной ~2300 px при кадре 1080 и обрезался по краям.
+    // Только ширина (водяной знак) — высота по пропорциям, как и было
+    const fit: React.CSSProperties = height ? {width: box, height, objectFit: 'contain'} : {width: box};
+    return <Image src={url} style={{maxWidth: '100%', ...fit, ...style}} />;
   }
   const name = (theme.name || '').trim();
   // Размер от места под знак: горизонтальный логотип — одна строка во всю высоту,
   // вертикальный (знак над подписью) — текст примерно в треть его высоты
-  const box = width ?? (asset === 'logoHorizontal' ? 720 : 900);
   const byHeight = height ? height * (asset === 'logoHorizontal' ? 0.72 : 0.36) : 110;
   // Oswald узкий: средняя буква заглавными — около 0,5 кегля
   const byWidth = box / Math.max(1, name.length * 0.5);
@@ -126,6 +147,78 @@ export const Logo: React.FC<{asset: LogoAsset; height?: number; width?: number; 
       <CopperText style={{fontFamily: HEAD, fontWeight: 700, fontSize: size, letterSpacing: size * 0.04, textTransform: 'uppercase'}}>
         {name}
       </CopperText>
+    </div>
+  );
+};
+
+/** Будет ли у логотипа подложка на фоне on — вёрстке, которой нужно место побольше под неё */
+export const useLogoPlated = (asset: LogoAsset, on?: string) => {
+  const theme = useTheme();
+  const value = theme.assets?.[asset];
+  if (value === '') return false;
+  const ink = theme.logoInk?.[value ?? BRAND.assets[asset]];
+  return !!ink && !!platePlan(theme, ink, on ?? theme.bg);
+};
+
+/**
+ * Логотип на подложке (src/shared/logoPlate.js). Занимает то же место «ширина × высота», что
+ * и логотип без неё: вёрстка вокруг не сдвигается — логотип внутри становится меньше на поля
+ * подложки. Поля — 16 % высоты места сверху и снизу, 24 % по бокам (у знака высотой 0,68 места
+ * это около четверти его высоты — нижняя граница защитного поля брендбуков). Углы — по множителю скругления бренда; сам знак
+ * не перекрашивается. Слева (objectPosition: left / textAlign: left) — прижата к левому краю
+ */
+const PlatedLogo: React.FC<{url: string; box: number; height: number; ink: LogoInk;
+  plan: NonNullable<ReturnType<typeof platePlan>>; style?: React.CSSProperties}> = ({url, box, height, ink, plan, style}) => {
+  const C = useTheme();
+  const Image = useContext(LogoImgContext);
+  const id = React.useId().replace(/[^a-z0-9]/gi, '');
+  const {objectFit: _fit, objectPosition, textAlign, ...rest} = style ?? {};
+  const left = String(objectPosition ?? '').startsWith('left') || textAlign === 'left';
+  const a = Math.max(0.05, ink.ratio || 1);
+  const halo = plan.shape === 'halo';
+  // Поля — от высоты места, а не от знака: у квадратного знака в шапке (66 px) поля от его
+  // стороны съедали место, и знак выходил в 37 px. Сверху и снизу — 16 % места, по бокам —
+  // в полтора раза больше; знак — всё остальное, затем ужимаем по ширине, если не влез
+  const padY0 = (halo ? .06 : .16) * height, padX0 = (halo ? .06 : .24) * height;
+  const lh0 = Math.min(height - 2 * padY0, (box - 2 * padX0) / a), lw0 = lh0 * a;
+  const ph0 = lh0 + 2 * padY0;
+  const slant0 = plan.shape === 'slant' ? ph0 * .3 : 0;
+  const k = Math.min(1, box / (lw0 + 2 * padX0 + slant0));
+  const lw = lw0 * k, lh = lh0 * k, padX = padX0 * k, padY = padY0 * k, slant = slant0 * k;
+  const pw = lw + 2 * padX + slant, ph = lh + 2 * padY;
+  const b0 = Math.min(lw0, lh0);
+  const r = radius(C, ph * .2);
+  const fill = {fill: plan.fill, fillOpacity: .95};
+  const cut = ph * .24;
+  const shape = (() => {
+    switch (plan.shape) {
+      case 'capsule': return <rect width={pw} height={ph} rx={radius(C, ph / 2)} {...fill} />;
+      case 'chamfer': return <polygon points={[[cut, 0], [pw - cut, 0], [pw, cut], [pw, ph - cut], [pw - cut, ph], [cut, ph], [0, ph - cut], [0, cut]].join(' ')} {...fill} />;
+      case 'slant': return <polygon points={[[slant, 0], [pw, 0], [pw - slant, ph], [0, ph]].join(' ')} {...fill} />;
+      case 'keyline': {
+        const sw = Math.max(1.5, ph * .03), g = ph * .07;
+        return <>
+          <rect x={sw / 2} y={sw / 2} width={pw - sw} height={ph - sw} rx={r + g} fill="none" stroke={plan.accent} strokeWidth={sw} />
+          <rect x={g} y={g} width={pw - 2 * g} height={ph - 2 * g} rx={r} {...fill} />
+        </>;
+      }
+      case 'halo': return <>
+        <defs><filter id={`${id}h`} x="-20%" y="-50%" width="140%" height="200%">
+          <feMorphology in="SourceAlpha" operator="dilate" radius={Math.max(2, b0 * k * .07)} result="d" />
+          <feFlood floodColor={plan.fill} /><feComposite in2="d" operator="in" />
+        </filter></defs>
+        <image href={url} x={padX} y={padY} width={lw} height={lh} preserveAspectRatio="xMidYMid meet" filter={`url(#${id}h)`} />
+      </>;
+      default: return <rect width={pw} height={ph} rx={r} {...fill} />;
+    }
+  })();
+  return (
+    <div style={{width: box, height, maxWidth: '100%', display: 'flex', alignItems: 'center', justifyContent: left ? 'flex-start' : 'center', ...rest}}>
+      <div style={{position: 'relative', width: pw, height: ph, flex: 'none'}}>
+        <svg width={pw} height={ph} viewBox={`0 0 ${pw} ${ph}`} style={{position: 'absolute', inset: 0, overflow: 'visible',
+          filter: plan.shape === 'soft' ? 'drop-shadow(0 4px 12px rgba(0,0,0,.22))' : undefined}}>{shape}</svg>
+        <Image src={url} style={{position: 'absolute', left: padX + slant / 2, top: padY, width: lw, height: lh, objectFit: 'contain'}} />
+      </div>
     </div>
   );
 };
