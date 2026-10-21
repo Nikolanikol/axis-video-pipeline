@@ -660,40 +660,6 @@ a.tab { text-decoration: none; }
 .fine-warn { color: var(--danger-text); }
 .formats .pair { align-items: flex-start; }
 .format-shape { display: block; height: 44px; border: 2px solid var(--accent-line); border-radius: 4px; margin-bottom: 4px; }
-/* «Пора продлевать» в админке: метка латунью «внимание», текст обычный — как все состояния */
-.card.renew { border-left: 3px solid var(--warn); }
-/* Админка у админа: клиенты слева, прайс справа и закреплён — он всегда под рукой, пока
-   листаешь список. Скролл у .page, поэтому sticky с top: 0 держится за неё. Высокий прайс
-   листается сам, не утаскивая колонку за экран */
-.page.admin-page.with-side { --page-w: 1560px; }
-.admin-layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
-.with-side .admin-layout { grid-template-columns: minmax(0, 1fr) 400px; }
-.admin-main > .card { margin-top: 16px; }
-.admin-main > .card:first-child { margin-top: 0; }
-.admin-side { position: sticky; top: 0; max-height: calc(100vh - 140px); overflow-y: auto; }
-.admin-side .form .row { flex-wrap: wrap; }
-.admin-side .form .row > * { flex: 1 1 150px; }
-@media (max-width: 1200px) {
-  .with-side .admin-layout { grid-template-columns: minmax(0, 1fr); }
-  .admin-side { position: static; max-height: none; overflow: visible; }
-}
-.clients-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 10px; }
-.clients-head h2 { margin: 0; flex: none; }
-.clients-head input { flex: 1; min-width: 200px; }
-.clients-head select { width: auto; flex: none; }
-.chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-.chip { background: none; border: 1px solid var(--line); border-radius: 16px; padding: 4px 11px; font-size: 13px; color: var(--muted); cursor: pointer; }
-.chip:hover { color: var(--text); }
-.chip.active { color: var(--text); border-color: var(--accent-line); background: var(--panel-2); }
-.chip-n { color: var(--muted); font-size: 12px; margin-left: 2px; }
-.table tr.active > td { background: var(--panel-2); }
-/* Карточка клиента прямо под его строкой: своя подложка, без линии таблицы */
-.table tr.client-open > td { padding: 0 0 16px; border-bottom: none; background: none; }
-.client-open .card.wide { margin-top: 8px; background: var(--bg); }
-/* «Подарить кредиты» в карточке клиента: отделено чертой от начисления подписки */
-.form.gift { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
-.form.gift h3 { margin: 0 0 4px; font-size: 15px; }
-.form.gift .hint { margin: 0 0 10px; }
 .pager { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 13px; }
 
 /* Лот по ссылке Encar: строка со ссылкой над формой, под ней — найденная машина и сетка фото.
@@ -2131,3 +2097,8 @@ a.tab { text-decoration: none; }
   .consent { flex-direction: column; align-items: stretch; bottom: 12px; }
   .consent-actions > * { flex: 1; }
 }
+
+/* Галочка «Получать новости KOK»: в регистрации и в профиле кабинета (рассылки, 21.10) */
+.auth-news, .news-toggle { display: flex; align-items: flex-start; gap: 10px; font-size: 13px; color: var(--muted); cursor: pointer; line-height: 1.4; }
+.auth-news input, .news-toggle input { flex: none; width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--accent); }
+.news-toggle { margin: 4px 0 14px; font-size: 14px; }

@@ -142,6 +142,12 @@ const touchSeen = (userId, hash) => {
 };
 
 /** Роль на платформе → права. admin — всё; manager — лиды и начисление пакетов */
+// Кабинет скрыт админом (миграция 018, server/clients.mjs): такой человек не входит, сессии не
+// читаются, пароль не сбрасывается. Условие над строкой пользователя u — одно на все три места,
+// иначе новая дверь (вход через Google и т. п.) легко его забудет
+const closedSql = (u) => `EXISTS (SELECT 1 FROM smmaker_memberships hm JOIN smmaker_workspaces hw ON hw.id = hm.workspace_id
+  WHERE hm.user_id = ${u}.id AND hw.hidden_at IS NOT NULL)`;
+
 const rights = (role) => ({role: role ?? null, isAdmin: role === 'admin', isStaff: role === 'admin' || role === 'manager'});
 
 /**
@@ -157,7 +163,7 @@ export const readSession = async (token) => {
        JOIN smmaker_users u ON u.id = s.user_id
        LEFT JOIN LATERAL (SELECT * FROM smmaker_memberships WHERE user_id = u.id ORDER BY created_at LIMIT 1) m ON true
        LEFT JOIN smmaker_workspaces w ON w.id = m.workspace_id
-      WHERE s.token_hash = $1 AND s.expires_at > now() AND u.delete_after IS NULL`,
+      WHERE s.token_hash = $1 AND s.expires_at > now() AND u.delete_after IS NULL AND NOT ${closedSql('u')}`,
     [hash]);
   const r = rows[0];
   if (!r) return null;
@@ -201,7 +207,7 @@ const starterProfile = (company) => ({
  * адреса. Письмо с кодом уходит после записи; не ушло — человек запросит ещё раз из кабинета.
  * Компания необязательна: не указана — берём имя человека (его можно поменять в профиле).
  */
-export const register = async ({name, email, phone, password, company}, meta = {}) => {
+export const register = async ({name, email, phone, password, company, news = true}, meta = {}) => {
   const person = checkName(name);
   const mail = normEmail(email);
   const key = emailKey(mail);
@@ -222,8 +228,10 @@ export const register = async ({name, email, phone, password, company}, meta = {
     if (phoneTaken) throw new HttpError(409, 'Этот телефон уже зарегистрирован — войдите по своей почте');
     const workspaceId = `ws-${crypto.randomBytes(5).toString('hex')}`;
     const {rows: [user]} = await client.query(
-      'INSERT INTO smmaker_users (email, email_key, password_hash, name, phone) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-      [mail, key, hash, person, tel]);
+      // Галочка «Получать новости KOK» (миграция 019): согласие — с датой, снятая — сразу «отказался»
+      `INSERT INTO smmaker_users (email, email_key, password_hash, name, phone, news_consent_at, news_off_at)
+       VALUES ($1, $2, $3, $4, $5, CASE WHEN $6 THEN now() END, CASE WHEN $6 THEN NULL ELSE now() END) RETURNING id`,
+      [mail, key, hash, person, tel, news !== false]);
     await client.query(
       'INSERT INTO smmaker_workspaces (id, name, brand, profile) VALUES ($1, $2, $3, $4)',
       [workspaceId, title, brand, starterProfile(title)]);
@@ -351,7 +359,8 @@ export const requestReset = async ({email}) => {
   try { mail = normEmail(email); } catch { return {ok: true}; }
   // Удаляемый аккаунт сбросом не открыть: возвращают его ссылкой «восстановить» из письма
   const {rows: [u]} = await db().query(
-    'SELECT id, email FROM smmaker_users WHERE (lower(email) = $1 OR email_key = $2) AND delete_after IS NULL LIMIT 1', [mail, emailKey(mail)]);
+    `SELECT u.id, u.email FROM smmaker_users u WHERE (lower(u.email) = $1 OR u.email_key = $2) AND u.delete_after IS NULL AND NOT ${closedSql('u')} LIMIT 1`,
+    [mail, emailKey(mail)]);
   if (!u || await pauseLeft(u.id, 'reset') > 0) return {ok: true};
   const {link} = await inTransaction((client) => issueToken(client, u.id, 'reset', RESET_MINUTES));
   await resetMail({to: u.email, link: `${appUrl()}/#/reset?t=${link}`}).catch((e) => journal.error('mail.failed', {note: 'письмо сброса пароля не ушло', userId: u.id, error: e}));
@@ -380,13 +389,15 @@ export const resetPassword = async ({token, password}, meta = {}) => {
 
 export const login = async ({email, password}, meta = {}) => {
   const mail = normEmail(email);
-  const {rows: [u]} = await db().query('SELECT id, password_hash, delete_after FROM smmaker_users WHERE lower(email) = $1', [mail]);
+  const {rows: [u]} = await db().query(
+    `SELECT u.id, u.password_hash, u.delete_after, ${closedSql('u')} AS closed FROM smmaker_users u WHERE lower(u.email) = $1`, [mail]);
   const ok = await verifyPassword(String(password ?? ''), u ? u.password_hash : await DUMMY_HASH);
   if (!u || !ok) throw new HttpError(401, 'Неверная почта или пароль');
   // Говорим только после верного пароля: чужому, кто подбирает почты, это ничего не раскрывает
   if (u.delete_after) {
     throw new HttpError(403, `Аккаунт удаляется. До ${new Date(u.delete_after).toLocaleDateString('ru-RU')} его можно восстановить по ссылке из письма`);
   }
+  if (u.closed) throw new HttpError(403, 'Кабинет закрыт. Если это ошибка — напишите нам');
   return {userId: u.id, token: await createSession(u.id, db(), meta)};
 };
 
@@ -426,7 +437,7 @@ const checkCurrentPassword = async (userId, password) => {
 /** Профиль для кабинета: человек и компания. Компанию меняет только владелец кабинета */
 export const accountOf = async (userId, workspaceId) => {
   const {rows: [u]} = await db().query(
-    `SELECT u.name, u.email, u.phone, u.email_verified_at, u.created_at,
+    `SELECT u.name, u.email, u.phone, u.email_verified_at, u.created_at, u.news_off_at,
             COALESCE(NULLIF(w.profile->>'company', ''), w.name) AS company, m.role
        FROM smmaker_users u
        LEFT JOIN smmaker_memberships m ON m.user_id = u.id AND m.workspace_id = $2
@@ -442,7 +453,18 @@ export const accountOf = async (userId, workspaceId) => {
     name: u.name, email: u.email, phone: u.phone ?? '', emailVerified: Boolean(u.email_verified_at),
     createdAt: u.created_at, company: u.company ?? '', canEditCompany: u.role === 'owner',
     pendingEmail: pending?.new_email ?? null,
+    // Получает ли служебные новости KOK (миграция 019) — галочка в кабинете
+    news: !u.news_off_at,
   };
+};
+
+/** Галочка «Получать новости KOK» в кабинете: снять — то же, что «Отписаться» в письме */
+export const setNews = async ({userId, workspaceId, on}) => {
+  await db().query(
+    `UPDATE smmaker_users SET news_off_at = CASE WHEN $2 THEN NULL ELSE COALESCE(news_off_at, now()) END,
+       news_consent_at = CASE WHEN $2 THEN COALESCE(news_consent_at, now()) ELSE news_consent_at END WHERE id = $1`,
+    [userId, Boolean(on)]);
+  return accountOf(userId, workspaceId);
 };
 
 /**
@@ -724,8 +746,8 @@ const PACK_ID_RE = /^[a-z0-9][a-z0-9-]{0,31}$/;
  * клиенту). kind: plan — подписка на месяц, topup — докупка сверх подписки. Подписки первыми
  */
 export const listPacks = async ({all = false} = {}) => (await db().query(
-  `SELECT id, title, credits, price_krw, valid_days, active, sort, kind FROM smmaker_packs
-    ${all ? '' : 'WHERE active'} ORDER BY kind = 'topup', sort, credits`)).rows;
+  `SELECT id, title, credits, price_krw, valid_days, active, sort, kind, archived_at FROM smmaker_packs
+    ${all ? '' : 'WHERE active AND archived_at IS NULL'} ORDER BY kind = 'topup', sort, credits`)).rows;
 
 // Вид пакета: plan — подписка на месяц, topup — докупка (миграция 006)
 const PACK_KINDS = new Set(['plan', 'topup']);
@@ -751,9 +773,43 @@ export const savePack = async ({id, title, credits, price_krw: price, valid_days
   const {rows: [pack]} = await db().query(
     `INSERT INTO smmaker_packs (id, title, credits, price_krw, valid_days, active, sort, kind) VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, 'topup'))
      ON CONFLICT (id) DO UPDATE SET title = $2, credits = $3, price_krw = $4, valid_days = $5, active = $6, sort = $7,
-       kind = COALESCE($8, smmaker_packs.kind)
-     RETURNING id, title, credits, price_krw, valid_days, active, sort, kind`,
+       kind = COALESCE($8, smmaker_packs.kind),
+       -- Включили «продаётся» у архивного — он возвращается в прайс: продаваемый тариф,
+       -- спрятанный от админа, никто бы потом не нашёл
+       archived_at = CASE WHEN $6 THEN NULL ELSE smmaker_packs.archived_at END
+     RETURNING id, title, credits, price_krw, valid_days, active, sort, kind, archived_at`,
     [id, name, c, p, d, Boolean(active), Number(sort) || 0, kind ?? null]);
+  return pack;
+};
+
+/**
+ * Удалить тариф из прайса (только админ). Не продавался — строка удаляется. Продавался — в архив:
+ * партии и заказы ссылаются на него по pack_id, без строки пропали бы название в истории клиента
+ * и «Оплачено». Архивный снят с продажи: начислить и оплатить его нельзя (grantPack и касса берут
+ * только active). Ответ — что именно сделали, админка говорит это словами
+ */
+export const removePack = async (id) => inTransaction(async (client) => {
+  const {rows: [pack]} = await client.query('SELECT id FROM smmaker_packs WHERE id = $1 FOR UPDATE', [id]);
+  if (!pack) throw new HttpError(404, 'Нет такого тарифа');
+  const {rowCount: sold} = await client.query(
+    `SELECT 1 FROM smmaker_credit_lots WHERE pack_id = $1 UNION ALL SELECT 1 FROM smmaker_payments WHERE pack_id = $1 LIMIT 1`, [id]);
+  if (sold) {
+    await client.query('UPDATE smmaker_packs SET active = false, archived_at = now() WHERE id = $1', [id]);
+    return {result: 'archived'};
+  }
+  await client.query('DELETE FROM smmaker_packs WHERE id = $1', [id]);
+  return {result: 'deleted'};
+});
+
+/**
+ * Вернуть тариф из архива. В продажу он сам не выходит: цену за время в архиве могли не
+ * пересматривать, поэтому «продаётся» админ включает сам, проверив цифры
+ */
+export const restorePack = async (id) => {
+  const {rows: [pack]} = await db().query(
+    `UPDATE smmaker_packs SET archived_at = NULL WHERE id = $1
+     RETURNING id, title, credits, price_krw, valid_days, active, sort, kind, archived_at`, [id]);
+  if (!pack) throw new HttpError(404, 'Нет такого тарифа');
   return pack;
 };
 
@@ -866,7 +922,7 @@ const CLIENTS_PAGE = 25;
  * «пора продлевать». Фильтры и сортировка ниже пишутся по её колонкам (c.…).
  */
 const CLIENTS_CTE = `WITH c AS (
-  SELECT w.id, w.name, w.created_at,
+  SELECT w.id, w.name, w.created_at, u.id AS user_id, u.news_off_at,
          u.name AS person, u.email, u.phone, u.platform_role, u.last_seen_at,
          u.email_verified_at IS NOT NULL AS verified,
          COALESCE((SELECT sum(remaining) FROM smmaker_credit_lots t WHERE t.workspace_id = w.id AND t.expires_at > now()), 0)::int AS credits,
@@ -875,7 +931,7 @@ const CLIENTS_CTE = `WITH c AS (
          sub.title AS plan_title, sub.expires_at AS plan_until,
          EXISTS (SELECT 1 FROM smmaker_credit_lots t WHERE t.workspace_id = w.id AND t.source = 'subscription') AS had_plan,
          g.generations, g.generations_30d, g.last_generation,
-         u.delete_after
+         u.delete_after, w.hidden_at, w.hidden_note
     FROM smmaker_workspaces w
     LEFT JOIN LATERAL (SELECT user_id FROM smmaker_memberships m WHERE m.workspace_id = w.id ORDER BY created_at LIMIT 1) m ON true
     LEFT JOIN smmaker_users u ON u.id = m.user_id
@@ -907,7 +963,11 @@ const CLIENT_FILTERS = {
   lapsed: 'c.plan_until IS NULL AND c.had_plan',
   idle: `(c.last_generation IS NULL OR c.last_generation < now() - interval '${IDLE_DAYS} days')`,
   unverified: 'NOT c.verified',
+  hidden: 'c.hidden_at IS NOT NULL',
 };
+// Скрытые админом (server/clients.mjs) живут только в своём фильтре: во всех остальных и в
+// «Пора продлевать» их нет — с ними уже не работают
+const visible = (id) => (id === 'hidden' ? CLIENT_FILTERS.hidden : `c.hidden_at IS NULL AND ${CLIENT_FILTERS[id]}`);
 // Сортировки. Вторым ключом всегда дата регистрации — иначе строки с равным значением
 // (у всех новых кредитов 7) прыгали бы между страницами
 const CLIENT_SORTS = {
@@ -950,15 +1010,15 @@ const clientSearch = (query, params) => {
  * «пора продлевать» без фильтров — этот блок должен быть виден всегда.
  */
 export const listClients = async ({q, filter, sort, page} = {}) => {
-  const where = CLIENT_FILTERS[filter] ?? CLIENT_FILTERS.all;
+  const where = visible(filter in CLIENT_FILTERS ? filter : 'all');
   const order = CLIENT_SORTS[sort] ?? CLIENT_SORTS.new;
   const params = [];
   const search = clientSearch(q, params);
-  const counts = Object.entries(CLIENT_FILTERS)
-    .map(([id, cond]) => `count(*) FILTER (WHERE ${cond})::int AS "${id}"`).join(', ');
+  const counts = Object.keys(CLIENT_FILTERS)
+    .map((id) => `count(*) FILTER (WHERE ${visible(id)})::int AS "${id}"`).join(', ');
   const [{rows: [count]}, {rows: renew}] = await Promise.all([
     db().query(`${CLIENTS_CTE} SELECT ${counts} FROM c WHERE ${search}`, params),
-    db().query(`${CLIENTS_CTE} SELECT * FROM c WHERE ${CLIENT_FILTERS.renew} ORDER BY c.plan_until`),
+    db().query(`${CLIENTS_CTE} SELECT * FROM c WHERE ${visible('renew')} ORDER BY c.plan_until`),
   ]);
   const total = count[filter in CLIENT_FILTERS ? filter : 'all'];
   const pages = Math.max(1, Math.ceil(total / CLIENTS_PAGE));
@@ -967,6 +1027,55 @@ export const listClients = async ({q, filter, sort, page} = {}) => {
     `${CLIENTS_CTE} SELECT * FROM c WHERE ${search} AND ${where} ORDER BY ${order} LIMIT ${CLIENTS_PAGE} OFFSET ${(at - 1) * CLIENTS_PAGE}`,
     params);
   return {rows, total, page: at, pages, pageSize: CLIENTS_PAGE, counts: count, renew};
+};
+
+/**
+ * Получатели рассылки (server/mailing.mjs): владельцы кабинетов из фильтра админки, которым
+ * новости можно слать. Не шлём: отписавшимся, с неподтверждённой почтой (письмо на непроверенный
+ * адрес — отказы и спам-баллы домену), удаляющим аккаунт, скрытым (их нет в visible) и
+ * сотрудникам платформы — им тестовое письмо уходит отдельно
+ */
+export const segmentUsers = async (segment) => (await db().query(
+  `${CLIENTS_CTE} SELECT c.user_id, c.email, c.person, c.name FROM c
+    WHERE ${visible(segment in CLIENT_FILTERS ? segment : 'all')}
+      AND c.user_id IS NOT NULL AND c.verified AND c.news_off_at IS NULL AND c.delete_after IS NULL AND c.platform_role IS NULL
+    ORDER BY c.created_at`)).rows;
+
+// Кому рассылку слать можно — то же условие, что в segmentUsers; почему нельзя — словами для админки
+const NEWS_OK = 'c.user_id IS NOT NULL AND c.verified AND c.news_off_at IS NULL AND c.delete_after IS NULL AND c.platform_role IS NULL AND c.hidden_at IS NULL';
+const NEWS_WHY = `CASE WHEN c.hidden_at IS NOT NULL THEN 'скрыт' WHEN c.platform_role IS NOT NULL THEN 'сотрудник платформы'
+  WHEN c.delete_after IS NOT NULL THEN 'удаляет аккаунт' WHEN NOT c.verified THEN 'почта не подтверждена'
+  WHEN c.news_off_at IS NOT NULL THEN 'отписался от новостей' END`;
+
+/**
+ * Поиск получателя для рассылки поимённо (владелец 21.10): тот же поиск, что в списке клиентов, —
+ * компания, имя, почта, телефон в любом виде. Неподходящих не прячем, а показываем с причиной:
+ * менеджер ищет конкретного человека и должен понять, почему ему письмо не уйдёт
+ */
+export const searchRecipients = async (q) => {
+  const params = [];
+  const search = clientSearch(q, params);
+  return (await db().query(
+    `${CLIENTS_CTE} SELECT c.user_id, c.name, c.person, c.email, (${NEWS_OK}) AS ok, ${NEWS_WHY} AS why FROM c
+      WHERE c.user_id IS NOT NULL AND ${search} ORDER BY (${NEWS_OK}) DESC, c.created_at DESC LIMIT 20`, params)).rows;
+};
+
+/** Выбранные поимённо — те же поля, что у поиска: черновик показывает список с причинами */
+export const pickedRecipients = async (ids) => (ids?.length ? (await db().query(
+  `${CLIENTS_CTE} SELECT c.user_id, c.name, c.person, c.email, (${NEWS_OK}) AS ok, ${NEWS_WHY} AS why FROM c
+    WHERE c.user_id = ANY($1::uuid[]) ORDER BY c.name`, [ids])).rows : []);
+
+/** Кому из выбранных поимённо письмо уйдёт — для отправки, поля как у segmentUsers */
+export const pickedUsers = async (ids) => (ids?.length ? (await db().query(
+  `${CLIENTS_CTE} SELECT c.user_id, c.email, c.person, c.name FROM c WHERE c.user_id = ANY($1::uuid[]) AND ${NEWS_OK} ORDER BY c.created_at`,
+  [ids])).rows : []);
+
+/** Сколько получателей у сегмента — счётчик у выбора «кому» в админке */
+export const segmentCounts = async () => {
+  const cond = 'c.user_id IS NOT NULL AND c.verified AND c.news_off_at IS NULL AND c.delete_after IS NULL AND c.platform_role IS NULL';
+  const counts = Object.keys(CLIENT_FILTERS).filter((id) => id !== 'hidden')
+    .map((id) => `count(*) FILTER (WHERE ${visible(id)} AND ${cond})::int AS "${id}"`).join(', ');
+  return (await db().query(`${CLIENTS_CTE} SELECT ${counts} FROM c`)).rows[0];
 };
 
 /** Сотрудники платформы: у кого есть роль */

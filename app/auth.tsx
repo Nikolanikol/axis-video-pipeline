@@ -210,7 +210,7 @@ export const VerifyBanner: React.FC = () => {
   );
 };
 
-const EMPTY: Registration = {name: '', email: '', phone: '', password: '', company: ''};
+const EMPTY: Registration = {name: '', email: '', phone: '', password: '', company: '', news: true};
 
 export type AuthMode = 'login' | 'register' | 'forgot';
 
@@ -291,6 +291,14 @@ export const AuthCard: React.FC<{signup: {credits: number; days: number}; notice
             <input type="password" value={form.password} onChange={set('password')}
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={mode === 'register' ? 8 : undefined} required />
           </Field>
+        )}
+        {/* Служебные новости KOK (рассылки, server/mailing.mjs). Отмечена заранее — решение владельца
+            21.10: это новости сервиса, не реклама; отписка — в каждом письме и в кабинете */}
+        {mode === 'register' && (
+          <label className="auth-news">
+            <input type="checkbox" checked={form.news} onChange={(e) => setForm({...form, news: e.target.checked})} />
+            <span>Получать новости KOK на почту — новые функции и изменения сервиса, без рекламы</span>
+          </label>
         )}
         {error && <div className="auth-error">{error}</div>}
         <button className="btn primary big" disabled={busy || (mode === 'forgot' && sent)}>

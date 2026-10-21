@@ -55,6 +55,14 @@ export const ProfileCard: React.FC = () => {
               <dd>{account.email}{!account.emailVerified && <span className="tag warn">не подтверждена</span>}</dd>
               <dt>В KOK с</dt><dd>{day(account.createdAt)}</dd>
             </dl>
+            {/* Рассылки KOK — только служебные новости; снять галочку — то же, что «Отписаться» в письме */}
+            <label className="news-toggle">
+              <input type="checkbox" checked={account.news} onChange={async (e) => {
+                const on = e.target.checked;
+                try { setAccount(await api.account.setNews(on)); toast(on ? 'Новости KOK будут приходить на почту' : 'Новости KOK больше не придут'); } catch (err) { setError(message(err)); }
+              }} />
+              <span>Получать новости KOK на почту</span>
+            </label>
             <div className="btn-row">
               <button className="btn" onClick={() => setEditing(true)}>Изменить</button>
               {!emailOpen && !account.pendingEmail && <button className="btn ghost" onClick={() => setEmailOpen(true)}>Сменить почту</button>}

@@ -73,7 +73,7 @@ export type Me =
   | {authRequired: true; user: null; signup: {credits: number; days: number}}
   | {authRequired: true; user: User; workspace: {id: string; name: string; role: string} | null; balance: Balance | null};
 // kind: plan — подписка на месяц (кредиты сгорают в конце месяца), topup — докупка, сгорает вместе с подпиской
-export type Pack = {id: string; title: string; credits: number; price_krw: number; valid_days: number; active: boolean; sort: number; kind: 'plan' | 'topup'};
+export type Pack = {id: string; title: string; credits: number; price_krw: number; valid_days: number; active: boolean; sort: number; kind: 'plan' | 'topup'; archived_at?: string | null};
 // pay — какие кассы включены на сервере (нет ключей — только менеджер)
 export type Offer = {contacts: {whatsapp?: string; telegram?: string; email?: string; instagram?: string}; packs: Pack[]; pay?: PayMethods; support?: boolean};
 // Включённые способы оплаты: usdt — касса NOWPayments; AnyPay — sbp и card (рубли), card_uah,
@@ -106,9 +106,26 @@ export type ClientRow = {
   last_seen_at: string | null; generations_30d: number; verified: boolean; had_plan: boolean;
   // Клиент поставил аккаунт на удаление: окончательно — в эту дату (null — живой)
   delete_after: string | null;
+  // Скрыт админом (миграция 018): когда и за что; null — в работе
+  hidden_at: string | null; hidden_note: string;
 };
 // Быстрые фильтры и сортировки админки — те же имена, что CLIENT_FILTERS/CLIENT_SORTS в server/accounts.mjs
-export type ClientFilter = 'all' | 'new' | 'trial' | 'active' | 'renew' | 'lapsed' | 'idle' | 'unverified';
+// Рассылка (server/mailing.mjs). segment — фильтр клиентов админки; counts — получатели по состояниям
+// segment 'pick' — получатели выбраны поимённо, их id в user_ids (владелец 21.10)
+export type MailingSegment = ClientFilter | 'pick';
+export type MailingDraft = {subject: string; body: string; button_label: string; button_url: string; segment: MailingSegment; user_ids: string[]};
+// Человек для «Выбрать вручную»: ok — письмо уйдёт, why — почему нет (отписался, почта не подтверждена…)
+export type Recipient = {user_id: string; name: string; person: string | null; email: string; ok: boolean; why: string | null};
+export type Mailing = MailingDraft & {
+  id: number; status: 'draft' | 'sending' | 'done' | 'cancelled'; created_at: string; updated_at: string;
+  started_at: string | null; finished_at: string | null; author?: string | null;
+  counts: {total: number; queued: number; sent: number; failed: number; skipped: number};
+  failed?: {email: string; error: string | null}[];
+  picked?: Recipient[];
+};
+// Что сотрудник правит у клиента: поля, которых нет, сервер не трогает
+export type ClientPatch = {company?: string; person?: string; phone?: string; email?: string};
+export type ClientFilter = 'all' | 'new' | 'trial' | 'active' | 'renew' | 'lapsed' | 'idle' | 'unverified' | 'hidden';
 export type ClientSort = 'new' | 'seen' | 'generated' | 'paid' | 'credits' | 'plan';
 export type ClientQuery = {q: string; filter: ClientFilter; sort: ClientSort; page: number};
 export type ClientList = {
@@ -120,11 +137,14 @@ export type UsdKrw = {krwPerUsd: number; fetchedAt: string; source: string; stal
 // Все курсы: единиц валюты за $1 (KRW, RUB, KZT…)
 export type Rates = {usdRates: Record<string, number>; fetchedAt: string; source: string; stale: boolean};
 export type StaffRow = {id: string; email: string; name: string | null; platform_role: Exclude<Role, null>};
-export type Registration = {name: string; email: string; phone: string; password: string; company: string};
+// news — галочка «Получать новости KOK» (отмечена заранее, владелец 21.10)
+export type Registration = {name: string; email: string; phone: string; password: string; company: string; news: boolean};
 // Профиль в кабинете: человек и кабинет. pendingEmail — новая почта ждёт кода из письма
 export type Account = {
   name: string; email: string; phone: string; emailVerified: boolean; createdAt: string;
   company: string; canEditCompany: boolean; pendingEmail: string | null;
+  // Получает ли служебные новости KOK (рассылки, миграция 019)
+  news: boolean;
 };
 // Вход на устройстве: device — «Chrome · Mac», current — тот, с которого смотрят
 export type SessionRow = {id: string; device: string; ip: string; createdAt: string; seenAt: string; current: boolean};
@@ -202,6 +222,7 @@ export const api = {
     supportLink: () => request<{url: string | null}>('POST', '/api/account/support-link'),
     profile: () => request<Account>('GET', '/api/account/profile'),
     save: (data: {name: string; company?: string}) => request<Account>('PUT', '/api/account/profile', data),
+    setNews: (on: boolean) => request<Account>('PUT', '/api/account/news', {on}),
     changePassword: (current: string, password: string) =>
       request<{ok: true; closed: number}>('POST', '/api/account/password', {current, password}),
     changeEmail: (email: string, password: string) =>
@@ -219,12 +240,30 @@ export const api = {
     clients: (query: ClientQuery) =>
       request<ClientList>('GET', `/api/admin/clients?${new URLSearchParams({...query, page: String(query.page)})}`),
     clientLedger: (id: string) => request<LedgerRow[]>('GET', `/api/admin/clients/${id}/ledger`),
+    updateClient: (id: string, patch: ClientPatch) => request<{ok: true}>('PUT', `/api/admin/clients/${id}`, patch),
+    takeCredits: (id: string, credits: number, note: string) => request<Balance>('POST', `/api/admin/clients/${id}/take`, {credits, note}),
+    hideClient: (id: string, note: string) => request<{ok: true}>('POST', `/api/admin/clients/${id}/hide`, {note}),
+    unhideClient: (id: string) => request<{ok: true}>('POST', `/api/admin/clients/${id}/unhide`),
     packs: () => request<Pack[]>('GET', '/api/admin/packs'),
     savePack: (pack: Pack) => request<Pack>('PUT', `/api/admin/packs/${pack.id}`, pack),
+    removePack: (id: string) => request<{result: 'deleted' | 'archived'}>('DELETE', `/api/admin/packs/${id}`),
+    restorePack: (id: string) => request<Pack>('POST', `/api/admin/packs/${id}/restore`),
     grantPack: (id: string, packId: string, note: string) =>
       request<Balance>('POST', `/api/admin/clients/${id}/packs`, {packId, note}),
     grantBonus: (id: string, credits: number, note: string) =>
       request<Balance>('POST', `/api/admin/clients/${id}/bonus`, {credits, note}),
+    mailings: () => request<Mailing[]>('GET', '/api/admin/mailings'),
+    mailing: (id: number) => request<Mailing>('GET', `/api/admin/mailings/${id}`),
+    audience: () => request<Record<ClientFilter, number>>('GET', '/api/admin/mailings/audience'),
+    findPeople: (q: string) => request<Recipient[]>('GET', `/api/admin/mailings/people?${new URLSearchParams({q})}`),
+    saveMailing: (m: MailingDraft, id?: number) => (id
+      ? request<Mailing>('PUT', `/api/admin/mailings/${id}`, m) : request<Mailing>('POST', '/api/admin/mailings', m)),
+    previewMailing: (m: MailingDraft) => request<{to: string; subject: string; html: string; problems: string[]}>('POST', '/api/admin/mailings/preview', m),
+    deleteMailing: (id: number) => request<{ok: true}>('DELETE', `/api/admin/mailings/${id}`),
+    copyMailing: (id: number) => request<Mailing>('POST', `/api/admin/mailings/${id}/copy`),
+    testMailing: (id: number) => request<{ok: true; to: string}>('POST', `/api/admin/mailings/${id}/test`),
+    sendMailing: (id: number) => request<Mailing>('POST', `/api/admin/mailings/${id}/send`),
+    cancelMailing: (id: number) => request<Mailing>('POST', `/api/admin/mailings/${id}/cancel`),
     staff: () => request<StaffRow[]>('GET', '/api/admin/staff'),
     setRole: (email: string, role: Role) => request<StaffRow[]>('PUT', '/api/admin/staff', {email, role}),
   },

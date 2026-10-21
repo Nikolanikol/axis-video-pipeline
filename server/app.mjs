@@ -34,9 +34,13 @@ import {styleError} from '../src/design/style/registry.js';
 import {withoutMusic} from '../src/shared/nomusic.js';
 import {
   accountOf, cancelEmailChange, requestDeletion, restoreAccount, changePassword, closeOtherSessions, closeSession, confirmEmailChange, dropSession,
-  grantBonus, grantPack, listClients, listPacks, listSessions, listStaff, login, register, requestEmailChange,
-  requestReset, resetPassword, savePack, sendVerification, setRole, updateAccount, verifyCode, verifyLink,
+  grantBonus, grantPack, setNews, listClients, listPacks, listSessions, listStaff, login, register, requestEmailChange,
+  removePack, requestReset, resetPassword, restorePack, savePack, sendVerification, setRole, updateAccount, verifyCode, verifyLink,
 } from './accounts.mjs';
+import {hideClient, takeCredits, unhideClient, updateClient} from './clients.mjs';
+import {
+  audience, cancelMailing, copyMailing, deleteDraft, findRecipients, getMailing, listMailings, previewMailing, saveMailing, sendTest, startMailing, unsubscribe,
+} from './mailing.mjs';
 import {
   authEnabled, clearSessionCookie, guardData, loginLimiter, readSessionMw, registerLimiter, requireAdmin, requireCredits,
   requireStaff, requireUser, sessionToken, setSessionCookie,
@@ -74,6 +78,14 @@ const withAbsolutePhotos = (lot, origin) => lot && {...lot, photos: lot.photos.m
 
 // Откуда вход: браузер и адрес — для списка «где выполнен вход» в кабинете.
 // req.ip — с учётом trust proxy ниже, то есть адрес человека, а не Traefik
+// Страница отписки — простая, без интерфейса KOK: её открывают из письма, часто с телефона и без входа
+const unsubscribePage = (inner) => `<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Новости KOK</title><meta name="robots" content="noindex">
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0b0b0d;color:#f7f2eb;font:16px/1.5 Manrope,Arial,sans-serif;padding:16px;box-sizing:border-box}
+main{max-width:420px;text-align:center}p{margin:0 0 16px}.m{color:#9b958e;font-size:14px}
+button{background:#8e0d2c;color:#f7f2eb;border:0;border-radius:8px;padding:12px 22px;font:inherit;font-weight:700;cursor:pointer}</style>
+</head><body><main><h1>KOK</h1>${inner}</main></body></html>`;
+
 const clientMeta = (req) => ({userAgent: req.get('user-agent') ?? '', ip: req.ip ?? ''});
 
 // Обработчик выполняется от имени компании из сессии. Контекст ставим заново здесь, а не
@@ -250,6 +262,20 @@ export const createApp = ({photoOrigin}) => {
   // Владелец 01.10: «прозрачные и заманчивые условия» — до регистрации видно, сколько дарим,
   // сколько стоит ролик и карусель и сколько стоят тарифы. Контакты продаж — для «написать
   // нам». Из пакетов отдаём только то, что и так показывает кабинет: название, кредиты, цену
+  // Отписка от новостей по ссылке из письма (server/mailing.mjs), без входа. GET — только страница
+  // с кнопкой: почтовые сканеры открывают ссылки из писем сами, и отписка по GET отписывала бы
+  // людей без их ведома. Отписывает POST — кнопка на странице и «Отписаться» в Gmail
+  // (List-Unsubscribe-Post шлёт POST на этот же адрес)
+  api.get('/public/unsubscribe', (req, res) => {
+    const k = String(req.query.k ?? '').replace(/[^0-9a-f-]/gi, '').slice(0, 36);
+    res.type('html').send(unsubscribePage(`<p>Не присылать вам новости KOK на почту?</p>
+<form method="post" action="/api/public/unsubscribe?k=${k}"><button>Отписаться</button></form>
+<p class="m">Письма о входе, оплате и безопасности аккаунта приходят всегда — это не рассылка.</p>`));
+  });
+  api.post('/public/unsubscribe', express.urlencoded({extended: false}), (req, res, next) => unsubscribe(req.query.k)
+    .then(() => res.type('html').send(unsubscribePage(`<p>Готово — новости KOK больше не придут.</p>
+<p class="m">Передумаете — включите «Получать новости KOK» в своём кабинете.</p>`)))
+    .catch(next));
   api.get('/public/offer', (_req, res, next) => (async () => {
     const {contacts, legal} = await platformInfo();
     const packs = authEnabled() ? await listPacks() : [];
@@ -301,6 +327,7 @@ export const createApp = ({photoOrigin}) => {
   account.use((req, _res, next) => next(authEnabled() ? undefined : new HttpError(400, 'Профиль работает только с базой')));
   const who = (req) => ({userId: req.user.id, workspaceId: req.ws, sessionId: req.sessionId});
   account.get('/profile', wrap((req) => accountOf(req.user.id, req.ws)));
+  account.put('/news', wrap((req) => setNews({...who(req), on: req.body?.on})));
   account.put('/profile', wrap((req) => updateAccount({...who(req), name: req.body?.name, company: req.body?.company})));
   // Всё, где проверяется текущий пароль, — под ограничением попыток: иначе вошедший на
   // чужом ноутбуке перебирал бы пароль владельца, чтобы сменить почту
@@ -361,6 +388,37 @@ export const createApp = ({photoOrigin}) => {
     workspaceId: checkId(req.params.id), credits: req.body?.credits, days: req.body?.days, note: req.body?.note, createdBy: req.user.id,
   })));
   admin.put('/packs/:id', requireAdmin, wrap((req) => savePack({...req.body, id: req.params.id})));
+  // Удаление: не продавался — строка прочь, продавался — в архив (ответ говорит, что сделано)
+  admin.delete('/packs/:id', requireAdmin, wrap((req) => removePack(req.params.id)));
+  admin.post('/packs/:id/restore', requireAdmin, wrap((req) => restorePack(req.params.id)));
+  // Сам клиент: контакты — сотрудникам, списание и скрытие — админу (server/clients.mjs)
+  admin.put('/clients/:id', wrap((req) => updateClient({
+    workspaceId: checkId(req.params.id), company: req.body?.company, person: req.body?.person, phone: req.body?.phone, email: req.body?.email,
+    by: {id: req.user.id, role: req.user.role},
+  })));
+  admin.post('/clients/:id/take', requireAdmin, wrap((req) => takeCredits({
+    workspaceId: checkId(req.params.id), credits: req.body?.credits, note: req.body?.note, by: {id: req.user.id},
+  })));
+  admin.post('/clients/:id/hide', requireAdmin, wrap((req) => hideClient({workspaceId: checkId(req.params.id), note: req.body?.note, by: {id: req.user.id}})));
+  admin.post('/clients/:id/unhide', requireAdmin, wrap((req) => unhideClient({workspaceId: checkId(req.params.id), by: {id: req.user.id}})));
+  // Рассылки — всем сотрудникам: их делает менеджер (владелец 21.10). Только служебные новости
+  const mid = (req) => {
+    const n = Number(req.params.id);
+    if (!Number.isInteger(n) || n < 1) throw new HttpError(400, 'Неверный номер рассылки');
+    return n;
+  };
+  admin.get('/mailings', wrap(() => listMailings()));
+  admin.get('/mailings/audience', wrap(() => audience()));
+  admin.get('/mailings/people', wrap((req) => findRecipients(req.query.q)));
+  admin.post('/mailings/preview', wrap((req) => previewMailing({...req.body, by: req.user.id})));
+  admin.post('/mailings', wrap((req) => saveMailing({...req.body, id: undefined, by: req.user.id})));
+  admin.get('/mailings/:id', wrap((req) => getMailing(mid(req))));
+  admin.put('/mailings/:id', wrap((req) => saveMailing({...req.body, id: mid(req), by: req.user.id})));
+  admin.delete('/mailings/:id', wrap((req) => deleteDraft(mid(req))));
+  admin.post('/mailings/:id/copy', wrap((req) => copyMailing({id: mid(req), by: req.user.id})));
+  admin.post('/mailings/:id/test', wrap((req) => sendTest({id: mid(req), by: req.user.id})));
+  admin.post('/mailings/:id/send', wrap((req) => startMailing({id: mid(req)})));
+  admin.post('/mailings/:id/cancel', wrap((req) => cancelMailing({id: mid(req)})));
   admin.get('/staff', requireAdmin, wrap(() => listStaff()));
   admin.put('/staff', requireAdmin, wrap((req) => setRole({email: req.body?.email, role: req.body?.role, by: req.user.id})));
   api.use('/admin', admin);
