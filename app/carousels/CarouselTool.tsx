@@ -424,7 +424,7 @@ const StyleList: React.FC<{value: string | null; built?: string | null; onChange
   const tile = (id: string | null, title: string, note: string, swatch?: string[]) =>
     <button key={id ?? 'brand'} type="button" role="radio" aria-checked={value === id} title={note}
       className={`style-tile${value === id ? ' on' : ''}${built !== undefined && built === id ? ' built' : ''}`} onClick={() => onChange(id)}>
-      <span className="style-swatch">{(swatch ?? []).map((c) => <i key={c} style={{background: c}} />)}</span>
+      <span className="style-swatch">{(swatch ?? []).map((c, i) => <i key={i} style={{background: c}} />)}</span>
       <span className="style-tile-name">{title}</span>
       {built !== undefined && built === id && <Check className="format-built-icon" size={14} aria-hidden />}
     </button>;

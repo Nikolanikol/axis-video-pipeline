@@ -95,6 +95,11 @@ if (production) {
   // адреса, canonical, витрина для гостя (server/seo.mjs). Оба файла читаем один раз: сборка в
   // контейнере не меняется до следующей выкладки
   app.use(express.static(DIST, {index: false}));
+  // Файла сборки нет (старая вкладка после выкладки просит кусок прежней сборки) — честный 404, а не
+  // запасная страница ниже. Раньше на /assets/index-CE4WdCIV.js приходил index.html с 200, браузер
+  // ронял экран ошибкой «'text/html' is not a valid JavaScript MIME type» (тревога 21.10, 933ea28d33),
+  // и её не узнавала граница экрана — клиент видел «сбой» вместо «обновите страницу»
+  app.use('/assets', (_req, res) => res.status(404).type('text/plain').send('Файл сборки не найден — обновите страницу'));
   const shell = await fs.readFile(path.join(DIST, 'index.html'), 'utf8');
   const landing = await readPrerendered(DIST);
   if (!landing) log.warn('seo.no-prerender', {note: 'нет dist/app/landing.html — роботы увидят пустую витрину'});

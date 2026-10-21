@@ -40,6 +40,8 @@ export const useSession = () => {
 };
 
 type Signed = Extract<Me, {user: User}>;
+// Поисковые и проверочные роботы (Googlebot и его проверка URL, Яндекс, Bing, превью соцсетей)
+const IS_BOT = typeof navigator !== 'undefined' && /bot|crawl|spider|slurp|Google-InspectionTool|Lighthouse|facebookexternalhit/i.test(navigator.userAgent);
 const signedIn = (m: Me): m is Signed => m.authRequired && m.user !== null;
 
 export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
@@ -55,7 +57,16 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
   // Перечитать, кто вошёл: после подтверждения почты меняются и признак, и баланс
   const load = useCallback(() => {
     api.me().then((m) => { setMe(m); if (signedIn(m)) setBalance(m.balance); })
-      .catch((e) => setError(errorText(e)));
+      // Поисковому роботу — витрина как гостю, а не экран ошибки: его рендер может не выполнить запрос
+      // входа (21.10: Google обрывал его с 499, и в поиск уходила плашка «Сервер ответил ошибкой»).
+      // Человеку — прежний экран с «Обновить страницу»: ему нужно знать, что вход не проверился
+      .catch((e) => {
+        if (!IS_BOT) { setError(errorText(e)); return; }
+        // Подарок при регистрации — из условий витрины (тот же источник, что у Landing); не отдались —
+        // те же умолчания, что у документов (Legal.tsx)
+        const guest = (signup: {credits: number; days: number}): Me => ({authRequired: true, user: null, signup});
+        api.publicOffer().then((o) => setMe(guest(o?.signup ?? {credits: 7, days: 30}))).catch(() => setMe(guest({credits: 7, days: 30})));
+      });
   }, []);
 
   // Баланс меняется и в других вкладках (собрали там ролик, оплатили тариф). Раньше он читался
