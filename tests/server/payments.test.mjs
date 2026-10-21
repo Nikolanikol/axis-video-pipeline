@@ -220,6 +220,7 @@ suite('оплата тарифа', () => {
     const second = await checkout();
     const before = (await lots()).length;
     await expect(notify(await paid(second.id, 7010))).resolves.toEqual({ok: true});
+    await settle(); // тревога уходит в фоне — без ожидания тест зависел от скорости машины и падал через раз
     expect(await lots()).toHaveLength(before);
     expect(telegram.some((t) => t.includes(second.id) && /уже привязан/.test(t))).toBe(true);
   });

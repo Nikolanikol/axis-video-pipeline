@@ -8,6 +8,7 @@ import {ROOT} from './store.mjs';
 import {hasDatabase, migrate} from './db/index.mjs';
 import {refundOrphans, sweepCharges} from './billing.mjs';
 import {purgeDeleted} from './accounts.mjs';
+import {startMailingQueue} from './mailing.mjs';
 import {reconcilePayments} from './payments.mjs';
 import {startSupport} from './support.mjs';
 import {DEFAULT_WORKSPACE, ensureWorkspace, legacyDataDirs} from './store.mjs';
@@ -57,6 +58,9 @@ if (hasDatabase()) {
   const reconcile = () => reconcilePayments().catch((e) => log.error('task.failed', {task: 'reconcilePayments', note: 'сверка оплат', error: e}));
   reconcile();
   setInterval(reconcile, 5 * 60 * 1000).unref();
+  // Очередь рассылок (server/mailing.mjs): продолжает начатые после перезапуска, раз в минуту
+  // подбирает новые и переждавшие сбой Resend
+  startMailingQueue();
   // Поддержка в Telegram (server/support.mjs): вебхук на проде, опрос на Mac — по TELEGRAM_SUPPORT.
   // Не ждём: Telegram недоступен — сервер всё равно должен отвечать клиентам
   void startSupport().catch((e) => log.error('task.failed', {task: 'startSupport', note: 'поддержка Telegram не запустилась', error: e}));
