@@ -13,7 +13,7 @@ import {currencyCode, currencySign, isDirect, krwPerUnit} from '../src/shared/cu
 import {useRates} from './rates';
 import {TOOLS, hasTool} from './tools';
 import {Toasts} from './Toast';
-import {reportError} from './errorReport';
+import {STALE_BUILD, reloadForNewBuild, reportError} from './errorReport';
 import {errorText} from './api';
 import {SiteFooter} from './SiteFooter';
 import {SourcesStrip} from './Sources';
@@ -260,13 +260,15 @@ const ToolScreen: React.FC<{pipeline: Pipeline; tool: ToolMeta}> = ({pipeline, t
 // он английский и про код («Cannot read properties of undefined»), — отчёт уже ушёл нам.
 // Отдельный случай — после выкладки старая вкладка просит кусок сборки, которого больше нет:
 // это лечит только перезагрузка, «Попробовать снова» падало бы раз за разом
-const STALE_BUILD = /dynamically imported module|Importing a module script failed|Loading chunk/i;
+// (шаблон и перезагрузка — в errorReport.ts: один раз сама, чаще раза в минуту — кнопкой)
 
 class ToolBoundary extends React.Component<{title: string; children: React.ReactNode}, {error: Error | null}> {
   state = {error: null as Error | null};
   static getDerivedStateFromError(error: Error) { return {error}; }
   componentDidCatch(error: Error, info: React.ErrorInfo) {
     console.error(error);
+    // Устаревшая сборка — сразу на новую; не вышло (уже перезагружались только что) — экран с кнопкой
+    if (STALE_BUILD.test(error.message) && reloadForNewBuild()) return;
     reportError('boundary', error, {tool: this.props.title, componentStack: info.componentStack ?? undefined});
   }
   render() {

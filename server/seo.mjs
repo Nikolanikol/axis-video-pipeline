@@ -44,8 +44,13 @@ export const robotsTxt = async (req) => {
   if (!(await isPrimary(req))) return 'User-agent: *\nDisallow: /\n';
   const site = await siteUrl();
   // Кабинет живёт на «/» за «#», его не закрыть отдельно — и не нужно: без входа робот видит витрину.
-  // Закрываем служебное: API, файлы компаний, миниатюры, возврат из кассы
-  return ['User-agent: *', 'Disallow: /api/', 'Disallow: /data/', 'Disallow: /thumbs/', 'Disallow: /pay-return/', '',
+  // Закрываем служебное: API, файлы компаний, миниатюры, возврат из кассы.
+  // Allow — два гостевых адреса API, без которых витрина не собирается: «кто вошёл» и условия витрины.
+  // Без них (21.10, проверка URL в Search Console) рендер Google обрывал запрос входа (499), экран
+  // входа показывал «Сервер ответил ошибкой» вместо витрины — и это видел поиск. Более точное правило
+  // важнее общего Disallow: так читают robots.txt и Google, и Яндекс
+  return ['User-agent: *', 'Allow: /api/auth/me', 'Allow: /api/public/', 'Disallow: /api/', 'Disallow: /data/', 'Disallow: /thumbs/',
+    'Disallow: /pay-return/', '',
     `Sitemap: ${site}/sitemap.xml`, ''].join('\n');
 };
 
