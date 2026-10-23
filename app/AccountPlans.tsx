@@ -12,12 +12,11 @@ import React, {useEffect, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {Check, Send} from 'lucide-react';
 import {Offer, Pack, PayMethod, Payment, api, errorText} from './api';
+import {usd} from './Account';
 import {day, useSession} from './auth';
 import {useConfig} from './config';
 import {useRoute} from './router';
 
-const won = (n: number) => `₩${n.toLocaleString('ru-RU')}`;
-const usd = (n: number) => `$${n.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
 // Валюты AnyPay: знак и копейки (сумы — целыми, на картах Узбекистана копеек нет)
 const CUR: Record<string, {sign: string; digits: number; name: string}> = {
   rub: {sign: '₽', digits: 2, name: 'рубли'}, uah: {sign: '₴', digits: 2, name: 'гривны'},
@@ -30,7 +29,9 @@ const paid = (p: Payment) => (p.currency === 'usd' ? `${usd(p.amount)} USDT` : i
 const CARD_CURRENCIES: {key: PayMethod; cur: string; country: string}[] = [
   {key: 'card_uzs', cur: 'uzs', country: 'Узбекистан'}, {key: 'card_kgs', cur: 'kgs', country: 'Киргизия'}, {key: 'card_uah', cur: 'uah', country: 'Украина'},
 ];
-const perCredit = (p: Pack) => p.price_krw / p.credits;
+const perCredit = (p: Pack) => p.price_usd / p.credits;
+// Цена за кредит — до цента: в долларах это доли, целыми было бы «$1 за кредит» у всех тарифов
+const cents = (n: number) => Math.round(n * 100) / 100;
 // 1 ролик, 2 ролика, 5 роликов
 const plural = (n: number, [one, few, many]: [string, string, string]) => {
   const m10 = n % 10;
@@ -107,7 +108,6 @@ const pressable = (onPress: () => void) => ({
 const PayDialog: React.FC<{pack: Pack; offer: Offer; text: string; onClose: () => void}> = ({pack, offer, text, onClose}) => {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [rate, setRate] = useState<number | null>(null);
   const manager = managerOf(offer, text);
   const [copied, setCopied] = useState(false);
   const write = async () => {
@@ -126,11 +126,10 @@ const PayDialog: React.FC<{pack: Pack; offer: Offer; text: string; onClose: () =
   // Курсы для подсказки «≈ сумма»: точную сумму считает сервер по тому же курсу дня
   const [usdRates, setUsdRates] = useState<Record<string, number> | null>(null);
 
-  useEffect(() => { if (usdt) api.usdKrw().then((r) => setRate(r.krwPerUsd)).catch(() => setRate(null)); }, [usdt]);
   useEffect(() => { if (anypay) api.rates().then((r) => setUsdRates(r.usdRates)).catch(() => setUsdRates(null)); }, [anypay]);
   const approx = (c: string) => {
-    const per = usdRates?.KRW && usdRates[c.toUpperCase()] ? usdRates.KRW / usdRates[c.toUpperCase()] : 0;
-    return per ? ` · ≈ ${inCur(pack.price_krw / per, c)}` : '';
+    const per = usdRates?.[c.toUpperCase()] ?? 0;
+    return per ? ` · ≈ ${inCur(pack.price_usd * per, c)}` : '';
   };
   const approxRub = approx('rub');
   useEffect(() => {
@@ -157,7 +156,7 @@ const PayDialog: React.FC<{pack: Pack; offer: Offer; text: string; onClose: () =
     <div className="modal-backdrop" onClick={() => !busy && onClose()}>
       <div className="pay-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="pay-title">
         <h2 id="pay-title">{pack.kind === 'plan' ? `Тариф «${pack.title}»` : `+${credits(pack.credits)}`}</h2>
-        <p className="pay-sum">{won(pack.price_krw)}{pack.kind === 'plan' ? <span className="muted"> · {credits(pack.credits)} на месяц</span> : null}</p>
+        <p className="pay-sum">{usd(pack.price_usd)}{pack.kind === 'plan' ? <span className="muted"> · {credits(pack.credits)} на месяц</span> : null}</p>
         {rubles && (
           <div className="pay-option">
             {sbp && (
@@ -193,7 +192,7 @@ const PayDialog: React.FC<{pack: Pack; offer: Offer; text: string; onClose: () =
         {usdt && (
           <div className="pay-option">
             <button className={`btn${anypay ? '' : ' primary'}`} onClick={() => pay('usdt')} disabled={busy}>
-              {busyWith === 'usdt' ? 'Открываю кассу…' : `Оплатить USDT${rate ? ` · ≈ ${usd(Math.round((pack.price_krw / rate) * 100) / 100)}` : ''}`}
+              {busyWith === 'usdt' ? 'Открываю кассу…' : `Оплатить ${usd(pack.price_usd)} в USDT`}
             </button>
             <p className="hint">
               Сеть <b>TRON (TRC20)</b>. Кредиты придут сами через несколько минут после оплаты.
@@ -306,8 +305,8 @@ export const PlansSection: React.FC = () => {
         {plans.map((p) => {
           const mine = current?.planId === p.id;
           const discount = discountOf(p, plans);
-          const saving = Math.round(top * p.credits - p.price_krw);
-          const text = `Здравствуйте! Хочу ${mine ? 'продлить' : 'подключить'} тариф «${p.title}» — ${p.credits} кредитов за ${won(p.price_krw)} в месяц.${who}`;
+          const saving = Math.round(top * p.credits - p.price_usd);
+          const text = `Здравствуйте! Хочу ${mine ? 'продлить' : 'подключить'} тариф «${p.title}» — ${p.credits} кредитов за ${usd(p.price_usd)} в месяц.${who}`;
           const isBest = best?.id === p.id;
           return (
             <div key={p.id} className={`plan lift${isBest ? ' best' : ''}${mine ? ' mine' : ''}`} {...pressable(() => setPaying({pack: p, text}))}>
@@ -316,11 +315,11 @@ export const PlansSection: React.FC = () => {
               )}
               <b className="plan-title">{p.title}</b>
               <div className="plan-credits"><span>{p.credits}</span> {plural(p.credits, ['кредит', 'кредита', 'кредитов'])}/мес</div>
-              <div className="plan-price">{won(p.price_krw)} <span className="muted">в месяц</span></div>
+              <div className="plan-price">{usd(p.price_usd)} <span className="muted">в месяц</span></div>
               <div className="plan-unit muted">
-                {won(Math.round(perCredit(p)))} за кредит
+                {usd(cents(perCredit(p)))} за кредит
                 {discount > 0 && !isBest && <> · −{discount}%</>}
-                {isBest && saving > 0 && <> · <span className="plan-save">экономия {won(saving)}</span></>}
+                {isBest && saving > 0 && <> · <span className="plan-save">экономия {usd(saving)}</span></>}
               </div>
               <ul className="plan-points">
                 <li><Check size={14} aria-hidden /> ≈ {Math.floor(p.credits / ads)} {plural(Math.floor(p.credits / ads), ['ролик', 'ролика', 'роликов'])} или {Math.floor(p.credits / carousels)} {plural(Math.floor(p.credits / carousels), ['карусель', 'карусели', 'каруселей'])}</li>
@@ -337,14 +336,14 @@ export const PlansSection: React.FC = () => {
           <div className="section-head"><h2>Не хватило на месяц</h2></div>
           <div className="topup-grid">
             {topups.map((p) => {
-              const text = `Здравствуйте! Хочу докупить ${credits(p.credits)} за ${won(p.price_krw)}.${who}`;
+              const text = `Здравствуйте! Хочу докупить ${credits(p.credits)} за ${usd(p.price_usd)}.${who}`;
               return (
                 <div key={p.id} className="topup lift" {...pressable(() => setPaying({pack: p, text}))}>
                   <div>
                     <b>+{credits(p.credits)}</b>
-                    <span className="muted">{won(Math.round(perCredit(p)))} за кредит{bestTopup?.id === p.id ? ' · выгоднее' : ''}</span>
+                    <span className="muted">{usd(cents(perCredit(p)))} за кредит{bestTopup?.id === p.id ? ' · выгоднее' : ''}</span>
                   </div>
-                  <span className="btn">{won(p.price_krw)}</span>
+                  <span className="btn">{usd(p.price_usd)}</span>
                 </div>
               );
             })}

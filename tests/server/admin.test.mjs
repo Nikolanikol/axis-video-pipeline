@@ -107,7 +107,7 @@ suite('админка: тарифы, клиенты, рассылки', () => {
 
   describe('тарифы', () => {
     it('непроданный удаляется совсем, проданный уходит в архив и не продаётся', async () => {
-      await owner.call('PUT', '/api/admin/packs/plan-temp', {title: 'Временный', credits: 5, price_krw: 1000, kind: 'plan'});
+      await owner.call('PUT', '/api/admin/packs/plan-temp', {title: 'Временный', credits: 5, price_usd: 1, kind: 'plan'});
       expect((await owner.call('DELETE', '/api/admin/packs/plan-temp')).body).toEqual({result: 'deleted'});
       expect((await owner.call('GET', '/api/admin/packs')).body.map((p) => p.id)).not.toContain('plan-temp');
 
@@ -123,7 +123,7 @@ suite('админка: тарифы, клиенты, рассылки', () => {
     it('«Вернуть» снимает архив, но в продажу не выставляет; «продаётся» — выставляет', async () => {
       expect((await owner.call('POST', '/api/admin/packs/start/restore')).body).toMatchObject({archived_at: null, active: false});
       await owner.call('DELETE', '/api/admin/packs/start');
-      const back = await owner.call('PUT', '/api/admin/packs/start', {title: 'Старт', credits: 10, price_krw: 19000, active: true});
+      const back = await owner.call('PUT', '/api/admin/packs/start', {title: 'Старт', credits: 10, price_usd: 16, active: true});
       expect(back.body).toMatchObject({active: true, archived_at: null});
     });
 

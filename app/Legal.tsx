@@ -19,11 +19,12 @@ import {api, Offer, PublicOffer} from './api';
 const EDITION = '19 октября 2026 г.';
 // Оферта поменялась в тот же день (возврат 14 дней → 3 суток, вечер 12.10) — вторая редакция того же
 // числа. Клиент, оплативший до неё, вправе требовать возврат по первой (14 дней)
-const OFFER_EDITION = '12 октября 2026 г. (вторая, возврат — 3 суток)';
+// 23.10 — цены в долларах вместо вон (раздел 4). Оплаченное раньше живёт по редакции дня оплаты
+const OFFER_EDITION = '23 октября 2026 г. (цены в долларах США)';
 
 export type LegalKind = 'offer' | 'privacy';
 
-const won = (n: number) => `${n.toLocaleString('ru-RU')} ₩`;
+const usd = (n: number) => `$${n.toLocaleString('en-US', Number.isInteger(n) ? {maximumFractionDigits: 0} : {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
 const credits = (n: number) => {
   const d = n % 10; const h = n % 100;
   return `${n} ${d === 1 && h !== 11 ? 'кредит' : d >= 2 && d <= 4 && (h < 12 || h > 14) ? 'кредита' : 'кредитов'}`;
@@ -152,8 +153,8 @@ const OfferText: React.FC<{offer: PublicOffer | null}> = ({offer}) => {
         <table className="legal-prices">
           <thead><tr><th>Тариф</th><th>Кредиты</th><th>Цена</th></tr></thead>
           <tbody>
-            {plans.map((p) => <tr key={p.id}><td>{p.title}</td><td>{p.credits} на месяц</td><td>{won(p.price_krw)}</td></tr>)}
-            {topups.map((p) => <tr key={p.id}><td>Докупка «{p.title}»</td><td>{p.credits}</td><td>{won(p.price_krw)}</td></tr>)}
+            {plans.map((p) => <tr key={p.id}><td>{p.title}</td><td>{p.credits} на месяц</td><td>{usd(p.price_usd)}</td></tr>)}
+            {topups.map((p) => <tr key={p.id}><td>Докупка «{p.title}»</td><td>{p.credits}</td><td>{usd(p.price_usd)}</td></tr>)}
           </tbody>
         </table>
       )}
@@ -161,7 +162,7 @@ const OfferText: React.FC<{offer: PublicOffer | null}> = ({offer}) => {
 
       <h2>4. Оплата</h2>
       <ul>
-        <li>Цены указаны в южнокорейских вонах (₩). Оплата — способами, которые показаны в окне оплаты в кабинете (на дату редакции — USDT в сети TRON/TRC20; оплата в рублях — по мере подключения).</li>
+        <li>Цены указаны в долларах США ($). Оплата — способами, которые показаны в окне оплаты в кабинете (на дату редакции — USDT в сети TRON/TRC20; оплата в рублях — по мере подключения).</li>
         <li>Если валюта оплаты другая, сумма пересчитывается по курсу на момент выставления счёта; точная сумма видна до оплаты.</li>
         <li>Платёж принимает сторонний платёжный сервис. Данные банковских карт и кошельков Продавец не получает и не хранит.</li>
         <li>Кредиты начисляются автоматически, как только платёжный сервис подтвердит оплату — обычно в течение нескольких минут.</li>

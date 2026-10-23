@@ -61,11 +61,11 @@ export const plural = (n) => {
  * source — signup | pack | bonus | subscription. Срок — либо days от сейчас, либо точная
  * дата expiresAt: подписка продлевается от конца текущей, докупка сгорает вместе с ней.
  */
-export const addLot = async (client, {workspaceId, credits, days, expiresAt = null, source, packId = null, priceKrw = null, note = '', createdBy = null}) => {
+export const addLot = async (client, {workspaceId, credits, days, expiresAt = null, source, packId = null, priceUsd = null, note = '', createdBy = null}) => {
   const {rows: [lot]} = await client.query(
-    `INSERT INTO smmaker_credit_lots (workspace_id, credits, remaining, expires_at, source, pack_id, price_krw, note, created_by)
+    `INSERT INTO smmaker_credit_lots (workspace_id, credits, remaining, expires_at, source, pack_id, price_usd, note, created_by)
      VALUES ($1, $2, $2, COALESCE($9::timestamptz, now() + $3 * interval '1 day'), $4, $5, $6, $7, $8) RETURNING id, expires_at`,
-    [workspaceId, credits, days ?? 30, source, packId, priceKrw, String(note).slice(0, 200), createdBy, expiresAt]);
+    [workspaceId, credits, days ?? 30, source, packId, priceUsd, String(note).slice(0, 200), createdBy, expiresAt]);
   await client.query(
     `INSERT INTO smmaker_credit_ledger (workspace_id, lot_id, delta, kind, note, created_by)
      VALUES ($1, $2, $3, 'grant', $4, $5)`,
@@ -281,7 +281,7 @@ export const sweepCharges = async ({log = console.log} = {}) => {
 
 /** Журнал кредитов компании — для админки: что, когда и за сколько; у начислений — срок партии */
 export const ledgerOf = async (workspaceId, limit = 200) => (await db().query(
-  `SELECT l.id, l.delta, l.kind, l.pipeline, l.job_id, l.note, l.created_at, t.expires_at, t.source, t.price_krw
+  `SELECT l.id, l.delta, l.kind, l.pipeline, l.job_id, l.note, l.created_at, t.expires_at, t.source, t.price_usd::float8 AS price_usd
      FROM smmaker_credit_ledger l LEFT JOIN smmaker_credit_lots t ON t.id = l.lot_id
     WHERE l.workspace_id = $1 ORDER BY l.created_at DESC, l.id DESC LIMIT $2`,
   [workspaceId, limit])).rows;
@@ -298,7 +298,7 @@ export const ledgerPage = async (workspaceId, page = 1) => {
   const pages = Math.max(1, Math.ceil(c.n / LEDGER_PAGE));
   const at = Math.min(Math.max(1, Math.floor(Number(page)) || 1), pages);
   const {rows} = await db().query(
-    `SELECT l.id, l.delta, l.kind, l.pipeline, l.job_id, l.note, l.created_at, t.expires_at, t.source, t.price_krw
+    `SELECT l.id, l.delta, l.kind, l.pipeline, l.job_id, l.note, l.created_at, t.expires_at, t.source, t.price_usd::float8 AS price_usd
        FROM smmaker_credit_ledger l LEFT JOIN smmaker_credit_lots t ON t.id = l.lot_id
       WHERE l.workspace_id = $1 ORDER BY l.created_at DESC, l.id DESC LIMIT $2 OFFSET $3`,
     [workspaceId, LEDGER_PAGE, (at - 1) * LEDGER_PAGE]);

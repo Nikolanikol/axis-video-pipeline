@@ -118,21 +118,21 @@ suite('оплата через AnyPay', () => {
   it('заказ: сумма в сумах по курсу дня, целыми; числовой номер у кассы; платёж кассы известен сразу', async () => {
     const {id, url} = await checkout('card_uzs');
     const o = await order(id);
-    // ₩49 000 / (1342 / 11887) = 434 026,08  → сумы целыми
-    expect(Number(o.amount)).toBe(434026);
+    // $36,98 (тариф) × 11 887 сумов за $1 = 439 581,26 → сумы целыми
+    expect(Number(o.amount)).toBe(439581);
     expect(o).toMatchObject({provider: 'anypay', status: 'created', currency: 'uzs', pay_currency: 'card', sandbox: false});
     expect(o.kassa_order).toMatch(/^[1-9]\d{14}$/);
     expect(o.payment_id).toBe(o.invoice_id);
     expect(url).toMatch(/^https:\/\/anypay\.io\/pay\//);
     // Кассе ушло: наш числовой номер, валюта карты, способ «card», без адреса возврата (не боевой сайт)
-    expect(created.at(-1)).toMatchObject({pay_id: o.kassa_order, amount: '434026.00', currency: 'UZS', method_currency: 'UZS', method: 'card'});
+    expect(created.at(-1)).toMatchObject({pay_id: o.kassa_order, amount: '439581.00', currency: 'UZS', method_currency: 'UZS', method: 'card'});
     expect(created.at(-1).success_url).toBeUndefined();
   });
 
   it('гривны — с копейками', async () => {
     const {id} = await checkout('card_uah');
-    // ₩49 000 / (1342 / 44,97) = 1641,97…
-    expect(await order(id)).toMatchObject({currency: 'uah', amount: '1641.97'});
+    // $36,98 × 44,97 = 1662,99…
+    expect(await order(id)).toMatchObject({currency: 'uah', amount: '1662.99'});
   });
 
   it('клиент оплатил → кредиты начисляются сами, ровно один раз, сколько бы касса ни повторяла', async () => {
@@ -146,16 +146,16 @@ suite('оплата через AnyPay', () => {
     await settle();
     const got = await lots();
     expect(got).toHaveLength(before + 1);
-    expect(got.at(-1)).toMatchObject({source: 'subscription', pack_id: 'plan-basic', credits: 30, price_krw: 49000});
+    expect(got.at(-1)).toMatchObject({source: 'subscription', pack_id: 'plan-basic', credits: 30, price_usd: '36.98'});
     expect(await order(id)).toMatchObject({status: 'paid', provider_status: 'paid'});
     expect(await pay.paymentOf(WS, id)).toMatchObject({credited: true, status: 'paid', currency: 'uzs'});
     // Сообщение в «Оплаты» — с суммой в сумах и способом
-    expect(telegram.some((t) => t.startsWith('✅ Оплата пришла') && t.includes(id) && /434\s026 сум · банковская карта/.test(t))).toBe(true);
+    expect(telegram.some((t) => t.startsWith('✅ Оплата пришла') && t.includes(id) && /439\s581 сум · банковская карта/.test(t))).toBe(true);
     // Письмо — одно, владельцу, сумма в сумах
     expect(mails.length - mailsBefore).toBe(1);
     expect(mails.at(-1).to).toBe('owner@anypay.test');
     // Разряды — неразрывным пробелом (toLocaleString), поэтому \s
-    expect(JSON.stringify(mails.at(-1))).toMatch(/434(\s|\\u00a0)026 сум/);
+    expect(JSON.stringify(mails.at(-1))).toMatch(/439(\s|\\u00a0)581 сум/);
     expect(await events(id, 'credit')).toHaveLength(1);
     // Журнал AnyPay: весь путь заказа по шагам, начисление — одно
     const mine = journal.filter((t) => t.includes(id));

@@ -6,10 +6,10 @@ import React, {useState} from 'react';
 import {Pack, api, errorText} from '../api';
 import {Field} from '../LotForm';
 import {toast} from '../Toast';
-import {won} from '../Account';
+import {usd} from '../Account';
 
 // Новый тариф по умолчанию — подписка «Базовый»: чаще всего добавляют тариф, а не докупку
-const EMPTY_PACK: Pack = {id: '', title: '', credits: 30, price_krw: 49000, valid_days: 30, active: true, sort: 0, kind: 'plan'};
+const EMPTY_PACK: Pack = {id: '', title: '', credits: 30, price_usd: 29, valid_days: 30, active: true, sort: 0, kind: 'plan'};
 
 export const Packs: React.FC<{packs: Pack[]; onSaved: () => void; onError: (e: string) => void}> = ({packs, onSaved, onError}) => {
   // Что открыто в форме: id тарифа, «new» — новый, null — ничего. Одна форма за раз: две
@@ -49,8 +49,8 @@ export const Packs: React.FC<{packs: Pack[]; onSaved: () => void; onError: (e: s
                 <span className="muted">{p.credits} кр. · {p.valid_days} дн.{p.active ? '' : ' · не продаётся'}</span>
               </div>
               <div className="pi-price">
-                {won(p.price_krw)}
-                <span className="muted">{won(Math.round(p.price_krw / p.credits))} за кр.</span>
+                {usd(p.price_usd)}
+                <span className="muted">{usd(Math.round((p.price_usd / p.credits) * 100) / 100)} за кр.</span>
               </div>
             </div>
             {open === p.id ? (
@@ -87,7 +87,7 @@ export const Packs: React.FC<{packs: Pack[]; onSaved: () => void; onError: (e: s
           {archived.map((p) => (
             <div key={p.id} className="pack-item off">
               <div className="pi-main">
-                <div className="pi-info"><b>{p.title}</b><span className="muted">{p.kind === 'plan' ? 'подписка' : 'докупка'} · {p.credits} кр. · {won(p.price_krw)}</span></div>
+                <div className="pi-info"><b>{p.title}</b><span className="muted">{p.kind === 'plan' ? 'подписка' : 'докупка'} · {p.credits} кр. · {usd(p.price_usd)}</span></div>
                 <button type="button" className="btn ghost" onClick={() => restore(p)}>Вернуть</button>
               </div>
             </div>
@@ -137,9 +137,9 @@ const PackForm: React.FC<{pack: Pack; editing?: boolean; taken: Pack[]; onDone: 
         <Field label="Кредитов"><input type="number" inputMode="numeric" min={1} value={pack.credits} onChange={(e) => set({credits: Number(e.target.value)})} /></Field>
       </div>
       <div className="row">
-        {/* step={1}: любая сумма в вонах. Был step={1000}, и браузер не давал сохранить 24 900 —
-            «ближайшие допустимые 24 000 и 25 000» (владелец 04.10). Сервер всегда принимал любое целое */}
-        <Field label="Цена, ₩"><input type="number" inputMode="numeric" min={0} step={1} value={pack.price_krw} onChange={(e) => set({price_krw: Number(e.target.value)})} /></Field>
+        {/* Цена в долларах до цента (23.10). step="0.01", а не 1: со step={1} браузер не дал бы сохранить
+            $29.90 — так же, как раньше step={1000} не давал вписать ₩24 900 (владелец 04.10) */}
+        <Field label="Цена, $"><input type="number" inputMode="decimal" min={0} step="0.01" value={pack.price_usd} onChange={(e) => set({price_usd: Number(e.target.value)})} /></Field>
         <Field label="Действует, дней" hint="у подписки — длина месяца; у докупки — если подписки нет">
           <input type="number" inputMode="numeric" min={1} value={pack.valid_days} onChange={(e) => set({valid_days: Number(e.target.value)})} />
         </Field>

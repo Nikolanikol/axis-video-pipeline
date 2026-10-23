@@ -284,7 +284,7 @@ export const createApp = ({photoOrigin}) => {
       costs: await creditCosts(),
       contacts,
       legal,
-      packs: packs.map(({id, title, credits, price_krw, valid_days, kind, sort}) => ({id, title, credits, price_krw, valid_days, kind, sort})),
+      packs: packs.map(({id, title, credits, price_usd, valid_days, kind, sort}) => ({id, title, credits, price_usd, valid_days, kind, sort})),
       // Номер PR превью: метка «ТЕСТ» нужна и гостю — витрина открывается до входа, /config ещё закрыт
       preview: previewId(),
     });

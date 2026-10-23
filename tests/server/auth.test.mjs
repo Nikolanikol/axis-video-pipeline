@@ -212,7 +212,7 @@ suite('вход и кабинеты SMMAKER', () => {
 
   it('клиент не лезет в админку и в общие реестры', async () => {
     expect((await a.call('GET', '/api/admin/clients')).status).toBe(403);
-    expect((await a.call('PUT', '/api/admin/packs/start', {title: 'x', credits: 1, price_krw: 1})).status).toBe(403);
+    expect((await a.call('PUT', '/api/admin/packs/start', {title: 'x', credits: 1, price_usd: 1})).status).toBe(403);
     expect((await a.call('PUT', '/api/markets/mk', {name: 'x'})).status).toBe(403);
   });
 
@@ -256,7 +256,7 @@ suite('вход и кабинеты SMMAKER', () => {
 
     it('менеджер видит лидов с телефонами и начисляет докупку без подписки', async () => {
       const clients = (await m.call('GET', '/api/admin/clients')).body.rows;
-      expect(clients.find((c) => c.id === wsA)).toMatchObject({person: 'Анна', phone: '+821011112222', credits: 7, paid_krw: 0, plan_until: null});
+      expect(clients.find((c) => c.id === wsA)).toMatchObject({person: 'Анна', phone: '+821011112222', credits: 7, paid_usd: 0, plan_until: null});
       // Телефон ищется в том виде, как его набирают внутри страны: 010-… вместо +8210…
       const found = (await m.call('GET', '/api/admin/clients?q=010-1111-2222')).body;
       expect(found.rows.map((c) => c.id)).toEqual([wsA]);
@@ -297,41 +297,41 @@ suite('вход и кабинеты SMMAKER', () => {
 
       // Менеджеру видно, у кого какая подписка и до какого числа; оплачено — всё вместе
       const row = (await m.call('GET', '/api/admin/clients')).body.rows.find((c) => c.id === wsA);
-      expect(row).toMatchObject({plan_title: 'Базовый', paid_krw: 19000 + 69000 + 49000 + 44000});
+      expect(row).toMatchObject({plan_title: 'Базовый', paid_usd: 113.53} /* start 14.34 + plan-standard 29 (50 кр. — в сетке 020) + plan-basic 36.98 + base 33.21 */);
       expect(new Date(row.plan_until).toISOString()).toBe(new Date(topped.subscription.until).toISOString());
     });
 
     it('правка цены без вида пакета не превращает подписку в докупку', async () => {
-      const saved = await owner.call('PUT', '/api/admin/packs/plan-pro', {title: 'Про', credits: 90, price_krw: 89000, valid_days: 30, sort: 3});
+      const saved = await owner.call('PUT', '/api/admin/packs/plan-pro', {title: 'Про', credits: 90, price_usd: 39, valid_days: 30, sort: 3});
       expect(saved.body).toMatchObject({kind: 'plan'});
-      expect((await owner.call('PUT', '/api/admin/packs/plan-pro', {title: 'Про', credits: 90, price_krw: 89000, kind: 'monthly'})).status).toBe(400);
+      expect((await owner.call('PUT', '/api/admin/packs/plan-pro', {title: 'Про', credits: 90, price_usd: 39, kind: 'monthly'})).status).toBe(400);
     });
 
     it('менеджер не меняет цены, бонусы и сотрудников', async () => {
-      expect((await m.call('PUT', '/api/admin/packs/start', {title: 'Старт', credits: 15, price_krw: 1})).status).toBe(403);
+      expect((await m.call('PUT', '/api/admin/packs/start', {title: 'Старт', credits: 15, price_usd: 1})).status).toBe(403);
       expect((await m.call('POST', `/api/admin/clients/${wsA}/bonus`, {credits: 100})).status).toBe(403);
       expect((await m.call('GET', '/api/admin/staff')).status).toBe(403);
       expect((await m.call('PUT', '/api/admin/staff', {email: 'a@dealer.test', role: 'admin'})).status).toBe(403);
     });
 
     it('новая цена не меняет проданное; снятый с продажи пакет не начислить', async () => {
-      const saved = await owner.call('PUT', '/api/admin/packs/start', {title: 'Старт', credits: 15, price_krw: 45000, valid_days: 365, active: false});
-      expect(saved.body).toMatchObject({price_krw: 45000, active: false});
+      const saved = await owner.call('PUT', '/api/admin/packs/start', {title: 'Старт', credits: 15, price_usd: 45, valid_days: 365, active: false});
+      expect(saved.body).toMatchObject({price_usd: 45, active: false});
       expect((await a.call('GET', '/api/account/offer')).body.packs.map((p) => p.id)).not.toContain('start');
       expect((await owner.call('POST', `/api/admin/clients/${wsA}/packs`, {packId: 'start'})).status).toBe(404);
       // Список клиентов с 11.10 — страницами (listClients): строки в .rows
       const clients = (await owner.call('GET', '/api/admin/clients')).body.rows;
-      expect(clients.find((c) => c.id === wsA).paid_krw).toBe(19000 + 69000 + 49000 + 44000);
+      expect(clients.find((c) => c.id === wsA).paid_usd).toBe(113.53);
       // Проданная докупка осталась по цене продажи, а не по новой
       const rows = (await a.call('GET', '/api/account/ledger')).body.rows;
       const sold = rows.find((r) => r.note.includes('перевод 123'));
-      expect(sold).toMatchObject({kind: 'grant', delta: 10, source: 'pack', price_krw: 19000});
+      expect(sold).toMatchObject({kind: 'grant', delta: 10, source: 'pack', price_usd: 14.34});
       expect(sold.note).toMatch(/\+10 кредитов.*перевод 123/);
     });
 
     it('негодный пакет в прайс не попадает', async () => {
-      expect((await owner.call('PUT', '/api/admin/packs/Bad_Id', {title: 'x', credits: 1, price_krw: 1})).status).toBe(400);
-      expect((await owner.call('PUT', '/api/admin/packs/zero', {title: 'x', credits: 0, price_krw: 1})).status).toBe(400);
+      expect((await owner.call('PUT', '/api/admin/packs/Bad_Id', {title: 'x', credits: 1, price_usd: 1})).status).toBe(400);
+      expect((await owner.call('PUT', '/api/admin/packs/zero', {title: 'x', credits: 0, price_usd: 1})).status).toBe(400);
     });
   });
 
