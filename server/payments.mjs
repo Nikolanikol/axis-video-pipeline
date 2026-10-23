@@ -28,7 +28,7 @@ import {db, hasDatabase} from './db/index.mjs';
 import {HttpError} from './store.mjs';
 import {grantPackIn, inTransaction, ownerOf} from './accounts.mjs';
 import {appUrl, paymentMail} from './mailer.mjs';
-import {rates, usdKrw} from './rates.mjs';
+import {rates} from './rates.mjs';
 import {esc, notifyAnypay, notifyPayments} from './telegram.mjs';
 import {
   METHOD_PROVIDER, PROVIDER, anypayMethods, anypayOption, isAnypayIp, kassa, kassaHttpError, kassaInfo, kassaReady, sandboxForbidden, sandboxMode,
@@ -49,14 +49,11 @@ const SYNC_EVERY_MS = 30_000;
 const ABANDON_AFTER_DAYS = 3;
 // Касса сутки не знает платежа — значит, и не узнает (номер из песочницы, чужой, ошибочный)
 const LOST_AFTER_MS = 24 * 60 * 60_000;
-// Правдоподобный курс воны для счёта. Общая защита rates.mjs (500–5000) — от явного мусора, а для
-// денег она слишком широка: курс 5000 вместо ~1350 продал бы тариф вчетверо дешевле. За последние
-// двадцать лет вона ходила в 900–1600 за доллар; вышло за 900–2200 — счёт не выставляем, зовём человека
-const RATE_MIN = 900;
-const RATE_MAX = 2200;
-// То же для валют AnyPay: вон за единицу, коридор с запасом вокруг курса 13.10 (₽ ≈ 15,9 ₩, гривна ≈
-// 29,7 ₩, сум ≈ 0,112 ₩, сом ≈ 15,2 ₩). Вышло за коридор — источник курса сломан, счёт не выставляем
-const KRW_PER_UNIT = {rub: [8, 35], uah: [15, 60], uzs: [0.05, 0.25], kgs: [8, 30]};
+// Цена тарифа — в долларах (миграция 020, 23.10): USDT берёт её как есть, курс нужен только AnyPay.
+// Правдоподобный курс валют AnyPay — единиц за $1, коридор с запасом вокруг курса 13.10 (₽ ≈ 83,
+// гривна ≈ 44,6, сум ≈ 11 800, сом ≈ 87). Общая защита rates.mjs для денег слишком широка: сломанный
+// источник продал бы тариф вчетверо дешевле. Вышло за коридор — счёт не выставляем, зовём человека
+const UNITS_PER_USD = {rub: [40, 180], uah: [20, 100], uzs: [5500, 26000], kgs: [40, 190]};
 // Знак валюты для группы и экрана: рубль, гривна, сум, сом
 const SIGN = {rub: '₽', uah: '₴', uzs: 'сум', kgs: 'сом'};
 // Сумы — целыми: копеек (тийинов) на картах Узбекистана не бывает
@@ -83,7 +80,7 @@ const event = async (paymentId, kind, {status = null, data = null, requestId = n
   }
 };
 
-const won = (n) => `₩${Number(n).toLocaleString('ru-RU')}`;
+const usd = (n) => `$${Number(n).toLocaleString('ru-RU', {maximumFractionDigits: 2})}`;
 // Даты — по Сеулу: группа читает их в Корее, а сервер живёт в UTC
 const dayKst = (d) => new Date(d).toLocaleDateString('ru-RU', {timeZone: 'Asia/Seoul'});
 const tag = (o) => (o.sandbox ? ' · 🧪 <i>тест</i>' : '');
@@ -123,7 +120,7 @@ const sum = (o) => {
 // Что купили и за сколько
 const what = (o) => [
   `💳 ${o.kind === 'plan' ? `Тариф «${esc(o.title)}»` : `Докупка «${esc(o.title ?? o.pack_id)}»`}`,
-  `💵 <b>${esc(sum(o))}</b> · ${won(o.price_krw)}`,
+  `💵 <b>${esc(sum(o))}</b>${String(o.currency).toLowerCase() === 'usd' ? '' : ` · тариф ${usd(o.price_usd)}`}`,
 ].join('\n');
 // Номер заказа — моноширинным: в Telegram копируется одним нажатием, с ним ищут журнал заказа
 const orderLine = (o) => `🧾 <code>${esc(o.id)}</code>`;
@@ -184,7 +181,7 @@ const readOrder = async (where, args, client = db()) => (await client.query(`${S
 /** Заказ для интерфейса: без служебного (сырые уведомления, ошибки сверки, номер платежа) */
 const view = (o) => ({
   id: o.id, status: o.status, credited: Boolean(o.credited_at), packId: o.pack_id, title: o.title ?? o.pack_id,
-  credits: o.credits ?? null, priceKrw: o.price_krw, amount: Number(o.amount), currency: o.currency,
+  credits: o.credits ?? null, priceUsd: Number(o.price_usd), amount: Number(o.amount), currency: o.currency,
   payCurrency: o.pay_currency, sandbox: o.sandbox, createdAt: o.created_at, creditedAt: o.credited_at,
 });
 
@@ -229,30 +226,22 @@ export const startCheckout = async ({workspaceId, userId, packId, method = 'usdt
   if (!kassaReady()) throw new HttpError(503, 'Оплата USDT пока не подключена — напишите нам, подключим вручную');
   const {rows: [pack]} = await db().query('SELECT * FROM smmaker_packs WHERE id = $1 AND active', [String(packId ?? '').slice(0, 40)]);
   if (!pack) throw new HttpError(404, 'Нет такого тарифа');
-  if (!(pack.price_krw > 0)) throw new HttpError(400, 'У тарифа нет цены — напишите нам');
+  const price = Number(pack.price_usd);
+  if (!(price > 0)) throw new HttpError(400, 'У тарифа нет цены — напишите нам');
   const rlog = log.child({requestId});
 
-  // Тариф в вонах → доллары по курсу дня, до цента: точнее касса не принимает, а округлять до
-  // целых — менять цену тарифа на глазах у клиента. Курс без источника старше суток — берём,
-  // но отмечаем в логе: цена по вчерашнему курсу лучше, чем закрытая касса
-  const rate = await usdKrw();
-  if (rate.stale) rlog.warn('rate.stale', {fetchedAt: rate.fetchedAt});
-  if (!(rate.krwPerUsd >= RATE_MIN && rate.krwPerUsd <= RATE_MAX)) {
-    rlog.error('rate.implausible', {krwPerUsd: rate.krwPerUsd, fetchedAt: rate.fetchedAt});
-    crashAlarm(`курс воны ${rate.krwPerUsd} за $1 — неправдоподобный, счета не выставляются`, new Error('проверьте open.er-api и data/rates.json'), requestId);
-    throw new HttpError(503, 'Оплата временно недоступна — напишите нам, подключим вручную');
-  }
-  const amount = Math.round((pack.price_krw / rate.krwPerUsd) * 100) / 100;
+  // Цена тарифа в долларах — она же сумма счёта, без курса: клиент платит ровно то, что видел в прайсе
+  const amount = price;
   if (!(amount >= 1)) throw new HttpError(400, 'Сумма тарифа слишком мала для оплаты USDT — напишите нам');
 
   const sandbox = sandboxMode();
   // 80 случайных бит: номер заказа не угадать и не перебрать, по нему ничего не видно о продажах
   const id = `pay-${crypto.randomBytes(10).toString('hex')}`;
   await db().query(
-    `INSERT INTO smmaker_payments (id, workspace_id, created_by, provider, sandbox, pack_id, price_krw, amount, currency, pay_currency)
+    `INSERT INTO smmaker_payments (id, workspace_id, created_by, provider, sandbox, pack_id, price_usd, amount, currency, pay_currency)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-    [id, workspaceId, userId ?? null, PROVIDER, sandbox, pack.id, pack.price_krw, amount, kassaInfo().priceCurrency, kassaInfo().payCurrency]);
-  const order = {id, workspace_id: workspaceId, created_by: userId, sandbox, pack_id: pack.id, price_krw: pack.price_krw, amount, title: pack.title, kind: pack.kind};
+    [id, workspaceId, userId ?? null, PROVIDER, sandbox, pack.id, price, amount, kassaInfo().priceCurrency, kassaInfo().payCurrency]);
+  const order = {id, workspace_id: workspaceId, created_by: userId, sandbox, pack_id: pack.id, price_usd: price, amount, currency: 'usd', title: pack.title, kind: pack.kind};
 
   try {
     const {invoiceId, url} = await kassa(sandbox).createInvoice({
@@ -261,7 +250,7 @@ export const startCheckout = async ({workspaceId, userId, packId, method = 'usdt
       notifyUrl: `${origin}/api/payments/${PROVIDER}/notify`, returnUrl: `${origin}/#/account/${id}`,
     });
     await db().query('UPDATE smmaker_payments SET invoice_id = $2, updated_at = now() WHERE id = $1', [id, invoiceId]);
-    await event(id, 'checkout', {status: 'created', data: {invoiceId, amount, rate: rate.krwPerUsd, origin}, requestId});
+    await event(id, 'checkout', {status: 'created', data: {invoiceId, amount, origin}, requestId});
     rlog.info('checkout.ok', {order: id, pack: pack.id, amount, sandbox});
     return {id, url};
   } catch (e) {
@@ -281,7 +270,7 @@ export const startCheckout = async ({workspaceId, userId, packId, method = 'usdt
 const activePack = async (packId) => {
   const {rows: [pack]} = await db().query('SELECT * FROM smmaker_packs WHERE id = $1 AND active', [String(packId ?? '').slice(0, 40)]);
   if (!pack) throw new HttpError(404, 'Нет такого тарифа');
-  if (!(pack.price_krw > 0)) throw new HttpError(400, 'У тарифа нет цены — напишите нам');
+  if (!(Number(pack.price_usd) > 0)) throw new HttpError(400, 'У тарифа нет цены — напишите нам');
   return pack;
 };
 
@@ -301,17 +290,19 @@ const startAnypay = async ({workspaceId, userId, packId, method, origin, request
   const pack = await activePack(packId);
   const rlog = log.child({requestId});
 
-  // Тариф в вонах → валюта счёта по курсу дня: вон за единицу = (вон за $1) / (единиц за $1)
+  // Тариф в долларах → валюта счёта по курсу дня. Курс без источника старше суток — берём, но
+  // отмечаем в логе: цена по вчерашнему курсу лучше, чем закрытая касса
+  const price = Number(pack.price_usd);
   const r = await rates();
-  const krwPerUnit = Number(r.usdRates?.KRW) / Number(r.usdRates?.[currency.toUpperCase()]);
-  const [lo, hi] = KRW_PER_UNIT[currency];
+  const perUsd = Number(r.usdRates?.[currency.toUpperCase()]);
+  const [lo, hi] = UNITS_PER_USD[currency];
   if (r.stale) rlog.warn('rate.stale', {fetchedAt: r.fetchedAt});
-  if (!(krwPerUnit >= lo && krwPerUnit <= hi)) {
-    rlog.error('rate.implausible', {currency, krwPerUnit, fetchedAt: r.fetchedAt});
-    crashAlarm(`курс воны ${krwPerUnit} за 1 ${currency.toUpperCase()} — неправдоподобный, счета в этой валюте не выставляются`, new Error('проверьте open.er-api и data/rates.json'), requestId);
+  if (!(perUsd >= lo && perUsd <= hi)) {
+    rlog.error('rate.implausible', {currency, perUsd, fetchedAt: r.fetchedAt});
+    crashAlarm(`курс ${perUsd} ${currency.toUpperCase()} за $1 — неправдоподобный, счета в этой валюте не выставляются`, new Error('проверьте open.er-api и data/rates.json'), requestId);
     throw new HttpError(503, 'Оплата временно недоступна — напишите нам, подключим вручную');
   }
-  const amount = WHOLE.has(currency) ? Math.round(pack.price_krw / krwPerUnit) : Math.round((pack.price_krw / krwPerUnit) * 100) / 100;
+  const amount = WHOLE.has(currency) ? Math.round(price * perUsd) : Math.round(price * perUsd * 100) / 100;
   if (!(amount >= 1)) throw new HttpError(400, 'Сумма тарифа слишком мала для оплаты — напишите нам');
 
   // Почта плательщика — обязательна у AnyPay: того, кто нажал «Оплатить», иначе владельца кабинета
@@ -324,12 +315,12 @@ const startAnypay = async ({workspaceId, userId, packId, method, origin, request
   // поймает уникальный индекс — тогда просто ошибка, клиент нажмёт ещё раз
   const kassaOrder = (100_000_000_000_000n + crypto.randomBytes(8).readBigUInt64BE() % 900_000_000_000_000n).toString();
   await db().query(
-    `INSERT INTO smmaker_payments (id, workspace_id, created_by, provider, sandbox, pack_id, price_krw, amount, currency, pay_currency, kassa_order)
+    `INSERT INTO smmaker_payments (id, workspace_id, created_by, provider, sandbox, pack_id, price_usd, amount, currency, pay_currency, kassa_order)
      VALUES ($1, $2, $3, 'anypay', false, $4, $5, $6, $7, $8, $9)`,
-    [id, workspaceId, userId ?? null, pack.id, pack.price_krw, amount, currency, kassaMethod, kassaOrder]);
+    [id, workspaceId, userId ?? null, pack.id, price, amount, currency, kassaMethod, kassaOrder]);
   const order = {id, provider: 'anypay', kassa_order: kassaOrder, workspace_id: workspaceId, created_by: userId, sandbox: false,
-    pack_id: pack.id, price_krw: pack.price_krw, amount, currency, pay_currency: kassaMethod, title: pack.title, kind: pack.kind};
-  trace(order, '🟡 <b>Клиент начал оплату</b>', [`📈 курс: ${krwPerUnit.toFixed(4)} ₩ за 1 ${currency.toUpperCase()} · ${won(pack.price_krw)}`, `🌐 ${esc(origin)}`], {who: true});
+    pack_id: pack.id, price_usd: price, amount, currency, pay_currency: kassaMethod, title: pack.title, kind: pack.kind};
+  trace(order, '🟡 <b>Клиент начал оплату</b>', [`📈 курс: ${perUsd.toLocaleString('ru-RU', {maximumFractionDigits: 4})} ${currency.toUpperCase()} за $1 · тариф ${usd(price)}`, `🌐 ${esc(origin)}`], {who: true});
 
   // Куда вернуть клиента. AnyPay принимает адрес только на домене проекта (зарегистрирован боевой
   // сайт) и, видимо, без «#»: 13.10 на http://localhost:3210/#/account/… касса ответила 213 «Incorrect
@@ -342,7 +333,7 @@ const startAnypay = async ({workspaceId, userId, packId, method, origin, request
       returnUrl: prodSite ? `${origin}/pay-return/${id}` : undefined,
     });
     await db().query('UPDATE smmaker_payments SET invoice_id = $2, payment_id = $3, updated_at = now() WHERE id = $1', [id, invoiceId, paymentId]);
-    await event(id, 'checkout', {status: 'created', data: {invoiceId, kassaOrder, amount, currency, method: kassaMethod, krwPerUnit, origin}, requestId});
+    await event(id, 'checkout', {status: 'created', data: {invoiceId, kassaOrder, amount, currency, method: kassaMethod, perUsd, origin}, requestId});
     rlog.info('checkout.ok', {order: id, provider: 'anypay', pack: pack.id, amount, currency, method: kassaMethod});
     trace(order, '🔗 <b>Касса выдала ссылку на оплату</b> — клиент ушёл платить', [`🏦 платёж кассы <code>${esc(paymentId)}</code>`]);
     return {id, url};
@@ -435,7 +426,7 @@ const credit = async (o, paymentId, requestId) => {
     // Тариф могли снять с продажи, пока клиент платил, — оплаченное всё равно начисляем
     const {rows: [pack]} = await client.query('SELECT * FROM smmaker_packs WHERE id = $1', [row.pack_id]);
     const lot = await grantPackIn(client, {
-      workspaceId: row.workspace_id, pack, priceKrw: row.price_krw, createdBy: row.created_by,
+      workspaceId: row.workspace_id, pack, priceUsd: row.price_usd, createdBy: row.created_by,
       note: `оплата ${row.provider === 'anypay' ? `AnyPay · ${payMethod(row.pay_currency)}, ${String(row.currency).toUpperCase()}` : 'USDT'}${row.sandbox ? ' (песочница)' : ''} · ${paymentId}`,
     });
     await client.query(
@@ -485,7 +476,7 @@ const receipt = async (o, {pack, lot}, paymentId, requestId) => {
     }
     await paymentMail({
       to: u.email, name: u.name, plan: pack.kind === 'plan', title: pack.title ?? pack.id, credits: pack.credits,
-      until: lot.expires_at, paid: {amount: o.amount, currency: o.currency, method: payMethod(o.pay_currency)}, priceKrw: o.price_krw, orderId: o.id, paidAt: new Date(),
+      until: lot.expires_at, paid: {amount: o.amount, currency: o.currency, method: payMethod(o.pay_currency)}, priceUsd: o.price_usd, orderId: o.id, paidAt: new Date(),
       link: `${appUrl()}/#/account/${o.id}`, sandbox: o.sandbox,
     });
     await event(o.id, 'mail', {status: 'paid', data: {to: u.email, paymentId}, requestId});

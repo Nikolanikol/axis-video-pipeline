@@ -36,7 +36,7 @@ type Samples = {
 // Витрину рисует и сервер (server/seo.mjs) — там useLayoutEffect не работает и шумит предупреждением
 const useBrowserLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
-const won = (n: number) => `${n.toLocaleString('ru-RU')} ₩`;
+const usd = (n: number) => `$${n.toLocaleString('en-US', Number.isInteger(n) ? {maximumFractionDigits: 0} : {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
 // «7 кредитов», «3 кредита», «1 кредит»
 const credits = (n: number) => {
   const d = n % 10; const h = n % 100;
@@ -352,9 +352,9 @@ const Tariffs: React.FC<{offer: PublicOffer | null}> = ({offer}) => {
       {plans.map((p) => (
         <div key={p.id} className="land-tariff">
           <span className="land-tariff-title">{p.title}</span>
-          <b className="land-big">{won(p.price_krw)}</b>
+          <b className="land-big">{usd(p.price_usd)}</b>
           <span className="muted">в месяц</span>
-          <span>{credits(p.credits)} · {won(Math.round(p.price_krw / p.credits))} за кредит</span>
+          <span>{credits(p.credits)} · {usd(Math.round((p.price_usd / p.credits) * 100) / 100)} за кредит</span>
         </div>
       ))}
       {topups.length > 0 && (
@@ -362,7 +362,7 @@ const Tariffs: React.FC<{offer: PublicOffer | null}> = ({offer}) => {
           <span className="land-tariff-title">Не хватило на месяц</span>
           {/* Название пакета часто уже содержит число («+20 кредитов») — тогда не повторяем его */}
           {topups.map((p) => (
-            <span key={p.id}>{p.title.includes(String(p.credits)) ? p.title : `${p.title}: ${credits(p.credits)}`} — {won(p.price_krw)}</span>
+            <span key={p.id}>{p.title.includes(String(p.credits)) ? p.title : `${p.title}: ${credits(p.credits)}`} — {usd(p.price_usd)}</span>
           ))}
         </div>
       )}

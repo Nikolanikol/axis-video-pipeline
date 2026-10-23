@@ -746,21 +746,23 @@ const PACK_ID_RE = /^[a-z0-9][a-z0-9-]{0,31}$/;
  * клиенту). kind: plan — подписка на месяц, topup — докупка сверх подписки. Подписки первыми
  */
 export const listPacks = async ({all = false} = {}) => (await db().query(
-  `SELECT id, title, credits, price_krw, valid_days, active, sort, kind, archived_at FROM smmaker_packs
+  `SELECT id, title, credits, price_usd::float8 AS price_usd, valid_days, active, sort, kind, archived_at FROM smmaker_packs
     ${all ? '' : 'WHERE active AND archived_at IS NULL'} ORDER BY kind = 'topup', sort, credits`)).rows;
 
 // Вид пакета: plan — подписка на месяц, topup — докупка (миграция 006)
 const PACK_KINDS = new Set(['plan', 'topup']);
 
 /** Сохранить пакет прайса (только админ). Цена меняет будущие начисления, проданное — нет */
-export const savePack = async ({id, title, credits, price_krw: price, valid_days: days = 30, active = true, sort = 0, kind}) => {
+export const savePack = async ({id, title, credits, price_usd: price, valid_days: days = 30, active = true, sort = 0, kind}) => {
   if (!PACK_ID_RE.test(String(id))) throw new HttpError(400, 'id пакета — латиница, цифры и дефис (например, base)');
   if (!String(title ?? '').trim()) throw new HttpError(400, 'Нужно название пакета');
   const c = Number(credits);
   const p = Number(price);
   const d = Number(days);
   if (!Number.isInteger(c) || c < 1) throw new HttpError(400, 'Кредиты — целое число от 1');
-  if (!Number.isInteger(p) || p < 0) throw new HttpError(400, 'Цена — целое число вон');
+  // Цена — в долларах до цента: USDT-касса принимает центы, а сетка тарифов — целые доллары.
+  // Сверка с допуском, не на равенство: 19.99 * 100 в JS — 1998.9999999999998, и честная цена не прошла бы
+  if (!Number.isFinite(p) || p < 0 || Math.abs(p * 100 - Math.round(p * 100)) > 1e-6) throw new HttpError(400, 'Цена — в долларах, до цента (например, 29 или 29.90)');
   if (!Number.isInteger(d) || d < 1 || d > 3660) throw new HttpError(400, 'Срок — целое число дней от 1');
   // Вид не указан — у нового пакета докупка, у существующего прежний: правка цены без вида
   // не должна молча превращать подписку в докупку
@@ -771,13 +773,13 @@ export const savePack = async ({id, title, credits, price_krw: price, valid_days
   let name = String(title).trim();
   if (/^\+\s*\d+\s+кредит/i.test(name)) name = `+${c} ${plural(c)}`;
   const {rows: [pack]} = await db().query(
-    `INSERT INTO smmaker_packs (id, title, credits, price_krw, valid_days, active, sort, kind) VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, 'topup'))
-     ON CONFLICT (id) DO UPDATE SET title = $2, credits = $3, price_krw = $4, valid_days = $5, active = $6, sort = $7,
+    `INSERT INTO smmaker_packs (id, title, credits, price_usd, valid_days, active, sort, kind) VALUES ($1, $2, $3, $4, $5, $6, $7, COALESCE($8, 'topup'))
+     ON CONFLICT (id) DO UPDATE SET title = $2, credits = $3, price_usd = $4, valid_days = $5, active = $6, sort = $7,
        kind = COALESCE($8, smmaker_packs.kind),
        -- Включили «продаётся» у архивного — он возвращается в прайс: продаваемый тариф,
        -- спрятанный от админа, никто бы потом не нашёл
        archived_at = CASE WHEN $6 THEN NULL ELSE smmaker_packs.archived_at END
-     RETURNING id, title, credits, price_krw, valid_days, active, sort, kind, archived_at`,
+     RETURNING id, title, credits, price_usd::float8 AS price_usd, valid_days, active, sort, kind, archived_at`,
     [id, name, c, p, d, Boolean(active), Number(sort) || 0, kind ?? null]);
   return pack;
 };
@@ -808,7 +810,7 @@ export const removePack = async (id) => inTransaction(async (client) => {
 export const restorePack = async (id) => {
   const {rows: [pack]} = await db().query(
     `UPDATE smmaker_packs SET archived_at = NULL WHERE id = $1
-     RETURNING id, title, credits, price_krw, valid_days, active, sort, kind, archived_at`, [id]);
+     RETURNING id, title, credits, price_usd::float8 AS price_usd, valid_days, active, sort, kind, archived_at`, [id]);
   if (!pack) throw new HttpError(404, 'Нет такого тарифа');
   return pack;
 };
@@ -863,7 +865,7 @@ const packMail = async ({workspaceId, pack, lot, by}) => {
     }
     await paymentMail({
       to: u.email, name: u.name, plan: pack.kind === 'plan', title: pack.title ?? pack.id, credits: pack.credits,
-      until: lot.expires_at, priceKrw: pack.price_krw, paidAt: new Date(), link: `${appUrl()}/#/account`,
+      until: lot.expires_at, priceUsd: pack.price_usd, paidAt: new Date(), link: `${appUrl()}/#/account`,
     });
     journal.info('mail.pack_sent', {ws: workspaceId, lot: Number(lot.id), by});
   } catch (e) {
@@ -873,10 +875,10 @@ const packMail = async ({workspaceId, pack, lot, by}) => {
 
 /**
  * Начисление пакета внутри чужой транзакции — для оплаты: партия и отметка «оплата
- * начислена» должны лечь вместе (server/payments.mjs). priceKrw — сколько заплачено на самом
+ * начислена» должны лечь вместе (server/payments.mjs). priceUsd — сколько заплачено на самом
  * деле: цену могли поменять между счётом и оплатой. Возвращает партию {id, expires_at}
  */
-export const grantPackIn = async (client, {workspaceId, pack, note = '', createdBy = null, priceKrw = pack.price_krw}) => {
+export const grantPackIn = async (client, {workspaceId, pack, note = '', createdBy = null, priceUsd = pack.price_usd}) => {
   const plan = pack.kind === 'plan';
   await client.query('SELECT id FROM smmaker_workspaces WHERE id = $1 FOR UPDATE', [workspaceId]);
   const current = await subscriptionOf(workspaceId, client);
@@ -889,7 +891,7 @@ export const grantPackIn = async (client, {workspaceId, pack, note = '', created
   }
   return addLot(client, {
     workspaceId, credits: pack.credits, days: pack.valid_days, expiresAt,
-    source: plan ? 'subscription' : 'pack', packId: pack.id, priceKrw,
+    source: plan ? 'subscription' : 'pack', packId: pack.id, priceUsd,
     note: [plan ? `подписка «${pack.title}»` : `докупка «${pack.title}»`, String(note).trim()].filter(Boolean).join(' · '), createdBy,
   });
 };
@@ -926,7 +928,7 @@ const CLIENTS_CTE = `WITH c AS (
          u.name AS person, u.email, u.phone, u.platform_role, u.last_seen_at,
          u.email_verified_at IS NOT NULL AS verified,
          COALESCE((SELECT sum(remaining) FROM smmaker_credit_lots t WHERE t.workspace_id = w.id AND t.expires_at > now()), 0)::int AS credits,
-         COALESCE((SELECT sum(price_krw) FROM smmaker_credit_lots t WHERE t.workspace_id = w.id AND t.source IN ('pack', 'subscription')), 0)::int AS paid_krw,
+         COALESCE((SELECT sum(price_usd) FROM smmaker_credit_lots t WHERE t.workspace_id = w.id AND t.source IN ('pack', 'subscription')), 0)::float8 AS paid_usd,
          -- Подписка: тариф и конец оплаченного — менеджеру видно, кому пора продлевать
          sub.title AS plan_title, sub.expires_at AS plan_until,
          EXISTS (SELECT 1 FROM smmaker_credit_lots t WHERE t.workspace_id = w.id AND t.source = 'subscription') AS had_plan,
@@ -957,7 +959,7 @@ const CLIENTS_CTE = `WITH c AS (
 const CLIENT_FILTERS = {
   all: 'true',
   new: `c.created_at > now() - interval '7 days'`,
-  trial: 'c.paid_krw = 0',
+  trial: 'c.paid_usd = 0',
   active: 'c.plan_until IS NOT NULL',
   renew: `c.plan_until < now() + interval '${RENEW_DAYS} days'`,
   lapsed: 'c.plan_until IS NULL AND c.had_plan',
@@ -974,7 +976,7 @@ const CLIENT_SORTS = {
   new: 'c.created_at DESC',
   seen: 'c.last_seen_at DESC NULLS LAST, c.created_at DESC',
   generated: 'c.last_generation DESC NULLS LAST, c.created_at DESC',
-  paid: 'c.paid_krw DESC, c.created_at DESC',
+  paid: 'c.paid_usd DESC, c.created_at DESC',
   credits: 'c.credits DESC, c.created_at DESC',
   plan: 'c.plan_until ASC NULLS LAST, c.created_at DESC',
 };

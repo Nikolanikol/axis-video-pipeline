@@ -100,7 +100,7 @@ const structuredData = async (site) => {
     {'@type': 'WebApplication', name: 'KOK', url: `${site}/`, description: pages['/'].description,
       applicationCategory: 'BusinessApplication', operatingSystem: 'Web', inLanguage: 'ru', provider: {'@id': `${site}/#org`},
       // Цена «0» — пробные кредиты; тарифы в базе и меняются из админки, в разметку их не тащим
-      offers: {'@type': 'Offer', price: '0', priceCurrency: 'KRW', description: `${credits.signup.credits} кредитов бесплатно на ${credits.signup.days} дней`}},
+      offers: {'@type': 'Offer', price: '0', priceCurrency: 'USD', description: `${credits.signup.credits} кредитов бесплатно на ${credits.signup.days} дней`}},
     {'@type': 'FAQPage', mainEntity: faq.map((f) => ({'@type': 'Question', name: f.q, acceptedAnswer: {'@type': 'Answer', text: plain(f.a)}}))},
   ]};
 };

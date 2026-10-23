@@ -82,12 +82,12 @@ suite('оплата тарифа', () => {
     return body;
   };
 
-  it('цена — из базы по тарифу, в долларах по курсу дня до цента', async () => {
+  it('цена — из базы по тарифу, в долларах как есть, без курса', async () => {
     const {id, url} = await checkout('plan-basic');
     const o = await order(id);
-    // ₩49 000 / 1342 = 36,5126…
-    expect(Number(o.amount)).toBe(36.51);
-    expect(o).toMatchObject({status: 'created', price_krw: 49000, currency: 'usd', pay_currency: 'usdttrc20', sandbox: true});
+    // ₩49 000 из миграции 006, пересчитанные 020 по 1 325 ₩ за $1; курс дня (1342) на счёт не влияет
+    expect(Number(o.amount)).toBe(36.98);
+    expect(o).toMatchObject({status: 'created', price_usd: '36.98', currency: 'usd', pay_currency: 'usdttrc20', sandbox: true});
     expect(url).toMatch(/^https:\/\//);
   });
 
@@ -102,7 +102,7 @@ suite('оплата тарифа', () => {
     await notify({...body, payment_status: 'confirming'});
     const got = await lots();
     expect(got).toHaveLength(before + 1);
-    expect(got.at(-1)).toMatchObject({source: 'subscription', pack_id: 'plan-basic', credits: 30, price_krw: 49000});
+    expect(got.at(-1)).toMatchObject({source: 'subscription', pack_id: 'plan-basic', credits: 30, price_usd: '36.98'});
     expect(await order(id)).toMatchObject({status: 'paid', payment_id: '7001'});
     expect(await pay.paymentOf(WS, id)).toMatchObject({credited: true, status: 'paid'});
     expect(telegram.some((t) => t.startsWith('✅ Оплата пришла') && t.includes(id))).toBe(true);
@@ -125,7 +125,7 @@ suite('оплата тарифа', () => {
     expect(got[0].subject).toMatch(/\+30 кр\./);
     expect(got[0].text).toContain(id);
     expect(got[0].text).toContain('песочниц');
-    expect(got[0].text).toMatch(/Оплачено: \$36,51 · USDT TRC20 \(тариф ₩49\s000\)/);
+    expect(got[0].text).toMatch(/Оплачено: \$36,98 · USDT TRC20\n/);
     expect(got[0].html).toContain(`/#/account/${id}`);
     expect(await events(id, 'mail')).toHaveLength(1);
   });
@@ -155,7 +155,7 @@ suite('оплата тарифа', () => {
     const got = mails.slice(before);
     expect(got).toHaveLength(1);
     expect(got[0].to).toBe('owner@kok.test');
-    expect(got[0].text).toMatch(/Стоимость: ₩.+ · оплата через менеджера/);
+    expect(got[0].text).toMatch(/Стоимость: \$.+ · оплата через менеджера/);
     expect(got[0].text).not.toContain('Номер заказа');
     expect(got[0].text).not.toContain('песочниц');
   });

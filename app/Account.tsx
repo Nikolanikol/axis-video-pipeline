@@ -11,7 +11,8 @@ import {SetupCard} from './Onboarding';
 import {PaymentReturn, PlansSection} from './AccountPlans';
 import {useConfig} from './config';
 
-export const won = (n: number) => `₩${n.toLocaleString('ru-RU')}`;
+// Цены тарифов — в долларах (миграция 020, 23.10): целые — без центов ($19), иначе до цента ($0.76)
+export const usd = (n: number) => `$${n.toLocaleString('en-US', Number.isInteger(n) ? {maximumFractionDigits: 0} : {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
 export const when = (iso: string) => new Date(iso).toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
 // Откуда партия кредитов — подпись в кабинете. «pack» с 29.09 — докупка: пакеты на год
 // стали докупкой к подписке (миграция 006)
@@ -177,7 +178,7 @@ const LedgerSection: React.FC<{credits?: number}> = ({credits}) => {
                   <td className="muted">
                     {r.note || '—'}
                     {r.kind === 'grant' && r.expires_at && ` · до ${day(r.expires_at)}`}
-                    {r.price_krw ? ` · ${won(r.price_krw)}` : ''}
+                    {r.price_usd ? ` · ${usd(r.price_usd)}` : ''}
                   </td>
                 </tr>
               ))}

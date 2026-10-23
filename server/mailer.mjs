@@ -111,8 +111,9 @@ export const noticeMail = ({to, title, text}) => sendMail({
 // у рублёвой кассы будет rub). Знак — для привычных валют, остальные — кодом: письмо не должно
 // падать из-за новой валюты новой кассы
 const SIGNS = {usd: '$', krw: '₩', rub: '₽', eur: '€', jpy: '¥', cny: '¥', uah: '₴', uzs: 'сум', kgs: 'сом'};
-// Вона, иена и рубль — целыми (копейки в рублёвой кассе — редкость, а «49 000,00 ₩» читается как ошибка)
-const WHOLE = new Set(['krw', 'jpy', 'rub', 'uzs']);
+// Вона, иена и рубль — целыми (копейки в рублёвой кассе — редкость, а «49 000,00 ₩» читается как ошибка).
+// Доллары тоже, если сумма целая: тарифы — ровные $19 / $29 / $39 (23.10), «$29,00» выглядит как счёт
+const WHOLE = new Set(['krw', 'jpy', 'rub', 'uzs', 'usd']);
 export const money = (amount, currency) => {
   const c = String(currency ?? '').toLowerCase();
   const n = Number(amount);
@@ -129,14 +130,14 @@ export const money = (amount, currency) => {
 //   paid    — {amount, currency, method}: онлайн-оплата через кассу, любую (USDT, рубли AnyPay…).
 //             Нет — пакет начислил менеджер в админке после оплаты мимо кассы: сколько и в какой валюте
 //             клиент заплатил на самом деле, мы не знаем, поэтому пишем цену тарифа, а не «оплачено»;
-//   priceKrw — цена тарифа в вонах (по ней считается счёт), в скобках, если валюта оплаты другая;
+//   priceUsd — цена тарифа в долларах (по ней считается счёт), в скобках, если валюта оплаты другая;
 //   orderId — номер заказа кассы; у ручного начисления его нет;
 //   sandbox — оплата из песочницы (превью): помечаем, чтобы тестовое письмо не приняли за настоящее
-export const paymentMail = ({to, name, plan, title, credits, until, paid = null, priceKrw, orderId = null, paidAt, link, sandbox = false}) => {
+export const paymentMail = ({to, name, plan, title, credits, until, paid = null, priceUsd, orderId = null, paidAt, link, sandbox = false}) => {
   const date = (d) => new Date(d).toLocaleDateString('ru-RU');
-  const price = money(priceKrw, 'krw');
+  const price = money(priceUsd, 'usd');
   const sum = paid && [money(paid.amount, paid.currency), paid.method && `· ${paid.method}`,
-    String(paid.currency).toLowerCase() !== 'krw' && `(тариф ${price})`].filter(Boolean).join(' ');
+    String(paid.currency).toLowerCase() !== 'usd' && `(тариф ${price})`].filter(Boolean).join(' ');
   const rows = [
     ['Покупка', `${plan ? 'Тариф' : 'Докупка'} «${title}»`],
     paid ? ['Оплачено', sum] : ['Стоимость', `${price} · оплата через менеджера`],

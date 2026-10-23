@@ -73,7 +73,7 @@ export type Me =
   | {authRequired: true; user: null; signup: {credits: number; days: number}}
   | {authRequired: true; user: User; workspace: {id: string; name: string; role: string} | null; balance: Balance | null};
 // kind: plan — подписка на месяц (кредиты сгорают в конце месяца), topup — докупка, сгорает вместе с подпиской
-export type Pack = {id: string; title: string; credits: number; price_krw: number; valid_days: number; active: boolean; sort: number; kind: 'plan' | 'topup'; archived_at?: string | null};
+export type Pack = {id: string; title: string; credits: number; price_usd: number; valid_days: number; active: boolean; sort: number; kind: 'plan' | 'topup'; archived_at?: string | null};
 // pay — какие кассы включены на сервере (нет ключей — только менеджер)
 export type Offer = {contacts: {whatsapp?: string; telegram?: string; email?: string; instagram?: string}; packs: Pack[]; pay?: PayMethods; support?: boolean};
 // Включённые способы оплаты: usdt — касса NOWPayments; AnyPay — sbp и card (рубли), card_uah,
@@ -84,7 +84,7 @@ export type PayMethod = keyof PayMethods;
 // confirming, paid, partial, failed, expired, refunded, abandoned; credited — кредиты начислены
 export type Payment = {
   id: string; status: string; credited: boolean; packId: string; title: string; credits: number | null;
-  priceKrw: number; amount: number; currency: string; payCurrency: string | null; sandbox: boolean;
+  priceUsd: number; amount: number; currency: string; payCurrency: string | null; sandbox: boolean;
   createdAt: string; creditedAt: string | null;
 };
 // Условия для витрины гостя: без входа (GET /api/public/offer)
@@ -94,13 +94,13 @@ export type PublicOffer = Offer & {signup: {credits: number; days: number}; cost
 export type LedgerRow = {
   id: number; delta: number; kind: 'grant' | 'charge' | 'refund' | 'adjust'; pipeline: string | null;
   job_id: string | null; note: string; created_at: string;
-  expires_at: string | null; source: CreditLot['source'] | null; price_krw: number | null;
+  expires_at: string | null; source: CreditLot['source'] | null; price_usd: number | null;
 };
 // Страница истории кредитов в кабинете
 export type LedgerPage = {rows: LedgerRow[]; total: number; page: number; pages: number; pageSize: number};
 export type ClientRow = {
   id: string; name: string; created_at: string; person: string | null; email: string | null; phone: string | null;
-  platform_role: Role; credits: number; paid_krw: number; generations: number; last_generation: string | null;
+  platform_role: Role; credits: number; paid_usd: number; generations: number; last_generation: string | null;
   plan_title: string | null; plan_until: string | null;
   // Активность: когда заходил (null — не заходил с 11.10, когда завели отметку), генераций за 30 дней
   last_seen_at: string | null; generations_30d: number; verified: boolean; had_plan: boolean;

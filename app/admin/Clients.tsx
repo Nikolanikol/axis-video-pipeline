@@ -6,7 +6,7 @@ import {ClientFilter, ClientList, ClientPatch, ClientQuery, ClientRow, ClientSor
 import {day, daysLeft} from '../auth';
 import {Field} from '../LotForm';
 import {useIsPhone} from '../MobileTabs';
-import {KIND, RENEW_DAYS, WHAT, when, won} from '../Account';
+import {KIND, RENEW_DAYS, WHAT, usd, when} from '../Account';
 import {toast} from '../Toast';
 import {Sheet} from './Sheet';
 
@@ -146,7 +146,7 @@ export const Clients: React.FC<{packs: Pack[]; isAdmin: boolean; onError: (e: st
                     <td>{c.plan_until ? <>{c.plan_title}<br /><span className="muted">до {day(c.plan_until)}</span></>
                       : <span className="muted">{c.had_plan ? 'кончилась' : '—'}</span>}</td>
                     <td>{c.credits}</td>
-                    <td>{c.paid_krw ? won(c.paid_krw) : <span className="muted">—</span>}</td>
+                    <td>{c.paid_usd ? usd(Math.round(c.paid_usd * 100) / 100) : <span className="muted">—</span>}</td>
                     <td><button className="btn ghost" onClick={() => toggle(c.id)}>{openId === c.id ? 'Скрыть' : 'Открыть'}</button></td>
                   </tr>
                   {/* Карточка — прямо под строкой: внизу длинной страницы её приходилось искать */}
@@ -210,7 +210,7 @@ const Ledger: React.FC<{rows: LedgerRow[] | null; title?: string}> = ({rows, tit
   const details = (r: LedgerRow) => <>
     {r.note || '—'}
     {r.kind === 'grant' && r.expires_at && ` · до ${day(r.expires_at)}`}
-    {r.price_krw ? ` · ${won(r.price_krw)}` : ''}
+    {r.price_usd ? ` · ${usd(r.price_usd)}` : ''}
   </>;
   const what = (r: LedgerRow) => `${KIND[r.kind]}${r.pipeline ? ` · ${WHAT[r.pipeline] ?? r.pipeline}` : ''}`;
   const delta = (r: LedgerRow) => (r.delta > 0 ? `+${r.delta}` : r.delta);
@@ -275,7 +275,7 @@ const ClientCard: React.FC<{client: ClientRow; packs: Pack[]; isAdmin: boolean; 
     if (!pack) return;
     // Подтверждение: начисление — это деньги, которые клиент уже заплатил. Промах по строке
     // в длинном списке лидов начислил бы пакет не тому
-    if (!window.confirm(`Начислить «${pack.title}» (${pack.credits} кр., ${won(pack.price_krw)}) компании «${client.name}»?`)) return;
+    if (!window.confirm(`Начислить «${pack.title}» (${pack.credits} кр., ${usd(pack.price_usd)}) компании «${client.name}»?`)) return;
     run(() => api.admin.grantPack(client.id, pack.id, note));
   };
   const adjust = (e: React.FormEvent) => {
@@ -325,7 +325,7 @@ const ClientCard: React.FC<{client: ClientRow; packs: Pack[]; isAdmin: boolean; 
                 <dt>Телефон</dt><dd>{client.phone ? <a href={`tel:${client.phone}`}>{client.phone}</a> : '—'}</dd>
                 <dt>Почта</dt><dd>{client.email ? <a href={`mailto:${client.email}`}>{client.email}</a> : '—'}</dd>
                 <dt>С нами с</dt><dd>{day(client.created_at)} <span className="muted">· заходил {ago(client.last_seen_at)}</span></dd>
-                <dt>Оплачено</dt><dd>{client.paid_krw ? won(client.paid_krw) : '—'}</dd>
+                <dt>Оплачено</dt><dd>{client.paid_usd ? usd(Math.round(client.paid_usd * 100) / 100) : '—'}</dd>
               </dl>
               {/* Данные сотрудника платформы правит только админ — сервер ответит так же */}
               {(isAdmin || !client.platform_role) && (
@@ -342,10 +342,10 @@ const ClientCard: React.FC<{client: ClientRow; packs: Pack[]; isAdmin: boolean; 
                 : (client.plan_until ? `сгорит вместе с подпиской ${day(client.plan_until)}` : `подписки нет — сгорит через ${pack?.valid_days ?? 30} дн.`)}>
                 <select value={pack?.id} onChange={(e) => setPackId(e.target.value)}>
                   <optgroup label="Подписка на месяц">
-                    {packs.filter((p) => p.kind === 'plan').map((p) => <option key={p.id} value={p.id}>{p.title} · {p.credits} кр. · {won(p.price_krw)}</option>)}
+                    {packs.filter((p) => p.kind === 'plan').map((p) => <option key={p.id} value={p.id}>{p.title} · {p.credits} кр. · {usd(p.price_usd)}</option>)}
                   </optgroup>
                   <optgroup label="Докупка">
-                    {packs.filter((p) => p.kind === 'topup').map((p) => <option key={p.id} value={p.id}>{p.title} · {won(p.price_krw)}</option>)}
+                    {packs.filter((p) => p.kind === 'topup').map((p) => <option key={p.id} value={p.id}>{p.title} · {usd(p.price_usd)}</option>)}
                   </optgroup>
                 </select>
               </Field>
