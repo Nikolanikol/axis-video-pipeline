@@ -8,6 +8,7 @@
 // - устаревшую сборку после выкладки (STALE_BUILD) и неудачную загрузку картинки или видео событием.
 // Одна и та же ошибка — один раз за открытие страницы, всего не больше 10: зациклившийся экран
 // иначе слал бы отчёт на каждый кадр.
+import {lazy, type ComponentType} from 'react';
 import {ApiError} from './api';
 
 const sent = new Set<string>();
@@ -65,6 +66,22 @@ const describeEvent = (ev: Event): string | null => {
   return `Событие «${ev.type}»${where}${src ? ` (${String(src).slice(0, 200)})` : ''} вместо ошибки`;
 };
 
+/**
+ * Ленивый экран по имени экспорта: lazyNamed(() => import('./X'), 'X') вместо lazy(() => import(…).then(m => …)).
+ * Зачем. Кусок сборки не загрузился (старая вкладка после выкладки) → наш обработчик vite:preloadError
+ * перезагружает страницу и зовёт preventDefault. Vite в этом случае не бросает ошибку, а отдаёт import()
+ * значение undefined (handlePreloadError в vite/…/config.js). Обычный .then(m => m.CarouselTool) падал на
+ * undefined, граница экрана слала отчёт, и в «Сбои» приходило «undefined is not an object (evaluating
+ * 'e.CarouselTool')» (тревога 12.11, a38fbd8475), хотя страница уже перезагружалась. Здесь пустой модуль —
+ * ждём перезагрузку под Suspense, не роняя экран
+ */
+export const lazyNamed = <K extends string, M extends Record<K, ComponentType<any>>>(load: () => Promise<M>, name: K) =>
+  lazy(async () => {
+    const m = await load();
+    if (!m) return new Promise<never>(() => {});
+    return {default: m[name]};
+  });
+
 type Kind = 'boundary' | 'error' | 'rejection';
 
 export const reportError = (kind: Kind, error: unknown, extra: {tool?: string; componentStack?: string} = {}) => {
@@ -80,6 +97,10 @@ export const reportError = (kind: Kind, error: unknown, extra: {tool?: string; c
     if (NOISE.some((re) => re.test(message)) || STALE_BUILD.test(message)) return;
     const stack = [e.stack, extra.componentStack].filter(Boolean).join('\n--- компоненты ---\n');
     if (/chrome-extension:|moz-extension:|safari-web-extension:/.test(stack)) return;
+    // Скрипт, который встроенный браузер Instagram и Facebook на Android вставляет в каждую страницу
+    // (iabjs://navigation_performance_logger_android). При уходе со страницы он шлёт данные в своё
+    // приложение, а мост к нему уже закрыт — «Java object is gone». Не наш код (тревога 14.11, 75716426fd)
+    if (/iabjs:/.test(stack) || /Java object is gone/i.test(message)) return;
     if (sent.size >= MAX || sent.has(message)) return;
     sent.add(message);
     const body = JSON.stringify({kind, name: e.name, message, stack: stack.slice(0, 2000), url: location.href, tool: extra.tool});

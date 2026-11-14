@@ -3,18 +3,19 @@
 // Интерфейс начинает с /api/auth/me. Вход выключен (нет базы — Mac без DATABASE_URL,
 // тесты) — сразу пускаем внутрь, как было. Включён и никто не вошёл — витрина KOK с формой
 // входа и регистрации (app/Landing.tsx).
-import React, {Suspense, createContext, lazy, useCallback, useContext, useEffect, useLayoutEffect, useState} from 'react';
+import React, {Suspense, createContext, useCallback, useContext, useEffect, useLayoutEffect, useState} from 'react';
 import {Loading} from './Loading';
+import {lazyNamed} from './errorReport';
 import {dropPrerender, track} from './analytics';
 import {Balance, Me, Registration, User, api, errorText} from './api';
 import {Field} from './LotForm';
 import {useRoute} from './router';
 
 // Витрина — отдельным куском сборки: в ней плеер и композиции роликов, вошедшему они не нужны
-const Landing = lazy(() => import('./Landing').then((m) => ({default: m.Landing})));
+const Landing = lazyNamed(() => import('./Landing'), 'Landing');
 // Оферта и политика — открыты всем, и гостю, и вошедшему: их открывают по прямой ссылке
 // модератор платёжного сервиса и клиент из окна оплаты
-const LegalPage = lazy(() => import('./Legal').then((m) => ({default: m.LegalPage})));
+const LegalPage = lazyNamed(() => import('./Legal'), 'LegalPage');
 
 type Session = {
   enabled: boolean;

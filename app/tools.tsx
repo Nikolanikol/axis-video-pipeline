@@ -1,14 +1,14 @@
 // Экраны инструментов: «пайплайн/инструмент» → компонент (грузится при открытии).
 // Новый инструмент: запись в config/pipelines.json со status "ready" и строка здесь.
-import {lazy} from 'react';
+import {lazyNamed} from './errorReport';
 
 export const TOOLS = {
-  'ads/lot': lazy(() => import('./ads/LotTool').then((m) => ({default: m.LotTool}))),
-  'carousels/build': lazy(() => import('./carousels/CarouselTool').then((m) => ({default: m.CarouselTool}))),
-  'reviews/edit': lazy(() => import('./reviews/ReviewTool').then((m) => ({default: m.ReviewTool}))),
-  'settings/profile': lazy(() => import('./settings/SettingsTool').then((m) => ({default: m.ProfileTool}))),
-  'settings/ads': lazy(() => import('./settings/SettingsTool').then((m) => ({default: m.AdTextsTool}))),
-  'settings/brand': lazy(() => import('./settings/SettingsTool').then((m) => ({default: m.BrandTool}))),
+  'ads/lot': lazyNamed(() => import('./ads/LotTool'), 'LotTool'),
+  'carousels/build': lazyNamed(() => import('./carousels/CarouselTool'), 'CarouselTool'),
+  'reviews/edit': lazyNamed(() => import('./reviews/ReviewTool'), 'ReviewTool'),
+  'settings/profile': lazyNamed(() => import('./settings/SettingsTool'), 'ProfileTool'),
+  'settings/ads': lazyNamed(() => import('./settings/SettingsTool'), 'AdTextsTool'),
+  'settings/brand': lazyNamed(() => import('./settings/SettingsTool'), 'BrandTool'),
 } as const;
 
 export type ToolKey = keyof typeof TOOLS;

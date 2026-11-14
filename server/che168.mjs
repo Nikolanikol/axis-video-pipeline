@@ -11,6 +11,7 @@ import {carFromChe168} from '../src/shared/che168Car.js';
 import {getCar} from '../cores/che168/src/index.mjs';
 import {toCoreError} from '../cores/kit/errors.mjs';
 import {createLogger, levelFor} from '../cores/kit/log.mjs';
+import {sourceFailed, sourceOk} from './sourceHealth.mjs';
 
 const log = createLogger('che168');
 // Код ядра → статус ответа KOK
@@ -39,6 +40,7 @@ export const fetchChe168 = async (ref) => {
   } catch (e) {
     const err = toCoreError(e);
     // Ожидаемое (нет машины, кривая ссылка) — warn; поломки Autohome и ядра — error со стеком
+    sourceFailed('che168', {ref, code: err.code, message: err.message});
     rlog[levelFor(err.code)]('request.failed', {ref, code: err.code, error: err});
     // Текст ядра — уже по-русски и для человека; у INTERNAL — без подробностей, они в логе
     throw new HttpError(STATUS[err.code] ?? 502, err.code === 'INTERNAL' ? 'Источник «Китай» дал сбой — попробуйте позже' : err.message);
@@ -56,14 +58,17 @@ export const fetchChe168Car = async (ref, language) => {
   const data = await fetchChe168(ref);
   let car;
   try { car = carFromChe168(data, language); } catch (e) {
+    sourceFailed('che168', {ref, code: 'ADAPTER_FAILED', message: e?.message});
     log.error('adapter.failed', {ref, error: e});
     throw new HttpError(502, 'Не удалось разобрать машину из Китая — сообщите нам, мы поправим');
   }
   // Ядро ответило успехом, но без марки и модели — это не машина, а дыра в данных Autohome.
   // Пустое объявление молча не создаём
   if (!car.brand && !car.model) {
+    sourceFailed('che168', {ref, code: 'CAR_EMPTY'});
     log.error('car.empty', {ref});
     throw new HttpError(502, 'Источник «Китай» отдал машину без данных — попробуйте позже или другую ссылку');
   }
+  sourceOk('che168', {ref, car});
   return car;
 };
