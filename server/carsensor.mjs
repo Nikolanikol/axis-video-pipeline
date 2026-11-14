@@ -12,6 +12,7 @@ import {carFromCarsensor} from '../src/shared/carsensorCar.js';
 import {getCar} from '../cores/carsensor/src/index.mjs';
 import {toCoreError} from '../cores/kit/errors.mjs';
 import {createLogger, levelFor} from '../cores/kit/log.mjs';
+import {sourceFailed, sourceOk} from './sourceHealth.mjs';
 
 const log = createLogger('carsensor');
 const STATUS = {
@@ -40,6 +41,7 @@ export const fetchCarsensor = async (ref) => {
     return data;
   } catch (e) {
     const err = toCoreError(e);
+    sourceFailed('carsensor', {ref, code: err.code, message: err.message});
     rlog[levelFor(err.code)]('request.failed', {ref, code: err.code, tookMs: Date.now() - t0, error: err});
     throw new HttpError(STATUS[err.code] ?? 502, err.code === 'INTERNAL' ? 'Источник «Япония» дал сбой — попробуйте позже' : err.message);
   } finally {
@@ -67,13 +69,16 @@ export const fetchCarsensorCar = async (ref, language) => {
   const [data, rate] = await Promise.all([fetchCarsensor(ref), jpyRate()]);
   let car;
   try { car = carFromCarsensor(data, language, rate); } catch (e) {
+    sourceFailed('carsensor', {ref, code: 'ADAPTER_FAILED', message: e?.message});
     log.error('adapter.failed', {ref, error: e});
     throw new HttpError(502, 'Не удалось разобрать машину из Японии — сообщите нам, мы поправим');
   }
   if (!car.brand && !car.model) {
+    sourceFailed('carsensor', {ref, code: 'CAR_EMPTY'});
     log.error('car.empty', {ref});
     throw new HttpError(502, 'Источник «Япония» отдал машину без данных — попробуйте позже или другую ссылку');
   }
   if (car.price?.jpy && !car.price.usd) log.warn('price.no_rate', {ref, jpy: car.price.jpy});
+  sourceOk('carsensor', {ref, car});
   return car;
 };

@@ -11,6 +11,7 @@ import {carFromEncar} from '../src/shared/encarCar.js';
 import {getCar} from '../cores/encar/src/index.mjs';
 import {toCoreError} from '../cores/kit/errors.mjs';
 import {createLogger, levelFor} from '../cores/kit/log.mjs';
+import {sourceFailed, sourceOk} from './sourceHealth.mjs';
 
 const log = createLogger('encar');
 // Код ядра → статус ответа KOK (как у che168)
@@ -41,6 +42,7 @@ export const fetchEncarCar = async (ref) => {
   } catch (e) {
     const err = toCoreError(e);
     // Ожидаемое (нет машины, кривая ссылка) — warn; поломки шлюза и ядра — error со стеком
+    sourceFailed('encar', {ref, code: err.code, message: err.message});
     rlog[levelFor(err.code)]('request.failed', {ref: String(ref ?? '').slice(0, 200), code: err.code, tookMs: Date.now() - t0, error: err});
     // Текст ядра — по-русски и для человека; у INTERNAL — без подробностей, они в логе
     throw new HttpError(STATUS[err.code] ?? 502, err.code === 'INTERNAL' ? 'Источник «Корея» дал сбой — попробуйте позже' : err.message);
@@ -48,8 +50,11 @@ export const fetchEncarCar = async (ref) => {
     clearTimeout(timer);
   }
   try {
-    return carFromEncar(data);
+    const car = carFromEncar(data);
+    sourceOk('encar', {ref: data.ref, car});
+    return car;
   } catch (e) {
+    sourceFailed('encar', {ref: data?.ref, code: 'ADAPTER_FAILED', message: e?.message});
     rlog.error('adapter.failed', {ref: data?.ref, error: e});
     throw new HttpError(502, 'Не удалось разобрать машину из Кореи — сообщите нам, мы поправим');
   }
