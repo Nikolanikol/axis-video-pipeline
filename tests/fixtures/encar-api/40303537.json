@@ -1,0 +1,355 @@
+{
+  "Id": "40303537",
+  "Separation": [
+    "B"
+  ],
+  "Trust": [
+    "Warranty"
+  ],
+  "ServiceMark": [
+    "DiagnosisP0"
+  ],
+  "Condition": [
+    "Inspection",
+    "Record",
+    "Resume"
+  ],
+  "Photo": "/carpicture10/pic4030/40303537_",
+  "Photos": [
+    {
+      "location": "/carpicture10/pic4030/40303537_001.jpg"
+    },
+    {
+      "location": "/carpicture10/pic4030/40303537_002.jpg"
+    },
+    {
+      "location": "/carpicture10/pic4030/40303537_003.jpg"
+    },
+    {
+      "location": "/carpicture10/pic4030/40303537_004.jpg"
+    },
+    {
+      "location": "/carpicture10/pic4030/40303537_005.jpg"
+    },
+    {
+      "location": "/carpicture10/pic4030/40303537_006.jpg"
+    },
+    {
+      "location": "/carpicture10/pic4030/40303537_007.jpg"
+    },
+    {
+      "location": "/carpicture10/pic4030/40303537_008.jpg"
+    },
+    {
+      "location": "/carpicture10/pic4030/40303537_009.jpg"
+    },
+    {
+      "location": "/carpicture10/pic4030/40303537_010.jpg"
+    },
+    {
+      "location": "/carpicture10/pic4030/40303537_015.jpg"
+    },
+    {
+      "location": "/carpicture10/pic4030/40303537_016.jpg"
+    },
+    {
+      "location": "/carpicture10/pic4030/40303537_017.jpg"
+    },
+    {
+      "location": "/carpicture10/pic4030/40303537_018.jpg"
+    },
+    {
+      "location": "/carpicture10/pic4030/40303537_019.jpg"
+    },
+    {
+      "location": "/carpicture10/pic4030/40303537_020.jpg"
+    },
+    {
+      "location": "/carpicture10/pic4030/40303537_021.jpg"
+    },
+    {
+      "location": "/carpicture10/pic4030/40303537_022.jpg"
+    },
+    {
+      "location": "/carpicture10/pic4030/40303537_023.jpg"
+    },
+    {
+      "location": "/carpicture10/pic4030/40303537_024.jpg"
+    }
+  ],
+  "Manufacturer": "포드",
+  "Model": "F150",
+  "Badge": "5.0L",
+  "GreenType": "N",
+  "FuelType": "가솔린",
+  "Year": 201812,
+  "FormYear": "2018",
+  "Mileage": 67842,
+  "ServiceCopyCar": "ORIGINAL",
+  "Price": 3950,
+  "SellType": "일반",
+  "BuyType": [],
+  "OfficeCityState": "서울",
+  "postedAt": "2026-08-25T03:09:31.000Z",
+  "reserved": false,
+  "details": {
+    "color": "빨간색",
+    "transmission": "오토",
+    "fuel": "가솔린",
+    "displacement": 4951,
+    "seats": 5,
+    "body": "화물차",
+    "drive": null,
+    "modelYear": 2018,
+    "firstRegistration": "2020-03-18",
+    "vin": "TESTVIN303537",
+    "engineCode": null,
+    "newPrice": null,
+    "warranty": null,
+    "seatColor": null
+  },
+  "liens": {
+    "seizures": 0,
+    "pledges": 0
+  },
+  "options": [
+    {
+      "code": "001",
+      "name": "브레이크 잠김 방지(ABS)",
+      "nameDe": "Antiblockiersystem (ABS)",
+      "nameEn": "Anti-lock brakes (ABS)"
+    },
+    {
+      "code": "003",
+      "name": "CD 플레이어",
+      "nameDe": "CD-Player",
+      "nameEn": "CD player"
+    },
+    {
+      "code": "004",
+      "name": "앞좌석 AV 모니터",
+      "nameDe": "Monitor vorne",
+      "nameEn": "Front-seat display"
+    },
+    {
+      "code": "005",
+      "name": "내비게이션",
+      "nameDe": "Navigationssystem",
+      "nameEn": "Navigation system"
+    },
+    {
+      "code": "006",
+      "name": "전동시트",
+      "nameDe": "Elektrische Sitze",
+      "nameEn": "Power seats"
+    },
+    {
+      "code": "007",
+      "name": "열선시트",
+      "nameDe": "Sitzheizung",
+      "nameEn": "Heated seats"
+    },
+    {
+      "code": "008",
+      "name": "메모리 시트",
+      "nameDe": "Memory-Sitze",
+      "nameEn": "Memory seats"
+    },
+    {
+      "code": "014",
+      "name": "가죽시트",
+      "nameDe": "Ledersitze",
+      "nameEn": "Leather seats"
+    },
+    {
+      "code": "015",
+      "name": "무선도어 잠금장치",
+      "nameDe": "Funk-Zentralverriegelung",
+      "nameEn": "Remote central locking"
+    },
+    {
+      "code": "017",
+      "name": "알루미늄 휠",
+      "nameDe": "Leichtmetallfelgen",
+      "nameEn": "Alloy wheels"
+    },
+    {
+      "code": "019",
+      "name": "미끄럼 방지(TCS)",
+      "nameDe": "Antriebsschlupfregelung (TCS)",
+      "nameEn": "Traction control (TCS)"
+    },
+    {
+      "code": "021",
+      "name": "전동시트(운전석)",
+      "nameDe": "Elektrischer Fahrersitz",
+      "nameEn": "Power driver seat"
+    },
+    {
+      "code": "022",
+      "name": "열선시트(앞좌석)",
+      "nameDe": "Sitzheizung vorne",
+      "nameEn": "Heated front seats"
+    },
+    {
+      "code": "026",
+      "name": "에어백(운전석)",
+      "nameDe": "Fahrerairbag",
+      "nameEn": "Driver airbag"
+    },
+    {
+      "code": "027",
+      "name": "에어백(동승석)",
+      "nameDe": "Beifahrerairbag",
+      "nameEn": "Passenger airbag"
+    },
+    {
+      "code": "030",
+      "name": "ECM 룸미러",
+      "nameDe": "Automatisch abblendender Innenspiegel",
+      "nameEn": "Auto-dimming rear-view mirror"
+    },
+    {
+      "code": "031",
+      "name": "스티어링 휠 리모컨",
+      "nameDe": "Multifunktionslenkrad",
+      "nameEn": "Steering wheel controls"
+    },
+    {
+      "code": "032",
+      "name": "주차감지센서(후방)",
+      "nameDe": "Parksensoren hinten",
+      "nameEn": "Rear parking sensors"
+    },
+    {
+      "code": "033",
+      "name": "타이어 공기압센서(TPMS)",
+      "nameDe": "Reifendruckkontrolle (TPMS)",
+      "nameEn": "Tyre pressure monitoring (TPMS)"
+    },
+    {
+      "code": "035",
+      "name": "전동시트(동승석)",
+      "nameDe": "Elektrischer Beifahrersitz",
+      "nameEn": "Power passenger seat"
+    },
+    {
+      "code": "055",
+      "name": "차체자세 제어장치(ESC)",
+      "nameDe": "Elektronisches Stabilitätsprogramm (ESC)",
+      "nameEn": "Electronic stability control (ESC)"
+    },
+    {
+      "code": "056",
+      "name": "에어백(커튼)",
+      "nameDe": "Kopfairbags",
+      "nameEn": "Curtain airbags"
+    },
+    {
+      "code": "058",
+      "name": "후방 카메라",
+      "nameDe": "Rückfahrkamera",
+      "nameEn": "Rear-view camera"
+    },
+    {
+      "code": "063",
+      "name": "열선시트(뒷좌석)",
+      "nameDe": "Sitzheizung hinten",
+      "nameEn": "Heated rear seats"
+    },
+    {
+      "code": "068",
+      "name": "크루즈 컨트롤(일반)",
+      "nameDe": "Tempomat",
+      "nameEn": "Cruise control"
+    },
+    {
+      "code": "072",
+      "name": "USB 단자",
+      "nameDe": "USB-Anschluss",
+      "nameEn": "USB port"
+    },
+    {
+      "code": "085",
+      "name": "주차감지센서(전방)",
+      "nameDe": "Parksensoren vorne",
+      "nameEn": "Front parking sensors"
+    },
+    {
+      "code": "096",
+      "name": "블루투스",
+      "nameDe": "Bluetooth",
+      "nameEn": "Bluetooth"
+    },
+    {
+      "code": "097",
+      "name": "오토 라이트",
+      "nameDe": "Lichtautomatik",
+      "nameEn": "Automatic headlights"
+    }
+  ],
+  "history": {
+    "ownAccidents": 0,
+    "ownAccidentCost": 0,
+    "otherAccidents": 0,
+    "otherAccidentCost": 0,
+    "ownerChanges": 4,
+    "plateChanges": 0,
+    "totalLoss": 0,
+    "floodTotalLoss": 0,
+    "floodPartialLoss": 0,
+    "theft": 0,
+    "usedAsRental": false,
+    "usedCommercially": false,
+    "usedByGovernment": false,
+    "firstRegistration": "2020-03-18"
+  },
+  "inspection": {
+    "accident": false,
+    "simpleRepair": false
+  },
+  "priceDrop": {
+    "previousPrice": 4300,
+    "previousPriceSeenAt": "2026-10-09T10:59:22.340Z",
+    "droppedAt": "2026-10-18T11:39:10.765Z"
+  },
+  "powerPs": 445,
+  "powerKw": 327,
+  "powerSource": "estimate",
+  "powerBasis": "F150 5.0L",
+  "en": {
+    "manufacturer": "Ford",
+    "modelGroup": "F150",
+    "model": "F150",
+    "badge": "5.0L",
+    "badgeDetail": null,
+    "title": "Ford F150 5.0L",
+    "fuelType": "Gasoline",
+    "evType": null,
+    "sellType": "Sale",
+    "leaseType": null,
+    "region": "Seoul",
+    "color": "Red",
+    "transmission": "Automatic",
+    "body": "Truck"
+  },
+  "de": {
+    "manufacturer": "Ford",
+    "modelGroup": "F150",
+    "model": "F150",
+    "badge": "5.0L",
+    "badgeDetail": null,
+    "title": "Ford F150 5.0L",
+    "fuelType": "Benzin",
+    "evType": null,
+    "sellType": "Verkauf",
+    "leaseType": null,
+    "region": "Seoul",
+    "color": "Rot",
+    "transmission": "Automatik",
+    "body": "Lkw"
+  },
+  "status": "available",
+  "available": true,
+  "live": true
+}
