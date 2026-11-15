@@ -316,6 +316,8 @@ export const buildCarousel = async (link, opts = {}) => {
       ...(recent ? {recent} : {}),
       // Откуда лот: «Пересобрать» идёт по нему, кнопка «Открыть лот» — по адресу
       ...(lot ? {lot: {...lot, url: lotPageUrl(lot.house, lot.id)}} : {}),
+      // Текст поста, который дилер поправил, переживает пересборку: машина та же, текст его
+      ...(prev?.caption ? {caption: prev.caption} : {}),
     };
     await writeJson(path.join(dir, 'carousel.json'), meta);
     // Новый вариант — в память дилера: следующая карусель обойдёт эти фразы. Сбой памяти не
@@ -346,14 +348,20 @@ export const slideFileName = (car, n) => {
  * берём из сохранённой карусели, а не из запроса: иначе через бесплатную кнопку собирали бы
  * новые варианты и форматы, за которые берётся кредит
  */
+/** Своя цена на слайде из запроса: пусто — расчёт по курсу (null), иначе положительное число */
+export const parsePrice = (price) => {
+  const v = price === null || price === '' || price === undefined ? null : Number(price);
+  if (v !== null && (!Number.isFinite(v) || v <= 0 || v > 1e12)) throw new HttpError(400, 'Цена — положительное число');
+  return v ? Math.round(v) : null;
+};
+
 export const repriceCarousel = async (id, price) => {
   const file = path.join(carouselsDir(), checkId(id), 'carousel.json');
   const saved = await readJson(file).catch(skipUnreadable('карусель', file));
   if (!saved) throw new HttpError(404, 'Карусель не найдена — соберите её по ссылке');
-  const v = price === null || price === '' || price === undefined ? null : Number(price);
-  if (v !== null && (!Number.isFinite(v) || v <= 0 || v > 1e12)) throw new HttpError(400, 'Цена — положительное число');
+  const priceOverride = parsePrice(price);
   // Папка лота (km-…) сама разбирается как «сохранённый лот», номер Encar — как объявление
-  return buildCarousel(id, {format: saved.format, seed: saved.seed, family: saved.family ?? null, priceOverride: v ? Math.round(v) : null});
+  return buildCarousel(id, {format: saved.format, seed: saved.seed, family: saved.family ?? null, priceOverride});
 };
 
 /**
@@ -390,6 +398,28 @@ export const deleteCarousel = async (id) => {
 };
 
 /** Ранее собранные карусели, новые сверху */
+// Подпись к посту: Instagram режет на 2200 знаках, хэштегов там до 30 — у нас до 5 (владелец 16.11)
+const CAPTION_MAX = 2200;
+/**
+ * Текст поста к карусели — свои правки дилера. Бесплатно и без пересборки: слайды не меняются.
+ * Пустой текст — вернуть шаблон (интерфейс снова соберёт его из данных машины, app/carousels/PostCaption.tsx)
+ */
+export const saveCarouselCaption = async (id, body) => {
+  const file = path.join(carouselsDir(), checkId(id), 'carousel.json');
+  const saved = await readJson(file).catch(skipUnreadable('карусель', file));
+  if (!saved) throw new HttpError(404, 'Карусель не найдена — соберите её по ссылке');
+  const text = typeof body?.text === 'string' ? body.text.replace(/\r\n/g, '\n').trim() : '';
+  if (text.length > CAPTION_MAX) throw new HttpError(400, `Слишком длинный текст поста: до ${CAPTION_MAX} знаков`);
+  const tags = Array.isArray(body?.hashtags) ? body.hashtags : [];
+  if (tags.length > 5 || tags.some((t) => typeof t !== 'string' || !/^#[\p{L}\p{N}_]{1,60}$/u.test(t))) {
+    throw new HttpError(400, 'Хэштеги — до 5 штук, каждый со знаком # и без пробелов');
+  }
+  const {caption: _old, ...rest} = saved;
+  const next = text ? {...rest, caption: {text, hashtags: tags}} : rest;
+  await writeJson(file, next);
+  return publicMeta(next);
+};
+
 export const listCarousels = async () => {
   await fs.mkdir(carouselsDir(), {recursive: true});
   const dirs = (await fs.readdir(carouselsDir(), {withFileTypes: true})).filter((d) => d.isDirectory());
