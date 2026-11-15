@@ -57,7 +57,7 @@ export const brandForRender = async (theme) => {
 // загруженных до подложек, и не расходится с файлом при «вернуть фон» / новой загрузке.
 // Разбор — по уменьшенной до 512 копии (десятки мс), запоминается по пути и времени файла
 const inkCache = new Map();
-const logoFile = (url) => {
+export const logoFile = (url) => {
   if (typeof url !== 'string' || !url) return null;
   const own = `${workspaceUrl()}/brand/`;
   const [dir, rel] = url.startsWith(own) ? [brandDir(), url.slice(own.length)]

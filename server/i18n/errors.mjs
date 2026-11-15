@@ -107,6 +107,11 @@ const DICT = {
 
   // ——— Объявления, фото, ролики ———
   'Нет такого объявления': ['No such listing', 'Nuk ka shpallje të tillë'],
+  // КП в PDF (server/offers.mjs)
+  'Сумма в КП — число': ['Offer amounts must be numbers', 'Shumat në ofertë duhet të jenë numra'],
+  'Впишите сумму: {}': ['Enter the amount: {}', 'Shkruani shumën: {}'],
+  'Не удалось собрать PDF — попробуйте ещё раз': ['Could not build the PDF — please try again', 'PDF nuk u krijua — provoni përsëri'],
+  'КП не найдено': ['Offer not found', 'Oferta nuk u gjet'],
   'Ролик этого объявления сейчас собирается — дождитесь или отмените сборку': ['The video for this listing is being built — wait or cancel the build', 'Videoja e kësaj shpalljeje po krijohet — prisni ose anuloni'],
   'Добавь хотя бы одно фото': ['Add at least one photo', 'Shtoni të paktën një foto'],
   'Выберите хотя бы одно фото': ['Select at least one photo', 'Zgjidhni të paktën një foto'],

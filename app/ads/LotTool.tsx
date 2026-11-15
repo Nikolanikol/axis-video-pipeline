@@ -15,6 +15,7 @@ import {useConfig} from '../config';
 import {EncarImport} from './EncarImport';
 import {Preview} from '../Preview';
 import {RenderPanel} from '../RenderPanel';
+import {OfferButton} from './OfferButton';
 import {lastFormat, lastLot} from '../router';
 import {ImportModal, LotsPanel, QuickLink, type ImportStage} from './QuickLot';
 import {Palette} from './Palette';
@@ -273,8 +274,11 @@ export const LotTool: React.FC = () => {
         <LotsPanel lots={lots} current={lot?.id} pending={pending} onOpen={selectLot} onBlank={newLot} price={priceOf}
           onCopy={copyLot} onDelete={deleteLot} onDeleteEmpty={deleteEmpty} />
       </div>}
-      render={lot && <RenderPanel lot={lot} format={format} unsavedSettings={unsavedSettings} beforeRender={beforeRender} onError={report}
-        hideButton trigger={buildRef} onState={setBuilding} />}
+      render={lot && <>
+        <RenderPanel lot={lot} format={format} unsavedSettings={unsavedSettings} beforeRender={beforeRender} onError={report}
+          hideButton trigger={buildRef} onState={setBuilding} />
+        <OfferButton lot={lot} />
+      </>}
       buildRef={buildRef} building={building}
       photoSource={lot && <EncarImport lot={lot} onApply={applyFromCar} onError={report} />} />
   </>;
@@ -301,7 +305,10 @@ export const LotTool: React.FC = () => {
             save={save} onRetrySave={() => { void saveLot(); }} onChange={editLot} onPhotos={setPhotos} onError={report}
             onFormat={chooseFormat} scene={scene} onScene={pickScene} seek={seek}
             photoSource={<EncarImport lot={lot} onApply={applyFromCar} onError={report} />}
-            render={<RenderPanel lot={lot} format={format} unsavedSettings={unsavedSettings} beforeRender={beforeRender} onError={report} folded />} />
+            render={<>
+              <RenderPanel lot={lot} format={format} unsavedSettings={unsavedSettings} beforeRender={beforeRender} onError={report} folded />
+              <OfferButton lot={lot} />
+            </>} />
           : <section className="quick-preview">
             <div className="empty">{t('lot.empty')}</div>
           </section>}

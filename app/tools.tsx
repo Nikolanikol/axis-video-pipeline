@@ -5,9 +5,11 @@ import {lazyNamed} from './errorReport';
 export const TOOLS = {
   'ads/lot': lazyNamed(() => import('./ads/LotTool'), 'LotTool'),
   'carousels/build': lazyNamed(() => import('./carousels/CarouselTool'), 'CarouselTool'),
+  'offers/build': lazyNamed(() => import('./offers/OfferTool'), 'OfferTool'),
   'reviews/edit': lazyNamed(() => import('./reviews/ReviewTool'), 'ReviewTool'),
   'settings/profile': lazyNamed(() => import('./settings/SettingsTool'), 'ProfileTool'),
   'settings/ads': lazyNamed(() => import('./settings/SettingsTool'), 'AdTextsTool'),
+  'settings/offer': lazyNamed(() => import('./settings/OfferSettings'), 'OfferTool'),
   'settings/brand': lazyNamed(() => import('./settings/SettingsTool'), 'BrandTool'),
 } as const;
 
