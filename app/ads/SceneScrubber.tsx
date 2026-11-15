@@ -5,6 +5,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {Maximize2, Pause, Play} from 'lucide-react';
 import type {FormatMeta} from '../../src/shared/types';
+import {useT} from '../i18n';
 
 type Props = {
   format: FormatMeta;
@@ -23,6 +24,7 @@ const clock = (frame: number, fps: number) => {
 };
 
 export const SceneScrubber: React.FC<Props> = ({format, listen, seekFrame, playing, onToggle, onExpand}) => {
+  const t = useT();
   const [frame, setFrame] = useState(0);
   const [drag, setDrag] = useState<number | null>(null);
   const track = useRef<HTMLDivElement>(null);
@@ -53,19 +55,19 @@ export const SceneScrubber: React.FC<Props> = ({format, listen, seekFrame, playi
   const scene = sceneAt(shown);
 
   return <div className="mle-bar">
-    <button type="button" className="mle-bar-play" aria-label={playing ? 'Пауза' : 'Смотреть'} onClick={onToggle}>
+    <button type="button" className="mle-bar-play" aria-label={t(playing ? 'player.pause' : 'jobs.watch')} onClick={onToggle}>
       {playing ? <Pause size={18} /> : <Play size={18} />}</button>
     <span className="mle-bar-time">{clock(shown, format.fps)} / {clock(total, format.fps)}</span>
     <div className={`mle-scrub${drag !== null ? ' dragging' : ''}`} role="slider" tabIndex={0}
-      aria-label="Перемотка ролика" aria-valuemin={0} aria-valuemax={total - 1} aria-valuenow={shown}
-      aria-valuetext={`${scene.title}, ${clock(shown, format.fps)}`}
+      aria-label={t('player.seek')} aria-valuemin={0} aria-valuemax={total - 1} aria-valuenow={shown}
+      aria-valuetext={`${t.cfg(scene.title)}, ${clock(shown, format.fps)}`}
       onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onKeyDown={key}>
       <div className="mle-scrub-track" ref={track}>
         <i className="mle-scrub-fill" style={{width: pct}} />
         <b className="mle-scrub-knob" style={{left: pct}} />
       </div>
-      {drag !== null && <span className="mle-scrub-tip" style={{left: pct}}>{scene.title} · {clock(drag, format.fps)}</span>}
+      {drag !== null && <span className="mle-scrub-tip" style={{left: pct}}>{t.cfg(scene.title)} · {clock(drag, format.fps)}</span>}
     </div>
-    {onExpand && <button type="button" className="mle-bar-icon" aria-label="Смотреть целиком" onClick={onExpand}><Maximize2 size={18} /></button>}
+    {onExpand && <button type="button" className="mle-bar-icon" aria-label={t('player.full')} onClick={onExpand}><Maximize2 size={18} /></button>}
   </div>;
 };

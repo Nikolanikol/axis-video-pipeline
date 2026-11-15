@@ -15,6 +15,7 @@ import {api, LotEntry} from '../api';
 import {useConfig} from '../config';
 import {encarUrl} from './QuickLot';
 import {sourceName, sourceNote} from '../../src/shared/encarLink.js';
+import {locale, useT} from '../i18n';
 
 /** Тип данных при перетаскивании снимков из палитры в галерею лота: JSON-массив адресов */
 export const ENCAR_PHOTO_DRAG = 'application/x-kok-encar-photos';
@@ -41,6 +42,7 @@ const preview = (url: string) => thumb(url).replace(/(\.autoimg\.cn\/.*\/)(\d+x\
 // добирает фото — под «Изменить вручную»
 export const EncarImport: React.FC<Props> = ({lot, onApply, onError}) => {
   const {profile} = useConfig();
+  const t = useT();
   const [link, setLink] = useState('');
   const [car, setCar] = useState<CarouselCar | null>(null);
   // Выбранные фото — массив, а не множество: порядок нажатий и есть порядок в лоте
@@ -134,12 +136,12 @@ export const EncarImport: React.FC<Props> = ({lot, onApply, onError}) => {
     <section className="encar">
       <form className="link-bar encar-bar" onSubmit={lookup}>
         <Link2 className="link-bar-icon" size={20} aria-hidden />
-        <input ref={input} value={link} onChange={(e) => setLink(e.target.value)} placeholder="Ссылка на объявление Encar, che168 или Carsensor"
-          aria-label="Ссылка на объявление Encar, che168 или Carsensor" disabled={!!busy} />
+        <input ref={input} value={link} onChange={(e) => setLink(e.target.value)} placeholder={t('link.aria')}
+          aria-label={t('link.aria')} disabled={!!busy} />
         <button className="btn primary link-go" disabled={!!busy}>
-          <Search size={17} aria-hidden />{busy === 'lookup' ? 'Ищу…' : 'Подтянуть по ссылке'}
+          <Search size={17} aria-hidden />{t(busy === 'lookup' ? 'encar.looking' : 'encar.lookup')}
         </button>
-        {car && <button type="button" className="btn ghost" onClick={reset} disabled={!!busy}>Закрыть</button>}
+        {car && <button type="button" className="btn ghost" onClick={reset} disabled={!!busy}>{t('land.auth.close')}</button>}
       </form>
 
       {car && (
@@ -147,30 +149,30 @@ export const EncarImport: React.FC<Props> = ({lot, onApply, onError}) => {
           <div className="encar-head">
             <b>{[car.brand, car.model, car.grade].filter(Boolean).join(' ')}</b>
             <span className="muted">
-              {[car.year, car.mileageKm !== null ? `${car.mileageKm.toLocaleString('ru-RU')} км` : '',
-                car.price?.krw ? `₩${car.price.krw.toLocaleString('ru-RU')}`
-                  : car.price?.usd ? `$${car.price.usd.toLocaleString('ru-RU')}` : 'без цены'].filter(Boolean).join(' · ')}
+              {[car.year, car.mileageKm !== null ? t('common.km', {n: car.mileageKm.toLocaleString(locale())}) : '',
+                car.price?.krw ? `₩${car.price.krw.toLocaleString(locale())}`
+                  : car.price?.usd ? `$${car.price.usd.toLocaleString(locale())}` : t('encar.noPrice')].filter(Boolean).join(' · ')}
             </span>
           </div>
           <div className="encar-tools">
-            <span className="muted">Фото: выбрано {picked.length} из {photos.length}{loadedCount > 0 && `, уже загружено ${loadedCount}`} · нажмите, чтобы отметить, или перетащите в галерею ниже</span>
-            <button type="button" className="link" onClick={() => setPicked(recommended)}>рекомендованные</button>
-            <button type="button" className="link" onClick={() => setPicked(free.map((p) => p.url))}>все</button>
-            <button type="button" className="link" onClick={() => setPicked([])}>ни одного</button>
+            <span className="muted">{t('encar.picked', {a: picked.length, b: photos.length})}{loadedCount > 0 && t('encar.loadedN', {n: loadedCount})} · {t('encar.pickHint')}</span>
+            <button type="button" className="link" onClick={() => setPicked(recommended)}>{t('encar.recommended')}</button>
+            <button type="button" className="link" onClick={() => setPicked(free.map((p) => p.url))}>{t('encar.all')}</button>
+            <button type="button" className="link" onClick={() => setPicked([])}>{t('encar.none')}</button>
           </div>
           <div className="encar-photos">
             {photos.map((p) => {
               const n = picked.indexOf(p.url);
               if (loaded(p.url)) return (
-                <div key={p.url} className="encar-photo loaded" title="Это фото уже загружено">
+                <div key={p.url} className="encar-photo loaded" title={t('encar.alreadyTitle')}>
                   <img src={preview(p.url)} alt={p.label} loading="lazy" draggable={false} />
                   <span className="encar-label">{p.label}</span>
-                  <span className="encar-in-lot"><Check size={13} aria-hidden />загружено</span>
+                  <span className="encar-in-lot"><Check size={13} aria-hidden />{t('encar.loaded')}</span>
                 </div>
               );
               return (
                 <button type="button" key={p.url} className={n >= 0 ? 'encar-photo on' : 'encar-photo'} onClick={() => toggle(p.url)}
-                  title={n >= 0 ? 'Убрать' : 'Добавить'}>
+                  title={t(n >= 0 ? 'encar.remove' : 'encar.add')}>
                   {/* Тянется картинка, а не кнопка: Firefox кнопки не перетаскивает */}
                   <img src={preview(p.url)} alt={p.label} loading="lazy" draggable
                     onDragStart={(e) => dragStart(e, p.url)} onDragEnd={dragEnd} />
@@ -183,12 +185,12 @@ export const EncarImport: React.FC<Props> = ({lot, onApply, onError}) => {
           <div className="btn-row">
             {lot && (
               <button className="btn primary encar-load" onClick={apply} disabled={!!busy || (!blank && !picked.length)}>
-                {busy === 'apply' ? 'Загружаю…'
-                  : blank ? (picked.length ? `Заполнить из ${sourceName(car.id)} и подгрузить фотографии (${picked.length})` : `Заполнить из ${sourceName(car.id)}`)
-                  : `Подгрузить фотографии${picked.length ? ` (${picked.length})` : ''}`}
+                {busy === 'apply' ? t('encar.loading')
+                  : blank ? (picked.length ? t('encar.fillPhotos', {site: sourceName(car.id), n: picked.length}) : t('encar.fill', {site: sourceName(car.id)}))
+                  : `${t('encar.addPhotos')}${picked.length ? ` (${picked.length})` : ''}`}
               </button>
             )}
-            <span className="hint">Фото добавятся в конец галереи. Они копируются к нам: ролик не сломается, если объявление снимут. Бесплатно — кредиты только за сборку ролика.</span>
+            <span className="hint">{t('encar.hint')}</span>
           </div>
         </div>
       )}

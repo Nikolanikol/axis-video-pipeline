@@ -25,22 +25,32 @@ const LOW_MILEAGE_KM = 50_000;
  * о них здесь молчим (подробно — сцена истории в «Цене сразу»). Нечего сказать — пусто,
  * и ролик берёт фразу из профиля.
  */
+// Слова подзаголовка и страны маршрута по языку контента (албанский — с 15.11)
+const TAG = {
+  ru: {clean: 'Без страховых случаев', oneOwner: 'Один владелец', low: (k: number) => `Пробег ${k} тыс. км`,
+    CN: 'Из Китая', JP: 'Из Японии', countryCN: 'КИТАЙ', countryJP: 'ЯПОНИЯ'},
+  en: {clean: 'No insurance claims', oneOwner: 'One owner', low: (k: number) => `Only ${k}k km`,
+    CN: 'From China', JP: 'From Japan', countryCN: 'CHINA', countryJP: 'JAPAN'},
+  sq: {clean: 'Pa dëme në sigurime', oneOwner: 'Një pronar', low: (k: number) => `Vetëm ${k} mijë km`,
+    CN: 'Nga Kina', JP: 'Nga Japonia', countryCN: 'KINA', countryJP: 'JAPONIA'},
+};
+
 export const taglineFromCar = (car: CarouselCar, language?: string): string => {
-  const ru = carouselLang(language) === 'ru';
+  const w = TAG[carouselLang(language)];
   const facts: string[] = [];
   const h = car.history;
-  if (h && h.accidentsTotal === 0) facts.push(ru ? 'Без страховых случаев' : 'No insurance claims');
-  if (h && h.ownerChanges === 0) facts.push(ru ? 'Один владелец' : 'One owner');
+  if (h && h.accidentsTotal === 0) facts.push(w.clean);
+  if (h && h.ownerChanges === 0) facts.push(w.oneOwner);
   if (car.mileageKm !== null && car.mileageKm < LOW_MILEAGE_KM) {
     const k = Math.max(1, Math.round(car.mileageKm / 1000));
-    facts.push(ru ? `Пробег ${k} тыс. км` : `Only ${k}k km`);
+    facts.push(w.low(k));
   }
   // Два факта, если вместе влезают; иначе первый — он и сильнее
   const two = facts.slice(0, 2).join(' · ');
   const said = two.length <= TAGLINE_MAX ? two : (facts[0] ?? '');
   // Машине из Китая и Японии нельзя отдать фразу профиля — там «Из Кореи». Сказать нечего — страна
-  if (!said && car.origin === 'CN') return ru ? 'Из Китая' : 'From China';
-  if (!said && car.origin === 'JP') return ru ? 'Из Японии' : 'From Japan';
+  if (!said && car.origin === 'CN') return w.CN;
+  if (!said && car.origin === 'JP') return w.JP;
   return said;
 };
 
@@ -49,9 +59,11 @@ export const taglineFromCar = (car: CarouselCar, language?: string): string => {
 // строчными («guangzhou») — с заглавной. Страна — заглавными, как в профиле («KOREA»)
 const capital = (s: string) => s.replace(/(^|[\s-])\p{L}/gu, (m) => m.toUpperCase());
 // У японской — префектура латиницей («Tokyo») и Япония
-const originOf = (car: CarouselCar, ru: boolean): Pick<Lot, 'origin' | 'originCountry'> =>
-  car.origin === 'CN' ? {origin: capital(car.city ?? ''), originCountry: ru ? 'КИТАЙ' : 'CHINA'}
-    : car.origin === 'JP' ? {origin: car.city ?? '', originCountry: ru ? 'ЯПОНИЯ' : 'JAPAN'} : {};
+const originOf = (car: CarouselCar, language?: string): Pick<Lot, 'origin' | 'originCountry'> => {
+  const w = TAG[carouselLang(language)];
+  return car.origin === 'CN' ? {origin: capital(car.city ?? ''), originCountry: w.countryCN}
+    : car.origin === 'JP' ? {origin: car.city ?? '', originCountry: w.countryJP} : {};
+};
 
 /** Поля лота из карточки. Пустые строки характеристик выбрасываем: «—» в ролике хуже пустоты */
 export const lotFieldsFromCar = (car: CarouselCar, language?: string): CarFields => {
@@ -74,7 +86,7 @@ export const lotFieldsFromCar = (car: CarouselCar, language?: string): CarFields
     carPriceKrw: car.price?.krw ?? null,
     // Вон нет (машина из Китая или Японии) — цена в долларах; ролик сам пересчитает в валюту профиля
     carPriceUsd: car.price?.krw ? null : car.price?.usd ?? null,
-    ...originOf(car, carouselLang(language) === 'ru'),
+    ...originOf(car, language),
     history: car.history ? {
       accidentsTotal: car.history.accidentsTotal, accidentsOwn: car.history.accidentsOwn,
       accidentsOther: car.history.accidentsOther, ownerChanges: car.history.ownerChanges,

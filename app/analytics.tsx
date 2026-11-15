@@ -8,6 +8,7 @@
 // она грузится лишь после «Принять». Так описано в политике (app/Legal.tsx, «Какие данные»).
 // Выбор помнит этот браузер (localStorage, ключ читает и тег Google в HTML) — не переспрашиваем.
 import React, {useEffect, useState} from 'react';
+import {useT} from './i18n';
 
 type Ids = {ga: string; ym: string};
 declare global {
@@ -74,18 +75,19 @@ export const track = (name: string) => {
  */
 export const ConsentBar: React.FC = () => {
   const [choice, setChoice] = useState(readChoice);
+  const t = useT();
   useEffect(() => { if (choice === 'yes') start(); }, [choice]);
   if (!ids() || choice) return null;
   const pick = (v: 'yes' | 'no') => { saveChoice(v); setChoice(v); };
   return (
-    <div className="consent" role="dialog" aria-label="Согласие на cookie">
+    <div className="consent" role="dialog" aria-label={t('consent.aria')}>
       <p>
-        Мы используем cookie Google Analytics и Яндекс Метрики, чтобы понимать, как пользуются сайтом.
-        Подробно — в <a href="/privacy">политике</a>.
+        {t('consent.text')}{' '}
+        {t('consent.more')}<a href="/privacy">{t('consent.policy')}</a>.
       </p>
       <div className="consent-actions">
-        <button className="btn ghost" onClick={() => pick('no')}>Отказаться</button>
-        <button className="btn primary" onClick={() => pick('yes')}>Принять</button>
+        <button className="btn ghost" onClick={() => pick('no')}>{t('consent.no')}</button>
+        <button className="btn primary" onClick={() => pick('yes')}>{t('consent.yes')}</button>
       </div>
     </div>
   );

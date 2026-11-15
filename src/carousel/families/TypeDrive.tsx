@@ -91,10 +91,10 @@ const Interior: React.FC<FamilySlideProps> = ({car, content, colors, h}) => {
   </AbsoluteFill>;
 };
 
-const Facts: React.FC<FamilySlideProps> = ({car, tx, ru, colors, h}) => {
+const Facts: React.FC<FamilySlideProps> = ({car, tx, colors, h}) => {
   const {y, k} = scale(h);
   const year = car.year ? String(car.year) : '';
-  const km = car.mileageKm !== null ? new Intl.NumberFormat(ru ? 'ru-RU' : 'en-US').format(car.mileageKm).replace(/\s/g, ' ') : '';
+  const km = car.mileageKm !== null ? new Intl.NumberFormat(tx.locale).format(car.mileageKm).replace(/\s/g, ' ') : '';
   const rows = [upper(tx.value(car.fuel)), upper(tx.value(car.transmission))].filter(Boolean);
   const detail = car.photos.other[0] ?? car.photos.exterior[2] ?? car.photos.hero;
   return <AbsoluteFill style={{background: colors.light}}>
@@ -103,7 +103,7 @@ const Facts: React.FC<FamilySlideProps> = ({car, tx, ru, colors, h}) => {
     {year && <div style={{position: 'absolute', left: 44, top: y(140), display: 'flex', alignItems: 'flex-start', gap: 24, fontFamily: HEAD}}>
       <div style={{fontWeight: 700, fontSize: 290 * k, color: colors.accent, lineHeight: .85}}>{year}</div>
       <div style={{marginTop: 30, fontWeight: 500, fontSize: 64, color: colors.bg}}>
-        {ru ? 'ГОД' : 'YEAR'}<div style={{height: 4, background: colors.bg, marginTop: 10}} />
+        {tx.u.year}<div style={{height: 4, background: colors.bg, marginTop: 10}} />
       </div>
     </div>}
     {/* Винная панель: пробег крупно, топливо и коробка строками; справа — узкое фото детали */}
@@ -112,7 +112,7 @@ const Facts: React.FC<FamilySlideProps> = ({car, tx, ru, colors, h}) => {
       <div style={{position: 'absolute', left: 50, top: y(60), right: 440, bottom: y(60), display: 'flex', flexDirection: 'column', justifyContent: 'space-between', color: colors.text, fontFamily: HEAD}}>
         {km && <div style={{display: 'flex', alignItems: 'baseline', gap: 14, whiteSpace: 'nowrap'}}>
           <span style={{fontWeight: 700, fontSize: fitW(km, 420, 150 * k, 70, .5), lineHeight: 1}}>{km}</span>
-          <span style={{fontWeight: 500, fontSize: 52}}>{ru ? 'КМ' : 'KM'}</span>
+          <span style={{fontWeight: 500, fontSize: 52}}>{tx.u.km}</span>
         </div>}
         {rows.map((r) => <div key={r} style={{borderTop: `3px solid ${colors.text}55`, paddingTop: 26 * k, fontWeight: 500, fontSize: fitW(r, 420, 64 * k, 36, .5)}}>{r}</div>)}
       </div>

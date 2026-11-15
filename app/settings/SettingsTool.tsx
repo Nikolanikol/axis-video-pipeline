@@ -15,6 +15,7 @@ import {Preview} from '../Preview';
 import {DesignSampler} from '../../src/design/DesignAd';
 import {href, lastLot} from '../router';
 import {AdTextsForm, BrandForm, ProfileForm} from '../SettingsForms';
+import {useT} from '../i18n';
 
 const DEMO_LOT = '/preview-demo/lot.json';
 const DEMO_ID = 'demo';
@@ -38,18 +39,19 @@ const usePreviewLot = () => {
 
 const PreviewPanel: React.FC<{lot: LotEntry | null | undefined; market: MarketEntry}> = ({lot, market: base}) => {
   const {brand} = useConfig();
+  const t = useT();
   // Курс валюты компании на сегодня — цена в превью та же, что в ролике
   const market = useTodayMarket(base as Market & MarketEntry);
-  if (lot === undefined) return <div className="empty">Загрузка превью…</div>;
-  if (lot === null) return <div className="empty">Превью появится, когда будет хотя бы одно объявление</div>;
+  if (lot === undefined) return <div className="empty">{t('set.loadingPreview')}</div>;
+  if (lot === null) return <div className="empty">{t('set.noPreview')}</div>;
   const format = getFormat(lot.format);
   return (
     <>
       <div className="format-bar">
         <span className="muted">
           {lot.id === DEMO_ID
-            ? <>Превью на примере: {lotTitle(lot)} · {format.title}. Добавьте своё объявление — превью перейдёт на него</>
-            : <>Превью: <a href={href('ads', 'lot')}>{lotTitle(lot)}</a> · {format.title}</>}
+            ? <>{t('set.demoPreview', {title: `${lotTitle(lot)} · ${t.cfg(format.title)}`})}</>
+            : <>{t('set.preview')}: <a href={href('ads', 'lot')}>{lotTitle(lot)}</a> · {t.cfg(format.title)}</>}
         </span>
       </div>
       <Preview input={{lot: {...lot, market: market.id, ...(lot.id === DEMO_ID ? {krwPerUsd: lot.krwPerUsd ?? market.krwPerUsdToday} : {})},
@@ -65,6 +67,7 @@ const PreviewPanel: React.FC<{lot: LotEntry | null | undefined; market: MarketEn
 const SettingsLayout: React.FC<{editor: React.ReactNode; preview: React.ReactNode}> = ({editor, preview}) => {
   const phone = useIsPhone();
   const [tab, setTab] = useState<'edit' | 'preview'>('edit');
+  const t = useT();
   return (
     <>
       <main className="grid grid-settings" data-stab={tab}>
@@ -72,8 +75,8 @@ const SettingsLayout: React.FC<{editor: React.ReactNode; preview: React.ReactNod
         <section className="panel preview">{phone && tab !== 'preview' ? null : preview}</section>
       </main>
       <MobileTabs value={tab} onChange={setTab} tabs={[
-        {id: 'edit', label: 'Настройки', icon: <SlidersHorizontal size={20} />},
-        {id: 'preview', label: 'Превью', icon: <Eye size={20} />},
+        {id: 'edit', label: t.cfg('Настройки'), icon: <SlidersHorizontal size={20} />},
+        {id: 'preview', label: t('set.preview'), icon: <Eye size={20} />},
       ]} />
     </>
   );
@@ -123,6 +126,7 @@ export const BrandTool: React.FC = () => {
   // на второй секунде, плашка на седьмой — подбирать цвета по нему мучительно
   const [mode, setMode] = useState<'sampler' | 'ad' | 'design'>('sampler');
   const [scene, setScene] = useState('hook');
+  const t = useT();
   // Образец пресета — 9:16, как экран телефона в Instagram и TikTok: выбор пропорций здесь только мешал
   const sample = {width: 1080, height: 1920};
   const liveMarket = useTodayMarket(market);
@@ -136,14 +140,14 @@ export const BrandTool: React.FC = () => {
         <div className="format-bar">
           <div className="btn-row">
             <button className={`btn ${mode === 'sampler' ? 'primary' : 'ghost'}`} onClick={() => setMode('sampler')}>
-              Образец
+              {t('set.sample')}
             </button>
             <button className={`btn ${mode === 'ad' ? 'primary' : 'ghost'}`} onClick={() => setMode('ad')}>
-              Ролик
+              {t('acc.what.ads')}
             </button>
             {/* «Карусель» — только при выбранном пресете: у «Исходного» вид карусели задаёт её формат, а не бренд.
                 Сам режим не включается — владелец выбирает превью руками */}
-            {brand.design && <button className={`btn ${mode === 'design' ? 'primary' : 'ghost'}`} onClick={() => setMode('design')}>Карусель</button>}
+            {brand.design && <button className={`btn ${mode === 'design' ? 'primary' : 'ghost'}`} onClick={() => setMode('design')}>{t('car.tabMain')}</button>}
           </div>
         </div>
         {mode === 'sampler'
@@ -169,9 +173,9 @@ export const BrandTool: React.FC = () => {
                 market: liveMarket, theme: {...brand, name: market.name}, scene}}
               durationInFrames={1} fps={1} compositionWidth={sample.width} compositionHeight={sample.height}
               style={{width: '100%', aspectRatio: `${sample.width}/${sample.height}`}} /></div>
-              : <div className="empty">Загрузка образца…</div>}
-            <div className="design-sample-controls" aria-label="Слайд образца">
-              {[['hook', 'Обложка'], ['specs', 'Характеристики'], ['price', 'Цена'], ['cta', 'Контакты']].map(([id, label]) => <button key={id} type="button"
+              : <div className="empty">{t('set.loadingSample')}</div>}
+            <div className="design-sample-controls" aria-label={t('set.sampleSlide')}>
+              {[['hook', t('set.cover')], ['specs', t.cfg('Характеристики')], ['price', t.cfg('Цена')], ['cta', t.cfg('Контакты')]].map(([id, label]) => <button key={id} type="button"
                 className={`btn ${scene === id ? 'primary' : 'ghost'}`} aria-pressed={scene === id} onClick={() => setScene(id)}>{label}</button>)}
             </div>
           </> : <PreviewPanel lot={lot} market={market} />}

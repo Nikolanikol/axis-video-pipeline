@@ -1,6 +1,7 @@
 // Клиент API сервера: вход и кабинет, админка, настройки, лоты и фото, обзоры, речь и озвучка,
 // рендеры, карусели. Типы ответов — общие с сервером.
 import type {CarouselCar, FormatMeta, Lot, Market, Profile, Review, Texts, Theme} from '../src/shared/types';
+import {getLang, tNow, type Key, type Lang} from './i18n';
 
 export type MarketEntry = Market & {id: string};
 export type ProfileEntry = Profile & {id: string};
@@ -67,7 +68,8 @@ export type Subscription = {planId: string | null; title: string; credits: numbe
 // Баланс для шапки и кабинета; subscription — чтобы показать «подписка до» и полосу продления
 export type Balance = {credits: number; nextExpiry: {at: string; credits: number} | null; lots: CreditLot[]; subscription: Subscription | null};
 export type Role = 'admin' | 'manager' | null;
-export type User = {id: string; email: string; name: string | null; emailVerified: boolean; role: Role; isAdmin: boolean; isStaff: boolean};
+// lang — язык человека (переключатель RU · EN · SQ); null — зарегистрирован до переводов, язык ещё не выбирал
+export type User = {id: string; email: string; name: string | null; lang: Lang | null; emailVerified: boolean; role: Role; isAdmin: boolean; isStaff: boolean};
 export type Me =
   | {authRequired: false}
   | {authRequired: true; user: null; signup: {credits: number; days: number}}
@@ -157,19 +159,20 @@ export class ApiError extends Error {
 // Ответ без нашего JSON: сервер не дошёл до своего обработчика. Так отвечает прокси Coolify, пока
 // контейнер перезапускается после выкладки (502/503), или когда долгая сборка не уложилась в его
 // ожидание (504). Раньше человек видел «502 Bad Gateway» или голое «504» — и не понимал, что делать
-const PROXY_TEXT: Record<number, string> = {
-  413: 'Файл слишком большой для загрузки',
-  502: 'Сервер перезапускается — подождите минуту и попробуйте ещё раз',
-  503: 'Сервер перезапускается — подождите минуту и попробуйте ещё раз',
-  504: 'Сервер не дождался ответа — попробуйте ещё раз. Если повторится — напишите в поддержку',
-};
+// Тексты — net.<код> в словаре (app/i18n), на языке интерфейса
+const PROXY_TEXT: Record<number, Key> = {413: 'net.413', 502: 'net.restart', 503: 'net.restart', 504: 'net.504'};
 const failure = (status: number, body: {error?: string} | null, fallback?: string) => new ApiError(
-  body?.error || fallback || PROXY_TEXT[status] || `Сервер ответил ошибкой (${status}) — попробуйте ещё раз`, status);
+  body?.error || fallback || (PROXY_TEXT[status] ? tNow()(PROXY_TEXT[status]) : tNow()('net.other', {status})), status);
 
 // Запрос не ушёл вовсе: нет интернета или сервер недоступен. fetch бросает TypeError с текстом
 // браузера («Failed to fetch», в Safari «Load failed») — его человеку не показываем
-export const OFFLINE = 'Нет связи с сервером — проверьте интернет и попробуйте ещё раз';
-const send = (url: string, init?: RequestInit) => fetch(url, init).catch(() => { throw new ApiError(OFFLINE, 0); });
+export const offline = () => tNow()('net.offline');
+// X-Lang — язык переключателя: сервер отдаёт текст ошибки на нём (server/i18n/errors.mjs)
+const send = (url: string, init?: RequestInit) => {
+  const headers = new Headers(init?.headers);
+  headers.set('X-Lang', getLang());
+  return fetch(url, {...init, headers}).catch(() => { throw new ApiError(offline(), 0); });
+};
 
 /**
  * Текст ошибки для экрана. ApiError уже написан для человека. Всё прочее — поломка самого
@@ -179,7 +182,7 @@ const send = (url: string, init?: RequestInit) => fetch(url, init).catch(() => {
 export const errorText = (e: unknown): string => {
   if (e instanceof ApiError) return e.message;
   void import('./errorReport').then((m) => m.reportError('error', e));
-  return 'Что-то пошло не так на странице — обновите её и попробуйте ещё раз. Мы уже получили отчёт о сбое';
+  return tNow()('net.pageCrash');
 };
 
 const request = async <T,>(method: string, url: string, body?: unknown): Promise<T> => {
@@ -195,19 +198,20 @@ const request = async <T,>(method: string, url: string, body?: unknown): Promise
   if (!res.ok) throw failure(res.status, data);
   // 200 и не JSON — не наш ответ (так отвечает зависший прокси или страница-заглушка): пустые
   // данные уронили бы экран дальше по коду. Пустой JSON-ответ (обработчик ничего не вернул) — норма
-  if (data === null && !res.headers.get('content-type')?.includes('json')) throw new ApiError('Сервер ответил непонятно — обновите страницу и попробуйте ещё раз', res.status);
+  if (data === null && !res.headers.get('content-type')?.includes('json')) throw new ApiError(tNow()('net.garbled'), res.status);
   return (data ?? {}) as T;
 };
 
 export const api = {
   me: () => request<Me>('GET', '/api/auth/me'),
   login: (email: string, password: string) => request<{ok: true}>('POST', '/api/auth/login', {email, password}),
-  register: (data: Registration) => request<{ok: true}>('POST', '/api/auth/register', data),
+  // Язык переключателя на витрине — язык писем, интерфейса и постов новой компании
+  register: (data: Registration) => request<{ok: true}>('POST', '/api/auth/register', {...data, lang: getLang()}),
   logout: () => request<{ok: true}>('POST', '/api/auth/logout'),
   verify: (code: string) => request<{ok: true}>('POST', '/api/auth/verify', {code}),
   resendVerify: () => request<{sent: boolean}>('POST', '/api/auth/verify/resend'),
   verifyLink: (token: string) => request<{ok: true}>('POST', '/api/auth/verify/link', {token}),
-  forgot: (email: string) => request<{ok: true}>('POST', '/api/auth/forgot', {email}),
+  forgot: (email: string) => request<{ok: true}>('POST', '/api/auth/forgot', {email, lang: getLang()}),
   reset: (token: string, password: string) => request<{ok: true}>('POST', '/api/auth/reset', {token, password}),
   restore: (token: string) => request<{ok: true}>('POST', '/api/auth/restore', {token}),
   ledger: (page = 1) => request<LedgerPage>('GET', `/api/account/ledger?page=${page}`),
@@ -222,6 +226,7 @@ export const api = {
     supportLink: () => request<{url: string | null}>('POST', '/api/account/support-link'),
     profile: () => request<Account>('GET', '/api/account/profile'),
     save: (data: {name: string; company?: string}) => request<Account>('PUT', '/api/account/profile', data),
+    setLang: (lang: Lang) => request<{ok: true; lang: Lang}>('PUT', '/api/account/lang', {lang}),
     setNews: (on: boolean) => request<Account>('PUT', '/api/account/news', {on}),
     changePassword: (current: string, password: string) =>
       request<{ok: true; closed: number}>('POST', '/api/account/password', {current, password}),
@@ -309,7 +314,7 @@ export const api = {
     form.append('logo', file);
     const res = await send('/api/brand/logo', {method: 'POST', body: form});
     const body = await res.json().catch(() => null);
-    if (!res.ok) throw failure(res.status, body, res.status < 500 ? 'Не удалось загрузить логотип' : undefined);
+    if (!res.ok) throw failure(res.status, body, res.status < 500 ? tNow()('net.logo') : undefined);
     return body as {url: string; width: number; height: number; bytes: number; brand: Theme;
       notes: string[]; warnings: string[]; hasRaw: boolean};
   },
@@ -322,7 +327,7 @@ export const api = {
     form.append('icon', file);
     const res = await send('/api/brand/icon', {method: 'POST', body: form});
     const body = await res.json().catch(() => null);
-    if (!res.ok) throw failure(res.status, body, res.status < 500 ? 'Не удалось загрузить иконку' : undefined);
+    if (!res.ok) throw failure(res.status, body, res.status < 500 ? tNow()('net.icon') : undefined);
     return body as {url: string; width: number; height: number; bytes: number; brand: Theme;
       notes: string[]; warnings: string[]; hasRaw: boolean};
   },
@@ -348,7 +353,7 @@ export const api = {
   // Прослушать спикера: сервер отдаёт mp3, играем его сразу
   previewVoice: async (speaker: string, language: string, text: string) => {
     const res = await send('/api/voices/preview', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({speaker, language, text})});
-    if (!res.ok) throw failure(res.status, await res.json().catch(() => null), res.status < 500 ? 'Не удалось озвучить' : undefined);
+    if (!res.ok) throw failure(res.status, await res.json().catch(() => null), res.status < 500 ? tNow()('net.voice') : undefined);
     return URL.createObjectURL(await res.blob());
   },
   // Загрузка видео с прогрессом (fetch его не умеет)
@@ -362,7 +367,7 @@ export const api = {
       if (xhr.status >= 200 && xhr.status < 300) resolve(data as ReviewEntry);
       else reject(failure(xhr.status, data));
     };
-    xhr.onerror = () => reject(new ApiError('Загрузка прервалась — проверьте интернет и загрузите видео ещё раз', 0));
+    xhr.onerror = () => reject(new ApiError(tNow()('net.uploadBroken'), 0));
     const form = new FormData();
     form.append('video', file);
     xhr.send(form);

@@ -9,6 +9,7 @@
 // нажатия: если между нажатием и вызовом успеть скачать слайды, он отказывает (NotAllowedError).
 import {useEffect, useState} from 'react';
 import {ApiError} from './api';
+import {tNow} from './i18n';
 
 /** Телефон или планшет, где браузер умеет делиться файлами — там кнопка «В галерею» */
 export const canSaveToGallery = (() => {
@@ -90,7 +91,7 @@ export const shareFiles = async (files: File[]) => {
     if ((e as Error)?.name === 'AbortError') return;
     // Отказ браузера (NotAllowedError — меню открыли не сразу после нажатия, файлы не те) — не
     // поломка кода: текстом для человека, без отчёта в «Сбои» (ApiError errorText не отправляет)
-    throw new ApiError('Телефон не открыл «Поделиться» — нажмите кнопку ещё раз или скачайте файлы', 0);
+    throw new ApiError(tNow()('save.shareFailed'), 0);
   }
 };
 

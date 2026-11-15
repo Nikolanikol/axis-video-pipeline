@@ -19,11 +19,11 @@ const head = (size: number, color: string): React.CSSProperties =>
   ({fontFamily: HEAD, fontWeight: 800, fontStyle: 'italic', fontSize: size, lineHeight: .92, color, whiteSpace: 'nowrap'});
 const spaced = (size: number, color: string): React.CSSProperties => ({fontFamily: BODY, fontWeight: 600, fontSize: size, letterSpacing: size * .3, color});
 
-const Cover: React.FC<FamilySlideProps> = ({car, ru, colors, h}) => {
+const Cover: React.FC<FamilySlideProps> = ({car, tx, colors, h}) => {
   const {y, k} = scale(h);
   const brand = upper(car.brand);
   const model = upper(car.model || car.brand);
-  const km = kmNumber(car.mileageKm, ru);
+  const km = kmNumber(car.mileageKm, tx.locale);
   const year = car.year ? String(car.year) : '';
   return <AbsoluteFill style={{background: colors.light}}>
     {/* Винный косой штрих в правом верхнем углу */}
@@ -42,7 +42,7 @@ const Cover: React.FC<FamilySlideProps> = ({car, ru, colors, h}) => {
     {km && <div style={{position: 'absolute', left: 0, right: 0, bottom: 0, height: y(300), background: colors.accent, clipPath: 'polygon(0 22%, 100% 0, 100% 100%, 0 100%)'}}>
       <div style={{position: 'absolute', left: 50, bottom: 50, display: 'flex', alignItems: 'baseline', gap: 18, ...tilt(-4)}}>
         <span style={head(fitW(km, 700, 170 * k, 80, K), colors.light)}>{km}</span>
-        <span style={{...head(60, colors.light), borderBottom: `5px solid ${colors.light}`}}>{ru ? 'КМ' : 'KM'}</span>
+        <span style={{...head(60, colors.light), borderBottom: `5px solid ${colors.light}`}}>{tx.u.km}</span>
       </div>
     </div>}
   </AbsoluteFill>;
@@ -80,18 +80,18 @@ const Interior: React.FC<FamilySlideProps> = ({car, content, colors, h}) => {
   </AbsoluteFill>;
 };
 
-const Facts: React.FC<FamilySlideProps> = ({car, tx, ru, colors, h}) => {
+const Facts: React.FC<FamilySlideProps> = ({car, tx, colors, h}) => {
   const {y, k} = scale(h);
   const p = photosOf(car);
   const year = car.year ? String(car.year) : '';
-  const km = kmNumber(car.mileageKm, ru);
+  const km = kmNumber(car.mileageKm, tx.locale);
   const rows = [upper(tx.value(car.fuel)), upper(tx.value(car.transmission))].filter(Boolean);
   const unit = (t: string, color: string) => <span style={{...head(56, color), borderBottom: `4px solid ${colors.accent}`, marginLeft: 20}}>{t}</span>;
   return <AbsoluteFill style={{background: colors.light}}>
     <LogoCorner on={colors.light} />
     <div style={{position: 'absolute', left: 44, top: y(130), ...tilt()}}>
-      {year && <div style={{display: 'flex', alignItems: 'baseline'}}><span style={head(210, colors.accent)}>{year}</span>{unit(ru ? 'ГОД' : 'YEAR', colors.text)}</div>}
-      {km && <div style={{display: 'flex', alignItems: 'baseline'}}><span style={head(fitW(km, 700, 200 * k, 90, K), colors.text)}>{km}</span>{unit(ru ? 'КМ' : 'KM', colors.text)}</div>}
+      {year && <div style={{display: 'flex', alignItems: 'baseline'}}><span style={head(210, colors.accent)}>{year}</span>{unit(tx.u.year, colors.text)}</div>}
+      {km && <div style={{display: 'flex', alignItems: 'baseline'}}><span style={head(fitW(km, 700, 200 * k, 90, K), colors.text)}>{km}</span>{unit(tx.u.km, colors.text)}</div>}
     </div>
     {rows.length > 0 && <div style={{position: 'absolute', left: 50, right: 50, top: y(650), display: 'flex', gap: 50}}>
       {rows.map((r) => <div key={r} style={{display: 'flex', alignItems: 'center', gap: 18}}>

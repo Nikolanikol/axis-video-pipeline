@@ -5,6 +5,7 @@ import {useCost, useSession} from './auth';
 import {useConfig} from './config';
 import {useIsPhone} from './MobileTabs';
 import {canSaveToGallery, phoneKind, shareFiles, usePreparedFilesProgress} from './saveFiles';
+import {locale, tNow, useT} from './i18n';
 
 type Props = {
   query: JobQuery;
@@ -26,12 +27,13 @@ type Props = {
   onState?: (state: {starting: boolean; running: boolean}) => void;
 };
 
-const time = (iso: string) => new Date(iso).toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
+const time = (iso: string) => new Date(iso).toLocaleString(locale(), {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
 const active = (j: Job) => j.status === 'queued' || j.status === 'running';
 
 export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, start, onError, pipeline, folded = false, hideButton = false, trigger, onState}) => {
   const {config} = useConfig();
   const {refresh: refreshAccess} = useSession();
+  const tr = useT();
   const cost = useCost(pipeline ?? '', config.credits);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [starting, setStarting] = useState(false);
@@ -56,7 +58,7 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
     const lost = activeIds.current.filter((id) => !list.some((j) => j.id === id));
     const ended = list.find((j) => activeIds.current.includes(j.id) && (j.status === 'done' || j.status === 'error'));
     activeIds.current = list.filter(active).map((j) => j.id);
-    if (lost.length) onError(new ApiError('Сборка прервалась: сервер перезапускался. Кредиты вернутся сами в течение 10–15 минут — запустите сборку ещё раз', 0));
+    if (lost.length) onError(new ApiError(tNow()('jobs.lost'), 0));
     // Новый ролик готов — «В галерею» снова держит наготове его, а не выбранный раньше
     if (ended) { setFinished(ended.id); setGalleryPick(null); }
     setJobs(list);
@@ -71,7 +73,7 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
   const latestDone = jobs.find((j) => j.status === 'done');
   const galleryJob = jobs.find((j) => j.status === 'done' && j.id === galleryPick) ?? latestDone;
   const {files: video, progress: videoProgress} = usePreparedFilesProgress(galleryJob?.id ?? null, galleryJob
-    ? [{url: `/api/renders/${galleryJob.id}/download`, name: `${galleryJob.title || 'ролик'}.mp4`, type: 'video/mp4'}] : []);
+    ? [{url: `/api/renders/${galleryJob.id}/download`, name: `${galleryJob.title || tNow()('jobs.fileName')}.mp4`, type: 'video/mp4'}] : []);
 
   // Телефон: ролик досчитался — плавно доезжаем до его карточки (кнопки «В галерею», «Смотреть»).
   // Карточка появлялась ниже края экрана, под закреплённой кнопкой сборки, и готовый ролик
@@ -137,7 +139,7 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
   const shareButton = (j: Job, label: string, kind = '') => (j.id === galleryJob?.id
     ? (
       <button className={`btn ${kind}`} disabled={!video} onClick={() => video && shareFiles(video).catch(onError)}>
-        {video ? label : `Загружаю на телефон…${videoProgress === null ? '' : ` ${videoProgress}%`}`}
+        {video ? label : `${tr('jobs.loadingPhone')}${videoProgress === null ? '' : ` ${videoProgress}%`}`}
       </button>
     )
     : <button className={`btn ${kind}`} onClick={() => setGalleryPick(j.id)}>{label}</button>);
@@ -148,81 +150,81 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
           часа, и десять нажатий подряд встанут в очередь одинаковыми роликами. На сервере стоит
           такая же проверка — вкладку можно открыть дважды, и тогда эта кнопка ничего не знает. */}
       {!hideButton && <button className="btn primary big" onClick={run} disabled={starting || running || disabled}>
-        {starting ? 'Запускаю…' : running ? 'Уже собирается…' : `${label}${cost}`}
+        {starting ? tr('jobs.starting') : running ? tr('jobs.running') : `${label}${cost}`}
       </button>}
       {starting && <div className="bar wait"><div /></div>}
       {warnings.length > 0 && <ul className="warnings">{warnings.map((w) => <li key={w}>{w}</li>)}</ul>}
 
       {folded
         ? <button type="button" className="jobs-toggle" aria-expanded={listOpen} onClick={() => setListOpen(!listOpen)}>
-          Ролики{jobs.length ? ` (${jobs.length})` : ''} {listOpen ? '▴' : '▾'}{running ? ' · собирается…' : ''}</button>
-        : <h2>Ролики</h2>}
+          {tr('jobs.title')}{jobs.length ? ` (${jobs.length})` : ''} {listOpen ? '▴' : '▾'}{running ? ` · ${tr('jobs.building')}` : ''}</button>
+        : <h2>{tr('jobs.title')}</h2>}
       {(!folded || listOpen) && <>
       {/* Отдельный блок — чтобы в «Ролике по лоту» история прокручивалась внутри колонки,
           а кнопка сборки оставалась на месте (styles.css, .quick-side .jobs-list) */}
       <div className={showAll ? 'jobs-list' : 'jobs-list collapsed'}>
-      {!jobs.length && <div className="empty small">Пока пусто</div>}
+      {!jobs.length && <div className="empty small">{tr('common.empty')}</div>}
       {jobs.map((j) => (
         <div key={j.id} className={`job job-${j.status}`}
           ref={(el) => { if (el) cards.current.set(j.id, el); else cards.current.delete(j.id); }}>
           <div className="job-head">
-            <b>{time(j.createdAt)} · {j.formatTitle ?? j.format ?? 'Авто с ценой'}</b>
-            <span>{j.stage}{active(j) && j.status === 'running' ? ` · ${j.progress}%` : ''}</span>
+            <b>{time(j.createdAt)} · {tr.cfg(j.formatTitle ?? j.format ?? 'Авто с ценой')}</b>
+            <span>{tr.cfg(j.stage)}{active(j) && j.status === 'running' ? ` · ${j.progress}%` : ''}</span>
           </div>
           {active(j) && (j.status === 'queued' || !j.progress
             ? <div className="bar wait"><div /></div>
             : <div className="bar"><div style={{width: `${j.progress}%`}} /></div>)}
           {j.status === 'error' && <div className="job-message">{j.error}</div>}
           {j.status === 'done' && (
-            <a href={j.storyboard} target="_blank" rel="noreferrer"><img className="storyboard" src={j.storyboard} alt="Раскадровка" /></a>
+            <a href={j.storyboard} target="_blank" rel="noreferrer"><img className="storyboard" src={j.storyboard} alt={tr.cfg('Раскадровка')} /></a>
           )}
           {/* Кнопки управления есть всегда, только разные по состоянию:
               в очереди/работе — отменить; готовый — скачать/смотреть/пересобрать/удалить;
               ошибка или отменён — пересобрать/удалить */}
           <div className="job-actions">
-            {active(j) && <button className="btn ghost" onClick={() => cancel(j.id)}>Отменить</button>}
+            {active(j) && <button className="btn ghost" onClick={() => cancel(j.id)}>{tr('jobs.cancel')}</button>}
             {j.status === 'done' && (!canSaveToGallery ? (
               <>
-                <a className="btn primary" href={`/api/renders/${j.id}/download`}>Скачать mp4</a>
-                <a className="btn ghost" href={j.video} target="_blank" rel="noreferrer">Смотреть</a>
+                <a className="btn primary" href={`/api/renders/${j.id}/download`}>{tr('jobs.downloadMp4')}</a>
+                <a className="btn ghost" href={j.video} target="_blank" rel="noreferrer">{tr('jobs.watch')}</a>
               </>
             ) : phoneKind === 'android' ? (
               // Android: обычное скачивание кладёт ролик в «Загрузки», и галерея показывает его сама —
               // это и есть «в галерею». «Поделиться» — рядом, для Instagram, TikTok, Telegram: пункта
               // «Сохранить» в меню Android обычно нет, и главной кнопкой оно путало бы (владелец 13.10)
               <>
-                <a className="btn primary" href={`/api/renders/${j.id}/download`}>Скачать в галерею</a>
-                {shareButton(j, 'Поделиться')}
-                <a className="btn ghost" href={j.video} target="_blank" rel="noreferrer">Смотреть</a>
+                <a className="btn primary" href={`/api/renders/${j.id}/download`}>{tr('jobs.downloadGallery')}</a>
+                {shareButton(j, tr('jobs.share'))}
+                <a className="btn ghost" href={j.video} target="_blank" rel="noreferrer">{tr('jobs.watch')}</a>
               </>
             ) : (
               // iPhone (и всё прочее с «Поделиться»): ссылка на mp4 кладёт ролик в «Файлы», откуда его
               // не выложить в соцсети (владелец 13.10). «Поделиться» с файлом даёт «Сохранить видео» —
               // прямо в «Фото», — а заодно Instagram и TikTok. Скачать файлом — запасной путь
               <>
-                {shareButton(j, 'Сохранить в галерею', 'primary')}
-                <a className="btn ghost" href={j.video} target="_blank" rel="noreferrer">Смотреть</a>
-                <a className="btn ghost" href={`/api/renders/${j.id}/download`}>Скачать файл</a>
+                {shareButton(j, tr('jobs.saveGallery'), 'primary')}
+                <a className="btn ghost" href={j.video} target="_blank" rel="noreferrer">{tr('jobs.watch')}</a>
+                <a className="btn ghost" href={`/api/renders/${j.id}/download`}>{tr('jobs.downloadFile')}</a>
               </>
             ))}
             {(j.status === 'done' || j.status === 'error' || j.status === 'cancelled') && (
               <>
-                <button className="btn" onClick={() => retry(j.id)}>Пересобрать</button>
-                <button className="btn ghost" onClick={() => remove(j.id)}>Удалить</button>
+                <button className="btn" onClick={() => retry(j.id)}>{tr('jobs.rebuild')}</button>
+                <button className="btn ghost" onClick={() => remove(j.id)}>{tr('common.delete')}</button>
               </>
             )}
           </div>
           {canSaveToGallery && j.status === 'done' && j.id === galleryJob?.id && (
             <div className="job-hint">{phoneKind === 'android'
-              ? 'Ролик сохранится в «Загрузки» — галерея покажет его в папке Download'
-              : 'В открывшемся меню — «Сохранить видео» или сразу Instagram, TikTok'}</div>
+              ? tr('jobs.androidHint')
+              : tr('jobs.iosHint')}</div>
           )}
         </div>
       ))}
       </div>
       {jobs.length > 1 && (
         <button className="btn ghost jobs-more" onClick={() => setShowAll(!showAll)}>
-          {showAll ? 'Свернуть' : `Показать все ролики (${jobs.length})`}
+          {showAll ? tr('jobs.collapse') : tr('jobs.showAll', {n: jobs.length})}
         </button>
       )}
       </>}

@@ -11,6 +11,7 @@ import {api, LotEntry, UsdKrw} from './api';
 import {ENCAR_PHOTO_DRAG} from './ads/EncarImport';
 import {BlurEditor} from './BlurEditor';
 import {useConfig} from './config';
+import {locale, tNow, useT, type Key} from './i18n';
 
 type Props = {
   lot: LotEntry;
@@ -55,42 +56,47 @@ const useTodayRate = () => {
 type Block = Pick<Props, 'lot' | 'market' | 'onChange'>;
 
 /** Машина: марка, модель, версия, год и подзаголовок первого кадра — общие для всех сцен */
-export const CarFields: React.FC<Block> = ({lot, market, onChange}) => <>
+export const CarFields: React.FC<Block> = ({lot, market, onChange}) => {
+  const t = useT();
+  return <>
   <div className="row">
-    <Field label="Марка"><input value={lot.brand} placeholder="Audi" onChange={(e) => onChange({brand: e.target.value})} /></Field>
-    <Field label="Модель"><input value={lot.model} placeholder="A6" onChange={(e) => onChange({model: e.target.value})} /></Field>
+    <Field label={t('form.brand')}><input value={lot.brand} placeholder="Audi" onChange={(e) => onChange({brand: e.target.value})} /></Field>
+    <Field label={t('form.model')}><input value={lot.model} placeholder="A6" onChange={(e) => onChange({model: e.target.value})} /></Field>
   </div>
   <div className="row">
-    <Field label="Версия"><input value={lot.trim ?? ''} placeholder="35 TDI" onChange={(e) => onChange({trim: e.target.value})} /></Field>
-    <Field label="Год"><input type="number" value={lot.year ?? ''} onChange={(e) => onChange({year: Number(e.target.value)})} /></Field>
+    <Field label={t('form.trim')}><input value={lot.trim ?? ''} placeholder="35 TDI" onChange={(e) => onChange({trim: e.target.value})} /></Field>
+    <Field label={t('form.year')}><input type="number" value={lot.year ?? ''} onChange={(e) => onChange({year: Number(e.target.value)})} /></Field>
   </div>
   {/* Подзаголовок под годом в первом кадре. Пусто — фраза из настроек («Из Кореи»);
       из Encar подставляется по фактам: без страховых случаев, один владелец, малый пробег */}
-  <Field label="Подзаголовок" hint="строка под годом; пусто — из Настроек → «Реклама авто»">
+  <Field label={t('form.tagline')} hint={t('form.taglineHint')}>
     <input value={lot.texts?.hookTagline ?? ''} placeholder={market.texts.hookTagline ?? ''} maxLength={40}
       onChange={(e) => onChange({texts: {...lot.texts, hookTagline: e.target.value || undefined}})} />
   </Field>
 </>;
+};
 
 /** Строки характеристик (сцены «Характеристики», «Стопка», «История») */
 export const SpecsEditor: React.FC<Pick<Props, 'lot' | 'onChange'>> = ({lot, onChange}) => {
   const setSpec = (i: number, value: string) => onChange({specs: lot.specs.map((s, j) => (j === i ? value : s))});
+  const t = useT();
   return <>
-    <div className="label scene-label">Характеристики <span className="muted">на языке постов</span></div>
+    <div className="label scene-label">{t.cfg('Характеристики')} <span className="muted">{t('form.postLang')}</span></div>
     {lot.specs.map((s, i) => (
       <div className="spec" key={i}>
         <input value={s} placeholder={['78 498 км', 'Дизел · автоматик', 'Кожен ентериер', 'Шибер · навигација'][i] ?? ''}
           onChange={(e) => setSpec(i, e.target.value)} />
         <span className={s.length > SPEC_MAX ? 'count over' : 'count'}>{s.length}</span>
-        <button className="icon" title="Убрать строку" onClick={() => onChange({specs: lot.specs.filter((_, j) => j !== i)})}>×</button>
+        <button className="icon" title={t('form.removeLine')} onClick={() => onChange({specs: lot.specs.filter((_, j) => j !== i)})}>×</button>
       </div>
     ))}
-    {lot.specs.length < 5 && <button className="btn ghost" onClick={() => onChange({specs: [...lot.specs, '']})}>+ строка</button>}
+    {lot.specs.length < 5 && <button className="btn ghost" onClick={() => onChange({specs: [...lot.specs, '']})}>+ {t('form.line')}</button>}
   </>;
 };
 
 /** Цена: справка с Encar, фрахт, «Цена в ролике» (вручную / вернуть расчёт), итог и подписи сцены */
 export const PriceEditor: React.FC<Block & Pick<Props, 'format'> & {mobile?: boolean}> = ({lot, market, format, onChange, mobile = false}) => {
+  const t = useT();
   const car = priceUsd(lot);
   const total = lotTotal(lot, market);
   // Расчёт без ручной цены — подсказка у поля «Цена в ролике»: видно, от чего человек уходит
@@ -129,19 +135,19 @@ export const PriceEditor: React.FC<Block & Pick<Props, 'format'> & {mobile?: boo
       <div className="price-source">
         {lot.carPriceKrw || lot.carPriceUsd
           ? <>
-            {lot.carPriceKrw ? <>Цена на Encar: <b>{fmt(lot.carPriceKrw)} ₩</b></> : <>Цена авто: <b>{fmt(lot.carPriceUsd!)} $</b></>}
-            {usdMatters && lot.krwPerUsd ? <span className="muted"> · 1 $ = {lot.krwPerUsd.toLocaleString('ru-RU')} ₩</span> : null}
-            {fx && (fxOwn ?? fxToday) ? <span className="muted"> · 1 {sign} = {(fxOwn ?? fxToday)!.toLocaleString('ru-RU', {maximumFractionDigits: 2})} ₩{fxOwn ? '' : ' (сегодня)'}</span> : null}
-            {stale && <> · <button type="button" className="link" onClick={refreshRates}>обновить курс до сегодняшнего</button></>}
+            {lot.carPriceKrw ? <>{t('price.encar')} <b>{fmt(lot.carPriceKrw)} ₩</b></> : <>{t('price.car')} <b>{fmt(lot.carPriceUsd!)} $</b></>}
+            {usdMatters && lot.krwPerUsd ? <span className="muted"> · 1 $ = {lot.krwPerUsd.toLocaleString(locale())} ₩</span> : null}
+            {fx && (fxOwn ?? fxToday) ? <span className="muted"> · 1 {sign} = {(fxOwn ?? fxToday)!.toLocaleString(locale(), {maximumFractionDigits: 2})} ₩{fxOwn ? '' : ` (${t('price.today')})`}</span> : null}
+            {stale && <> · <button type="button" className="link" onClick={refreshRates}>{t('price.refreshRate')}</button></>}
           </>
-          : <>Цены с Encar нет — подтяните объявление по ссылке выше или впишите «Цену в ролике».</>}
+          : <>{t('price.noEncar')}</>}
       </div>
   </>;
   const freightField = <>
       {/* Фрахт — к цене: он и есть разница между ценой авто и итогом. Раньше прятался в
           «Переопределить для этого объявления» вместе с WhatsApp */}
       {market.pricingMode !== 'domestic' && (
-        <Field label="Фрахт, $" hint={`пусто — из профиля: ${fmt(market.freightUsd)} $`}>
+        <Field label={t('price.freight')} hint={t('form.fromProfile', {v: `${fmt(market.freightUsd)} $`})}>
           <input inputMode="decimal" value={lot.freightUsd ?? ''} placeholder={String(market.freightUsd)}
             onChange={(e) => { const v = num(e.target.value); onChange({freightUsd: v === null || Number.isNaN(v) ? undefined : v}); }} />
         </Field>
@@ -150,10 +156,10 @@ export const PriceEditor: React.FC<Block & Pick<Props, 'format'> & {mobile?: boo
   const override = <>
       {/* Своя цена — итог как есть, в валюте профиля. Клиенты продают со своей наценкой, и
           закупочная с Encar + фрахт им не годится (11.10). Пусто — считаем, как раньше */}
-      <Field label={`Цена в ролике, ${sign}`} wide
+      <Field label={`${t('price.inVideo')}, ${sign}`} wide
         hint={manual
-          ? <>задана вручную · расчёт дал бы {computed === null ? '—' : `${fmt(computed)} ${sign}`} · <button type="button" className="link" onClick={() => onChange({priceOverride: null})}>вернуть расчёт</button></>
-          : 'пусто — авто + фрахт по курсу; впишите своё число, и в ролике будет ровно оно'}>
+          ? <>{t('price.manualSet')} · {t('price.wouldBe', {v: computed === null ? '—' : `${fmt(computed)} ${sign}`})} · <button type="button" className="link" onClick={() => onChange({priceOverride: null})}>{t('price.backToCalc')}</button></>
+          : t('price.overrideHint')}>
         <input inputMode="decimal" value={lot.priceOverride ?? ''} placeholder={computed === null ? '' : fmt(computed)}
           onChange={(e) => { const v = num(e.target.value); onChange({priceOverride: v === null || Number.isNaN(v) ? null : v}); }} />
       </Field>
@@ -165,11 +171,11 @@ export const PriceEditor: React.FC<Block & Pick<Props, 'format'> & {mobile?: boo
       <div className={total === null ? 'total warn' : 'total'}>
         {total === null
           ? (fx && !fxOwn && !fxToday && car !== null
-            ? `Курс ₩ → ${sign} пока недоступен — впишите «Цену в ролике», иначе в ролике будет заглушка «XX XXX ${sign}»`
-            : `Цены нет — в ролике будет заглушка «XX XXX ${sign}»`)
+            ? t('price.noRate', {sign})
+            : t('price.none', {sign}))
           : manual
-            ? <>В ролике: <b>{fmt(total)} {sign}</b><span className="muted"> · вписано вручную</span>{port ? <span className="muted"> · до {port}</span> : null}</>
-            : <>В ролике: <b>{fmt(total)} {sign}</b>{freight > 0 && car !== null ? <span className="muted"> · с фрахтом {fmt(freight)} $</span> : null}{port ? <span className="muted"> · до {port}</span> : null}</>}
+            ? <>{t('price.inVideoColon')} <b>{fmt(total)} {sign}</b><span className="muted"> · {t('price.manual')}</span>{port ? <span className="muted"> · {t('price.to', {port})}</span> : null}</>
+            : <>{t('price.inVideoColon')} <b>{fmt(total)} {sign}</b>{freight > 0 && car !== null ? <span className="muted"> · {t('price.withFreight', {v: `${fmt(freight)} $`})}</span> : null}{port ? <span className="muted"> · {t('price.to', {port})}</span> : null}</>}
       </div>
   </>;
   const labels = <>
@@ -189,26 +195,26 @@ export const PriceEditor: React.FC<Block & Pick<Props, 'format'> & {mobile?: boo
   // сумма — поле над карточкой. Расчёт тот же, одна формула (lotTotal)
   if (mobile) {
     const pick = (m: 'calc' | 'manual') => { setMode(m); if (m === 'calc' && manual) onChange({priceOverride: null}); };
-    const what = mode === 'manual' && !manual ? 'Впишите сумму — пока в ролике расчёт'
+    const what = mode === 'manual' && !manual ? t('price.enterSum')
       : mode === 'manual'
-      ? (computed === null ? 'Вписано вручную' : `Вписано вручную · расчёт дал бы ${fmt(computed)} ${sign}`)
-      : freight > 0 && car !== null && market.pricingMode !== 'domestic' ? `Автомобиль + доставка${port ? ` до ${port}` : ''}` : 'Цена автомобиля';
+      ? (computed === null ? t('price.manualCap') : `${t('price.manualCap')} · ${t('price.wouldBe', {v: `${fmt(computed)} ${sign}`})}`)
+      : freight > 0 && car !== null && market.pricingMode !== 'domestic' ? `${t('price.carDelivery')}${port ? ` ${t('price.to', {port})}` : ''}` : t('price.carPrice');
     return <>
-      <div className="mprice-mode" role="radiogroup" aria-label="Цена в ролике">
-        {([['calc', 'Рассчитать'], ['manual', 'Указать сумму']] as const).map(([id, title]) => <button key={id} type="button" role="radio"
-          aria-checked={mode === id} className={mode === id ? 'on' : ''} onClick={() => pick(id)}>{title}</button>)}
+      <div className="mprice-mode" role="radiogroup" aria-label={t('price.inVideo')}>
+        {([['calc', 'price.calc'], ['manual', 'price.setSum']] as const).map(([id, title]) => <button key={id} type="button" role="radio"
+          aria-checked={mode === id} className={mode === id ? 'on' : ''} onClick={() => pick(id)}>{t(title)}</button>)}
       </div>
-      {mode === 'manual' && <Field label={`Сумма в ролике, ${sign}`} wide>
+      {mode === 'manual' && <Field label={`${t('price.sumInVideo')}, ${sign}`} wide>
         {/* Число — с разрядами («30 542 155»), и в подсказке, и во вписанном: сплошные цифры не читались */}
         <input inputMode="decimal" value={lot.priceOverride != null ? fmt(lot.priceOverride) : ''} placeholder={computed === null ? '' : fmt(computed)} autoFocus={!manual}
           onChange={(e) => { const v = num(e.target.value); onChange({priceOverride: v === null || Number.isNaN(v) ? null : v}); }} />
       </Field>}
       <div className={`mprice-card${total === null ? ' warn' : ''}`}>
-        <span className="mprice-label">Цена в ролике</span>
+        <span className="mprice-label">{t('price.inVideo')}</span>
         {total === null
           ? <span className="mprice-warn">{fx && !fxOwn && !fxToday && car !== null
-            ? `Курс ₩ → ${sign} пока недоступен — укажите сумму, иначе в ролике будет «XX XXX ${sign}»`
-            : `Цены нет — в ролике будет «XX XXX ${sign}»`}</span>
+            ? t('price.noRateMobile', {sign})
+            : t('price.none', {sign})}</span>
           : <b className="mprice-total">{fmt(total)} {sign}</b>}
         <span className="mprice-what">{what}</span>
       </div>
@@ -218,7 +224,7 @@ export const PriceEditor: React.FC<Block & Pick<Props, 'format'> & {mobile?: boo
         <LotText k="priceNoteExcluded" lot={lot} market={market} format={format} onChange={onChange} mobile />
       </>}
       {mode === 'calc' && <details className="mprice-calc">
-        <summary>Расчёт цены</summary>
+        <summary>{t('price.calcTitle')}</summary>
         <div className="mprice-calc-body">{source}{freightField}</div>
       </details>}
     </>;
@@ -227,38 +233,46 @@ export const PriceEditor: React.FC<Block & Pick<Props, 'format'> & {mobile?: boo
 };
 
 /** Контакты (финальная сцена): заголовок, акцент, преимущество, подпись и WhatsApp этого ролика */
-export const ContactsEditor: React.FC<Block & Pick<Props, 'format'>> = ({lot, market, format, onChange}) => <>
+export const ContactsEditor: React.FC<Block & Pick<Props, 'format'>> = ({lot, market, format, onChange}) => {
+  const t = useT();
+  return <>
   <TextsHint />
   <LotText k="ctaTitle" lot={lot} market={market} format={format} onChange={onChange} />
   <LotText k="ctaAccent" lot={lot} market={market} format={format} onChange={onChange} />
   <LotText k="ctaBenefit" lot={lot} market={market} format={format} onChange={onChange} />
   <LotText k="whatsappLabel" lot={lot} market={market} format={format} onChange={onChange} />
-  <Field label="WhatsApp" hint={lot.whatsapp === null ? 'номер скрыт' : `пусто — из профиля: ${market.whatsapp ?? '—'}`}>
+  <Field label="WhatsApp" hint={lot.whatsapp === null ? t('form.waHidden') : t('form.fromProfile', {v: market.whatsapp ?? '—'})}>
     <input value={lot.whatsapp ?? ''} placeholder={market.whatsapp ?? ''} disabled={lot.whatsapp === null}
       onChange={(e) => onChange({whatsapp: e.target.value || undefined})} />
   </Field>
   <label className="check scene-check">
     <input type="checkbox" checked={lot.whatsapp === null} onChange={(e) => onChange({whatsapp: e.target.checked ? null : undefined})} />
-    Не показывать WhatsApp в этом ролике
+    {t('form.waHide')}
   </label>
 </>;
+};
 
 /** Заметка для себя — в ролик не попадает */
 export const NoteField: React.FC<Pick<Props, 'lot' | 'onChange'>> = ({lot, onChange}) =>
-  <textarea rows={2} value={lot.note ?? ''} placeholder="источник, пометки: аукцион, номер лота, «демо»…"
+  <textarea rows={2} value={lot.note ?? ''} placeholder={useT()('form.notePlaceholder')}
     onChange={(e) => onChange({note: e.target.value})} />;
 
 /** Фото ролика: порядок, места по сценам, размытие номера */
-export const PhotosEditor: React.FC<Pick<Props, 'lot' | 'format' | 'onChange' | 'onPhotos' | 'onError'>> = ({lot, format, onChange, onPhotos, onError}) => <>
-  <h2>Фото <span className="muted">{COARSE ? 'удерживай фото и тяни, чтобы поменять порядок' : 'перетаскивай, чтобы поменять порядок'}</span></h2>
+export const PhotosEditor: React.FC<Pick<Props, 'lot' | 'format' | 'onChange' | 'onPhotos' | 'onError'>> = ({lot, format, onChange, onPhotos, onError}) => {
+  const t = useT();
+  return <>
+  <h2>{t('palette.tab.photo')} <span className="muted">{t(COARSE ? 'form.dragTouch' : 'form.dragMouse')}</span></h2>
   <Photos lot={lot} roles={format.photoRoles} rest={format.photoRest ?? 'запас'} slots={!!format.photoSlots} onChange={onChange} onPhotos={onPhotos} onError={onError} />
 </>;
+};
 
 /**
  * Прежняя форма по сценам — на телефоне (раздел «Правка»). На компьютере те же блоки собирает
  * палитра (app/ads/Palette.tsx): по выбранной сцене, рядом с превью
  */
-export const LotForm: React.FC<Props> = ({lot, market, format, onChange, onPhotos, onError}) => (
+export const LotForm: React.FC<Props> = ({lot, market, format, onChange, onPhotos, onError}) => {
+  const t = useT();
+  return (
   // Два столбца (владелец 01.10): слева всё, что набирают руками, — авто, характеристики,
   // цена, заметка; справа фото. В один столбец до фото приходилось листать через всю
   // форму, а цену и фото нельзя было видеть разом
@@ -272,7 +286,7 @@ export const LotForm: React.FC<Props> = ({lot, market, format, onChange, onPhoto
     <PhotoHint />
 
     <SceneHead title="Галерея" note={sceneNote(format.id, 'gallery')} />
-    <p className="hint scene-hint">Фото — {COARSE ? 'ниже' : 'справа'}: у каждого подписано место в ролике. Марка, модель и год — из «Хука».</p>
+    <p className="hint scene-hint">{t(COARSE ? 'form.galleryHintTouch' : 'form.galleryHintMouse')}</p>
 
     <SceneHead title="Стопка" note={sceneNote(format.id, 'stack')} />
     <SpecsEditor lot={lot} onChange={onChange} />
@@ -283,7 +297,7 @@ export const LotForm: React.FC<Props> = ({lot, market, format, onChange, onPhoto
     <SceneHead title="Контакты" note={sceneNote(format.id, 'cta')} />
     <ContactsEditor lot={lot} market={market} format={format} onChange={onChange} />
 
-    <SceneHead title="Заметка" note="в ролик не попадает" />
+    <SceneHead title={t('palette.note')} note={t('palette.noteHint')} />
     <NoteField lot={lot} onChange={onChange} />
     </div>
 
@@ -291,38 +305,36 @@ export const LotForm: React.FC<Props> = ({lot, market, format, onChange, onPhoto
     <PhotosEditor lot={lot} format={format} onChange={onChange} onPhotos={onPhotos} onError={onError} />
     </div>
   </div>
-);
+  );
+};
 
 // Заголовок сцены в форме объявления; note — чем сцена отличается в выбранном формате
-const SceneHead: React.FC<{title: string; note?: string}> = ({title, note}) => (
-  <h2 className="scene-head">{title}{note && <span className="muted">{note}</span>}</h2>
-);
+// title — русское название сцены (переводится через t.cfg) или уже переведённый текст; note — ключ или текст
+const SceneHead: React.FC<{title: string; note?: string}> = ({title, note}) => {
+  const t = useT();
+  return <h2 className="scene-head">{t.cfg(title)}{note && <span className="muted">{note}</span>}</h2>;
+};
 
 // Сцены у форматов разные: в «Авто с ценой» нет галереи, а третья сцена — «Характеристики»;
 // в «Цене сразу» цена — первая сцена вместе с хуком, а третья — «История». Говорим об этом
 // у раздела, иначе человек правит то, чего в его ролике нет, и не понимает, почему не видно
-const SCENE_NOTES: Record<string, Partial<Record<string, string>>> = {
-  'price-ad': {gallery: 'в формате «Авто с ценой» её нет', stack: 'в этом формате — «Характеристики»'},
-  'price-first': {hook: 'в этом формате вместе с ценой — первая сцена', stack: 'в этом формате — «История»: история Encar и характеристики',
-    price: 'в этом формате — первая сцена, без строк «включено / не включено»'},
-};
-const sceneNote = (format: string, scene: string) => SCENE_NOTES[format]?.[scene];
+// Тексты — scene.note.<формат>.<сцена> в словаре
+const SCENE_NOTES: Record<string, string[]> = {'price-ad': ['gallery', 'stack'], 'price-first': ['hook', 'stack', 'price']};
+const sceneNote = (format: string, scene: string) =>
+  (SCENE_NOTES[format]?.includes(scene) ? tNow()(`scene.note.${format}.${scene}` as Key) : undefined);
 
 // Подсказка про фото в «Хуке»: первое фото — его, места остальных подписаны в галерее
-const PhotoHint: React.FC = () => (
-  <p className="hint scene-hint">Фото хука — первое {COARSE ? 'в фото ниже' : 'в фото справа'} (или отмеченное «Хук»).</p>
-);
+const PhotoHint: React.FC = () => <p className="hint scene-hint">{useT()(COARSE ? 'form.hookPhotoTouch' : 'form.hookPhotoMouse')}</p>;
 
 // Одна строка на сцену вместо подсказки под каждой надписью: повторённая шесть раз, она шумела
-const TextsHint: React.FC = () => (
-  <p className="hint scene-hint">Серым — надписи из Настроек → «Реклама авто». Впишите своё — поменяется только в этом ролике.</p>
-);
+const TextsHint: React.FC = () => <p className="hint scene-hint">{useT()('form.textsHint')}</p>;
 
 /**
  * Надпись этого ролика поверх текстов компании (Настройки → «Реклама авто»). Пусто — берём
  * оттуда, она видна серым. Подпись и подсказка — из описания формата (config/formats.json)
  */
 const LotText: React.FC<Pick<Props, 'lot' | 'market' | 'format' | 'onChange'> & {k: string; mobile?: boolean}> = ({k, lot, market, format, onChange, mobile = false}) => {
+  const tr = useT();
   const t = format.texts.find((x) => x.key === k);
   if (!t) return null;
   const value = lot.texts?.[k] ?? '';
@@ -331,13 +343,13 @@ const LotText: React.FC<Pick<Props, 'lot' | 'market' | 'format' | 'onChange'> & 
   const set = (v: string) => onChange({texts: {...lot.texts, [k]: v === '' ? undefined : v}});
   // Телефон: откуда надпись — меткой справа от подписи («Из настроек» / «Своя»), без общей подсказки
   if (mobile) return <label className="field mfield">
-    <span className="mfield-head"><span className="label">{t.label}</span><span className="mfield-tag">{value ? 'Своя' : 'Из настроек'}</span></span>
+    <span className="mfield-head"><span className="label">{tr.cfg(t.label)}</span><span className="mfield-tag">{tr(value ? 'form.own' : 'form.fromSettings')}</span></span>
     {t.multiline
       ? <textarea rows={2} value={value} placeholder={fallback} onChange={(e) => set(e.target.value)} />
       : <input value={value} placeholder={fallback} onChange={(e) => set(e.target.value)} />}
   </label>;
   return (
-    <Field label={t.label} hint={value ? 'своя для этого ролика · сотрите — вернётся из настроек' : undefined} wide>
+    <Field label={tr.cfg(t.label)} hint={value ? tr('form.ownHint') : undefined} wide>
       {t.multiline
         ? <textarea rows={2} value={value} placeholder={fallback} onChange={(e) => set(e.target.value)} />
         : <input value={value} placeholder={fallback} onChange={(e) => set(e.target.value)} />}
@@ -346,6 +358,7 @@ const LotText: React.FC<Pick<Props, 'lot' | 'market' | 'format' | 'onChange'> & 
 };
 
 const Photos: React.FC<Pick<Props, 'lot' | 'onChange' | 'onPhotos' | 'onError'> & {roles: string[]; rest: string; slots: boolean}> = ({lot, roles, rest, slots, onChange, onPhotos, onError}) => {
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const [drag, setDrag] = useState<number | null>(null);
   const [over, setOver] = useState(false);
@@ -400,8 +413,8 @@ const Photos: React.FC<Pick<Props, 'lot' | 'onChange' | 'onPhotos' | 'onError'> 
   const placeOf = (p: string) => {
     const at = layout?.placed[p];
     if (!layout) return null;
-    if (at === 'stack') return `Стопка ${layout.stack.indexOf(p) + 1}`;
-    return at ? SLOT_TITLES[at] : 'не в ролике';
+    if (at === 'stack') return t.cfg(`Стопка ${layout.stack.indexOf(p) + 1}`);
+    return at ? t.cfg(SLOT_TITLES[at]) : t('form.notInVideo');
   };
   const setSlot = (p: string, value: Slot) => {
     const next = {...lot.slots};
@@ -542,25 +555,25 @@ const Photos: React.FC<Pick<Props, 'lot' | 'onChange' | 'onPhotos' | 'onError'> 
           {/* Тянется только фото: кнопки вне перетаскиваемого блока, иначе браузер съедает их клики */}
           <div className="drag" draggable={!COARSE} onDragStart={() => setDrag(i)} onDragEnd={() => { setDrag(null); setTarget(null); }}>
             <img src={p.startsWith('http') || p.startsWith('/') ? p : `/${p}`} alt="" />
-            <span className="role">{i + 1}. {layout ? placeOf(p) : roles[i] ?? rest}</span>
+            <span className="role">{i + 1}. {layout ? placeOf(p) : t.cfg(roles[i] ?? rest)}</span>
           </div>
           {layout && (
             // Вне перетаскиваемого блока — иначе браузер съедает клик по списку
-            <select className="slot" value={lot.slots?.[photoKey(p)] ?? 'auto'} title="Куда идёт фото в ролике"
+            <select className="slot" value={lot.slots?.[photoKey(p)] ?? 'auto'} title={t('form.slotTitle')}
               onChange={(e) => setSlot(p, e.target.value as Slot)}>
-              {(Object.keys(SLOT_TITLES) as Slot[]).map((s) => <option key={s} value={s}>{SLOT_TITLES[s]}</option>)}
+              {(Object.keys(SLOT_TITLES) as Slot[]).map((s) => <option key={s} value={s}>{t.cfg(SLOT_TITLES[s])}</option>)}
             </select>
           )}
-          <button className="icon del" title="Удалить фото" onClick={() => remove(p)}>×</button>
+          <button className="icon del" title={t('form.deletePhoto')} onClick={() => remove(p)}>×</button>
           {p.startsWith(own) && (
-            <button className={blurCount(p) ? 'blur-btn on' : 'blur-btn'} title="Размыть номер или лишнее" onClick={() => setEditing(p)}>
-              {blurCount(p) ? `Размыто: ${blurCount(p)}` : 'Размыть'}
+            <button className={blurCount(p) ? 'blur-btn on' : 'blur-btn'} title={t('form.blurTitle')} onClick={() => setEditing(p)}>
+              {blurCount(p) ? t('form.blurred', {n: blurCount(p)}) : t('form.blur')}
             </button>
           )}
         </div>
       ))}
       <button className="thumb add" onClick={() => fileRef.current?.click()} disabled={busy}>
-        {busy ? <>Загружаю…<div className="bar wait"><div /></div></> : <>+ Фото<br /><span className="muted">или перетащи сюда</span></>}
+        {busy ? <>{t('encar.loading')}<div className="bar wait"><div /></div></> : <>+ {t('palette.tab.photo')}<br /><span className="muted">{t('form.orDrop')}</span></>}
       </button>
       <input ref={fileRef} type="file" accept="image/*" multiple hidden
         onChange={(e) => { upload([...(e.target.files ?? [])]); e.target.value = ''; }} />

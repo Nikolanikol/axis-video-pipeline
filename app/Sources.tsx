@@ -10,15 +10,17 @@
 //
 // Новый источник (ядро в cores/<id>) — строка в SOURCES и логотип в public/sources/.
 import React from 'react';
+import {useT, type Key} from './i18n';
 
-type Source = {id: string; name: string; country: string; url: string; logo: string; caption?: string};
+// country — ключ словаря (app/i18n): страна показывается на языке интерфейса
+type Source = {id: string; name: string; country: Key; url: string; logo: string; caption?: string};
 
 export const SOURCES: Source[] = [
-  {id: 'encar', name: 'Encar', country: 'Корея', url: 'https://www.encar.com', logo: '/sources/encar.png'},
-  {id: 'che168', name: 'che168', country: 'Китай', url: 'https://www.che168.com', logo: '/sources/che168.png'},
+  {id: 'encar', name: 'Encar', country: 'src.korea', url: 'https://www.encar.com', logo: '/sources/encar.png'},
+  {id: 'che168', name: 'che168', country: 'src.china', url: 'https://www.che168.com', logo: '/sources/che168.png'},
   // Логотип японский («カーセンサー»), латиницей его не нашли — подпись «Carsensor» ставим сами (владелец 13.10).
   // Ссылка — на каталог подержанных машин, а не на главную: оттуда клиент и берёт объявления
-  {id: 'carsensor', name: 'Carsensor', country: 'Япония', url: 'https://www.carsensor.net/usedcar/', logo: '/sources/carsensor.png', caption: 'Carsensor'},
+  {id: 'carsensor', name: 'Carsensor', country: 'src.japan', url: 'https://www.carsensor.net/usedcar/', logo: '/sources/carsensor.png', caption: 'Carsensor'},
 ];
 
 /**
@@ -30,21 +32,24 @@ export const SOURCES: Source[] = [
  */
 export const SourcesStrip: React.FC<{compact?: boolean; title?: string; countries?: boolean; className?: string}> = (
   {compact, title, countries = true, className},
-) => (
+) => {
+  const t = useT();
+  return (
   <div className={['sources', compact ? 'sources-compact' : '', countries ? '' : 'sources-no-country', className].filter(Boolean).join(' ')}>
-    {title !== '' && <span className="sources-title">{title ?? (compact ? 'Площадки:' : 'Объявления с площадок')}</span>}
+    {title !== '' && <span className="sources-title">{title ?? t(compact ? 'src.titleCompact' : 'src.title')}</span>}
     <ul className="sources-list">
       {SOURCES.map((s) => (
         <li key={s.id}>
-          <a className={`source source-${s.id}`} href={s.url} target="_blank" rel="noreferrer noopener" title={`${s.name} — открыть сайт площадки (${s.country})`}>
+          <a className={`source source-${s.id}`} href={s.url} target="_blank" rel="noreferrer noopener" title={t('src.open', {name: s.name, country: t(s.country)})}>
             <span className="source-plate">
               <img src={s.logo} alt={s.name} loading="lazy" />
               {s.caption && <span className="source-caption">{s.caption}</span>}
             </span>
-            <span className="source-country">{s.country}</span>
+            <span className="source-country">{t(s.country)}</span>
           </a>
         </li>
       ))}
     </ul>
   </div>
-);
+  );
+};

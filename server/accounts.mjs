@@ -158,7 +158,7 @@ export const readSession = async (token) => {
   if (!token) return null;
   const hash = tokenHash(token);
   const {rows} = await db().query(
-    `SELECT u.id, u.email, u.name, u.platform_role, u.email_verified_at, m.workspace_id, m.role, w.name AS workspace_name
+    `SELECT u.id, u.email, u.name, u.lang, u.platform_role, u.email_verified_at, m.workspace_id, m.role, w.name AS workspace_name
        FROM smmaker_sessions s
        JOIN smmaker_users u ON u.id = s.user_id
        LEFT JOIN LATERAL (SELECT * FROM smmaker_memberships WHERE user_id = u.id ORDER BY created_at LIMIT 1) m ON true
@@ -170,7 +170,7 @@ export const readSession = async (token) => {
   touchSeen(r.id, hash);
   return {
     sessionId: sidOf(hash),
-    user: {id: r.id, email: r.email, name: r.name, emailVerified: Boolean(r.email_verified_at), ...rights(r.platform_role)},
+    user: {id: r.id, email: r.email, name: r.name, lang: r.lang ?? null, emailVerified: Boolean(r.email_verified_at), ...rights(r.platform_role)},
     workspace: r.workspace_id ? {id: r.workspace_id, name: r.workspace_name, role: r.role} : null,
   };
 };
@@ -193,10 +193,15 @@ export const inTransaction = async (fn) => {
   }
 };
 
+// Язык человека (миграция 021): интерфейс, письма и язык постов новой компании — один переключатель
+export const LANGS = ['ru', 'en', 'sq'];
+export const normLang = (v) => (LANGS.includes(v) ? v : null);
+
 // Стартовый профиль новой компании. Контакты пустые: подставлять чужие (владельца
 // платформы) нельзя, а пустой номер вёрстка просто не рисует
-const starterProfile = (company) => ({
-  company, language: 'en', contacts: {whatsapp: '', site: ''},
+// Язык постов — язык, на котором человек регистрировался (переключатель на витрине); без него — английский, как было
+const starterProfile = (company, lang) => ({
+  company, language: normLang(lang) ?? 'en', contacts: {whatsapp: '', site: ''},
   pricing: {mode: 'domestic', currency: 'USD', export: {origin: '', originCountry: '', port: '', portCountry: '', freight: 0}},
   texts: {},
 });
@@ -207,7 +212,7 @@ const starterProfile = (company) => ({
  * адреса. Письмо с кодом уходит после записи; не ушло — человек запросит ещё раз из кабинета.
  * Компания необязательна: не указана — берём имя человека (его можно поменять в профиле).
  */
-export const register = async ({name, email, phone, password, company, news = true}, meta = {}) => {
+export const register = async ({name, email, phone, password, company, news = true, lang}, meta = {}) => {
   const person = checkName(name);
   const mail = normEmail(email);
   const key = emailKey(mail);
@@ -229,12 +234,12 @@ export const register = async ({name, email, phone, password, company, news = tr
     const workspaceId = `ws-${crypto.randomBytes(5).toString('hex')}`;
     const {rows: [user]} = await client.query(
       // Галочка «Получать новости KOK» (миграция 019): согласие — с датой, снятая — сразу «отказался»
-      `INSERT INTO smmaker_users (email, email_key, password_hash, name, phone, news_consent_at, news_off_at)
-       VALUES ($1, $2, $3, $4, $5, CASE WHEN $6 THEN now() END, CASE WHEN $6 THEN NULL ELSE now() END) RETURNING id`,
-      [mail, key, hash, person, tel, news !== false]);
+      `INSERT INTO smmaker_users (email, email_key, password_hash, name, phone, news_consent_at, news_off_at, lang)
+       VALUES ($1, $2, $3, $4, $5, CASE WHEN $6 THEN now() END, CASE WHEN $6 THEN NULL ELSE now() END, $7) RETURNING id`,
+      [mail, key, hash, person, tel, news !== false, normLang(lang)]);
     await client.query(
       'INSERT INTO smmaker_workspaces (id, name, brand, profile) VALUES ($1, $2, $3, $4)',
-      [workspaceId, title, brand, starterProfile(title)]);
+      [workspaceId, title, brand, starterProfile(title, lang)]);
     await client.query(
       `INSERT INTO smmaker_memberships (workspace_id, user_id, role) VALUES ($1, $2, 'owner')`, [workspaceId, user.id]);
     return {userId: user.id, token: await createSession(user.id, client, meta)};
@@ -277,7 +282,7 @@ const pauseLeft = async (userId, kind) => {
 
 /** Отправить код подтверждения. force — без паузы (сразу после регистрации) */
 export const sendVerification = async (userId, {force = false} = {}) => {
-  const {rows: [u]} = await db().query('SELECT email, name, email_verified_at FROM smmaker_users WHERE id = $1', [userId]);
+  const {rows: [u]} = await db().query('SELECT email, name, lang, email_verified_at FROM smmaker_users WHERE id = $1', [userId]);
   if (!u) throw new HttpError(404, 'Нет такого пользователя');
   if (u.email_verified_at) return {sent: false, verified: true};
   const left = force ? 0 : await pauseLeft(userId, 'verify');
@@ -285,7 +290,7 @@ export const sendVerification = async (userId, {force = false} = {}) => {
   const {code, link} = await inTransaction((client) => issueToken(client, userId, 'verify', VERIFY_HOURS * 60));
   // Удалявшемуся подарка не будет (confirmEmail) — и письмо его не обещает
   const credits = (await wasDeleted(db(), userId)) ? 0 : (await signupCredits()).credits;
-  await verifyMail({to: u.email, name: u.name, code, link: `${appUrl()}/#/verify?t=${link}`, credits});
+  await verifyMail({to: u.email, name: u.name, code, link: `${appUrl()}/#/verify?t=${link}`, credits, lang: u.lang});
   return {sent: true};
 };
 
@@ -354,16 +359,16 @@ export const verifyLink = async ({token}) => inTransaction(async (client) => {
  * «Забыли пароль»: письмо со ссылкой, если такая почта есть. Ответ одинаковый в обоих
  * случаях — по нему нельзя узнать, кто зарегистрирован
  */
-export const requestReset = async ({email}) => {
+export const requestReset = async ({email, lang}) => {
   let mail;
   try { mail = normEmail(email); } catch { return {ok: true}; }
   // Удаляемый аккаунт сбросом не открыть: возвращают его ссылкой «восстановить» из письма
   const {rows: [u]} = await db().query(
-    `SELECT u.id, u.email FROM smmaker_users u WHERE (lower(u.email) = $1 OR u.email_key = $2) AND u.delete_after IS NULL AND NOT ${closedSql('u')} LIMIT 1`,
+    `SELECT u.id, u.email, u.lang FROM smmaker_users u WHERE (lower(u.email) = $1 OR u.email_key = $2) AND u.delete_after IS NULL AND NOT ${closedSql('u')} LIMIT 1`,
     [mail, emailKey(mail)]);
   if (!u || await pauseLeft(u.id, 'reset') > 0) return {ok: true};
   const {link} = await inTransaction((client) => issueToken(client, u.id, 'reset', RESET_MINUTES));
-  await resetMail({to: u.email, link: `${appUrl()}/#/reset?t=${link}`}).catch((e) => journal.error('mail.failed', {note: 'письмо сброса пароля не ушло', userId: u.id, error: e}));
+  await resetMail({to: u.email, link: `${appUrl()}/#/reset?t=${link}`, lang: normLang(lang) ?? u.lang}).catch((e) => journal.error('mail.failed', {note: 'письмо сброса пароля не ушло', userId: u.id, error: e}));
   return {ok: true};
 };
 
@@ -499,11 +504,10 @@ export const changePassword = async ({userId, sessionId, current, password}) => 
   await checkCurrentPassword(userId, current);
   if (pass === String(current)) throw new HttpError(400, 'Новый пароль совпадает с текущим');
   const hash = await hashPassword(pass);
-  const {rows: [u]} = await db().query('UPDATE smmaker_users SET password_hash = $2 WHERE id = $1 RETURNING email', [userId, hash]);
+  const {rows: [u]} = await db().query('UPDATE smmaker_users SET password_hash = $2 WHERE id = $1 RETURNING email, lang', [userId, hash]);
   const {rowCount: closed} = await db().query(
     'DELETE FROM smmaker_sessions WHERE user_id = $1 AND left(token_hash, $3) <> $2', [userId, sessionId, SID_LEN]);
-  await noticeMail({to: u.email, title: 'Пароль изменён',
-    text: 'Пароль от KOK только что изменили в кабинете. Остальные устройства вышли из аккаунта.\n\nЕсли это были не вы — сбросьте пароль через «Забыли пароль?» на странице входа и напишите нам.'})
+  await noticeMail({to: u.email, kind: 'password', lang: u.lang})
     .catch((e) => journal.error('mail.failed', {note: 'уведомление о смене пароля не ушло', error: e}));
   return {ok: true, closed};
 };
@@ -518,7 +522,7 @@ export const requestEmailChange = async ({userId, password, email}) => {
   await checkCurrentPassword(userId, password);
   const mail = normEmail(email);
   const key = emailKey(mail);
-  const {rows: [u]} = await db().query('SELECT name, email, email_key FROM smmaker_users WHERE id = $1', [userId]);
+  const {rows: [u]} = await db().query('SELECT name, email, email_key, lang FROM smmaker_users WHERE id = $1', [userId]);
   if (u.email_key === key) throw new HttpError(400, 'Это и есть ваша почта');
   if (await isDisposable(mail)) throw new HttpError(400, 'Одноразовая почта не подойдёт — укажите рабочую');
   const {rows: [taken]} = await db().query(
@@ -527,7 +531,7 @@ export const requestEmailChange = async ({userId, password, email}) => {
   const left = await pauseLeft(userId, 'email');
   if (left > 0) throw new HttpError(429, `Письмо уже отправлено — повторить можно через ${left} с`);
   const {code} = await inTransaction((client) => issueToken(client, userId, 'email', EMAIL_CHANGE_HOURS * 60, mail));
-  await emailChangeMail({to: mail, name: u.name, code});
+  await emailChangeMail({to: mail, name: u.name, code, lang: u.lang});
   return {sent: true, pendingEmail: mail};
 };
 
@@ -539,16 +543,23 @@ export const requestEmailChange = async ({userId, password, email}) => {
 export const confirmEmailChange = async ({userId, code}) => {
   const out = await takeCode({
     userId, code, kind: 'email', onValid: async (client, t) => {
-      const {rows: [old]} = await client.query('SELECT email FROM smmaker_users WHERE id = $1', [userId]);
+      const {rows: [old]} = await client.query('SELECT email, lang FROM smmaker_users WHERE id = $1', [userId]);
       await client.query('UPDATE smmaker_users SET email = $2, email_key = $3 WHERE id = $1', [userId, t.new_email, emailKey(t.new_email)]);
       await confirmEmail(client, userId);
-      return {email: t.new_email, oldEmail: old.email};
+      return {email: t.new_email, oldEmail: old.email, lang: old.lang};
     },
   });
-  await noticeMail({to: out.oldEmail, title: 'Почта аккаунта изменена',
-    text: `Почту для входа в KOK сменили на ${out.email}. Если это были не вы — срочно напишите нам.`})
+  await noticeMail({to: out.oldEmail, kind: 'email', vars: {email: out.email}, lang: out.lang})
     .catch((e) => journal.error('mail.failed', {note: 'уведомление о смене почты не ушло', error: e}));
   return {ok: true, email: out.email};
+};
+
+/** Язык человека — с переключателя RU · EN · SQ (интерфейс шлёт его при каждой смене) */
+export const setUserLang = async ({userId, lang}) => {
+  const l = normLang(lang);
+  if (!l) throw new HttpError(400, 'Язык — ru, en или sq');
+  await db().query('UPDATE smmaker_users SET lang = $2 WHERE id = $1', [userId, l]);
+  return {ok: true, lang: l};
 };
 
 /** Отменить смену почты: погасить код, адрес остаётся прежним */
@@ -647,7 +658,7 @@ export const requestDeletion = async ({userId, workspaceId, password, confirm}) 
     const t = await issueToken(client, userId, 'restore', DELETE_DAYS * 24 * 60);
     return {link: t.link, until: r.delete_after};
   });
-  await deletionMail({to: u.email, name: u.name, link: `${appUrl()}/#/restore?t=${link}`, until})
+  await deletionMail({to: u.email, name: u.name, link: `${appUrl()}/#/restore?t=${link}`, until, lang: u.lang})
     .catch((e) => journal.error('mail.failed', {note: 'письмо об удалении аккаунта не ушло', error: e}));
   return {ok: true, until};
 };
@@ -661,11 +672,11 @@ export const restoreAccount = async ({token}, meta = {}) => {
       [tokenHash(String(token ?? ''))]);
     if (!t) throw new HttpError(410, 'Ссылка устарела или уже использована');
     const {rows: [u]} = await client.query(
-      'UPDATE smmaker_users SET delete_after = NULL WHERE id = $1 AND delete_after > now() RETURNING email', [t.user_id]);
+      'UPDATE smmaker_users SET delete_after = NULL WHERE id = $1 AND delete_after > now() RETURNING email, lang', [t.user_id]);
     if (!u) throw new HttpError(410, 'Аккаунт уже удалён окончательно — восстановить нельзя');
-    return {email: u.email, token: await createSession(t.user_id, client, meta)};
+    return {email: u.email, lang: u.lang, token: await createSession(t.user_id, client, meta)};
   });
-  await noticeMail({to: out.email, title: 'Аккаунт восстановлен', text: 'Удаление аккаунта KOK отменено: всё на месте, можно работать дальше.'})
+  await noticeMail({to: out.email, kind: 'restored', lang: out.lang})
     .catch((e) => journal.error('mail.failed', {note: 'письмо о восстановлении аккаунта не ушло', error: e}));
   return out;
 };
@@ -682,7 +693,7 @@ export const purgeDeleted = async ({log = console.log} = {}) => {
     try {
       const done = await inTransaction(async (client) => {
         const {rows: [u]} = await client.query(
-          'SELECT email, name, email_key, phone FROM smmaker_users WHERE id = $1 AND delete_after <= now() FOR UPDATE', [id]);
+          'SELECT email, name, email_key, phone, lang FROM smmaker_users WHERE id = $1 AND delete_after <= now() FOR UPDATE', [id]);
         if (!u) return null;
         await client.query('INSERT INTO smmaker_deleted_identities (email_hash, phone_hash) VALUES ($1, $2)',
           [identityHash('email', u.email_key), u.phone ? identityHash('phone', u.phone) : null]);
@@ -719,7 +730,7 @@ export const purgeDeleted = async ({log = console.log} = {}) => {
         await client.query(
           `UPDATE smmaker_users SET email = $2, email_key = $2, name = '', phone = NULL, password_hash = 'deleted',
              email_verified_at = NULL, platform_role = NULL, last_seen_at = NULL, delete_after = NULL WHERE id = $1`, [id, gone]);
-        return {email: u.email, workspaces: wss.map((w) => w.id)};
+        return {email: u.email, lang: u.lang, workspaces: wss.map((w) => w.id)};
       });
       if (!done) continue;
       // Файлы — после записи в базу: упадёт удаление файлов — данные всё равно обезличены,
@@ -727,8 +738,7 @@ export const purgeDeleted = async ({log = console.log} = {}) => {
       for (const ws of done.workspaces) {
         await fs.rm(workspaceDir(ws), {recursive: true, force: true}).catch((e) => journal.error('purge.files_failed', {note: 'файлы удалённой компании не стёрты — убрать руками', workspace: ws, error: e}));
       }
-      await noticeMail({to: done.email, title: 'Аккаунт удалён',
-        text: 'Аккаунт KOK удалён окончательно: файлы и личные данные стёрты. Спасибо, что были с нами.'})
+      await noticeMail({to: done.email, kind: 'deleted', lang: done.lang})
         .catch((e) => journal.error('mail.failed', {note: 'письмо об окончательном удалении не ушло', userId: id, error: e}));
       log(`Удалён аккаунт ${id} (компаний: ${done.workspaces.length})`);
     } catch (e) {
@@ -846,7 +856,7 @@ export const grantPack = async ({workspaceId, packId, note = '', createdBy}) => 
  */
 export const ownerOf = async (workspaceId) => {
   const {rows: [u]} = await db().query(
-    `SELECT u.id, u.email, u.name FROM smmaker_memberships m JOIN smmaker_users u ON u.id = m.user_id
+    `SELECT u.id, u.email, u.name, u.lang FROM smmaker_memberships m JOIN smmaker_users u ON u.id = m.user_id
       WHERE m.workspace_id = $1 AND m.role = 'owner' ORDER BY m.created_at LIMIT 1`, [workspaceId]);
   return u ?? null;
 };
@@ -865,7 +875,7 @@ const packMail = async ({workspaceId, pack, lot, by}) => {
     }
     await paymentMail({
       to: u.email, name: u.name, plan: pack.kind === 'plan', title: pack.title ?? pack.id, credits: pack.credits,
-      until: lot.expires_at, priceUsd: pack.price_usd, paidAt: new Date(), link: `${appUrl()}/#/account`,
+      until: lot.expires_at, priceUsd: pack.price_usd, paidAt: new Date(), link: `${appUrl()}/#/account`, lang: u.lang,
     });
     journal.info('mail.pack_sent', {ws: workspaceId, lot: Number(lot.id), by});
   } catch (e) {

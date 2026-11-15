@@ -10,6 +10,7 @@ import {dropPrerender, track} from './analytics';
 import {Balance, Me, Registration, User, api, errorText} from './api';
 import {Field} from './LotForm';
 import {useRoute} from './router';
+import {locale, tNow, useT, type Lang} from './i18n';
 
 // Витрина — отдельным куском сборки: в ней плеер и композиции роликов, вошедшему они не нужны
 const Landing = lazyNamed(() => import('./Landing'), 'Landing');
@@ -21,6 +22,8 @@ type Session = {
   enabled: boolean;
   email: string | null;
   name: string | null;
+  // Язык человека с сервера (null — ещё не выбирал); синхронизация с переключателем — app/config.tsx
+  lang: Lang | null;
   // Админ — прайс, роли, бонусы; сотрудник (админ или менеджер) — лиды и пакеты, не платит
   isAdmin: boolean;
   isStaff: boolean;
@@ -92,21 +95,21 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
     // Ссылка «восстановить» из письма об удалении: сервер снимает удаление и сразу впускает
     if (link?.kind === 'restore') {
       api.restore(link.token)
-        .then(() => setNotice('Аккаунт восстановлен — всё на месте'))
+        .then(() => setNotice(tNow()('auth.restored')))
         .catch((e) => setNotice(errorText(e)))
         .finally(() => { window.history.replaceState(null, '', '#/account'); load(); });
       return;
     }
     // Только что удалили аккаунт — витрина откроет окно входа с этой строкой
     if (window.location.hash.startsWith('#/deleted')) {
-      setNotice('Аккаунт закрыт и будет удалён через 14 дней. Передумаете — восстановите по ссылке из письма.');
+      setNotice(tNow()('auth.deleted'));
       window.history.replaceState(null, '', window.location.pathname);
     }
     if (link?.kind !== 'verify') { load(); return; }
     // Подтверждаем и убираем ключ из адреса: в истории браузера и при пересылке ссылки
     // ему делать нечего
     api.verifyLink(link.token)
-      .then(() => setNotice('Почта подтверждена — бесплатные кредиты на счёте'))
+      .then(() => setNotice(tNow()('auth.verified')))
       .catch((e) => setNotice(errorText(e)))
       .finally(() => { window.history.replaceState(null, '', '#/account'); load(); });
   }, [link, load]);
@@ -117,6 +120,7 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
   const keep = !error && !legal && link?.kind !== 'reset' && (!me || (me.authRequired && !me.user));
   useLayoutEffect(() => { if (!keep) dropPrerender(); }, [keep]);
 
+  const t = useT();
   const logout = useCallback(() => {
     api.logout().finally(() => window.location.reload());
   }, []);
@@ -129,7 +133,7 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
   if (error) return (
     <div className="boot">
       <p>{error}</p>
-      <button className="btn" onClick={() => window.location.reload()}>Обновить страницу</button>
+      <button className="btn" onClick={() => window.location.reload()}>{t('common.reload')}</button>
     </div>
   );
   if (!me) return <Loading />;
@@ -141,9 +145,9 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
   }
 
   const session: Session = signedIn(me)
-    ? {enabled: true, email: me.user.email, name: me.user.name, isAdmin: me.user.isAdmin, isStaff: me.user.isStaff,
+    ? {enabled: true, email: me.user.email, name: me.user.name, lang: me.user.lang ?? null, isAdmin: me.user.isAdmin, isStaff: me.user.isStaff,
       emailVerified: me.user.emailVerified, workspace: me.workspace, balance, refresh: load, logout}
-    : {enabled: false, email: null, name: null, isAdmin: true, isStaff: true, emailVerified: true, workspace: null, balance: null,
+    : {enabled: false, email: null, name: null, lang: null, isAdmin: true, isStaff: true, emailVerified: true, workspace: null, balance: null,
       refresh: load, logout};
   return (
     <SessionCtx.Provider value={session}>
@@ -161,6 +165,7 @@ const readEmailLink = (): EmailLink | null => {
 
 // Новый пароль по ссылке из письма. Сессия не нужна: пароль и забывают, когда войти нельзя
 const ResetScreen: React.FC<{token: string}> = ({token}) => {
+  const t = useT();
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -179,15 +184,15 @@ const ResetScreen: React.FC<{token: string}> = ({token}) => {
   };
   return (
     <div className="auth">
-      <img src="/kok/full.svg" alt="KOK — контент одной кнопкой" className="auth-logo" />
+      <img src="/kok/full.svg" alt={t('auth.logoAlt')} className="auth-logo" />
       <form className="auth-card form" onSubmit={submit}>
-        <h2>Новый пароль</h2>
-        <Field label="Пароль" hint="не короче 8 символов">
+        <h2>{t('land.auth.reset')}</h2>
+        <Field label={t('auth.password')} hint={t('auth.passwordHint')}>
           <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" minLength={8} required />
         </Field>
         {error && <div className="auth-error">{error}</div>}
-        <button className="btn primary big" disabled={busy}>Сохранить и войти</button>
-        <p className="hint"><a href={window.location.pathname}>Вернуться ко входу</a></p>
+        <button className="btn primary big" disabled={busy}>{t('auth.saveAndLogin')}</button>
+        <p className="hint"><a href={window.location.pathname}>{t('auth.backToLogin')}</a></p>
       </form>
     </div>
   );
@@ -202,11 +207,12 @@ const ResetScreen: React.FC<{token: string}> = ({token}) => {
 export const VerifyBanner: React.FC = () => {
   const {enabled, isStaff, emailVerified, email} = useSession();
   const route = useRoute();
+  const t = useT();
   if (!enabled || isStaff || emailVerified || route.pipeline === 'start') return null;
   return (
     <div className="readonly verify">
-      <span>Подтвердите почту <b>{email}</b> — после этого придут бесплатные кредиты.</span>
-      <a className="btn primary" href="#/start">Ввести код</a>
+      <span>{t('auth.verifyBanner.a')}<b>{email}</b>{t('auth.verifyBanner.b')}</span>
+      <a className="btn primary" href="#/start">{t('auth.enterCode')}</a>
     </div>
   );
 };
@@ -223,6 +229,7 @@ export type AuthMode = 'login' | 'register' | 'forgot';
 export const AuthCard: React.FC<{signup: {credits: number; days: number}; notice: string; mode: AuthMode; setMode: (m: AuthMode) => void}> = (
   {signup, notice, mode, setMode},
 ) => {
+  const t = useT();
   const [sent, setSent] = useState(false);
   const [form, setForm] = useState<Registration>(EMPTY);
   const [busy, setBusy] = useState(false);
@@ -263,32 +270,32 @@ export const AuthCard: React.FC<{signup: {credits: number; days: number}; notice
   return (
       <form className="auth-card form" onSubmit={submit}>
         <div className="btn-row auth-switch">
-          <button type="button" className={`btn ${mode === 'login' ? 'primary' : 'ghost'}`} onClick={() => setMode('login')}>Вход</button>
-          <button type="button" className={`btn ${mode === 'register' ? 'primary' : 'ghost'}`} onClick={() => setMode('register')}>Регистрация</button>
+          <button type="button" className={`btn ${mode === 'login' ? 'primary' : 'ghost'}`} onClick={() => setMode('login')}>{t('auth.tab.login')}</button>
+          <button type="button" className={`btn ${mode === 'register' ? 'primary' : 'ghost'}`} onClick={() => setMode('register')}>{t('auth.tab.register')}</button>
         </div>
         {notice && <p className="note">{notice}</p>}
         {mode === 'forgot' && (
           <p className="note">{sent
-            ? 'Если такая почта зарегистрирована, на неё ушло письмо со ссылкой. Ссылка действует час.'
-            : 'Пришлём ссылку, по которой можно задать новый пароль.'}</p>
+            ? t('auth.forgot.sent')
+            : t('auth.forgot.intro')}</p>
         )}
         {mode === 'register' && (
           <>
             {signup.credits > 0 && (
-              <p className="note auth-gift">Подтвердите почту — и получите <b>{signup.credits} кредитов бесплатно</b> на {signup.days} дней: карусель стоит 1 кредит, рекламный ролик — 3.</p>
+              <p className="note auth-gift">{t('auth.gift.a')}<b>{t('auth.gift.b', {credits: t.n('unit.credit', signup.credits)})}</b>{t('auth.gift.c', {days: t.n('unit.day', signup.days)})}</p>
             )}
-            <Field label="Имя"><input value={form.name} onChange={set('name')} autoComplete="name" required /></Field>
-            <Field label="Телефон" hint="с кодом страны — свяжемся, если понадобится помощь">
+            <Field label={t('auth.name')}><input value={form.name} onChange={set('name')} autoComplete="name" required /></Field>
+            <Field label={t('auth.phone')} hint={t('auth.phoneHint')}>
               <input type="tel" value={form.phone} onChange={set('phone')} placeholder="+82 10 1234 5678" autoComplete="tel" required />
             </Field>
-            <Field label="Компания" hint="будет на ваших постах; можно оставить пустым и поменять потом">
+            <Field label={t('auth.company')} hint={t('auth.companyHint')}>
               <input value={form.company} onChange={set('company')} autoComplete="organization" />
             </Field>
           </>
         )}
-        <Field label="Почта"><input type="email" value={form.email} onChange={set('email')} autoComplete="email" required /></Field>
+        <Field label={t('auth.email')}><input type="email" value={form.email} onChange={set('email')} autoComplete="email" required /></Field>
         {mode !== 'forgot' && (
-          <Field label="Пароль" hint={mode === 'register' ? 'не короче 8 символов' : undefined}>
+          <Field label={t('auth.password')} hint={mode === 'register' ? t('auth.passwordHint') : undefined}>
             <input type="password" value={form.password} onChange={set('password')}
               autoComplete={mode === 'login' ? 'current-password' : 'new-password'} minLength={mode === 'register' ? 8 : undefined} required />
           </Field>
@@ -298,20 +305,20 @@ export const AuthCard: React.FC<{signup: {credits: number; days: number}; notice
         {mode === 'register' && (
           <label className="auth-news">
             <input type="checkbox" checked={form.news} onChange={(e) => setForm({...form, news: e.target.checked})} />
-            <span>Получать новости KOK на почту — новые функции и изменения сервиса, без рекламы</span>
+            <span>{t('auth.news')}</span>
           </label>
         )}
         {error && <div className="auth-error">{error}</div>}
         <button className="btn primary big" disabled={busy || (mode === 'forgot' && sent)}>
-          {mode === 'login' ? 'Войти' : mode === 'register' ? 'Создать кабинет' : 'Прислать ссылку'}
+          {t(mode === 'login' ? 'land.login' : mode === 'register' ? 'auth.create' : 'auth.sendLink')}
         </button>
-        {mode === 'login' && <p className="hint"><button type="button" className="link" onClick={() => { setMode('forgot'); setSent(false); }}>Забыли пароль?</button></p>}
+        {mode === 'login' && <p className="hint"><button type="button" className="link" onClick={() => { setMode('forgot'); setSent(false); }}>{t('auth.forgotLink')}</button></p>}
         {/* Акцепт оферты — регистрацией (Legal.tsx): клиент должен видеть, с чем соглашается */}
         {mode === 'register' && (
-          <p className="hint">Создавая кабинет, вы принимаете <a href="/offer" target="_blank" rel="noreferrer">оферту</a> и{' '}
-            <a href="/privacy" target="_blank" rel="noreferrer">политику персональных данных</a>.</p>
+          <p className="hint">{t('auth.accept.a')}<a href="/offer" target="_blank" rel="noreferrer">{t('auth.accept.offer')}</a>{t('auth.accept.and')}
+            <a href="/privacy" target="_blank" rel="noreferrer">{t('auth.accept.privacy')}</a>.</p>
         )}
-        {mode === 'forgot' && <p className="hint"><button type="button" className="link" onClick={() => setMode('login')}>Вернуться ко входу</button></p>}
+        {mode === 'forgot' && <p className="hint"><button type="button" className="link" onClick={() => setMode('login')}>{t('auth.backToLogin')}</button></p>}
       </form>
   );
 };
@@ -330,11 +337,11 @@ export const useOutOfCredits = () => {
 export const useCost = (pipeline: string, costs?: Record<string, number>) => {
   const {enabled, isStaff} = useSession();
   const cost = costs?.[pipeline];
-  return enabled && !isStaff && cost ? ` · ${cost} кр.` : '';
+  return enabled && !isStaff && cost ? ` · ${tNow().n('unit.creditShort', cost)}` : '';
 };
 
-/** Дата для людей: 26.10.2026 */
-export const day = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString('ru-RU') : '—');
+/** Дата для людей: 26.10.2026 (по-английски 26/10/2026 — app/i18n, locale) */
+export const day = (iso: string | null | undefined) => (iso ? new Date(iso).toLocaleDateString(locale()) : '—');
 /** Сколько полных дней осталось до даты (0, если уже прошла) */
 export const daysLeft = (iso: string | null | undefined) =>
   (iso ? Math.max(0, Math.ceil((new Date(iso).getTime() - Date.now()) / 864e5)) : 0);

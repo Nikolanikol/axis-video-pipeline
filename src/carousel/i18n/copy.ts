@@ -404,7 +404,180 @@ const EN: Copy = {
   },
 };
 
-export const COPY: Record<CarouselLang, Copy> = {ru: RU, en: EN};
+// Албанский (15.11): перевод английского набора, те же варианты и признаки — зерно выбирает
+// фразы одинаково на всех языках. Машинный перевод, перед запуском — вычитка носителем.
+// Страна пишется только формами «Koreja e Jugut», «Koreja», «Kore» — их меняет ORIGIN_SWAP ниже
+const SQ: Copy = {
+  cover: {
+    tagline: [
+      'Makina\nnga Koreja', 'Import direkt\nnga Koreja', 'Makina të verifikuara\nnga Koreja e Jugut', 'Makina me porosi\nnga Koreja',
+      '[premium] Premium\nnga Koreja', '[low] Pak kilometra\nnga Koreja',
+    ],
+    strap: [
+      'E besueshme · E rehatshme · Elegante', 'E kontrolluar · Gati për nisje', 'Histori e ndershme · Import direkt',
+      '[low] Vetëm %mileage%', '[oneOwner] Pa ndërrim pronari · %year%', '[clean] Pa dëme në sigurime · %year%',
+      '[rich] %options% në pajisje', '[fresh] Viti %year% · %mileage%',
+    ],
+    benefits: [
+      [{icon: 'shield', text: 'Cilësi\ne verifikuar'}, {icon: 'plane', text: 'Import direkt\nnga Koreja'}, {icon: 'handshake', text: 'Kushte\ntë drejta'}],
+      [{icon: 'file', text: 'Histori\ne ndershme'}, {icon: 'search', text: 'Inspektim\npara blerjes'}, {icon: 'ship', text: 'Transport\nderi në port'}],
+      [{icon: 'shield', text: 'Kontroll\npara blerjes'}, {icon: 'file', text: 'Dokumente\npër eksport'}, {icon: 'handshake', text: 'Mbështetje\nnë marrëveshje'}],
+    ],
+  },
+  exterior: {
+    kicker: ['Eksterieri', 'Pamja e jashtme', 'Karroceria'],
+    title: [
+      'Dizajn modern\ndhe {elegant}', 'Karakter\n{i spikatur}', 'Silueta\n{e njohur}', 'Stil\n{i sigurt}',
+      '[premium] Pamje\n{premium}', '[fresh] Pamje\n{moderne}',
+    ],
+    text: [
+      'Silueta e sigurt dhe stili karakteristik — %model% bie në sy në rrugë.',
+      'Linja të pastra dhe përmasa të balancuara: %model% duket bukur nga çdo kënd.',
+      'Pamja e njohur e %model% — e përmbajtur, moderne dhe e pastër.',
+      '[premium] %model% — karakter premium që e vëren që në shikim të parë.',
+      '[fresh] %model% i vitit %year% — pamje moderne që nuk vjetrohet nesër.',
+      '[mature] %model% — pamje që mban vlerën edhe sot.',
+    ],
+  },
+  interior: {
+    kicker: ['Interieri', 'Kabina', 'Brenda'],
+    title: [
+      'Rehati\nnë çdo {detaj}', 'Rehati\ndhe {teknologji}', 'Kabinë ku\n{të vjen të ngasësh}',
+      '[family] Vend\n{për gjithë familjen}', '[rich] Pajisje\n{të pasura}', '[premium] Kabinë\n{premium}',
+    ],
+    text: [
+      'Kabinë e gjerë, materiale cilësore dhe pajisje që e bëjnë çdo udhëtim të rehatshëm.',
+      'Gjithçka pranë dorës: ergonomi e menduar dhe pajisje që të shërbejnë çdo ditë.',
+      'E qetë, e rehatshme dhe e gjerë — në qytet dhe në udhëtime të gjata.',
+      '[family] %seats% — vend për familjen dhe për udhëtime të gjata.',
+      '[rich] %options% në pajisje — rehati e menduar deri në detajin e fundit.',
+      '[premium] Materiale dhe përfundime premium në çdo cep të kabinës.',
+    ],
+  },
+  details: {
+    kicker: ['Detajet', 'Nga afër'],
+    title: ['Detaje\n{mbresëlënëse}', 'Prekje\n{të menduara}', '[rich] {%options%}\nnë pajisje'],
+    text: [
+      'Gjërat e vogla krijojnë ndjesinë e makinës.', 'Gjëra që i vëren më vonë dhe i vlerëson çdo ditë.',
+      '[rich] Shumë pajisje — këtu janë disa, na kërkoni listën e plotë.',
+    ],
+  },
+  engine: {
+    kicker: ['Motori', 'Performanca', 'Nën kapak'],
+    title: [
+      'Motor i besueshëm\n{%engine%}', 'Performancë\n{e sigurt}', 'Motor\n{i provuar}',
+      '[diesel] Naftë\n{me fuqi}', '[hybrid] Hibrid\n{ekonomik}', '[electric] Elektrik\n{i heshtur}', '[low] Vetëm\n{%mileage%}',
+    ],
+    text: [
+      'Një motor i provuar jep performancë të sigurt dhe qetësi në çdo kusht.',
+      'Fuqi e mjaftueshme për autostradë dhe qytet — pa harxhim të tepërt.',
+      'Një motor që mekanikët e njohin mirë — pa surpriza për vite me radhë.',
+      '[diesel] Motor nafte me fuqi të mjaftueshme — i sigurt në autostradë dhe ekonomik në rrugë të gjata.',
+      '[hybrid] Hibrid: më i qetë në qytet dhe më pak karburant në çdo kilometër.',
+      '[electric] Plotësisht elektrik: qetësi, reagim i menjëhershëm dhe pa benzinë.',
+      '[low] Vetëm %mileage% — pothuajse e re.',
+      '[gas] Motor benzine — i butë, i qetë dhe i lehtë për mirëmbajtje.',
+    ],
+  },
+  safety: {
+    kicker: ['Siguria', 'Mbrojtja'],
+    title: ['Siguri\n{në rrugë}', 'Siguria\n{në radhë të parë}', 'Mirë\n{e mbrojtur}'],
+    text: [
+      'Sistemet e ndihmës për shoferin e bëjnë çdo udhëtim më të sigurt dhe më të qetë.', 'Elektronika moderne kujdeset për shoferin dhe pasagjerët.',
+      'Çdo udhëtim ndihet më i qetë: elektronika e ndjek rrugën bashkë me ju.',
+    ],
+  },
+  historyClean: {
+    kicker: ['Historia e makinës', 'Raporti Encar'],
+    title: ['Pa dëme\n{në sigurime}', 'Histori\n{e pastër}', '[oneOwner] Pa ndërrim\n{pronari}'],
+    text: [
+      'Siguruesit nuk kanë asnjë regjistrim. Raporti i plotë Encar jepet para blerjes.',
+      'Siguruesit nuk kanë asgjë të keqe për këtë makinë. Raporti Encar jepet para blerjes.',
+      '[oneOwner] Asnjë dëm në sigurime dhe asnjë ndërrim pronari. Raporti i plotë Encar jepet para blerjes.',
+    ],
+  },
+  historyClaims: {
+    kicker: ['Historia e makinës', 'Raporti Encar'],
+    title: ['Histori\n{e ndershme}', 'Asgjë\n{e fshehur}', 'Gjithçka\n{transparente}'],
+    text: [
+      'Çdo dëm me pagesën e tij. Raporti i plotë Encar jepet para blerjes.',
+      'Tregojmë gjithçka: datat, shumat dhe çfarë u riparua. Raporti Encar para blerjes.',
+    ],
+  },
+  historyNone: {
+    kicker: ['Historia e makinës', 'Raporti Encar'],
+    title: ['Raporti\n{me kërkesë}', 'Historia e plotë\n{para blerjes}'],
+    text: ['Ju dërgojmë raportin e plotë të sigurimeve Encar para blerjes.', 'Raporti i sigurimeve Encar me kërkesën tuaj, para marrëveshjes.'],
+  },
+  rear: {
+    kicker: ['Eksterieri', 'Pamja nga pas'],
+    title: ['%model%'],
+    text: [
+      'Mbresëlënëse nga çdo kënd', 'Cilësi që i qëndron kohës', 'Duket bukur nga çdo anë',
+      '[low] Vetëm %mileage%', '[fresh] Prodhuar në %year%',
+    ],
+  },
+  gallery: {kicker: ['Galeria', 'Fotot', 'Më shumë foto']},
+  price: {kicker: ['Çmimi', 'Kostoja'], title: ['Çmimi\n{në Kore}', 'Kostoja\n{në Kore}', 'Çmimi i makinës\n{në Kore}', 'Çmimi i autos\n{në Kore}', 'Çmimi i tregut\n{në Kore}'], text: ['']},
+  why: {
+    kicker: ['Pse %brand%?', 'Si punojmë', 'Qasja jonë'],
+    title: ['E thjeshtë\n{dhe e sigurt}', 'Punojmë\n{me ndershmëri}', 'Marrëveshje\n{me çelës në dorë}'],
+    text: [''],
+    benefits: [
+      [
+        {icon: 'shield', text: 'Inspektim i plotë\npara blerjes'}, {icon: 'file', text: 'Dokumentet\ndhe eksporti nga Koreja'},
+        {icon: 'ship', text: 'Transport i sigurt\nderi në port'}, {icon: 'headset', text: 'Mbështetje\nnë çdo hap'},
+      ],
+      [
+        {icon: 'search', text: 'Inspektim\nnë vend'}, {icon: 'file', text: 'Të gjitha dokumentet\ne eksportit'},
+        {icon: 'ship', text: 'Transport\nderi në port'}, {icon: 'headset', text: 'Në kontakt\nderi në dorëzim'},
+      ],
+    ],
+  },
+  cta: {
+    kicker: ['Gati të flasim?', 'Na kontaktoni', 'Na shkruani'],
+    title: ['%model%\n{është në dispozicion}', 'E doni\n{këtë makinë?}', 'Merrni\n{çmimin e plotë}', '[low] Pak kilometra —\n{bëhuni i pari}'],
+    text: [
+      'Na shkruani për konsultim, çmimin aktual dhe kushtet e dorëzimit.',
+      'Na shkruani — llogarisim koston e plotë deri në vendin tuaj.',
+      'Ju dërgojmë më shumë foto, raportin dhe ofertën e transportit — vetëm na shkruani.',
+    ],
+    guarantees: [
+      [{icon: 'eye', text: 'Kushte\ntransparente'}, {icon: 'search', text: 'Inspektim\npara blerjes'}, {icon: 'ship', text: 'Transport\nderi në port'}],
+      [{icon: 'shield', text: 'Inspektim\ni shpejtë'}, {icon: 'card', text: 'Kushte\ntransparente'}, {icon: 'handshake', text: 'Partner\ni besueshëm'}],
+      [{icon: 'file', text: 'Histori\ne ndershme'}, {icon: 'ship', text: 'Transport\nderi në port'}, {icon: 'headset', text: 'Mbështetje\nnë çdo hap'}],
+    ],
+    button: {whatsapp: 'Shkruani në WhatsApp', telegram: 'Shkruani në Telegram'},
+  },
+  engineRows: {fuel: 'Karburanti', transmission: 'Kambio', mileage: 'Kilometrat', volume: 'Motori'},
+  classic: {
+    tagline: [
+      'Import direkt nga Koreja', 'Makina nga Koreja e Jugut', '[low] Pak kilometra', '[clean] Pa dëme në sigurime',
+      '[oneOwner] Pa ndërrim pronari', '[premium] Premium nga Koreja', '[fresh] Model i viteve të fundit',
+    ],
+    swipe: ['Rrëshqit →', 'Shiko më shumë →', 'Të gjitha detajet →'],
+    interior: ['Interieri', 'Kabina', 'Brenda'],
+    technology: ['Teknologji dhe siguri', 'Siguri dhe asistencë', 'Elektronika'],
+    specs: ['Të dhënat teknike', 'Shkurtimisht', 'Në shifra'],
+    price: ['Çmimi', 'Kostoja'],
+    priceLabel: ['Çmimi në Kore', 'Kostoja në Kore', 'Çmimi i makinës në Kore', 'Çmimi i autos në Kore', 'Çmimi i tregut në Kore'],
+    historyClean: ['Pa dëme të regjistruara', 'Histori e pastër', '[oneOwner] E pastër, pa ndërrim pronari'],
+    historyClaims: ['Asgjë e fshehur', 'Histori e ndershme', 'Gjithçka transparente'],
+    historyNone: ['Raporti — me kërkesë', 'Historia dërgohet para blerjes'],
+    cleanNote: [
+      'Siguruesit nuk kanë asnjë regjistrim. Raporti i plotë Encar jepet para blerjes.',
+      'Siguruesit nuk kanë asgjë të keqe për këtë makinë. Raporti Encar jepet para blerjes.',
+    ],
+    ctaTitle: ['E doni këtë makinë?', 'Ju pëlqen kjo makinë?', 'Merrni çmimin e plotë', '[low] Kaq pak kilometra rrallë gjen'],
+    ctaText: [
+      'Na shkruani për koston e plotë deri në vendin tuaj',
+      'Ju dërgojmë më shumë foto, raportin dhe ofertën e transportit — vetëm na shkruani',
+      'U përgjigjemi pyetjeve dhe llogarisim dorëzimin deri në qytetin tuaj',
+    ],
+  },
+};
+
+export const COPY: Record<CarouselLang, Copy> = {ru: RU, en: EN, sq: SQ};
 
 // Страна происхождения машины. Тексты написаны под Корею (Encar — первый источник); для машин
 // из Китая (che168, с 11.10) и Японии (Carsensor, с 12.10) те же фразы с другой страной. Заменой,
@@ -414,10 +587,12 @@ const ORIGIN_SWAP: Record<string, Record<CarouselLang, [RegExp, string][]>> = {
   CN: {
     ru: [[/Южной Кореи/g, 'Китая'], [/Южная Корея/g, 'Китай'], [/Кореи/g, 'Китая'], [/Корее/g, 'Китае'], [/Корея/g, 'Китай']],
     en: [[/South Korea/g, 'China'], [/Korea/g, 'China']],
+    sq: [[/Koreja e Jugut/g, 'Kina'], [/Koreja/g, 'Kina'], [/Kore\b/g, 'Kinë']],
   },
   JP: {
     ru: [[/Южной Кореи/g, 'Японии'], [/Южная Корея/g, 'Япония'], [/Кореи/g, 'Японии'], [/Корее/g, 'Японии'], [/Корея/g, 'Япония']],
     en: [[/South Korea/g, 'Japan'], [/Korea/g, 'Japan']],
+    sq: [[/Koreja e Jugut/g, 'Japonia'], [/Koreja/g, 'Japonia'], [/Kore\b/g, 'Japoni']],
   },
 };
 const swapDeep = <T,>(v: T, swaps: [RegExp, string][]): T => {

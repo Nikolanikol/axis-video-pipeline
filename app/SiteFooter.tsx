@@ -10,6 +10,7 @@ import {Instagram, Mail, MessageCircle, Send} from 'lucide-react';
 import {api, PublicOffer} from './api';
 import {contactLinks} from './Legal';
 import {SourcesStrip} from './Sources';
+import {useT} from './i18n';
 
 export type FooterLink = {label: string; href: string; onClick?: (e: React.MouseEvent) => void};
 
@@ -22,6 +23,7 @@ type Props = {
 };
 
 export const SiteFooter: React.FC<Props> = ({service, offer: given, className}) => {
+  const t = useT();
   const [loaded, setLoaded] = useState<PublicOffer | null>(null);
   useEffect(() => {
     if (given !== undefined) return;
@@ -42,7 +44,7 @@ export const SiteFooter: React.FC<Props> = ({service, offer: given, className}) 
       <div className="land-foot-grid">
         <div className="land-foot-brand">
           <img src="/kok/wordmark.svg" alt="KOK" className="land-logo" />
-          <p className="muted">Контент одной кнопкой: рекламные ролики и карусели для автодилеров по объявлениям Encar, che168 и Carsensor.</p>
+          <p className="muted">{t('foot.about')}</p>
           {links.length > 0 && (
             <div className="land-socials">
               {links.map((c) => (
@@ -51,38 +53,38 @@ export const SiteFooter: React.FC<Props> = ({service, offer: given, className}) 
             </div>
           )}
         </div>
-        <nav className="land-foot-col" aria-label="Разделы">
-          <b>Сервис</b>
+        <nav className="land-foot-col" aria-label={t('foot.sections')}>
+          <b>{t('foot.service')}</b>
           {service.map((s) => <a key={s.href} href={s.href} onClick={s.onClick}>{s.label}</a>)}
         </nav>
         {/* Откуда KOK берёт объявления — логотипы-ссылки на площадки (13.10, app/Sources.tsx) */}
         <div className="land-foot-col land-foot-sources">
-          <b>Площадки</b>
+          <b>{t('foot.sources')}</b>
           <SourcesStrip compact title="" />
         </div>
-        <nav className="land-foot-col" aria-label="Документы">
-          <b>Документы</b>
+        <nav className="land-foot-col" aria-label={t('foot.docs')}>
+          <b>{t('foot.docs')}</b>
           {/* Настоящие адреса, а не «#/offer»: по ним документы находят поисковики (server/seo.mjs) */}
-          <a href="/offer">Публичная оферта</a>
-          <a href="/offer/refunds">Возврат денег</a>
-          <a href="/privacy">Персональные данные</a>
+          <a href="/offer">{t('foot.offer')}</a>
+          <a href="/offer/refunds">{t('foot.refunds')}</a>
+          <a href="/privacy">{t('foot.privacy')}</a>
         </nav>
         <div className="land-foot-col">
-          <b>Связаться</b>
+          <b>{t('foot.contact')}</b>
           {/* Telegram — главный канал (владелец 12.10): там бот поддержки и тема на клиента у команды.
               Остальные каналы — строками ниже, тише */}
           {tg && (
             <a className="btn primary land-foot-tg" href={tg.href} target="_blank" rel="noreferrer">
-              <Send size={17} aria-hidden /> Написать в Telegram
+              <Send size={17} aria-hidden /> {t('foot.telegram')}
             </a>
           )}
           {links.filter((c) => c !== tg).map((c) => <a key={c.label} href={c.href} target="_blank" rel="noreferrer">{c.label}: <span className="nowrap">{c.value}</span></a>)}
-          <span className="muted">Оплата, возвраты, помощь с кабинетом</span>
+          <span className="muted">{t('foot.contactNote')}</span>
         </div>
       </div>
       <div className="land-foot-legal">
         <span>© {new Date().getFullYear()} {l?.seller || 'KOK'}</span>
-        {l?.regNo && <span>Рег. № {l.regNo.replace(/\s*\(.*\)$/, '')}</span>}
+        {l?.regNo && <span>{t('foot.regNo', {no: l.regNo.replace(/\s*\(.*\)$/, '')})}</span>}
         {l?.country && <span>{l.country}</span>}
       </div>
     </footer>

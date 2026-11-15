@@ -64,10 +64,11 @@ describe('варианты', () => {
 });
 
 describe('тексты слайдов', () => {
-  it('у русского и английского одинаковые разделы и число вариантов', () => {
+  it('у русского, английского и албанского одинаковые разделы и число вариантов', () => {
     const shape = (o: unknown): unknown => (Array.isArray(o) ? o.length : o && typeof o === 'object'
       ? Object.fromEntries(Object.entries(o).map(([k, v]) => [k, shape(v)])) : typeof o);
     expect(shape(COPY.ru)).toEqual(shape(COPY.en));
+    expect(shape(COPY.sq)).toEqual(shape(COPY.en));
   });
 
   it('у каждого заголовка ровно одно выделенное слово и нет лишних скобок', () => {

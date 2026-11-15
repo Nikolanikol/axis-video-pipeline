@@ -106,16 +106,16 @@ const Gallery: React.FC<FamilySlideProps> = ({car, content, colors, h}) => {
   </AbsoluteFill>;
 };
 
-const Facts: React.FC<FamilySlideProps> = ({car, tx, ru, colors, h}) => {
+const Facts: React.FC<FamilySlideProps> = ({car, tx, colors, h}) => {
   const {k} = scale(h);
   const year = car.year ? String(car.year) : '';
   // Разряды — как у остальных слайдов карусели на этом языке (обложка: «67,842 KM» / «67 842 км»)
-  const km = kmNumber(car.mileageKm, ru);
-  const engine = car.displacementCc ? `${(car.displacementCc / 1000).toFixed(1).replace('.', ru ? ',' : '.')} ${ru ? 'Л' : 'L'}` : '';
+  const km = kmNumber(car.mileageKm, tx.locale);
+  const engine = car.displacementCc ? `${(car.displacementCc / 1000).toFixed(1).replace('.', tx.u.dec)} ${tx.u.l}` : '';
   const pair = [upper(tx.value(car.fuel)), upper(tx.value(car.transmission))].filter(Boolean);
   const detail = car.photos.other[0] ?? car.photos.exterior[2] ?? car.photos.hero;
   // Главное число — пробег; нет пробега — объём двигателя; нет и его — год (факты не выдумываем)
-  const main = km ? {v: km, unit: ru ? 'КМ' : 'KM'} : engine ? {v: engine, unit: ''} : null;
+  const main = km ? {v: km, unit: tx.u.km} : engine ? {v: engine, unit: ''} : null;
   const line = <div style={{height: 4, background: '#ffffffb3', margin: '0 60px'}} />;
   return <AbsoluteFill style={{background: colors.accent, color: '#fff', fontFamily: HEAD}}>
     <LogoTab colors={colors} flat />
@@ -124,7 +124,7 @@ const Facts: React.FC<FamilySlideProps> = ({car, tx, ru, colors, h}) => {
         <Photo src={detail} style={{position: 'relative', width: 560, height: 250 * k, borderRadius: 40}} />
         {year && <div style={{flex: 1, textAlign: 'right'}}>
           <div style={{fontWeight: 700, fontSize: 150 * k, lineHeight: .95}}>{year}</div>
-          <div style={{fontWeight: 500, fontSize: 52}}>{ru ? 'ГОД' : 'YEAR'}</div>
+          <div style={{fontWeight: 500, fontSize: 52}}>{tx.u.year}</div>
         </div>}
       </div>
       {line}

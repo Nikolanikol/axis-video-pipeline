@@ -1,4 +1,5 @@
 // API сервера (без Vite и без запуска) — отдельно, чтобы тестировать
+import {requestLang, translateError} from './i18n/errors.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import express from 'express';
@@ -34,7 +35,7 @@ import {styleError} from '../src/design/style/registry.js';
 import {withoutMusic} from '../src/shared/nomusic.js';
 import {
   accountOf, cancelEmailChange, requestDeletion, restoreAccount, changePassword, closeOtherSessions, closeSession, confirmEmailChange, dropSession,
-  grantBonus, grantPack, setNews, listClients, listPacks, listSessions, listStaff, login, register, requestEmailChange,
+  grantBonus, grantPack, setNews, setUserLang, listClients, listPacks, listSessions, listStaff, login, register, requestEmailChange,
   removePack, requestReset, resetPassword, restorePack, savePack, sendVerification, setRole, updateAccount, verifyCode, verifyLink,
 } from './accounts.mjs';
 import {hideClient, takeCredits, unhideClient, updateClient} from './clients.mjs';
@@ -248,7 +249,7 @@ export const createApp = ({photoOrigin}) => {
   api.post('/auth/verify/link', loginLimiter, (req, res, next) => verifyLink({token: req.body?.token})
     .then((r) => res.json(r)).catch(next));
   // Сброс пароля: письмо со ссылкой; по ссылке — новый пароль и сразу вход
-  api.post('/auth/forgot', loginLimiter, (req, res, next) => requestReset({email: req.body?.email})
+  api.post('/auth/forgot', loginLimiter, (req, res, next) => requestReset({email: req.body?.email, lang: req.body?.lang})
     .then((r) => res.json(r)).catch(next));
   api.post('/auth/reset', loginLimiter, (req, res, next) => resetPassword({token: req.body?.token, password: req.body?.password}, clientMeta(req))
     .then(({token}) => { setSessionCookie(req, res, token); res.json({ok: true}); }).catch(next));
@@ -328,6 +329,8 @@ export const createApp = ({photoOrigin}) => {
   const who = (req) => ({userId: req.user.id, workspaceId: req.ws, sessionId: req.sessionId});
   account.get('/profile', wrap((req) => accountOf(req.user.id, req.ws)));
   account.put('/news', wrap((req) => setNews({...who(req), on: req.body?.on})));
+  // Переключатель языка RU · EN · SQ: язык писем человека (язык постов компании пишется профилем)
+  account.put('/lang', wrap((req) => setUserLang({...who(req), lang: req.body?.lang})));
   account.put('/profile', wrap((req) => updateAccount({...who(req), name: req.body?.name, company: req.body?.company})));
   // Всё, где проверяется текущий пароль, — под ограничением попыток: иначе вошедший на
   // чужом ноутбуке перебирал бы пароль владельца, чтобы сменить почту
@@ -740,11 +743,13 @@ export const createApp = ({photoOrigin}) => {
     } catch (e) { next(e); }
   });
 
-  api.get('/renders', wrap((req) => listJobs({
+  // Текст сбоя ролика пишется в запись по-русски — на язык клиента переводим при выдаче
+  const jobFor = (req) => (j) => (j?.error ? {...j, error: translateError(j.error, requestLang(req))} : j);
+  api.get('/renders', wrap(async (req) => (await listJobs({
     lotId: req.query.lot ? checkId(req.query.lot) : undefined,
     reviewId: req.query.review ? checkId(req.query.review) : undefined,
-  })));
-  api.get('/renders/:id', wrap((req) => getJob(checkId(req.params.id))));
+  })).map(jobFor(req))));
+  api.get('/renders/:id', wrap(async (req) => jobFor(req)(await getJob(checkId(req.params.id)))));
   api.post('/renders/:id/cancel', wrap((req) => cancelJob(checkId(req.params.id))));
   api.post('/renders/:id/retry', requireCredits, wrap((req) => retryJob(checkId(req.params.id), billOf(req))));
   api.delete('/renders/:id', wrap((req) => deleteJob(checkId(req.params.id))));
@@ -779,8 +784,10 @@ export const createApp = ({photoOrigin}) => {
     if (!ours) log.error('request.failed', {...where, error: err});
     else if (status >= 500) log.warn('request.failed', {...where, message: err.message});
     const requestId = req.requestId;
+    // Текст — на языке клиента (заголовок X-Lang от интерфейса, server/i18n/errors.mjs); в журнал выше
+    // ушёл русский, как всегда
     res.status(status).json({
-      error: ours ? err.message : `Внутренняя ошибка сервера. Код для поддержки: ${requestId}`,
+      error: translateError(ours ? err.message : `Внутренняя ошибка сервера. Код для поддержки: ${requestId}`, requestLang(req)),
       // Код отдельным полем — для интерфейса и поддержки; в тексте он тоже есть, чтобы его увидел человек
       ...(status >= 500 ? {requestId} : {}),
     });

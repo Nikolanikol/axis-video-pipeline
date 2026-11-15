@@ -16,29 +16,25 @@ import {usd} from './Account';
 import {day, useSession} from './auth';
 import {useConfig} from './config';
 import {useRoute} from './router';
+import {locale, tNow, useT, type Key, type T} from './i18n';
 
-// Валюты AnyPay: знак и копейки (сумы — целыми, на картах Узбекистана копеек нет)
-const CUR: Record<string, {sign: string; digits: number; name: string}> = {
-  rub: {sign: '₽', digits: 2, name: 'рубли'}, uah: {sign: '₴', digits: 2, name: 'гривны'},
-  uzs: {sign: 'сум', digits: 0, name: 'сумы'}, kgs: {sign: 'сом', digits: 2, name: 'сомы'},
-};
-const inCur = (n: number, c: string) => `${n.toLocaleString('ru-RU', {minimumFractionDigits: CUR[c]?.digits ?? 2, maximumFractionDigits: CUR[c]?.digits ?? 2})} ${CUR[c]?.sign ?? c.toUpperCase()}`;
+// Валюты AnyPay: копейки (сумы — целыми, на картах Узбекистана копеек нет); знак и название — в словаре
+// (pay.cur.<код>.sign / .name): «сум» по-английски — «UZS»
+const CUR: Record<string, {digits: number}> = {rub: {digits: 2}, uah: {digits: 2}, uzs: {digits: 0}, kgs: {digits: 2}};
+const curSign = (c: string) => (CUR[c] ? tNow()(`pay.cur.${c}.sign` as Key) : c.toUpperCase());
+const inCur = (n: number, c: string) => `${n.toLocaleString(locale(), {minimumFractionDigits: CUR[c]?.digits ?? 2, maximumFractionDigits: CUR[c]?.digits ?? 2})} ${curSign(c)}`;
 // Сумма заказа в валюте его кассы: доллары USDT (NOWPayments) или валюта AnyPay
 const paid = (p: Payment) => (p.currency === 'usd' ? `${usd(p.amount)} USDT` : inCur(p.amount, p.currency));
 // Карта AnyPay в валютах, которые касса принимает (13.10 рубли закрыты): способ клиента → валюта
-const CARD_CURRENCIES: {key: PayMethod; cur: string; country: string}[] = [
-  {key: 'card_uzs', cur: 'uzs', country: 'Узбекистан'}, {key: 'card_kgs', cur: 'kgs', country: 'Киргизия'}, {key: 'card_uah', cur: 'uah', country: 'Украина'},
+// country — ключ словаря: страна банка карты на языке интерфейса
+const CARD_CURRENCIES: {key: PayMethod; cur: string; country: Key}[] = [
+  {key: 'card_uzs', cur: 'uzs', country: 'pay.country.uz'}, {key: 'card_kgs', cur: 'kgs', country: 'pay.country.kg'}, {key: 'card_uah', cur: 'uah', country: 'pay.country.ua'},
 ];
 const perCredit = (p: Pack) => p.price_usd / p.credits;
 // Цена за кредит — до цента: в долларах это доли, целыми было бы «$1 за кредит» у всех тарифов
 const cents = (n: number) => Math.round(n * 100) / 100;
-// 1 ролик, 2 ролика, 5 роликов
-const plural = (n: number, [one, few, many]: [string, string, string]) => {
-  const m10 = n % 10;
-  const m100 = n % 100;
-  return m10 === 1 && m100 !== 11 ? one : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many;
-};
-const credits = (n: number) => `${n} ${plural(n, ['кредит', 'кредита', 'кредитов'])}`;
+// «3 кредита» / «3 credits» — формы числа по языку (app/i18n)
+const credits = (n: number) => tNow().n('unit.credit', n);
 
 /**
  * Куда писать за тарифом — по убыванию: бот поддержки с ключом кабинета (в рабочей группе тема
@@ -51,7 +47,7 @@ const managerOf = (offer: Offer, text: string): Manager | null => {
   if (offer.support) return {kind: 'bot', label: 'Telegram', href: null};
   if (c.telegram) return {kind: 'telegram', label: 'Telegram', href: `https://t.me/${c.telegram.replace(/^https?:\/\/t\.me\//, '').replace(/^@/, '')}`};
   if (c.whatsapp) return {kind: 'whatsapp', label: 'WhatsApp', href: `https://wa.me/${c.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(text)}`};
-  if (c.email) return {kind: 'email', label: 'почту', href: `mailto:${c.email}?subject=${encodeURIComponent('Подписка KOK')}&body=${encodeURIComponent(text)}`};
+  if (c.email) return {kind: 'email', label: tNow()('pay.emailLabel'), href: `mailto:${c.email}?subject=${encodeURIComponent(tNow()('pay.emailSubject'))}&body=${encodeURIComponent(text)}`};
   return null;
 };
 
@@ -83,15 +79,11 @@ const discountOf = (p: Pack, packs: Pack[]) => {
   return Math.round((1 - perCredit(p) / top) * 100);
 };
 
-// Что сейчас с оплатой — словами клиента. Статусы — общие для всех касс (cores/PAYMENTS.md, раздел 3)
-const STATUS: Record<string, string> = {
-  created: 'Ждём оплату', waiting: 'Ждём перевод', confirming: 'Перевод в сети, подтверждается',
-  partial: 'Пришло меньше суммы счёта — мы уже разбираемся, напишем вам', failed: 'Оплата не прошла',
-  expired: 'Время счёта вышло — оплаты не было', refunded: 'Деньги возвращены', abandoned: 'Счёт не оплачен',
-  unknown: 'Проверяем оплату',
-};
-const statusText = (p: Payment) => (p.credited ? `Оплачено — +${credits(p.credits ?? 0)}`
-  : p.status === 'paid' ? 'Оплата пришла, проверяем' : STATUS[p.status] ?? 'Проверяем оплату');
+// Что сейчас с оплатой — словами клиента (pay.status.<статус> в словаре). Статусы — общие для всех касс
+// (cores/PAYMENTS.md, раздел 3)
+const STATUSES = new Set(['created', 'waiting', 'confirming', 'partial', 'failed', 'expired', 'refunded', 'abandoned', 'paid']);
+const statusText = (t: T, p: Payment) => (p.credited ? t('pay.status.credited', {credits: t.n('unit.credit', p.credits ?? 0)})
+  : t(STATUSES.has(p.status) ? `pay.status.${p.status}` as Key : 'pay.status.unknown'));
 // После этих статусов ждать больше нечего — опрос останавливается
 const settled = (p: Payment) => p.credited || ['failed', 'expired', 'refunded', 'partial', 'abandoned'].includes(p.status);
 
@@ -106,6 +98,7 @@ const pressable = (onPress: () => void) => ({
  * открытое после ответа сервера, браузер счёл бы всплывающим и заблокировал
  */
 const PayDialog: React.FC<{pack: Pack; offer: Offer; text: string; onClose: () => void}> = ({pack, offer, text, onClose}) => {
+  const t = useT();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const manager = managerOf(offer, text);
@@ -155,22 +148,22 @@ const PayDialog: React.FC<{pack: Pack; offer: Offer; text: string; onClose: () =
   return createPortal(
     <div className="modal-backdrop" onClick={() => !busy && onClose()}>
       <div className="pay-dialog" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="pay-title">
-        <h2 id="pay-title">{pack.kind === 'plan' ? `Тариф «${pack.title}»` : `+${credits(pack.credits)}`}</h2>
-        <p className="pay-sum">{usd(pack.price_usd)}{pack.kind === 'plan' ? <span className="muted"> · {credits(pack.credits)} на месяц</span> : null}</p>
+        <h2 id="pay-title">{pack.kind === 'plan' ? t('pay.plan', {title: pack.title}) : `+${credits(pack.credits)}`}</h2>
+        <p className="pay-sum">{usd(pack.price_usd)}{pack.kind === 'plan' ? <span className="muted"> · {t('pay.perMonth', {credits: credits(pack.credits)})}</span> : null}</p>
         {rubles && (
           <div className="pay-option">
             {sbp && (
               <button className="btn primary" onClick={() => pay('sbp')} disabled={busy}>
-                {busyWith === 'sbp' ? 'Открываю кассу…' : `Оплатить по СБП${approxRub}`}
+                {busyWith === 'sbp' ? t('pay.opening') : `${t('pay.sbp')}${approxRub}`}
               </button>
             )}
             {card && (
               <button className={`btn${sbp ? '' : ' primary'}`} onClick={() => pay('card')} disabled={busy}>
-                {busyWith === 'card' ? 'Открываю кассу…' : `Оплатить картой${approxRub}`}
+                {busyWith === 'card' ? t('pay.opening') : `${t('pay.card')}${approxRub}`}
               </button>
             )}
             <p className="hint">
-              Рубли — {[sbp && 'по СБП', card && 'картой российского банка'].filter(Boolean).join(' или ')}. Кредиты придут сами через несколько минут после оплаты.
+              {t('pay.rubles', {how: [sbp && t('pay.rubles.sbp'), card && t('pay.rubles.card')].filter(Boolean).join(t('pay.or'))})} {t('pay.creditsArrive')}
             </p>
           </div>
         )}
@@ -178,25 +171,24 @@ const PayDialog: React.FC<{pack: Pack; offer: Offer; text: string; onClose: () =
           <div className="pay-option">
             {cards.map((c, i) => (
               <button key={c.key} className={`btn${!rubles && i === 0 ? ' primary' : ''}`} onClick={() => pay(c.key)} disabled={busy}>
-                {busyWith === c.key ? 'Открываю кассу…' : `Картой · ${CUR[c.cur].name}${approx(c.cur)}`}
+                {busyWith === c.key ? t('pay.opening') : `${t('pay.byCard')} · ${t(`pay.cur.${c.cur}.name` as Key)}${approx(c.cur)}`}
               </button>
             ))}
             <p className="hint">
-              Карта банка: {cards.map((c) => c.country).join(', ')}. Касса покажет реквизиты для перевода с вашей карты.
+              {t('pay.cardBank', {countries: cards.map((c) => t(c.country)).join(', ')})}
               {/* Комиссию кассы платит покупатель (владелец 13.10): без этой строки сумма на странице
                   кассы выглядела бы как ошибка в цене */}
-              {' '}Комиссия кассы — сверху, итоговую сумму покажет касса. Кредиты придут сами через несколько минут после оплаты.
+              {' '}{t('pay.fee')} {t('pay.creditsArrive')}
             </p>
           </div>
         )}
         {usdt && (
           <div className="pay-option">
             <button className={`btn${anypay ? '' : ' primary'}`} onClick={() => pay('usdt')} disabled={busy}>
-              {busyWith === 'usdt' ? 'Открываю кассу…' : `Оплатить ${usd(pack.price_usd)} в USDT`}
+              {busyWith === 'usdt' ? t('pay.opening') : t('pay.usdt', {sum: usd(pack.price_usd)})}
             </button>
             <p className="hint">
-              Сеть <b>TRON (TRC20)</b>. Кредиты придут сами через несколько минут после оплаты.
-              USDT, отправленные в другой сети, не дойдут.
+              {t('pay.network')}<b>TRON (TRC20)</b>. {t('pay.creditsArrive')} {t('pay.wrongNetwork')}
             </p>
           </div>
         )}
@@ -204,22 +196,20 @@ const PayDialog: React.FC<{pack: Pack; offer: Offer; text: string; onClose: () =
           <div className="pay-option">
             <button type="button" className={`btn${usdt || anypay ? '' : ' primary'}${telegram ? ' btn-tg' : ''}`} onClick={write}>
               {telegram && <Send size={17} aria-hidden />}
-              {rubles ? `Другой способ — написать в ${manager.label}`
-                : usdt ? `Рубли или другой способ — написать в ${manager.label}` : `Написать в ${manager.label}`}
+              {t(rubles ? 'pay.mgr.other' : usdt ? 'pay.mgr.rubOther' : 'pay.mgr.write', {channel: manager.label})}
             </button>
             <p className="hint">
               {telegram
-                ? (copied ? 'Текст заявки скопирован — вставьте его в чат. Пришлём реквизиты и подключим.'
-                  : 'Откроется Telegram, текст заявки скопируется сам — останется вставить. Пришлём реквизиты и подключим.')
-                : `Откроется ${manager.label} с готовым сообщением: пришлём реквизиты и подключим.`}
+                ? t(copied ? 'pay.mgr.copied' : 'pay.mgr.willCopy')
+                : t('pay.mgr.opens', {channel: manager.label})}
             </p>
           </div>
         )}
-        {!usdt && !anypay && !manager && <p className="hint">Способы оплаты ещё не настроены — напишите нам на почту из подвала сайта.</p>}
+        {!usdt && !anypay && !manager && <p className="hint">{t('pay.none')}</p>}
         {/* Модерация кассы и сам клиент: перед оплатой видно условия и возврат */}
-        <p className="hint">Оплачивая, вы принимаете <a href="/offer" target="_blank" rel="noreferrer">оферту</a>: возврат — в течение 3 суток, если кредиты из покупки не тратились.</p>
+        <p className="hint">{t('pay.accept.a')}<a href="/offer" target="_blank" rel="noreferrer">{t('auth.accept.offer')}</a>{t('pay.accept.b')}</p>
         {error && <div className="auth-error">{error}</div>}
-        <button type="button" className="btn ghost" onClick={onClose} disabled={busy}>Отмена</button>
+        <button type="button" className="btn ghost" onClick={onClose} disabled={busy}>{t('common.cancel')}</button>
       </div>
     </div>,
     document.body,
@@ -234,6 +224,7 @@ export const PaymentReturn: React.FC = () => {
   const route = useRoute();
   const id = route.tool?.startsWith('pay-') ? route.tool : null;
   const {refresh} = useSession();
+  const t = useT();
   const [p, setP] = useState<Payment | null>(null);
   const [error, setError] = useState('');
 
@@ -259,11 +250,11 @@ export const PaymentReturn: React.FC = () => {
   return (
     <div className={`notice pay-return${p?.credited ? ' ok' : p && settled(p) ? ' warn' : ''}`}>
       <div>
-        <b>{p ? `${p.title} · ${paid(p)}` : 'Оплата'}</b>
-        <span>{error || (p ? statusText(p) : 'Проверяем оплату…')}</span>
-        {p && !settled(p) && <span className="muted">Страницу можно не обновлять — проверяем сами каждые несколько секунд.</span>}
+        <b>{p ? `${p.title} · ${paid(p)}` : t('pay.payment')}</b>
+        <span>{error || (p ? statusText(t, p) : t('pay.checking'))}</span>
+        {p && !settled(p) && <span className="muted">{t('pay.noReload')}</span>}
       </div>
-      <button className="btn ghost" onClick={close}>{p && settled(p) ? 'Готово' : 'Скрыть'}</button>
+      <button className="btn ghost" onClick={close}>{t(p && settled(p) ? 'pay.done' : 'pay.hide')}</button>
     </div>
   );
 };
@@ -271,6 +262,7 @@ export const PaymentReturn: React.FC = () => {
 export const PlansSection: React.FC = () => {
   const {workspace, email, balance} = useSession();
   const {config} = useConfig();
+  const t = useT();
   const [offer, setOffer] = useState<Offer | null>(null);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [paying, setPaying] = useState<{pack: Pack; text: string} | null>(null);
@@ -282,7 +274,7 @@ export const PlansSection: React.FC = () => {
   const plans = offer.packs.filter((p) => p.kind === 'plan');
   const topups = offer.packs.filter((p) => p.kind === 'topup');
   // Подпись кабинета в сообщении: по ней менеджер находит клиента в админке
-  const who = `\nКабинет: ${[workspace?.name, email].filter(Boolean).join(', ')}`;
+  const who = `\n${t('pay.req.account')}: ${[workspace?.name, email].filter(Boolean).join(', ')}`;
   const current = balance?.subscription;
   // «Выгоднее всего» — самый дешёвый кредит, и только когда есть с чем сравнить
   const best = plans.length > 1 ? plans.reduce((a, b) => (perCredit(b) < perCredit(a) ? b : a)) : null;
@@ -292,40 +284,40 @@ export const PlansSection: React.FC = () => {
   const top = plans.length ? Math.max(...plans.map(perCredit)) : 0;
   const usdt = Boolean(offer.pay?.usdt);
   const rubles = Boolean(offer.pay?.sbp || offer.pay?.card);
-  const cardCountries = CARD_CURRENCIES.filter((c) => offer.pay?.[c.key]).map((c) => c.country);
+  const cardCountries = CARD_CURRENCIES.filter((c) => offer.pay?.[c.key]).map((c) => t(c.country));
   const cardsOn = cardCountries.length > 0;
 
   return (
     <section id="plans" className="plans">
       <div className="section-head">
-        <h2>Тарифы</h2>
-        <span className="muted">Кредиты действуют месяц и сгорают в конце</span>
+        <h2>{t('shell.plans')}</h2>
+        <span className="muted">{t('plans.lead')}</span>
       </div>
       <div className="plan-grid">
         {plans.map((p) => {
           const mine = current?.planId === p.id;
           const discount = discountOf(p, plans);
           const saving = Math.round(top * p.credits - p.price_usd);
-          const text = `Здравствуйте! Хочу ${mine ? 'продлить' : 'подключить'} тариф «${p.title}» — ${p.credits} кредитов за ${usd(p.price_usd)} в месяц.${who}`;
+          const text = `${t(mine ? 'pay.req.renew' : 'pay.req.plan', {title: p.title, credits: credits(p.credits), price: usd(p.price_usd)})}${who}`;
           const isBest = best?.id === p.id;
           return (
             <div key={p.id} className={`plan lift${isBest ? ' best' : ''}${mine ? ' mine' : ''}`} {...pressable(() => setPaying({pack: p, text}))}>
               {(mine || isBest) && (
-                <span className="plan-flag">{mine ? `Ваш тариф · до ${day(current?.until)}` : `Выгоднее всего · −${discount}% за кредит`}</span>
+                <span className="plan-flag">{mine ? t('plans.mine', {date: day(current?.until)}) : t('plans.best', {n: discount})}</span>
               )}
               <b className="plan-title">{p.title}</b>
-              <div className="plan-credits"><span>{p.credits}</span> {plural(p.credits, ['кредит', 'кредита', 'кредитов'])}/мес</div>
-              <div className="plan-price">{usd(p.price_usd)} <span className="muted">в месяц</span></div>
+              <div className="plan-credits"><span>{p.credits}</span> {t.n('plans.creditsMonth', p.credits)}</div>
+              <div className="plan-price">{usd(p.price_usd)} <span className="muted">{t('land.tariffs.month')}</span></div>
               <div className="plan-unit muted">
-                {usd(cents(perCredit(p)))} за кредит
+                {t('land.tariffs.perCredit', {price: usd(cents(perCredit(p)))})}
                 {discount > 0 && !isBest && <> · −{discount}%</>}
-                {isBest && saving > 0 && <> · <span className="plan-save">экономия {usd(saving)}</span></>}
+                {isBest && saving > 0 && <> · <span className="plan-save">{t('plans.save', {sum: usd(saving)})}</span></>}
               </div>
               <ul className="plan-points">
-                <li><Check size={14} aria-hidden /> ≈ {Math.floor(p.credits / ads)} {plural(Math.floor(p.credits / ads), ['ролик', 'ролика', 'роликов'])} или {Math.floor(p.credits / carousels)} {plural(Math.floor(p.credits / carousels), ['карусель', 'карусели', 'каруселей'])}</li>
-                {isBest && discount > 0 && <li><Check size={14} aria-hidden /> Кредит на {discount}% дешевле, чем в «{plans.find((x) => perCredit(x) === top)?.title}»</li>}
+                <li><Check size={14} aria-hidden /> {t('plans.approx', {videos: t.n('unit.video', Math.floor(p.credits / ads)), carousels: t.n('unit.carousel', Math.floor(p.credits / carousels))})}</li>
+                {isBest && discount > 0 && <li><Check size={14} aria-hidden /> {t('plans.cheaper', {n: discount, title: plans.find((x) => perCredit(x) === top)?.title ?? ''})}</li>}
               </ul>
-              <span className={`btn${isBest || mine ? ' primary' : ''}`}>{mine ? 'Продлить' : `Выбрать${isBest ? ` ${p.title}` : ''}`}</span>
+              <span className={`btn${isBest || mine ? ' primary' : ''}`}>{mine ? t('shell.renewLink') : `${t('plans.choose')}${isBest ? ` ${p.title}` : ''}`}</span>
             </div>
           );
         })}
@@ -333,15 +325,15 @@ export const PlansSection: React.FC = () => {
 
       {topups.length > 0 && (
         <>
-          <div className="section-head"><h2>Не хватило на месяц</h2></div>
+          <div className="section-head"><h2>{t('land.tariffs.topup')}</h2></div>
           <div className="topup-grid">
             {topups.map((p) => {
-              const text = `Здравствуйте! Хочу докупить ${credits(p.credits)} за ${usd(p.price_usd)}.${who}`;
+              const text = `${t('pay.req.topup', {credits: credits(p.credits), price: usd(p.price_usd)})}${who}`;
               return (
                 <div key={p.id} className="topup lift" {...pressable(() => setPaying({pack: p, text}))}>
                   <div>
                     <b>+{credits(p.credits)}</b>
-                    <span className="muted">{usd(cents(perCredit(p)))} за кредит{bestTopup?.id === p.id ? ' · выгоднее' : ''}</span>
+                    <span className="muted">{t('land.tariffs.perCredit', {price: usd(cents(perCredit(p)))})}{bestTopup?.id === p.id ? ` · ${t('plans.better')}` : ''}</span>
                   </div>
                   <span className="btn">{usd(p.price_usd)}</span>
                 </div>
@@ -351,25 +343,25 @@ export const PlansSection: React.FC = () => {
         </>
       )}
       <p className="hint plans-foot">
-        Докупленные кредиты сгорают вместе с подпиской.
-        {rubles || cardsOn ? ` Оплата ${[rubles && 'рублями', cardsOn && `картой (${cardCountries.join(', ')})`, usdt && 'в USDT'].filter(Boolean).join(', ')} — кредиты придут сами.`
-          : usdt ? ' Оплата в USDT — кредиты придут сами; рублями — через менеджера.'
-          : ` Нажмите тариф — напишите нам в ${managerOf(offer, '')?.label ?? 'чат'}: пришлём реквизиты и подключим.`}
+        {t('plans.foot')}
+        {rubles || cardsOn ? ` ${t('plans.footPay', {how: [rubles && t('plans.byRubles'), cardsOn && t('plans.byCard', {countries: cardCountries.join(', ')}), usdt && t('plans.byUsdt')].filter(Boolean).join(', ')})}`
+          : usdt ? ` ${t('plans.footUsdt')}`
+          : ` ${t('plans.footManager', {channel: managerOf(offer, '')?.label ?? t('plans.chat')})}`}
       </p>
 
       {payments.length > 0 && (
         <div className="pay-history">
-          <div className="section-head"><h2>История оплат</h2></div>
+          <div className="section-head"><h2>{t('plans.history')}</h2></div>
           <div className="table-scroll">
             <table className="table">
-              <thead><tr><th>Дата</th><th>Что</th><th>Сумма</th><th>Статус</th></tr></thead>
+              <thead><tr><th>{t('plans.h.date')}</th><th>{t('acc.l.what')}</th><th>{t('plans.h.sum')}</th><th>{t('plans.h.status')}</th></tr></thead>
               <tbody>
                 {payments.map((p) => (
                   <tr key={p.id}>
                     <td className="nowrap">{day(p.createdAt)}</td>
-                    <td>{p.title}{p.sandbox ? ' · тест' : ''}</td>
+                    <td>{p.title}{p.sandbox ? ` · ${t('plans.test')}` : ''}</td>
                     <td className="nowrap">{paid(p)}</td>
-                    <td>{statusText(p)}</td>
+                    <td>{statusText(t, p)}</td>
                   </tr>
                 ))}
               </tbody>

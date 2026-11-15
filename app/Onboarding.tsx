@@ -16,6 +16,7 @@ import {useSession} from './auth';
 import {useConfig} from './config';
 import platformBrand from '../config/brand.json';
 import {href} from './router';
+import {useT, type Key, type T} from './i18n';
 
 type StepId = 'email' | 'company' | 'brand' | 'first';
 type Step = {id: StepId; done: boolean; skipped: boolean};
@@ -75,56 +76,58 @@ export const useOnboarding = () => {
   };
 };
 
-const TEXT: Record<StepId, {title: string; why: string; go?: string; link?: string}> = {
-  email: {title: 'Подтвердите почту', why: 'После подтверждения на счёт придут бесплатные кредиты — без них ролики и карусели не собираются.'},
-  company: {title: 'Расскажите о компании', why: 'Название, язык постов и WhatsApp или сайт — они будут на каждом вашем ролике и карусели.',
-    go: 'Заполнить профиль', link: href('settings', 'profile')},
-  brand: {title: 'Настройте бренд', why: 'Логотип, цвета и шрифты. Можно позже: без логотипа на роликах будет название компании текстом.',
-    go: 'Открыть бренд', link: href('settings', 'brand')},
-  first: {title: 'Соберите первый ролик или карусель', why: 'Вставьте ссылку на объявление Encar, che168 или Carsensor — фото, характеристики и цена подтянутся сами.',
-    go: 'Вставить ссылку', link: href('ads', 'lot')},
+// Тексты шагов — в словаре (app/i18n): start.<шаг>.title / .why / .go
+const LINK: Partial<Record<StepId, string>> = {
+  company: href('settings', 'profile'),
+  brand: href('settings', 'brand'),
+  first: href('ads', 'lot'),
 };
+const text = (t: T, id: StepId) => ({
+  title: t(`start.${id}.title` as Key), why: t(`start.${id}.why` as Key),
+  go: id === 'email' ? undefined : t(`start.${id}.go` as Key), link: LINK[id],
+});
 
 /** Страница «Первые шаги» (#/start) — сюда ведёт регистрация */
 export const StartPage: React.FC = () => {
   const o = useOnboarding();
   const {balance} = useSession();
+  const tr = useT();
   const emailDone = o.steps[0].done;
   return (
     <div className="page start">
-      <h1 className="page-title">Первые шаги</h1>
-      <p className="muted start-lead">Четыре шага — и у вас первый ролик. «О компании» и «Бренд» можно пропустить и вернуться к ним позже.</p>
-      <div className="start-progress" aria-label={`Готово ${o.passed} из ${o.total}`}>
+      <h1 className="page-title">{tr('start.h1')}</h1>
+      <p className="muted start-lead">{tr('start.lead')}</p>
+      <div className="start-progress" aria-label={tr('start.done', {a: o.passed, b: o.total})}>
         <div className="start-bar"><div style={{width: `${(o.passed / o.total) * 100}%`}} /></div>
-        <span>Готово {o.passed} из {o.total}</span>
+        <span>{tr('start.done', {a: o.passed, b: o.total})}</span>
       </div>
       <ol className="start-steps">
         {o.steps.map((s, i) => {
-          const t = TEXT[s.id];
+          const t = text(tr, s.id);
           // Первый ролик тратит кредиты — до подтверждения почты их нет, шаг приглушён
           const locked = s.id === 'first' && !emailDone;
           return (
             <li key={s.id} className={`start-step${s.done ? ' done' : ''}${s.skipped ? ' skipped' : ''}${locked ? ' locked' : ''}`}>
               <span className="start-mark">{s.done ? <Check size={18} /> : i + 1}</span>
               <div className="start-body">
-                <h3>{t.title}{s.skipped && <span className="muted"> · пропущено</span>}</h3>
+                <h3>{t.title}{s.skipped && <span className="muted"> · {tr('start.skipped')}</span>}</h3>
                 {s.id === 'email' && !s.done ? <VerifyEmailCard /> : (
                   <>
                     <p className="muted">
                       {s.id === 'email'
-                        ? <>Почта подтверждена{balance ? <> — на счёте <b className="start-ok">{balance.credits} кр.</b></> : null}</>
-                        : locked ? 'Откроется после подтверждения почты: сборка тратит кредиты.' : t.why}
+                        ? <>{tr('start.emailDone')}{balance ? <>{tr('start.onAccount')}<b className="start-ok">{tr.n('unit.creditShort', balance.credits)}</b></> : null}</>
+                        : locked ? tr('start.locked') : t.why}
                     </p>
                     {/* Пройденный шаг можно поправить: профиль и бренд меняются когда угодно */}
                     {s.done && t.link && s.id !== 'first' && (
-                      <a className="link start-edit" href={t.link}>Изменить</a>
+                      <a className="link start-edit" href={t.link}>{tr('start.edit')}</a>
                     )}
                     {!s.done && t.link && (
                       <div className="btn-row">
                         <a className={`btn ${s.id === o.steps.find((x) => !x.done && !x.skipped)?.id ? 'primary' : ''}`}
                           href={t.link} aria-disabled={locked}>{t.go} <ChevronRight size={16} aria-hidden /></a>
                         {(s.id === 'company' || s.id === 'brand') && !s.skipped && (
-                          <button className="btn ghost" onClick={() => o.skip(s.id)}>Пропустить</button>
+                          <button className="btn ghost" onClick={() => o.skip(s.id)}>{tr('start.skip')}</button>
                         )}
                       </div>
                     )}
@@ -137,11 +140,11 @@ export const StartPage: React.FC = () => {
       </ol>
       {o.allDone ? (
         <div className="start-finish">
-          <b>Всё готово.</b> Дальше — ролики и карусели по любым объявлениям.
-          <a className="btn primary" href={href()} onClick={o.hide}>К пайплайнам</a>
+          <b>{tr('start.finish.a')}</b> {tr('start.finish.b')}
+          <a className="btn primary" href={href()} onClick={o.hide}>{tr('start.toPipelines')}</a>
         </div>
       ) : (
-        <p className="muted start-foot"><a className="link" href={href()} onClick={o.hide}>Скрыть список</a> — вернуть можно в кабинете.</p>
+        <p className="muted start-foot"><a className="link" href={href()} onClick={o.hide}>{tr('start.hide')}</a>{tr('start.hideNote')}</p>
       )}
     </div>
   );
@@ -150,22 +153,22 @@ export const StartPage: React.FC = () => {
 /** Карточка на главной: прогресс и следующий шаг, пока список не пройден и не скрыт */
 export const StartCard: React.FC = () => {
   const o = useOnboarding();
+  const tr = useT();
   if (!o.relevant || o.hidden || o.allDone) return null;
   const next = o.steps.find((s) => !s.done && !s.skipped);
   return (
     <a className="card start-card" href={href('start')}>
       <div>
-        <b>Первые шаги · {o.passed} из {o.total}</b>
-        <span className="muted">Дальше: {next ? TEXT[next.id].title.toLowerCase() : 'всё готово'}</span>
+        <b>{tr('start.h1')} · {tr('start.of', {a: o.passed, b: o.total})}</b>
+        <span className="muted">{tr('start.next', {step: next ? text(tr, next.id).title.toLocaleLowerCase(tr.lang) : tr('start.allDone')})}</span>
       </div>
       <div className="start-bar"><div style={{width: `${(o.passed / o.total) * 100}%`}} /></div>
-      <span className="btn primary">Продолжить <ChevronRight size={16} aria-hidden /></span>
+      <span className="btn primary">{tr('start.continue')} <ChevronRight size={16} aria-hidden /></span>
     </a>
   );
 };
 
-// Подписи плиток в кабинете — короче, чем заголовки страницы: плитка узкая
-const SHORT: Record<StepId, string> = {email: 'Почта', company: 'О компании', brand: 'Бренд', first: 'Первый ролик'};
+// Подписи плиток в кабинете — короче, чем заголовки страницы (start.<шаг>.short): плитка узкая
 
 /**
  * «Настройка кабинета» вверху «Моего кабинета» (владелец 12.10: первые шаги — и в кабинете).
@@ -175,29 +178,30 @@ const SHORT: Record<StepId, string> = {email: 'Почта', company: 'О ком�
  */
 export const SetupCard: React.FC = () => {
   const o = useOnboarding();
+  const tr = useT();
   if (!o.relevant || o.allDone) return null;
   const next = o.steps.find((s) => !s.done && !s.skipped);
   return (
     <section className="setup">
       <div className="setup-head">
-        <h2>Настройка кабинета</h2>
-        <span className="muted">{o.passed} из {o.total}</span>
+        <h2>{tr('start.setup')}</h2>
+        <span className="muted">{tr('start.of', {a: o.passed, b: o.total})}</span>
       </div>
       <div className="start-bar"><div style={{width: `${(o.passed / o.total) * 100}%`}} /></div>
       <ol className="setup-steps">
         {o.steps.map((s, i) => {
-          const t = TEXT[s.id];
+          const t = text(tr, s.id);
           // Почта вводится крупными клетками на «Первых шагах» — туда и ведём. Плитка нажимается
           // целиком: в ней одно действие, и узкая ссылка внутри была бы мелкой целью на телефоне.
           // Сделанные почта и первый ролик никуда не ведут — плитка не двигается при наведении
           const link = s.id === 'email' ? href('start') : t.link;
           const clickable = !!link && !(s.done && (s.id === 'email' || s.id === 'first'));
-          const action = s.done ? (clickable ? 'готово · изменить' : 'готово')
-            : s.id === 'email' ? 'Ввести код' : s.skipped ? 'Пропущено — вернуться' : t.go;
+          const action = s.done ? tr(clickable ? 'start.tile.doneEdit' : 'start.tile.done')
+            : s.id === 'email' ? tr('auth.enterCode') : s.skipped ? tr('start.tile.skipped') : t.go;
           const body = (
             <>
               <span className="start-mark">{s.done ? <Check size={16} /> : i + 1}</span>
-              <div><b>{SHORT[s.id]}</b><span className="muted">{action}</span></div>
+              <div><b>{tr(`start.${s.id}.short` as Key)}</b><span className="muted">{action}</span></div>
             </>
           );
           const cls = `setup-step${s.done ? ' done' : ''}${s.id === next?.id ? ' next' : ''}${clickable ? ' lift' : ''}`;
@@ -216,6 +220,7 @@ export const SetupCard: React.FC = () => {
 const RESEND_PAUSE = 30;
 const VerifyEmailCard: React.FC = () => {
   const {email, refresh, enabled} = useSession();
+  const tr = useT();
   const [digits, setDigits] = useState<string[]>(Array(6).fill(''));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -251,16 +256,16 @@ const VerifyEmailCard: React.FC = () => {
   };
   const resend = async () => {
     setError(''); setNote('');
-    try { await api.resendVerify(); setNote('Отправили новый код.'); setWait(RESEND_PAUSE); } catch (e) { setError(errorText(e)); }
+    try { await api.resendVerify(); setNote(tr('verify.resent')); setWait(RESEND_PAUSE); } catch (e) { setError(errorText(e)); }
   };
 
   return (
     <div className="verify-card">
-      <p className="verify-to"><Mail size={18} aria-hidden /> Код отправлен на <b>{email ?? 'вашу почту'}</b></p>
+      <p className="verify-to"><Mail size={18} aria-hidden /> {tr('verify.sentTo')}<b>{email ?? tr('verify.yourEmail')}</b></p>
       <div className="otp" onPaste={(e) => { e.preventDefault(); put(0, e.clipboardData.getData('text')); }}>
         {digits.map((d, i) => (
           <input key={i} ref={(el) => { cells.current[i] = el; }} value={d} disabled={busy} inputMode="numeric"
-            autoComplete={i === 0 ? 'one-time-code' : 'off'} maxLength={6} aria-label={`Цифра ${i + 1} из 6`}
+            autoComplete={i === 0 ? 'one-time-code' : 'off'} maxLength={6} aria-label={tr('verify.digit', {n: i + 1})}
             onChange={(e) => put(i, e.target.value)}
             onKeyDown={(e) => {
               if (e.key === 'Backspace' && !digits[i] && i > 0) {
@@ -269,15 +274,14 @@ const VerifyEmailCard: React.FC = () => {
             }} />
         ))}
       </div>
-      {busy && <p className="muted">Проверяю…</p>}
+      {busy && <p className="muted">{tr('verify.checking')}</p>}
       {error && <p className="auth-error">{error}</p>}
       {note && <p className="auth-ok">{note}</p>}
       <p className="muted verify-hint">
-        Код — прямо в теме письма «Код подтверждения KOK». Можно и просто нажать ссылку в письме.
-        Нет письма — загляните в «Спам» и «Промоакции».
+        {tr('verify.hint')}
       </p>
       <button className="btn ghost" onClick={resend} disabled={!enabled || wait > 0}>
-        {wait > 0 ? `Отправить ещё раз через ${wait} с` : 'Отправить ещё раз'}
+        {wait > 0 ? tr('verify.resendIn', {n: wait}) : tr('verify.resend')}
       </button>
     </div>
   );

@@ -14,6 +14,7 @@ import {Logo, LogoImgContext, ThemeProvider} from '../src/shared/ui';
 import {Field} from './LotForm';
 import {useConfig} from './config';
 import {DesignField} from './DesignField';
+import {LangSwitch, useT, type Key} from './i18n';
 
 
 // Только цветовые поля темы: в ней теперь есть ещё имя, шрифты и файлы бренда,
@@ -22,10 +23,8 @@ type ColorKey = {[K in keyof Theme]-?: Theme[K] extends string ? K : never}[keyo
 
 // Ключи в теме исторические (copper — со времён брендбука AXIS), а в интерфейсе — «акцент»:
 // у клиента он бывает синим или зелёным
-const COLOR_FIELDS: [ColorKey, string][] = [
-  ['bg', 'Фон'], ['panel', 'Плашки'], ['line', 'Линии, пунктир'], ['grey', 'Второстепенный текст'],
-  ['white', 'Основной текст'], ['copper', 'Акцент'], ['copperLight', 'Акцент светлый'], ['copperDark', 'Акцент тёмный'],
-];
+// Подпись — ключ словаря color.<поле> (app/i18n)
+const COLOR_FIELDS: ColorKey[] = ['bg', 'panel', 'line', 'grey', 'white', 'copper', 'copperLight', 'copperDark'];
 
 /**
  * Палитра: восемь цветов темы разом. Человек выбирает настроение, а не восемь цветов по
@@ -35,6 +34,7 @@ const COLOR_FIELDS: [ColorKey, string][] = [
  */
 export const PaletteField: React.FC<{theme: Theme; palettes: Palette[]; onChange: (t: Theme) => void}> = ({theme, palettes, onChange}) => {
   const current = matchPalette(theme, palettes);
+  const t = useT();
   return (
     <>
       <div className="pairs">
@@ -44,19 +44,19 @@ export const PaletteField: React.FC<{theme: Theme; palettes: Palette[]; onChange
             <button key={p.id} type="button" className={`pair palette${p.id === current?.id ? ' on' : ''}`}
               style={{background: c.bg, color: c.white, borderColor: p.id === current?.id ? c.copper : c.line}}
               onClick={() => onChange({...theme, ...c} as Theme)}>
-              <span className="pair-head">{p.title}</span>
+              <span className="pair-head">{t.cfg(p.title)}</span>
               <span className="palette-demo">
                 <span className="palette-price" style={{backgroundImage: `linear-gradient(115deg, ${c.copperDark}, ${c.copper} 35%, ${c.copperLight} 55%, ${c.copper} 80%, ${c.copperDark})`, color: c.bg}}>$10 349</span>
                 <span className="palette-chip" style={{background: c.panel, border: `1px solid ${c.line}`}}>
-                  <b style={{color: c.copper}}>7</b> <span style={{color: c.grey}}>владельцев</span>
+                  <b style={{color: c.copper}}>7</b> <span style={{color: c.grey}}>{t('color.owners')}</span>
                 </span>
               </span>
-              <span className="pair-note" style={{color: c.grey, opacity: 1}}>{p.note}</span>
+              <span className="pair-note" style={{color: c.grey, opacity: 1}}>{t.cfg(p.note)}</span>
             </button>
           );
         })}
       </div>
-      {!current && <p className="hint">Сейчас стоят свои цвета — ни одна палитра с ними не совпадает.</p>}
+      {!current && <p className="hint">{t('color.custom')}</p>}
     </>
   );
 };
@@ -67,21 +67,22 @@ export const PaletteField: React.FC<{theme: Theme; palettes: Palette[]; onChange
  */
 export const FineColors: React.FC<{theme: Theme; custom: boolean; onChange: (t: Theme) => void}> = ({theme, custom, onChange}) => {
   const issues = contrastIssues(theme);
+  const t = useT();
   return (
     <details className="fine" open={custom && issues.length > 0}>
-      <summary>Тонкая настройка цветов{issues.length > 0 && <span className="fine-warn"> · {issues.length} {issues.length === 1 ? 'проблема' : 'проблемы'} с читаемостью</span>}</summary>
-      <p className="note">Цвета по одному — на свой страх: палитры выше уже проверены на читаемость.</p>
-      {COLOR_FIELDS.map(([key, label]) => (
+      <summary>{t('color.fine')}{issues.length > 0 && <span className="fine-warn"> · {t.n('color.issues', issues.length)}</span>}</summary>
+      <p className="note">{t('color.fineNote')}</p>
+      {COLOR_FIELDS.map((key) => (
         <div className="color" key={key}>
           <input type="color" value={theme[key]} onChange={(e) => onChange({...theme, [key]: e.target.value.toUpperCase()})} />
           <input value={theme[key]} maxLength={7} onChange={(e) => onChange({...theme, [key]: e.target.value})} />
-          <span>{label}</span>
+          <span>{t(`color.${key}` as Key)}</span>
         </div>
       ))}
       {issues.length > 0 && (
         <ul className="warnings">
           {issues.map((i) => (
-            <li key={i.what}>плохо читается {i.what}{i.ratio ? `: контраст ${i.ratio.toFixed(1)} при нужных ${i.min}` : ': цвет не дописан'}</li>
+            <li key={i.what}>{t('color.poor', {what: t.cfg(i.what)})}{i.ratio ? `: ${t('color.ratio', {ratio: i.ratio.toFixed(1), min: i.min})}` : `: ${t('color.unfinished')}`}</li>
           ))}
         </ul>
       )}
@@ -99,6 +100,7 @@ const LogoField: React.FC<{theme: Theme; onSaved: (t: Theme) => void; onError: (
   ({theme, onSaved, onError}) => {
     // Без логотипа ролик пишет название компании из профиля, а не name из бренда — его и показываем
     const company = useConfig().profile.company?.trim();
+    const t = useT();
     const [busy, setBusy] = useState(false);
     const [notes, setNotes] = useState<string[]>([]);
     const [warnings, setWarnings] = useState<string[]>([]);
@@ -126,7 +128,7 @@ const LogoField: React.FC<{theme: Theme; onSaved: (t: Theme) => void; onError: (
       setNotes([]); setWarnings([]);
       return run(async () => {
         const res = await api.uploadLogo(file);
-        setNotes([`${res.width}×${res.height}, ${Math.round(res.bytes / 1024)} КБ`, ...res.notes]);
+        setNotes([`${res.width}×${res.height}, ${t('common.kb', {n: Math.round(res.bytes / 1024)})}`, ...res.notes]);
         setWarnings(res.warnings);
         setHasRaw(res.hasRaw);
         return res;
@@ -138,31 +140,31 @@ const LogoField: React.FC<{theme: Theme; onSaved: (t: Theme) => void; onError: (
     const shown = logo.startsWith('http') || logo.startsWith('/') ? logo : `/${logo}`;
     return (
       <div className="logo-field">
-        <div className="logo-shot" style={{background: theme.bg}} title="Так логотип ляжет на тёмный слайд">
+        <div className="logo-shot" style={{background: theme.bg}} title={t('logo.shotTitle')}>
           {logo
-            ? <img src={shown} alt="Логотип" />
-            : <span className="logo-text" style={{fontFamily: theme.fonts?.head, color: theme.copper}}>{company || 'Компания'}</span>}
+            ? <img src={shown} alt={t.cfg('Логотип')} />
+            : <span className="logo-text" style={{fontFamily: theme.fonts?.head, color: theme.copper}}>{company || t('auth.company')}</span>}
         </div>
         <div>
           <div className="btn-row">
             <button className="btn" disabled={busy} onClick={() => ref.current?.click()}>
-              {busy ? 'Обрабатываю…' : 'Загрузить логотип'}
+              {t(busy ? 'logo.processing' : 'logo.upload')}
             </button>
-            {isOwn && hasRaw && !isRaw && <button className="btn ghost" disabled={busy} onClick={() => variant('raw')}>Оставить фон как был</button>}
-            {isOwn && isRaw && <button className="btn ghost" disabled={busy} onClick={() => variant('clean')}>Убрать фон</button>}
-            {logo && <button className="btn ghost" disabled={busy} onClick={() => variant('none')}>Без логотипа — название текстом</button>}
+            {isOwn && hasRaw && !isRaw && <button className="btn ghost" disabled={busy} onClick={() => variant('raw')}>{t('logo.keepBg')}</button>}
+            {isOwn && isRaw && <button className="btn ghost" disabled={busy} onClick={() => variant('clean')}>{t('logo.removeBg')}</button>}
+            {logo && <button className="btn ghost" disabled={busy} onClick={() => variant('none')}>{t('logo.none')}</button>}
           </div>
           <input ref={ref} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg" hidden
             onChange={(e) => send(e.target.files?.[0])} />
-          {!logo && <p className="hint">Логотипа нет — на роликах вместо него название компании.</p>}
+          {!logo && <p className="hint">{t('logo.noLogo')}</p>}
           <ul className="rules">
-            <li><b>PNG, JPG, WebP или SVG</b>, до 10 МБ</li>
-            <li>фон <b>прозрачный или однотонный</b> — однотонный уберём сами; фото и текстуры не подойдут</li>
-            <li>от <b>300</b> точек по длинной стороне; большое уменьшим, пустые поля обрежем</li>
+            <li>{t('logo.rule1')}</li>
+            <li>{t('logo.rule2')}</li>
+            <li>{t('logo.rule3')}</li>
           </ul>
-          {notes.length > 0 && <p className="hint">Загружен: {notes.join(' · ')}</p>}
+          {notes.length > 0 && <p className="hint">{t('logo.loaded', {notes: notes.join(' · ')})}</p>}
           {warnings.map((w) => <p key={w} className="auth-error">{w}</p>)}
-          <p className="hint">Ставится везде, где виден логотип: крупно на финале и полосой вверху кадра.</p>
+          <p className="hint">{t('logo.where')}</p>
         </div>
       </div>
     );
@@ -179,18 +181,17 @@ export const PlateField: React.FC<{theme: Theme; onChange: (t: Theme) => void}> 
   const set = (patch: Partial<typeof setting>) => onChange({...theme, logoPlate: {...setting, ...patch}});
   const logo = theme.assets?.logoStacked;
   const ink = logo ? theme.logoInk?.[logo] : undefined;
+  const t = useT();
   if (!logo) return null;
   const needs = !!ink && inkContrast(ink, theme.bg) < PLATE_MIN_CONTRAST;
-  const status = !ink ? 'Тон логотипа ещё не разобран — сохраните бренд или обновите страницу.'
-    : needs ? 'Логотип плохо виден на фоне роликов — «Авто» поставит подложку.'
-      : 'На фоне роликов логотип читается — «Авто» поставит подложку только там, где фон другой (светлый пресет, тёмная плашка).';
+  const status = t(!ink ? 'plate.unknown' : needs ? 'plate.needs' : 'plate.ok');
   return <div className="plate-field">
-    <div className="seg" role="radiogroup" aria-label="Когда ставить подложку">
+    <div className="seg" role="radiogroup" aria-label={t('plate.when')}>
       {PLATE_MODES.map((m) => <button key={m.id} type="button" role="radio" aria-checked={setting.mode === m.id}
-        className={setting.mode === m.id ? 'on' : ''} onClick={() => set({mode: m.id})}>{m.title}</button>)}
+        className={setting.mode === m.id ? 'on' : ''} onClick={() => set({mode: m.id})}>{t.cfg(m.title)}</button>)}
     </div>
     <p className="hint">{status}</p>
-    {setting.mode !== 'off' && ink && <div className="plate-shapes" role="radiogroup" aria-label="Форма подложки">
+    {setting.mode !== 'off' && ink && <div className="plate-shapes" role="radiogroup" aria-label={t('plate.shape')}>
       {PLATE_SHAPES.map((sh) => <button key={sh.id} type="button" role="radio" aria-checked={setting.shape === sh.id}
         className={`plate-shape${setting.shape === sh.id ? ' on' : ''}`} onClick={() => set({shape: sh.id})}>
         <span className="plate-shape-frame" style={{background: theme.bg}}>
@@ -200,7 +201,7 @@ export const PlateField: React.FC<{theme: Theme; onChange: (t: Theme) => void}> 
             </ThemeProvider>
           </LogoImgContext.Provider>
         </span>
-        <span>{sh.title}</span>
+        <span>{t.cfg(sh.title)}</span>
       </button>)}
     </div>}
   </div>;
@@ -234,6 +235,7 @@ const useFontSheets = (pairs: FontPair[]) => {
  */
 export const FontField: React.FC<{theme: Theme; pairs: FontPair[]; onChange: (t: Theme) => void}> = ({theme, pairs, onChange}) => {
   useFontSheets(pairs);
+  const t = useT();
   // Выбранную пару узнаём по самим шрифтам, а не по отдельному полю id: лишнее поле
   // разошлось бы с fonts, стоит один раз поправить brand.json руками
   const current = pairs.find((p) => p.head === theme.fonts?.head && p.body === theme.fonts?.body);
@@ -249,13 +251,13 @@ export const FontField: React.FC<{theme: Theme; pairs: FontPair[]; onChange: (t:
           >
             <span className="pair-head" style={{fontFamily: p.head}}>Hyundai Equus</span>
             <span className="pair-body" style={{fontFamily: p.body}}>2015 · Бензин · Автомат · 239 601 км</span>
-            <span className="pair-note">{p.note}</span>
+            <span className="pair-note">{t.cfg(p.note)}</span>
           </button>
         ))}
       </div>
       {!current && (
         <p className="hint">
-          Сейчас стоит свой шрифт из <code>config/brand.json</code> — ни одна пара с ним не совпадает.
+          {t('font.custom')}
         </p>
       )}
     </>
@@ -269,34 +271,35 @@ export const FontField: React.FC<{theme: Theme; pairs: FontPair[]; onChange: (t:
  * и они разного размера — плашка, рамка, «таблетка», точка списка. Множитель сохраняет
  * их соотношение, и подбирать полтора десятка чисел никому не приходится.
  */
-const RADIUS: [number, string][] = [[0, 'Острые'], [1, 'Мягкие'], [1.8, 'Круглые']];
+const RADIUS: [number, Key][] = [[0, 'style.sharp'], [1, 'style.soft'], [1.8, 'style.round']];
 
 export const StyleField: React.FC<{theme: Theme; onChange: (t: Theme) => void}> = ({theme, onChange}) => {
   // Значения по умолчанию те же, что в вёрстке: тема могла прийти без style
   const style = {gradient: theme.style?.gradient ?? true, radius: theme.style?.radius ?? 1};
   const set = (patch: Partial<typeof style>) => onChange({...theme, style: {...style, ...patch}});
+  const t = useT();
   return (
     <>
       <div className="switch-row">
-        <span className="switch-label">Акцент</span>
+        <span className="switch-label">{t('color.copper')}</span>
         <div className="btn-row">
           <button type="button" className={`btn ${style.gradient ? 'primary' : 'ghost'}`}
-            onClick={() => set({gradient: true})}>Градиентом</button>
+            onClick={() => set({gradient: true})}>{t('style.gradient')}</button>
           <button type="button" className={`btn ${style.gradient ? 'ghost' : 'primary'}`}
-            onClick={() => set({gradient: false})}>Плоским цветом</button>
+            onClick={() => set({gradient: false})}>{t('style.flat')}</button>
         </div>
       </div>
       <div className="switch-row">
-        <span className="switch-label">Углы</span>
+        <span className="switch-label">{t('style.corners')}</span>
         <div className="btn-row">
           {RADIUS.map(([value, label]) => (
             <button key={label} type="button"
               className={`btn ${style.radius === value ? 'primary' : 'ghost'}`}
-              onClick={() => set({radius: value})}>{label}</button>
+              onClick={() => set({radius: value})}>{t(label)}</button>
           ))}
         </div>
       </div>
-      <p className="hint">Углы задаются множителем: он меняет плашки, рамки, «таблетки» и точки списка разом, сохраняя их соотношение.</p>
+      <p className="hint">{t('style.cornersHint')}</p>
     </>
   );
 };
@@ -308,6 +311,7 @@ type BrandProps = {
 
 export const BrandForm: React.FC<BrandProps> = ({theme, saved, pairs, palettes, onChange, onSaved, onError}) => {
   const [busy, setBusy] = useState(false);
+  const t = useT();
   const dirty = theme !== saved;
   const persist = async () => {
     setBusy(true);
@@ -315,30 +319,27 @@ export const BrandForm: React.FC<BrandProps> = ({theme, saved, pairs, palettes, 
   };
   return (
     <div className="form">
-      <h2>Логотип</h2>
+      <h2>{t.cfg('Логотип')}</h2>
       <LogoField theme={theme} onSaved={onSaved} onError={onError} />
-      <h2>Подложка логотипа</h2>
+      <h2>{t('look.plate')}</h2>
       <PlateField theme={theme} onChange={onChange} />
 
       <DesignField theme={theme} onChange={onChange} />
 
-      <h2>Шрифты</h2>
-      <p className="note">
-        Пары со стороны грузятся по сети при рендере. Не догрузился — кадр рисуется системным
-        шрифтом, а не ждёт: первая пара встроена в проект и работает всегда.
-      </p>
+      <h2>{t('font.title')}</h2>
+      <p className="note">{t('font.note')}</p>
       <FontField theme={theme} pairs={pairs} onChange={onChange} />
 
-      <h2>Оформление</h2>
+      <h2>{t('look.style')}</h2>
       <StyleField theme={theme} onChange={onChange} />
 
-      <h2>Палитра</h2>
-      <p className="note">Цвета всех роликов и слайдов. Каждая палитра проверена: текст и цена читаются на телефоне.</p>
+      <h2>{t('land.demo.palette')}</h2>
+      <p className="note">{t('color.paletteNote')}</p>
       <PaletteField theme={theme} palettes={palettes} onChange={onChange} />
       <FineColors theme={theme} custom={!matchPalette(theme, palettes)} onChange={onChange} />
       <div className="actions">
-        <button className="btn primary" disabled={!dirty || busy} onClick={persist}>Сохранить</button>
-        <button className="btn" disabled={!dirty || busy} onClick={() => onChange(saved)}>Отменить правки</button>
+        <button className="btn primary" disabled={!dirty || busy} onClick={persist}>{t('common.save')}</button>
+        <button className="btn" disabled={!dirty || busy} onClick={() => onChange(saved)}>{t('set.revert')}</button>
       </div>
     </div>
   );
@@ -365,6 +366,7 @@ const EXPORT_DEFAULTS = {origin: '', originCountry: '', port: '', portCountry: '
  */
 export const ProfileForm: React.FC<ProfileProps> = ({profile, saved, onChange, onSaved, onError}) => {
   const [busy, setBusy] = useState(false);
+  const t = useT();
   const dirty = profile !== saved;
   const set = (patch: Partial<Profile>) => onChange({...profile, ...patch});
   const setPricing = (patch: Partial<Profile['pricing']>) => set({pricing: {...profile.pricing, ...patch}});
@@ -381,89 +383,84 @@ export const ProfileForm: React.FC<ProfileProps> = ({profile, saved, onChange, o
 
   return (
     <div className="form">
-      <h2>Профиль <span className="muted">кто вы и как продаёте</span></h2>
-      <p className="note">Тексты постов подставляются сами под язык и модель цены; свои надписи роликов — в разделе «Реклама авто». Дизайн — в разделе «Бренд».</p>
+      <h2>{t('prof.title')} <span className="muted">{t('pf.sub')}</span></h2>
+      <p className="note">{t('pf.note')}</p>
 
       <div className="row">
-        <Field label="Компания" hint="печатается на постах"><input value={profile.company} onChange={(e) => set({company: e.target.value})} /></Field>
-        <Field label="Язык постов" hint="реклама и карусели">
-          <select value={profile.language} onChange={(e) => set({language: e.target.value})}>
-            {POST_LANGUAGES.map((l) => <option key={l.code} value={l.code}>{l.name}</option>)}
-            {/* Старый профиль мог остаться на языке, которого в списке больше нет: показываем
-                его как есть, иначе поле молча отображало бы первый пункт, а сохранялось другое */}
-            {!POST_LANGUAGES.some((l) => l.code === profile.language) && (
-              <option value={profile.language}>{profile.language} — больше не поддерживается, выберите другой</option>
-            )}
-          </select>
+        <Field label={t('auth.company')} hint={t('pf.companyHint')}><input value={profile.company} onChange={(e) => set({company: e.target.value})} /></Field>
+        {/* Язык — тот же переключатель, что в шапке (15.11): интерфейс, посты и письма на одном языке.
+            Пишется сразу, без «Сохранить» (app/config.tsx) — как и в шапке */}
+        <Field label={t('pf.lang')} hint={t('pf.langHint')}>
+          <LangSwitch className="pf-lang" />
         </Field>
       </div>
 
-      <h2>Модель цены</h2>
+      <h2>{t('pf.pricing')}</h2>
       <div className="switch-row">
-        <span className="switch-label">Режим</span>
+        <span className="switch-label">{t('pf.mode')}</span>
         <div className="btn-row">
           <button type="button" className={`btn ${isExport ? 'primary' : 'ghost'}`}
-            onClick={() => setPricing({mode: 'export', export: {...EXPORT_DEFAULTS, ...profile.pricing.export}})}>Экспорт</button>
+            onClick={() => setPricing({mode: 'export', export: {...EXPORT_DEFAULTS, ...profile.pricing.export}})}>{t('pf.export')}</button>
           <button type="button" className={`btn ${isExport ? 'ghost' : 'primary'}`}
-            onClick={() => setPricing({mode: 'domestic'})}>Внутренний рынок</button>
+            onClick={() => setPricing({mode: 'domestic'})}>{t('pf.domestic')}</button>
         </div>
       </div>
       <p className="hint">
         {isExport
-          ? 'Экспорт: цена = авто + фрахт, на постах маршрут и «цена до порта».'
-          : 'Внутренний рынок: цена как есть, без порта и фрахта.'}
+          ? t('pf.exportHint')
+          : t('pf.domesticHint')}
       </p>
 
       <div className="row">
         {/* Список со значками, а не свободное поле: вписанное слово («РУБЛЬ») печаталось в
             ролике как есть и не склонялось. Старое значение узнаём (currencyCode) */}
-        <Field label="Валюта" hint={isKnownCurrency(profile.pricing.currency) ? `в ролике: 10 000 ${currencySign(profile.pricing.currency)}` : undefined}>
+        <Field label={t('pf.currency')} hint={isKnownCurrency(profile.pricing.currency) ? t('pf.currencyHint', {v: `10 000 ${currencySign(profile.pricing.currency)}`}) : undefined}>
           <select value={currencyCode(profile.pricing.currency)} onChange={(e) => setPricing({currency: e.target.value})}>
-            {CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.sign} — {c.name}</option>)}
+            {CURRENCIES.map((c) => <option key={c.code} value={c.code}>{c.sign} — {t.cfg(c.name)}</option>)}
             {!isKnownCurrency(profile.pricing.currency) && (
-              <option value={currencyCode(profile.pricing.currency)}>{profile.pricing.currency} — нет в списке, выберите другую</option>
+              <option value={currencyCode(profile.pricing.currency)}>{profile.pricing.currency} — {t('pf.currencyGone')}</option>
             )}
           </select>
         </Field>
-        {isExport && <Field label="Фрахт, $"><input inputMode="decimal" value={profile.pricing.export?.freight ?? 0}
+        {isExport && <Field label={t('price.freight')}><input inputMode="decimal" value={profile.pricing.export?.freight ?? 0}
           onChange={(e) => setExport({freight: Number(e.target.value) || 0})} /></Field>}
       </div>
       {isExport && (
         <>
           <div className="row">
-            <Field label="Откуда"><input value={profile.pricing.export?.origin ?? ''} onChange={(e) => setExport({origin: e.target.value})} /></Field>
-            <Field label="Страна отправки"><input value={profile.pricing.export?.originCountry ?? ''} onChange={(e) => setExport({originCountry: e.target.value})} /></Field>
+            <Field label={t('pf.from')}><input value={profile.pricing.export?.origin ?? ''} onChange={(e) => setExport({origin: e.target.value})} /></Field>
+            <Field label={t('pf.fromCountry')}><input value={profile.pricing.export?.originCountry ?? ''} onChange={(e) => setExport({originCountry: e.target.value})} /></Field>
           </div>
           <div className="row">
-            <Field label="Порт назначения"><input value={profile.pricing.export?.port ?? ''} onChange={(e) => setExport({port: e.target.value})} /></Field>
-            <Field label="Страна порта"><input value={profile.pricing.export?.portCountry ?? ''} onChange={(e) => setExport({portCountry: e.target.value})} /></Field>
+            <Field label={t('pf.port')}><input value={profile.pricing.export?.port ?? ''} onChange={(e) => setExport({port: e.target.value})} /></Field>
+            <Field label={t('pf.portCountry')}><input value={profile.pricing.export?.portCountry ?? ''} onChange={(e) => setExport({portCountry: e.target.value})} /></Field>
           </div>
         </>
       )}
 
-      <h2>Контакты</h2>
+      <h2>{t.cfg('Контакты')}</h2>
       <div className="row">
-        <Field label="WhatsApp" hint="пусто — не показывать">
+        <Field label="WhatsApp" hint={t('pf.waHint')}>
           <input value={profile.contacts.whatsapp ?? ''} onChange={(e) => setContacts({whatsapp: e.target.value || null})} />
         </Field>
-        <Field label="Сайт"><input value={profile.contacts.site} onChange={(e) => setContacts({site: e.target.value})} /></Field>
+        <Field label={t('pf.site')}><input value={profile.contacts.site} onChange={(e) => setContacts({site: e.target.value})} /></Field>
       </div>
       <div className="row">
-        <Field label="Telegram" hint="@имя или ссылка t.me/…">
+        <Field label="Telegram" hint={t('pf.tgHint')}>
           <input value={profile.contacts.telegram ?? ''} onChange={(e) => setContacts({telegram: e.target.value})} />
         </Field>
-        <Field label="Кнопка на финале карусели" hint="если у выбранного нет контакта — возьмём другой">
+        <Field label={t('pf.button')} hint={t('pf.buttonHint')}>
           <select value={profile.contacts.primary ?? 'whatsapp'}
             onChange={(e) => setContacts({primary: e.target.value as 'whatsapp' | 'telegram'})}>
-            <option value="whatsapp">Написать в WhatsApp</option>
-            <option value="telegram">Написать в Telegram</option>
+            <option value="whatsapp">{t('pay.mgr.write', {channel: 'WhatsApp'})}</option>
+            <option value="telegram">{t('pay.mgr.write', {channel: 'Telegram'})}</option>
           </select>
         </Field>
       </div>
 
       <div className="actions">
-        <button className="btn primary" disabled={!dirty || busy} onClick={persist}>Сохранить</button>
-        <button className="btn" disabled={!dirty || busy || !saved} onClick={() => saved && onChange(saved)}>Отменить правки</button>
+        <button className="btn primary" disabled={!dirty || busy} onClick={persist}>{t('common.save')}</button>
+        <button className="btn" disabled={!dirty || busy || !saved} onClick={() => saved && onChange(saved)}>{t('set.revert')}</button>
       </div>
     </div>
   );
@@ -480,6 +477,7 @@ const AD_TEXT_FIELDS = new Map(FORMATS.flatMap((f) => f.texts).map((t) => [t.key
  * Названия сцен у форматов разные: третья — «Стопка» в «Галерее», «Характеристики» в «Авто
  * с ценой», «История» в «Цене сразу»; в «Цене сразу» цена — первая сцена, а не четвёртая.
  * Новый текст в formats.json без места здесь не пропадёт — он попадёт в «Прочее».
+ * Строки здесь — русские; на экран идут через t.cfg (переводы — app/i18n/names.ts)
  */
 type Locked = {what: string; where: string};
 const AD_SCENES: {id: string; title: string; also?: string; keys: string[]; hints?: Record<string, string>; locked: Locked[]}[] = [
@@ -508,6 +506,7 @@ const UNPLACED = [...AD_TEXT_FIELDS.keys()].filter((k) => !PLACED.has(k));
  */
 const IconField: React.FC<{theme: Theme; onSaved: (t: Theme) => void; onError: (e: unknown) => void}> = ({theme, onSaved, onError}) => {
   const [busy, setBusy] = useState(false);
+  const t = useT();
   const [notes, setNotes] = useState<string[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
   const ref = useRef<HTMLInputElement>(null);
@@ -532,7 +531,7 @@ const IconField: React.FC<{theme: Theme; onSaved: (t: Theme) => void; onError: (
     setNotes([]); setWarnings([]);
     return run(async () => {
       const res = await api.uploadIcon(file);
-      setNotes([`${res.width}×${res.height}, ${Math.round(res.bytes / 1024)} КБ`, ...res.notes]);
+      setNotes([`${res.width}×${res.height}, ${t('common.kb', {n: Math.round(res.bytes / 1024)})}`, ...res.notes]);
       setWarnings(res.warnings);
       setHasRaw(res.hasRaw);
       return res;
@@ -543,19 +542,19 @@ const IconField: React.FC<{theme: Theme; onSaved: (t: Theme) => void; onError: (
 
   return (
     <div className="icon-field">
-      <div className="icon-shot" style={{background: theme.bg}} title="Так иконка ляжет на слайд">
-        <img src={shown} alt="Иконка преимущества" />
+      <div className="icon-shot" style={{background: theme.bg}} title={t('icon.shotTitle')}>
+        <img src={shown} alt={t('icon.alt')} />
       </div>
       <div>
         <div className="btn-row">
-          <button className="btn" disabled={busy} onClick={() => ref.current?.click()}>{busy ? 'Обрабатываю…' : 'Загрузить свою иконку'}</button>
-          {isOwn && hasRaw && !isRaw && <button className="btn ghost" disabled={busy} onClick={() => variant('raw')}>Оставить фон как был</button>}
-          {isOwn && isRaw && <button className="btn ghost" disabled={busy} onClick={() => variant('clean')}>Убрать фон</button>}
-          {isOwn && <button className="btn ghost" disabled={busy} onClick={() => variant('default')}>Вернуть стандартную</button>}
+          <button className="btn" disabled={busy} onClick={() => ref.current?.click()}>{t(busy ? 'logo.processing' : 'icon.upload')}</button>
+          {isOwn && hasRaw && !isRaw && <button className="btn ghost" disabled={busy} onClick={() => variant('raw')}>{t('logo.keepBg')}</button>}
+          {isOwn && isRaw && <button className="btn ghost" disabled={busy} onClick={() => variant('clean')}>{t('logo.removeBg')}</button>}
+          {isOwn && <button className="btn ghost" disabled={busy} onClick={() => variant('default')}>{t('icon.default')}</button>}
         </div>
         <input ref={ref} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml,.svg" hidden onChange={(e) => send(e.target.files?.[0])} />
-        <p className="hint">PNG, JPG, WebP или SVG до 5 МБ, от 96 точек; фон прозрачный или однотонный — однотонный уберём сами, поля обрежем. Сохраняется сразу, общая для всех языков.</p>
-        {notes.length > 0 && <p className="hint">Загружена: {notes.join(' · ')}</p>}
+        <p className="hint">{t('icon.rules')}</p>
+        {notes.length > 0 && <p className="hint">{t('logo.loaded', {notes: notes.join(' · ')})}</p>}
         {warnings.map((w) => <p key={w} className="auth-error">{w}</p>)}
       </div>
     </div>
@@ -580,6 +579,7 @@ type AdTextsProps = ProfileProps & {
  */
 export const AdTextsForm: React.FC<AdTextsProps> = ({profile, saved, copy, theme, onBrandSaved, language, onLanguage, onChange, onSaved, onError}) => {
   const [busy, setBusy] = useState(false);
+  const t = useT();
   const dirty = profile !== saved;
   const mode = profile.pricing.mode === 'domestic' ? 'domestic' : 'export';
   const defaults = resolveTexts(copy, mode, language, {});
@@ -605,34 +605,34 @@ export const AdTextsForm: React.FC<AdTextsProps> = ({profile, saved, copy, theme
 
   return (
     <div className="form">
-      <h2>Реклама авто <span className="muted">надписи в роликах</span></h2>
+      <h2>{t.cfg('Реклама авто')} <span className="muted">{t('ad.sub')}</span></h2>
       <p className="note">
-        Пустое поле — текст по умолчанию (серым). В конкретном ролике любую надпись можно поменять ещё раз — в «Изменить вручную».
-        {mode === 'domestic' ? ' Сейчас режим «Внутренний рынок»' : ' Сейчас режим «Экспорт»'} — тексты по умолчанию под него.
+        {t('ad.note')} {t('ad.mode', {mode: t(mode === 'domestic' ? 'pf.domestic' : 'pf.export')})}
       </p>
 
       <div className="btn-row">
         {POST_LANGUAGES.map((l) => (
           <button key={l.code} type="button" className={`btn ${l.code === language ? 'primary' : 'ghost'}`} onClick={() => onLanguage(l.code)}>
-            {l.name}{ownCount(l.code) ? ` · ${ownCount(l.code)}` : ''}{l.code === profile.language ? ' (в постах)' : ''}
+            {t.cfg(l.name)}{ownCount(l.code) ? ` · ${ownCount(l.code)}` : ''}{l.code === profile.language ? ` (${t('ad.inPosts')})` : ''}
           </button>
         ))}
       </div>
       {language !== profile.language && (
-        <p className="hint">Посты сейчас на другом языке — эти тексты включатся, когда в «Профиле» выберете {POST_LANGUAGES.find((l) => l.code === language)?.name}.</p>
+        <p className="hint">{t('ad.otherLang', {lang: t.cfg(POST_LANGUAGES.find((l) => l.code === language)?.name ?? '')})}</p>
       )}
 
       {[...AD_SCENES, ...(UNPLACED.length ? [{id: 'other', title: 'Прочее', keys: UNPLACED, locked: []}] : [])].map((sc) => (
         <section key={sc.id} className="scene-group">
-          <h2>{sc.title}{'also' in sc && sc.also ? <span className="muted">{sc.also}</span> : null}</h2>
+          <h2>{t.cfg(sc.title)}{'also' in sc && sc.also ? <span className="muted">{t.cfg(sc.also)}</span> : null}</h2>
           {sc.keys.map((key) => {
-            const t = AD_TEXT_FIELDS.get(key);
-            const label = t?.label ?? key;
-            const hint = ('hints' in sc ? sc.hints?.[key] : undefined) ?? t?.hint;
+            const f = AD_TEXT_FIELDS.get(key);
+            const label = f?.label ? t.cfg(f.label) : key;
+            const raw = ('hints' in sc ? sc.hints?.[key] : undefined) ?? f?.hint;
+            const hint = raw && t.cfg(raw);
             return (
               <React.Fragment key={key}>
                 <Field label={label} hint={hint} wide>
-                  {t?.multiline
+                  {f?.multiline
                     ? <textarea rows={2} value={own[key] ?? ''} placeholder={defaults[key] ?? ''} onChange={(e) => set(key, e.target.value)} />
                     : <input value={own[key] ?? ''} placeholder={defaults[key] ?? ''} onChange={(e) => set(key, e.target.value)} />}
                 </Field>
@@ -641,7 +641,7 @@ export const AdTextsForm: React.FC<AdTextsProps> = ({profile, saved, copy, theme
                   <label className="check scene-check">
                     <input type="checkbox" checked={profile.ad?.benefitIcon !== false}
                       onChange={(e) => onChange({...profile, ad: {...profile.ad, benefitIcon: e.target.checked}})} />
-                    Показывать иконку рядом — для всех языков
+                    {t('ad.icon')}
                   </label>
                 )}
                 {key === 'ctaBenefit' && profile.ad?.benefitIcon !== false && (
@@ -651,15 +651,15 @@ export const AdTextsForm: React.FC<AdTextsProps> = ({profile, saved, copy, theme
             );
           })}
           {sc.locked.map((l) => (
-            <div key={l.what} className="locked-row"><Lock size={13} aria-hidden /> <span>{l.what}</span> <span className="muted">— {l.where}</span></div>
+            <div key={l.what} className="locked-row"><Lock size={13} aria-hidden /> <span>{t.cfg(l.what)}</span> <span className="muted">— {t.cfg(l.where)}</span></div>
           ))}
         </section>
       ))}
 
       <div className="actions">
-        <button className="btn primary" disabled={!dirty || busy} onClick={persist}>Сохранить</button>
-        <button className="btn" disabled={!dirty || busy || !saved} onClick={() => saved && onChange(saved)}>Отменить правки</button>
-        <button className="btn ghost" disabled={busy || !ownCount(language)} onClick={reset}>Вернуть тексты по умолчанию</button>
+        <button className="btn primary" disabled={!dirty || busy} onClick={persist}>{t('common.save')}</button>
+        <button className="btn" disabled={!dirty || busy || !saved} onClick={() => saved && onChange(saved)}>{t('set.revert')}</button>
+        <button className="btn ghost" disabled={busy || !ownCount(language)} onClick={reset}>{t('ad.reset')}</button>
       </div>
     </div>
   );
