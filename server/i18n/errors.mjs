@@ -106,6 +106,9 @@ const DICT = {
   'Ядро перегружено запросами — повторите чуть позже': ['Too many requests right now — try again a bit later', 'Shumë kërkesa tani — provoni pak më vonë'],
 
   // ——— Объявления, фото, ролики ———
+  // Текст поста к карусели (server/carousel.mjs, saveCarouselCaption)
+  'Слишком длинный текст поста: до {} знаков': ['The post text is too long: up to {} characters', 'Teksti i postimit është shumë i gjatë: deri në {} karaktere'],
+  'Хэштеги — до 5 штук, каждый со знаком # и без пробелов': ['Hashtags: up to 5, each starting with # and without spaces', 'Hashtag-ët: deri në 5, secili me # dhe pa hapësira'],
   'Нет такого объявления': ['No such listing', 'Nuk ka shpallje të tillë'],
   'Ролик этого объявления сейчас собирается — дождитесь или отмените сборку': ['The video for this listing is being built — wait or cancel the build', 'Videoja e kësaj shpalljeje po krijohet — prisni ose anuloni'],
   'Добавь хотя бы одно фото': ['Add at least one photo', 'Shtoni të paktën një foto'],
