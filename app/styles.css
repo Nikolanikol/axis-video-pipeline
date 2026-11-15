@@ -2199,3 +2199,24 @@ a.tab { text-decoration: none; }
 .offer-builder .btn.primary { width: 100%; padding: 11px 14px; }
 .offer-sheet-col .of-live { max-height: calc(100dvh - 240px); }
 .offer-main.phone .offer-sheet-col .of-live { max-height: none; }
+
+/* Карусель: машина по ссылке до сборки — главное фото и подсказка, цена справа (CarouselTool, 16.11) */
+.carousel-draft { display: flex; flex-direction: column; gap: 10px; align-items: center; justify-content: center; height: 100%; min-height: 0; }
+.carousel-draft img { max-width: 100%; max-height: calc(100% - 60px); object-fit: contain; border-radius: 10px; }
+.carousel-draft .hint { max-width: 460px; text-align: center; }
+
+/* Текст поста под слайдами карусели (app/carousels/PostCaption.tsx, 16.11) */
+.post-caption { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.post-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.post-head h3 { margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: .06em; }
+.post-caption textarea { width: 100%; min-height: 180px; resize: vertical; font: inherit; line-height: 1.45; }
+.post-tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.post-tag { display: inline-flex; align-items: center; gap: 4px; padding: 3px 4px 3px 10px; border-radius: 99px; background: #8e0d2c33; color: var(--accent-text); font-size: 13px; }
+.post-tag button { display: grid; place-items: center; width: 20px; height: 20px; border: none; border-radius: 50%; background: none; color: inherit; cursor: pointer; }
+.post-tag-input { width: 130px; padding: 4px 8px; }
+.post-caption .btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.post-caption .btn-row .btn { display: inline-flex; align-items: center; gap: 6px; }
+@media (max-width: 900px) { .post-caption textarea, .post-tag-input { font-size: 16px; } }
+/* Центр каруселей — высотой в экран; текст поста под слайдами прокручивается внутри колонки,
+   а не вылезает за её край (слайд остаётся прежнего размера) */
+.carousel-center { overflow-y: auto; overscroll-behavior: contain; }

@@ -2,8 +2,10 @@
 //
 // Экран — как у «Ролика по лоту» (владелец 30.09): сверху строка ссылки, слева собранные
 // карусели, по центру слайды с перелистыванием, справа формат и действия. Вставил ссылку —
-// карусель собирается сама в выбранном формате. Всё остальное — данные, слайды, брендбук —
-// решено на сервере и в композиции.
+// машина подтягивается бесплатно, справа её цена: можно вписать свою, и карусель соберётся
+// сразу с ней (владелец 16.11: «править цену до первой генерации» — раньше ссылка собирала
+// карусель сразу, и своя цена была доступна только после сборки). Всё остальное — данные,
+// слайды, брендбук — решено на сервере и в композиции.
 //
 // Отличие от ролика: превью ролика живое, и формат там меняется бесплатно, а карусель надо
 // собрать — это кредит. Поэтому клик по формату только выбирает его, пересборка — отдельной
@@ -19,11 +21,13 @@ import {Check, ChevronLeft, ChevronRight, Download, ExternalLink, Images, List, 
 import {MobileTabs, usePanelSwipes} from '../MobileTabs';
 import {toast} from '../Toast';
 import {api, CarouselEntry, CarouselFormat, errorText} from '../api';
+import type {CarouselCar} from '../../src/shared/types';
 import {useConfig} from '../config';
 import {useCost, useSession} from '../auth';
 import {carouselLang} from '../../src/carousel/i18n';
 import {TEXT_FIELDS, TEXT_MAX, accentField} from '../../src/carousel/texts';
 import {BusyModal} from '../BusyModal';
+import {PostCaption} from './PostCaption';
 import {carouselPrice} from '../../src/carousel/price';
 import {currencySign} from '../../src/shared/currencies';
 import {marketFromProfile} from '../../src/shared/profile';
@@ -35,7 +39,7 @@ import {locale, tNow, useT} from '../i18n';
 const km = (v: number | null) => (v === null ? '—' : tNow()('common.km', {n: v.toLocaleString(locale())}));
 
 /** Сводка по машине: по ней видно, ту ли карточку подтянули, не открывая слайды */
-const CarSummary: React.FC<{entry: CarouselEntry}> = ({entry}) => {
+const CarSummary: React.FC<{entry: {id: string; car: CarouselCar}}> = ({entry}) => {
   const c = entry.car;
   const t = useT();
   const n = (v: number) => v.toLocaleString(locale());
@@ -58,6 +62,37 @@ const CarSummary: React.FC<{entry: CarouselEntry}> = ({entry}) => {
       <div className="muted">{bits.join(' · ')}</div>
     </div>
   );
+};
+
+/**
+ * Цена на слайде до сборки (владелец 16.11): у новой машины — до первой сборки, у собранной —
+ * перед сборкой в другом стиле или формате. Пусто — расчёт по курсу дня; своё число уйдёт на
+ * слайд сразу, без отдельной пересборки
+ */
+const NextPrice: React.FC<{car: CarouselCar; id: string; value: string; onChange: (v: string) => void}> = ({car, id, value, onChange}) => {
+  const {config, profile} = useConfig();
+  const t = useT();
+  const market = useTodayMarket(useMemo(() => marketFromProfile(profile, config.copy) as Market, [profile, config.copy]));
+  const computed = carouselPrice(car, market, null);
+  const sign = currencySign(market.currency);
+  return (
+    <div className="carousel-price">
+      <label className="field">
+        <span className="label">{t('cprice.label')}, {sign}</span>
+        <input inputMode="decimal" value={value} placeholder={computed === null ? '' : String(computed)} onChange={(e) => onChange(e.target.value)} />
+        <span className="hint">
+          {t('cprice.emptyFrom', {site: sourceName(id)})}{market.currency === 'KRW' && car.price?.krw ? '' : ` ${t('cprice.atRate')}`}{computed === null ? '' : `: ${computed.toLocaleString(locale())} ${sign}`}; {t('cprice.beforeBuild')}
+        </span>
+      </label>
+    </div>
+  );
+};
+/** Что вписано в поле цены: undefined — ошибка ввода, null — пусто (расчёт), число — своя цена */
+const typedPrice = (v: string): number | null | undefined => {
+  const s = v.trim();
+  if (!s) return null;
+  const n = Number(s.replace(/[\s,]/g, ''));
+  return Number.isFinite(n) && n > 0 ? n : undefined;
 };
 
 /**
@@ -489,6 +524,11 @@ export const CarouselTool: React.FC = () => {
   const [pending, setPending] = useState<Set<string>>(new Set());
   const [linkError, setLinkError] = useState('');
   const [entry, setEntry] = useState<CarouselEntry | null>(null);
+  // Машина по ссылке, ещё не собранная: показана с ценой, собирается кнопкой (NextPrice)
+  const [draft, setDraft] = useState<{link: string; car: CarouselCar} | null>(null);
+  const [looking, setLooking] = useState(false);
+  // Своя цена для ближайшей сборки — новой машины или собранной в другом стиле/формате
+  const [nextPrice, setNextPrice] = useState('');
   const [history, setHistory] = useState<CarouselEntry[]>([]);
   // Какой слайд открыт во весь экран; null — нет
   const [open, setOpen] = useState<number | null>(null);
@@ -507,12 +547,15 @@ export const CarouselTool: React.FC = () => {
 
   // fmt — в каком формате собрать: по умолчанию выбранный справа; «Пересобрать» из списка
   // передаёт формат самой карусели, иначе пересборка молча меняла бы её формат
-  const run = async (link: string, seed?: number, fmt: string = format, fam: string | null = family && familyFormats(family).includes(fmt) ? family : null) => {
+  const run = async (link: string, seed?: number, fmt: string = format, fam: string | null = family && familyFormats(family).includes(fmt) ? family : null,
+    price?: number | null) => {
     setBusy(true);
     setLinkError('');
     try {
-      const made = await api.buildCarousel(link, fmt, seed, fam);
+      const made = await api.buildCarousel(link, fmt, seed, fam, price);
       setEntry(made);
+      setDraft(null);
+      setNextPrice('');
       setMtab('main');
       setHistory((h) => [made, ...h.filter((x) => x.id !== made.id)]);
     } catch (e) {
@@ -525,10 +568,25 @@ export const CarouselTool: React.FC = () => {
   // затёрла бы прежнюю: карусель у машины одна). Нет — собираем в выбранном формате
   const fromLink = (link: string) => {
     let id: string;
-    try { ({id} = parseCarouselSource(link)); } catch (e) { setLinkError(e instanceof Error ? e.message : String(e)); return; }
+    let source: string;
+    try { ({id, source} = parseCarouselSource(link)); } catch (e) { setLinkError(e instanceof Error ? e.message : String(e)); return; }
     const known = history.find((h) => h.id === id);
-    if (known) { setEntry(known); setLinkError(''); setMtab('main'); return; }
-    run(link);
+    if (known) { setEntry(known); setDraft(null); setLinkError(''); setMtab('main'); return; }
+    // Лоты аукционов (только сотрудникам) — как раньше, сразу в сборку: у них цена не главное
+    if (!['encar', 'che168', 'carsensor'].includes(source)) { run(link); return; }
+    void lookup(link);
+  };
+  // Машина по ссылке — бесплатно (тот же вход, что у лота в «Рекламе авто»): видно цену и можно
+  // вписать свою до сборки. Кредит — только по кнопке «Собрать»
+  const lookup = async (link: string) => {
+    setLooking(true);
+    setLinkError('');
+    try {
+      const car = await api.lookupCar(link);
+      setDraft({link, car});
+      setNextPrice('');
+      setMtab('main');
+    } catch (e) { setLinkError(errorText(e)); } finally { setLooking(false); }
   };
 
   // Своя цена — пересборка без кредита: та же машина, формат и вариант (server/carousel.mjs)
@@ -603,6 +661,14 @@ export const CarouselTool: React.FC = () => {
   const otherFormat = !!entry && ((entry.format ?? 'classic') !== format || (entry.family ?? null) !== family);
   const chosenFamily = FAMILIES.find((f) => f.id === family);
   const ratio = entryFormat ? `${entryFormat.width} / ${entryFormat.height}` : '9 / 16';
+  // Собранную машину собирают в другом стиле или формате — в поле её нынешняя цена, её и пошлём
+  useEffect(() => {
+    if (otherFormat && entry) setNextPrice(entry.priceOverride ? String(entry.priceOverride) : '');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [otherFormat, entry?.id]);
+  const price = typedPrice(nextPrice);
+  const famFor = (fmt: string) => (family && familyFormats(family).includes(fmt) ? family : null);
+  const draftPhoto = draft ? draft.car.photos.hero ?? draft.car.photos.exterior[0] ?? null : null;
 
   return (
     <>
@@ -614,21 +680,37 @@ export const CarouselTool: React.FC = () => {
       {/* Сборка — 10–20 секунд (замер 30.09: 13 с на 9 слайдов); экран закрыт окном, как у лота по ссылке */}
       <BusyModal step={busy ? 0 : null} steps={[t('car.busyStep')]} label={t('car.busyLabel')}
         note={t('car.busyNote')} />
+      <BusyModal step={looking ? 0 : null} steps={[t('car.lookupStep')]} label={t('car.lookupLabel')} note={t('car.lookupNote')} />
 
       <main className="quick-main">
         <CarouselsPanel items={history} current={entry?.id} formats={formats} busy={busy} cost={cost} pending={pending}
-          onOpen={(e) => { setEntry(e); setLinkError(''); setMtab('main'); }}
+          onOpen={(e) => { setEntry(e); setDraft(null); setLinkError(''); setMtab('main'); }}
           onRebuild={(e) => run(e.id, e.seed, e.format ?? 'classic', e.family ?? null)}
           onDelete={(e) => remove(e.id)} />
 
-        <section className="quick-preview">
-          {entry
-            ? <SlideViewer entry={entry} ratio={ratio} busy={busy} onZoom={setOpen} onEditTexts={editTexts} />
-            : <div className="empty">{t('car.empty')}</div>}
+        <section className="quick-preview carousel-center">
+          {draft
+            ? <div className="carousel-draft">
+              {draftPhoto ? <img src={draftPhoto} alt="" /> : null}
+              <p className="hint">{t('car.draftNote')}</p>
+            </div>
+            : entry
+              ? <>
+                <SlideViewer entry={entry} ratio={ratio} busy={busy} onZoom={setOpen} onEditTexts={editTexts} />
+                {/* Подпись к посту — под слайдами, как в самом посте (владелец 16.11) */}
+                <PostCaption entry={entry} onSaved={(made) => { setEntry(made); setHistory((h) => h.map((x) => (x.id === made.id ? made : x))); }} />
+              </>
+              : <div className="empty">{t('car.empty')}</div>}
         </section>
 
         <section className="quick-side">
-          {entry && (
+          {draft && (
+            <div className="quick-title">
+              <h1>{[draft.car.brand, draft.car.model].filter(Boolean).join(' ') || `№ ${draft.car.id}`} <span className="muted">{draft.car.year ?? ''}</span></h1>
+              <CarSummary entry={{id: draft.car.id, car: draft.car}} />
+            </div>
+          )}
+          {!draft && entry && (
             <div className="quick-title">
               <h1>{[entry.car.brand, entry.car.model].filter(Boolean).join(' ') || `№ ${entry.id}`} <span className="muted">{entry.car.year ?? ''}</span></h1>
               <CarSummary entry={entry} />
@@ -644,10 +726,22 @@ export const CarouselTool: React.FC = () => {
           {/* Пресет меняет вёрстку всех форматов — видно здесь, чтобы не искать причину «чужого» вида в настройках */}
           {!family && <div className="design-summary">{t('car.preset')}: {brand.design ? t.cfg(DESIGNS.find((d) => d.id === brand.design)?.title ?? '') : t('design.original')} · <a href="#/settings/brand">{t('car.setup')}</a></div>}
 
-          {entry && (
+          {draft && (
             <div className="carousel-actions">
+              <NextPrice car={draft.car} id={draft.car.id} value={nextPrice} onChange={setNextPrice} />
+              <button className="btn primary big" onClick={() => run(draft.link, undefined, format, famFor(format), price)} disabled={busy || price === undefined}>
+                {chosenFamily ? t('car.buildStyle', {style: chosenFamily.title}) : t('car.buildFormat', {format: t.cfg(chosen?.title ?? '')})}{cost}
+              </button>
+              <div className="btn-row">
+                <button className="btn ghost" onClick={() => { setDraft(null); setNextPrice(''); }} disabled={busy}>{t('common.cancel')}</button>
+              </div>
+            </div>
+          )}
+          {!draft && entry && (
+            <div className="carousel-actions">
+              {otherFormat && <NextPrice car={entry.car} id={entry.id} value={nextPrice} onChange={setNextPrice} />}
               {otherFormat ? (
-                <button className="btn primary big" onClick={() => run(entry.id)} disabled={busy}>
+                <button className="btn primary big" onClick={() => run(entry.id, undefined, format, famFor(format), price)} disabled={busy || price === undefined}>
                   {chosenFamily && (entry.family ?? null) !== family ? t('car.buildStyle', {style: chosenFamily.title}) : !family && entry.family && (entry.format ?? 'classic') === format
                     ? t('car.buildBrand') : t('car.buildFormat', {format: t.cfg(chosen?.title ?? '')})}{cost}
                 </button>
