@@ -17,7 +17,7 @@ import brand from '../config/brand.json';
 import copy from '../config/copy.json';
 import palettes from '../config/palettes.json';
 import seo from '../config/seo.json';
-import {DEMO_PROFILE, demoTheme} from '../src/shared/landingDemo.js';
+import {DEMO_LOT_TEXTS, demoProfile, demoTheme} from '../src/shared/landingDemo.js';
 import {FORMATS} from '../src/shared/model';
 import {marketFromProfile} from '../src/shared/profile';
 import type {AdProps, Lot, Market, Theme} from '../src/shared/types';
@@ -267,10 +267,16 @@ const LiveDemo: React.FC = () => {
   const [format, setFormat] = useState(FORMATS[0].id);
   const [palette, setPalette] = useState(palettes[0].id);
   useEffect(() => { fetch('/landing/demo/lot.json').then((r) => r.json()).then(setLot).catch(() => setLot(null)); }, []);
-  const market = useMemo(() => marketFromProfile(DEMO_PROFILE, copy) as Market, []);
-  const theme = useMemo(() => demoTheme(brand, palettes.find((p) => p.id === palette)!.colors) as Theme, [palette]);
+  // Ролик — на языке переключателя, как у клиента в кабинете
+  const lang = t.lang;
+  const market = useMemo(() => marketFromProfile(demoProfile(lang), copy) as Market, [lang]);
+  const theme = useMemo(() => demoTheme(brand, palettes.find((p) => p.id === palette)!.colors, lang) as Theme, [palette, lang]);
   const fmt = FORMATS.find((f) => f.id === format)!;
-  const input: AdProps | null = lot ? {lot, market, theme} as AdProps : null;
+  const local = useMemo(() => {
+    const over = lang === 'ru' ? null : DEMO_LOT_TEXTS[lang];
+    return lot && over ? {...lot, specs: over.specs, texts: {...lot.texts, hookTagline: over.hookTagline}} as Lot : lot;
+  }, [lot, lang]);
+  const input: AdProps | null = local ? {lot: local, market, theme} as AdProps : null;
   return (
     <div className="land-demo">
       <div className="land-phone">
