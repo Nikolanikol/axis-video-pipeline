@@ -74,18 +74,18 @@ const Interior: React.FC<FamilySlideProps> = ({car, content, colors, h}) => {
   </AbsoluteFill>;
 };
 
-const Facts: React.FC<FamilySlideProps> = ({car, tx, ru, colors, h}) => {
+const Facts: React.FC<FamilySlideProps> = ({car, tx, colors, h}) => {
   const {y, k} = scale(h);
   const p = photosOf(car);
   const year = car.year ? String(car.year) : '';
-  const km = kmNumber(car.mileageKm, ru);
+  const km = kmNumber(car.mileageKm, tx.locale);
   const rows = [upper(tx.value(car.fuel)), upper(tx.value(car.transmission))].filter(Boolean);
   return <AbsoluteFill style={{background: colors.accent}}>
     <LogoCorner on={colors.accent} />
     {/* Год и пробег по диагонали: год слева сверху, пробег справа снизу; тёмная полоса техники между */}
     {year && <div style={{position: 'absolute', left: 44, top: y(140)}}>
       <div style={head(230, colors.bg)}>{year}</div>
-      <div style={{fontFamily: HEAD, fontWeight: 800, fontSize: 56, color: colors.bg, marginTop: 6}}>{ru ? 'ГОД' : 'YEAR'}</div>
+      <div style={{fontFamily: HEAD, fontWeight: 800, fontSize: 56, color: colors.bg, marginTop: 6}}>{tx.u.year}</div>
     </div>}
     <Photo src={p.detail} style={{right: 30, top: y(130), width: 300, height: y(360), borderRadius: 44, border: `5px solid ${colors.text}`}} />
     {rows.length > 0 && <div style={{position: 'absolute', left: -40, right: -40, top: y(560), height: y(170), background: colors.bg, transform: 'rotate(-5deg)',
@@ -97,7 +97,7 @@ const Facts: React.FC<FamilySlideProps> = ({car, tx, ru, colors, h}) => {
     </div>}
     {km && <div style={{position: 'absolute', left: 44, right: 44, bottom: 60, textAlign: 'right'}}>
       <div style={head(fitW(km, 990, 250 * k, 100, K), colors.text)}>{km}</div>
-      <div style={{fontFamily: HEAD, fontWeight: 800, fontSize: 84, color: colors.bg, lineHeight: 1}}>{ru ? 'КМ' : 'KM'}</div>
+      <div style={{fontFamily: HEAD, fontWeight: 800, fontSize: 84, color: colors.bg, lineHeight: 1}}>{tx.u.km}</div>
     </div>}
   </AbsoluteFill>;
 };

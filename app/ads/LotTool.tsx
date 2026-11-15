@@ -22,6 +22,7 @@ import {MobileLotEditor} from './MobileLotEditor';
 import type {SceneSeek} from '../Preview';
 import {toast} from '../Toast';
 import {useIsPhone} from '../MobileTabs';
+import {tNow, useT} from '../i18n';
 
 type SaveState = 'saved' | 'dirty' | 'saving' | 'error';
 
@@ -29,10 +30,11 @@ type SaveState = 'saved' | 'dirty' | 'saving' | 'error';
 // непонятное); в коде, данных и адресах остаётся lot. Без марки и модели — «Без названия»:
 // «Новый…» врало бы про карточку, которая висит неделю
 
-export const lotTitle = (l: LotEntry) => [l.brand, l.model, l.year].filter(Boolean).join(' ') || 'Без названия';
+export const lotTitle = (l: LotEntry) => [l.brand, l.model, l.year].filter(Boolean).join(' ') || tNow()('lots.untitled');
 
 export const LotTool: React.FC = () => {
   const {config, profile, brand, report} = useConfig();
+  const t = useT();
   const [lots, setLots] = useState<LotEntry[]>([]);
   const [lot, setLot] = useState<LotEntry | null>(null);
   const [loaded, setLoaded] = useState(false);
@@ -119,7 +121,7 @@ export const LotTool: React.FC = () => {
   // Возвращает созданный лот: вызывающему он нужен сразу, а состояние React к этому
   // моменту может ещё не обновиться
   const createFromCar = async (fields: Partial<LotEntry>, urls: string[]): Promise<LotEntry> => {
-    if (!(await flush())) throw new ApiError('Правки текущего объявления не сохранились — новое не создано. Повторите сохранение вверху', 0);
+    if (!(await flush())) throw new ApiError(t('lot.flushFailed'), 0);
     const created = await api.createLot({market: lot?.market ?? config.defaultMarket});
     let next = await api.saveLot({...created, ...fields});
     setLots((ls) => [next, ...ls]);
@@ -154,7 +156,7 @@ export const LotTool: React.FC = () => {
     if (save === 'saved') return;
     // ApiError, а не Error: это ожидаемая ситуация для человека, а не сбой страницы — обычная Error
     // ушла бы отчётом в тему «Сбои» (errorReport.ts). Причину сохранения сервер уже записал сам
-    if (!(await saveLot())) throw new ApiError('Правки не сохранились — сборка не запущена. Нажмите «Не удалось сохранить — повторить» вверху или попробуйте ещё раз', 0);
+    if (!(await saveLot())) throw new ApiError(t('lot.saveFailed'), 0);
   };
   const quickFromLink = async (link: string) => {
     setQuickError('');
@@ -205,16 +207,16 @@ export const LotTool: React.FC = () => {
     if (lot && ids.includes(lot.id)) { setLot(rest[0] ?? null); setSave('saved'); }
   };
   const deleteLot = async (l: LotEntry) => {
-    if (!window.confirm(`Удалить объявление «${lotTitle(l)}» вместе с его фото и готовыми роликами?`)) return;
+    if (!window.confirm(t('lot.confirmDelete', {title: lotTitle(l)}))) return;
     mark([l.id], true);
     try {
       await api.deleteLot(l.id);
       dropFromList([l.id]);
-      toast(`Удалено: ${lotTitle(l)}`);
+      toast(t('lot.deleted', {title: lotTitle(l)}));
     } catch (e) { report(e); } finally { mark([l.id], false); }
   };
   const deleteEmpty = async (list: LotEntry[]) => {
-    if (!window.confirm(`Удалить пустые объявления (${list.length}) — без фото и без машины?`)) return;
+    if (!window.confirm(t('lot.confirmEmpty', {n: list.length}))) return;
     const ids = list.map((l) => l.id);
     mark(ids, true);
     const done: string[] = [];
@@ -223,7 +225,7 @@ export const LotTool: React.FC = () => {
     } catch (e) { report(e); } finally {
       dropFromList(done);
       mark(ids, false);
-      if (done.length) toast(`Удалено пустых объявлений: ${done.length}`);
+      if (done.length) toast(t('lot.deletedEmpty', {n: done.length}));
     }
   };
   const copyLot = async (l: LotEntry) => {
@@ -234,7 +236,7 @@ export const LotTool: React.FC = () => {
       setLot(copy);
       setSave('saved');
       setMtab('main');
-      toast(`Создана копия: ${lotTitle(copy)}`);
+      toast(t('lot.copied', {title: lotTitle(copy)}));
     } catch (e) { report(e); }
   };
 
@@ -255,7 +257,7 @@ export const LotTool: React.FC = () => {
     return total === null ? '' : `${fmt(total)} ${currencySign(market.currency)}`;
   };
 
-  if (!loaded) return <Loading text="Загрузка объявлений…" />;
+  if (!loaded) return <Loading text={t('lot.loading')} />;
 
   // Телефон — мобильная палитра «Секции под превью» (docs/palette-mobile.md). Прежние разделы
   // «Объявления / Ролик / Правка» с выезжающими панелями здесь больше не рисуются
@@ -301,7 +303,7 @@ export const LotTool: React.FC = () => {
             photoSource={<EncarImport lot={lot} onApply={applyFromCar} onError={report} />}
             render={<RenderPanel lot={lot} format={format} unsavedSettings={unsavedSettings} beforeRender={beforeRender} onError={report} folded />} />
           : <section className="quick-preview">
-            <div className="empty">Вставьте ссылку на объявление Encar — машина, фото и превью появятся сами.</div>
+            <div className="empty">{t('lot.empty')}</div>
           </section>}
       </main>
       </div>

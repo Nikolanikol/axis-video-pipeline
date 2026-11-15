@@ -30,21 +30,24 @@ import {marketFromProfile} from '../../src/shared/profile';
 import type {Market} from '../../src/shared/types';
 import {useTodayMarket} from '../rates';
 import {canSaveToFolder, canSaveToGallery, saveToFolder, shareFiles, slideName, usePreparedFiles} from '../saveFiles';
+import {locale, tNow, useT} from '../i18n';
 
-const km = (v: number | null) => (v === null ? '—' : `${v.toLocaleString('ru-RU')} км`);
+const km = (v: number | null) => (v === null ? '—' : tNow()('common.km', {n: v.toLocaleString(locale())}));
 
 /** Сводка по машине: по ней видно, ту ли карточку подтянули, не открывая слайды */
 const CarSummary: React.FC<{entry: CarouselEntry}> = ({entry}) => {
   const c = entry.car;
+  const t = useT();
+  const n = (v: number) => v.toLocaleString(locale());
   const bits = [
     c.year, km(c.mileageKm), c.transmission, c.fuel,
-    c.price?.krw ? `${c.price.krw.toLocaleString('ru-RU')} ₩ на Encar`
+    c.price?.krw ? t('car.priceOn', {price: `${n(c.price.krw)} ₩`, site: 'Encar'})
       // У японской — иены, как на Carsensor: доллары из них посчитаны нами по курсу дня
-      : c.price?.jpy ? `${c.price.jpy.toLocaleString('ru-RU')} ¥ на ${sourceName(c.id)}`
-        : c.price?.usd ? `$${c.price.usd.toLocaleString('ru-RU')} на ${sourceName(c.id)}` : null,
+      : c.price?.jpy ? t('car.priceOn', {price: `${n(c.price.jpy)} ¥`, site: sourceName(c.id)})
+        : c.price?.usd ? t('car.priceOn', {price: `$${n(c.price.usd)}`, site: sourceName(c.id)}) : null,
     // У машин из Китая и Японии истории нет вовсе (в рекламу не идёт) — и строку о ней не пишем
-    c.origin === 'CN' || c.origin === 'JP' ? null : c.history ? `${c.history.accidentsTotal} ДТП` : 'история недоступна',
-    c.history ? `${c.history.ownerChanges} смен владельца` : null,
+    c.origin === 'CN' || c.origin === 'JP' ? null : c.history ? t.n('car.accidents', c.history.accidentsTotal) : t('car.noHistory'),
+    c.history ? t.n('car.owners', c.history.ownerChanges) : null,
   ].filter(Boolean);
   return (
     <div className="job">
@@ -64,6 +67,7 @@ const CarSummary: React.FC<{entry: CarouselEntry}> = ({entry}) => {
  */
 const PriceBox: React.FC<{entry: CarouselEntry; busy: boolean; onReprice: (price: number | null) => void}> = ({entry, busy, onReprice}) => {
   const {config, profile} = useConfig();
+  const t = useT();
   const market = useTodayMarket(useMemo(() => marketFromProfile(profile, config.copy) as Market, [profile, config.copy]));
   const computed = carouselPrice(entry.car, market, null);
   const [value, setValue] = useState(entry.priceOverride ? String(entry.priceOverride) : '');
@@ -75,16 +79,16 @@ const PriceBox: React.FC<{entry: CarouselEntry; busy: boolean; onReprice: (price
   return (
     <div className="carousel-price">
       <label className="field">
-        <span className="label">Цена на слайде, {sign}</span>
+        <span className="label">{t('cprice.label')}, {sign}</span>
         <input inputMode="decimal" value={value} placeholder={computed === null ? '' : String(computed)} onChange={(e) => setValue(e.target.value)} />
         <span className="hint">
           {entry.priceOverride
-            ? <>своя цена · {market.currency === 'KRW' && entry.car.price?.krw ? `на ${sourceName(entry.id)}` : 'расчёт по курсу дал бы'} {computed === null ? '—' : `${computed.toLocaleString('ru-RU')} ${sign}`}</>
-            : <>пусто — цена с {sourceName(entry.id)}{market.currency === 'KRW' && entry.car.price?.krw ? '' : ' по курсу дня'}{computed === null ? '' : `: ${computed.toLocaleString('ru-RU')} ${sign}`}; впишите свою — она и будет на слайде</>}
+            ? <>{t('cprice.own')} · {market.currency === 'KRW' && entry.car.price?.krw ? t('cprice.onSite', {site: sourceName(entry.id)}) : t('cprice.wouldBe')} {computed === null ? '—' : `${computed.toLocaleString(locale())} ${sign}`}</>
+            : <>{t('cprice.emptyFrom', {site: sourceName(entry.id)})}{market.currency === 'KRW' && entry.car.price?.krw ? '' : ` ${t('cprice.atRate')}`}{computed === null ? '' : `: ${computed.toLocaleString(locale())} ${sign}`}; {t('cprice.typeOwn')}</>}
         </span>
       </label>
       <button className="btn" disabled={busy || bad || same} onClick={() => onReprice(typed)}>
-        {typed === null && entry.priceOverride ? 'Вернуть расчёт и пересобрать' : 'Пересобрать с этой ценой'} · бесплатно
+        {t(typed === null && entry.priceOverride ? 'cprice.reset' : 'cprice.rebuild')} · {t('land.pricing.extrasFree')}
       </button>
     </div>
   );
@@ -174,7 +178,7 @@ const SlideTrack: React.FC<{slides: string[]; at: number; v: string; imgProps?: 
     <div className="slide-track" style={{transform: `translateX(${-at * 100}%)`}}>
       {slides.map((src, i) => (
         <div key={src} className="slide-cell" aria-hidden={i !== at}>
-          {Math.abs(i - at) <= 1 && <img src={`${src}${v}`} alt={`Слайд ${i + 1}`} draggable={false} {...imgProps?.(i)} />}
+          {Math.abs(i - at) <= 1 && <img src={`${src}${v}`} alt={tNow()('slides.n', {n: i + 1})} draggable={false} {...imgProps?.(i)} />}
         </div>
       ))}
     </div>
@@ -196,6 +200,7 @@ const Lightbox: React.FC<{entry: CarouselEntry; at: number; onClose: () => void;
       return () => window.removeEventListener('keydown', onKey);
     }, [onClose, onMove]);
     const stage = useRef<HTMLDivElement>(null);
+    const t = useT();
     useSlideTrack(stage, at, entry.slides.length, onMove, onClose);
     const stop = (e: React.MouseEvent) => e.stopPropagation();
 
@@ -203,8 +208,8 @@ const Lightbox: React.FC<{entry: CarouselEntry; at: number; onClose: () => void;
     // поведение». Раньше внутренний блок во весь экран глотал клик, и закрыть можно было
     // только кнопкой. Клик по самой картинке не закрывает: по ней возят курсором и разглядывают
     return (
-      <div className="lightbox" onClick={onClose} role="dialog" aria-modal="true" aria-label={`Слайд ${at + 1} из ${entry.slides.length}`}>
-        <button className="lightbox-close" onClick={onClose} aria-label="Закрыть"><X size={22} /></button>
+      <div className="lightbox" onClick={onClose} role="dialog" aria-modal="true" aria-label={t('slides.nOf', {n: at + 1, total: entry.slides.length})}>
+        <button className="lightbox-close" onClick={onClose} aria-label={t('land.auth.close')}><X size={22} /></button>
         <div className="lightbox-inner">
           {/* Картинка — ровно по размеру слайда, а поле вокруг неё — подложка: раньше картинка
               тянулась на всю высоту, и нажатие в чёрную полосу над квадратным слайдом считалось
@@ -215,14 +220,14 @@ const Lightbox: React.FC<{entry: CarouselEntry; at: number; onClose: () => void;
           {/* На телефоне подписи «Назад / Вперёд» прячутся — остаются стрелки, иначе строка
               не помещалась в 375 px и «Закрыть» уезжала за край */}
           <div className="lightbox-bar" onClick={stop}>
-            <button className="btn ghost" onClick={() => onMove(-1)} disabled={at === 0} aria-label="Предыдущий слайд">
-              <ChevronLeft size={18} /><span className="lb-label">Назад</span>
+            <button className="btn ghost" onClick={() => onMove(-1)} disabled={at === 0} aria-label={t('slides.prev')}>
+              <ChevronLeft size={18} /><span className="lb-label">{t('land.prev')}</span>
             </button>
             <span className="muted lb-count">{at + 1} / {entry.slides.length}</span>
-            <button className="btn ghost" onClick={() => onMove(1)} disabled={at === entry.slides.length - 1} aria-label="Следующий слайд">
-              <span className="lb-label">Вперёд</span><ChevronRight size={18} />
+            <button className="btn ghost" onClick={() => onMove(1)} disabled={at === entry.slides.length - 1} aria-label={t('slides.next')}>
+              <span className="lb-label">{t('land.next')}</span><ChevronRight size={18} />
             </button>
-            <a className="btn primary" href={`/api/carousels/${entry.id}/slide/${at + 1}/download`}><Download size={17} />Скачать</a>
+            <a className="btn primary" href={`/api/carousels/${entry.id}/slide/${at + 1}/download`}><Download size={17} />{t('slides.download')}</a>
           </div>
         </div>
       </div>
@@ -237,31 +242,34 @@ const Lightbox: React.FC<{entry: CarouselEntry; at: number; onClose: () => void;
 // Раньше выбор формата сбрасывал стиль, а выбор стиля менял формат — списки «боролись за клик»
 // (владелец 21.10), теперь стиль задаёт рамку, формат её не ломает
 const FormatList: React.FC<{formats: CarouselFormat[]; value: string; built?: string; only?: string[]; onChange: (id: string) => void}> =
-  ({formats, value, built, only, onChange}) => (
-    <div className="format-list format-grid" role="radiogroup" aria-label="Формат карусели">
+  ({formats, value, built, only, onChange}) => {
+    const t = useT();
+    return (
+    <div className="format-list format-grid" role="radiogroup" aria-label={t('car.format')}>
       {formats.map((f) => (
         <button key={f.id} type="button" role="radio" aria-checked={f.id === value} disabled={!!only && !only.includes(f.id)}
-          title={only && !only.includes(f.id) ? 'Этот формат — пока только в стиле «Как в бренде»' : f.note}
+          title={only && !only.includes(f.id) ? t('car.formatOnlyBrand') : t.cfg(f.note)}
           className={`format-item${f.id === value ? ' on' : ''}${f.id === built ? ' built' : ''}`} onClick={() => onChange(f.id)}>
           <span className="format-item-head">
             <span className="format-item-name">
               <span className="format-shape-mini" style={{aspectRatio: `${f.width} / ${f.height}`}} />
-              <b>{f.title}</b>
+              <b>{t.cfg(f.title)}</b>
               {f.id === built && <Check className="format-built-icon" size={15} aria-hidden />}
             </span>
             <span className="muted">
-              {f.slides.length} слайдов
-              {f.id === built && <span className="format-built-label"> · собрана</span>}
+              {t.n('unit.slide', f.slides.length)}
+              {f.id === built && <span className="format-built-label"> · {t('car.built')}</span>}
             </span>
           </span>
-          <span className="format-item-sub">{f.note}</span>
+          <span className="format-item-sub">{t.cfg(f.note)}</span>
         </button>
       ))}
     </div>
-  );
+    );
+  };
 
 // Дата сборки на карточке: по ней видно, какая карусель свежая, а какую пора пересобрать
-const shortDate = (iso: string) => new Date(iso).toLocaleDateString('ru-RU', {day: '2-digit', month: '2-digit'});
+const shortDate = (iso: string) => new Date(iso).toLocaleDateString(locale(), {day: '2-digit', month: '2-digit'});
 
 /**
  * Собранные карусели — колонка слева во всю высоту. Карточка: обложка в своей пропорции
@@ -274,13 +282,14 @@ const CarouselsPanel: React.FC<{
   items: CarouselEntry[]; current?: string; formats: CarouselFormat[]; busy: boolean; cost: string; pending: Set<string>;
   onOpen: (e: CarouselEntry) => void; onRebuild: (e: CarouselEntry) => void; onDelete: (e: CarouselEntry) => void;
 }> = ({items, current, formats, busy, cost, pending, onOpen, onRebuild, onDelete}) => {
+  const t = useT();
   const [query, setQuery] = useState('');
   const q = query.trim().toLowerCase();
   const shown = q ? items.filter((c) => [c.car.brand, c.car.model, c.id].join(' ').toLowerCase().includes(q)) : items;
   return (
     <aside className="lots-panel carousels-panel" data-mpanel="list">
-      <div className="lots-title">Карусели <span className="muted">{items.length}</span></div>
-      {items.length > 4 && <input className="lots-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Поиск: марка, модель, номер" />}
+      <div className="lots-title">{t('car.title')} <span className="muted">{items.length}</span></div>
+      {items.length > 4 && <input className="lots-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('car.search')} />}
       <div className="lots-list">
         {shown.map((c) => {
           const f = formats.find((x) => x.id === (c.format ?? 'classic'));
@@ -294,22 +303,22 @@ const CarouselsPanel: React.FC<{
                 style={{aspectRatio: f ? `${f.width} / ${f.height}` : '9 / 16'}} loading="lazy" />
               <div className="car-card-body">
                 <b>{[c.car.brand, c.car.model].filter(Boolean).join(' ') || `№ ${c.id}`}</b>
-                <span className="muted">{[c.car.year, f?.title].filter(Boolean).join(' · ')}</span>
-                <span className="muted small">{c.slides.length} слайдов · {shortDate(c.updatedAt)}</span>
-                {pending.has(c.id) ? <span className="car-card-status">Удаляю…</span> : <div className="car-card-actions">
-                  <button className="icon-btn" title={`Пересобрать в формате «${f?.title ?? ''}»${cost}`} aria-label="Пересобрать"
+                <span className="muted">{[c.car.year, f?.title && t.cfg(f.title)].filter(Boolean).join(' · ')}</span>
+                <span className="muted small">{t.n('unit.slide', c.slides.length)} · {shortDate(c.updatedAt)}</span>
+                {pending.has(c.id) ? <span className="car-card-status">{t('del.deleting')}</span> : <div className="car-card-actions">
+                  <button className="icon-btn" title={`${t('car.rebuildIn', {format: t.cfg(f?.title ?? '')})}${cost}`} aria-label={t('jobs.rebuild')}
                     disabled={busy} onClick={stop(() => onRebuild(c))}><RefreshCw size={16} /></button>
                   <a className="icon-btn" href={c.lot?.url ?? encarAdUrl(c.id)} target="_blank" rel="noreferrer"
-                    title={c.lot ? 'Открыть лот на kmotors' : `Открыть объявление на ${sourceName(c.id)}`}
-                    aria-label={c.lot ? 'Открыть лот' : `Открыть на ${sourceName(c.id)}`} onClick={(e) => e.stopPropagation()}><ExternalLink size={16} /></a>
-                  <button className="icon-btn danger" title="Удалить" aria-label="Удалить" disabled={busy}
+                    title={c.lot ? t('car.openLotKm') : t('lots.openOn', {site: sourceName(c.id)})}
+                    aria-label={c.lot ? t('car.openLot') : t('lots.openOn', {site: sourceName(c.id)})} onClick={(e) => e.stopPropagation()}><ExternalLink size={16} /></a>
+                  <button className="icon-btn danger" title={t('common.delete')} aria-label={t('common.delete')} disabled={busy}
                     onClick={stop(() => onDelete(c))}><Trash2 size={16} /></button>
                 </div>}
               </div>
             </div>
           );
         })}
-        {!shown.length && <div className="empty small">{q ? 'Ничего не нашлось' : 'Каруселей пока нет — вставьте ссылку сверху'}</div>}
+        {!shown.length && <div className="empty small">{t(q ? 'lots.notFound' : 'car.none')}</div>}
       </div>
     </aside>
   );
@@ -323,14 +332,15 @@ const CarouselsPanel: React.FC<{
 const SlideTextEditor: React.FC<{entry: CarouselEntry; at: number; busy: boolean;
   onSave: (slide: string, fields: Record<string, string>) => Promise<void>}> = ({entry, at, busy, onSave}) => {
   const own = entry.texts?.[at];
+  const t = useT();
   const [draft, setDraft] = useState<Record<string, string>>({});
   useEffect(() => setDraft(own ? {...own.fields} : {}), [own]);
   if (!entry.texts) {
-    return <div className="slide-texts"><span className="hint">Эту карусель собрали до правки текста — нажмите «Пересобрать», и текст можно будет менять.</span></div>;
+    return <div className="slide-texts"><span className="hint">{t('ctext.old')}</span></div>;
   }
   if (!own) return null;
   const fields = TEXT_FIELDS.filter((f) => f.key in own.fields);
-  if (!fields.length) return <div className="slide-texts"><span className="hint">На этом слайде только данные машины — текста для правки нет.</span></div>;
+  if (!fields.length) return <div className="slide-texts"><span className="hint">{t('ctext.none')}</span></div>;
   const edited = entry.textOverrides?.[own.slide] ?? {};
   const changed = fields.filter((f) => (draft[f.key] ?? '') !== own.fields[f.key]);
   const save = (out: Record<string, string>) => onSave(own.slide, out);
@@ -338,21 +348,21 @@ const SlideTextEditor: React.FC<{entry: CarouselEntry; at: number; busy: boolean
     <div className="slide-texts">
       {fields.map((f) => (
         <label key={f.key} className="field">
-          <span className="label">{f.label}{edited[f.key] ? ' · свой текст' : ''}</span>
+          <span className="label">{t.cfg(f.label)}{edited[f.key] ? ` · ${t('ctext.own')}` : ''}</span>
           <textarea rows={Math.min(4, Math.max(1, (draft[f.key] ?? '').split('\n').length))} maxLength={TEXT_MAX}
             value={draft[f.key] ?? ''} onChange={(e) => setDraft((d) => ({...d, [f.key]: e.target.value}))} />
-          {accentField(entry.format, f.key) && <span className="hint">Слово в {'{фигурных скобках}'} — цветом акцента; новая строка — Enter</span>}
+          {accentField(entry.format, f.key) && <span className="hint">{t('ctext.accent')}</span>}
         </label>
       ))}
       <div className="btn-row">
         <button className="btn primary" disabled={busy || !changed.length}
-          onClick={() => save(Object.fromEntries(changed.map((f) => [f.key, draft[f.key] ?? ''])))}>Сохранить и пересобрать · бесплатно</button>
+          onClick={() => save(Object.fromEntries(changed.map((f) => [f.key, draft[f.key] ?? ''])))}>{t('ctext.save')} · {t('land.pricing.extrasFree')}</button>
         {Object.keys(edited).length > 0 && (
-          <button className="btn ghost" disabled={busy} title="Вернуть фразы, которые подобрала карусель"
-            onClick={() => save(Object.fromEntries(Object.keys(edited).map((k) => [k, ''])))}>Вернуть исходный текст</button>
+          <button className="btn ghost" disabled={busy} title={t('ctext.resetTitle')}
+            onClick={() => save(Object.fromEntries(Object.keys(edited).map((k) => [k, ''])))}>{t('ctext.reset')}</button>
         )}
       </div>
-      <span className="hint">Пустое поле — вернуть исходную фразу. Пересобирается та же карусель: формат, фразы других слайдов и цена остаются.</span>
+      <span className="hint">{t('ctext.hint')}</span>
     </div>
   );
 };
@@ -365,6 +375,7 @@ const SlideTextEditor: React.FC<{entry: CarouselEntry; at: number; busy: boolean
 const SlideViewer: React.FC<{entry: CarouselEntry; ratio: string; busy: boolean; onZoom: (i: number) => void;
   onEditTexts: (slide: string, fields: Record<string, string>) => Promise<void>}> = ({entry, ratio, busy, onZoom, onEditTexts}) => {
   const [at, setAt] = useState(0);
+  const t = useT();
   const [editing, setEditing] = useState(false);
   // Другая машина — с первого слайда; пересборка той же (своя цена, свой текст) — на том же
   // слайде: человек только что правил его и хочет увидеть результат, а не обложку
@@ -381,22 +392,22 @@ const SlideViewer: React.FC<{entry: CarouselEntry; ratio: string; busy: boolean;
       <div className="slide-stage" style={{aspectRatio: ratio}} ref={stage}>
         {/* ?v= — время сборки: иначе браузер покажет прежнюю картинку из кэша */}
         <SlideTrack slides={entry.slides} at={at} v={v}
-          imgProps={(i) => ({onClick: () => onZoom(i), title: 'Открыть во весь экран'})} />
-        {at > 0 && <button className="slide-arrow left" onClick={() => go(-1)} aria-label="Предыдущий слайд">‹</button>}
-        {at < n - 1 && <button className="slide-arrow right" onClick={() => go(1)} aria-label="Следующий слайд">›</button>}
+          imgProps={(i) => ({onClick: () => onZoom(i), title: t('slides.zoom')})} />
+        {at > 0 && <button className="slide-arrow left" onClick={() => go(-1)} aria-label={t('slides.prev')}>‹</button>}
+        {at < n - 1 && <button className="slide-arrow right" onClick={() => go(1)} aria-label={t('slides.next')}>›</button>}
       </div>
       <div className="slide-bar">
         <span className="muted">{at + 1} / {n}</span>
-        <a className="link" href={`/api/carousels/${entry.id}/slide/${at + 1}/download`}>скачать этот слайд</a>
+        <a className="link" href={`/api/carousels/${entry.id}/slide/${at + 1}/download`}>{t('slides.downloadThis')}</a>
         <button type="button" className="link" aria-expanded={editing} onClick={() => setEditing((v) => !v)}>
-          {editing ? 'скрыть правку текста' : 'редактировать текст'}
+          {t(editing ? 'slides.hideEdit' : 'slides.edit')}
         </button>
       </div>
       {editing && <SlideTextEditor entry={entry} at={at} busy={busy} onSave={onEditTexts} />}
       <div className="slide-thumbs">
         {entry.slides.map((src, i) => (
           <button key={src} className={i === at ? 'slide-thumb on' : 'slide-thumb'} onClick={() => setAt(i)} style={{aspectRatio: ratio}}>
-            <img src={thumb(`${src}${v}`, 160)} alt={`Слайд ${i + 1}`} loading="lazy" />
+            <img src={thumb(`${src}${v}`, 160)} alt={t('slides.n', {n: i + 1})} loading="lazy" />
           </button>
         ))}
       </div>
@@ -414,6 +425,7 @@ const SlideViewer: React.FC<{entry: CarouselEntry; ratio: string; busy: boolean;
 // из скрытых виден всегда: список открывается сам
 const MAIN_STYLES = 3;
 const StyleList: React.FC<{value: string | null; built?: string | null; onChange: (id: string | null) => void}> = ({value, built, onChange}) => {
+  const t = useT();
   const ready = FAMILIES.filter((f) => f.ready);
   const more = ready.slice(MAIN_STYLES);
   const pinned = more.some((f) => f.id === value || f.id === built);
@@ -428,12 +440,12 @@ const StyleList: React.FC<{value: string | null; built?: string | null; onChange
       <span className="style-tile-name">{title}</span>
       {built !== undefined && built === id && <Check className="format-built-icon" size={14} aria-hidden />}
     </button>;
-  const famTile = (f: typeof ready[number]) => tile(f.id, f.title, f.note, [f.colors.bg, f.colors.accent, f.colors.light]);
-  return <div className="style-grid" role="radiogroup" aria-label="Стиль карусели">
-    {tile(null, 'Как в бренде', 'Оформление из настроек бренда')}
+  const famTile = (f: typeof ready[number]) => tile(f.id, f.title, t.cfg(f.note), [f.colors.bg, f.colors.accent, f.colors.light]);
+  return <div className="style-grid" role="radiogroup" aria-label={t('car.styleAria')}>
+    {tile(null, t('car.asBrand'), t('car.asBrandNote'))}
     {ready.slice(0, MAIN_STYLES).map(famTile)}
     {more.length > 0 && !pinned && <button type="button" className="style-more" aria-expanded={shown} onClick={() => setOpen(!open)}>
-      {shown ? 'Скрыть' : `Ещё стили · ${more.length}`} <span aria-hidden>{shown ? '▴' : '▾'}</span></button>}
+      {shown ? t('pay.hide') : t('car.moreStyles', {n: more.length})} <span aria-hidden>{shown ? '▴' : '▾'}</span></button>}
     {shown && more.map(famTile)}
   </div>;
 };
@@ -450,8 +462,9 @@ const CAROUSEL_PANELS = {list: 'left'} as const;
 
 export const CarouselTool: React.FC = () => {
   const {config, profile, brand, report} = useConfig();
+  const t = useT();
   // Язык слайдов — из профиля: виден здесь, чтобы не удивляться английской карусели
-  const slidesLang = carouselLang(profile.language) === 'ru' ? 'русском' : 'английском';
+  const slidesLang = t(({ru: 'car.langRu', en: 'car.langEn', sq: 'car.langSq'} as const)[carouselLang(profile.language)]);
   const {refresh: refreshAccess} = useSession();
   const cost = useCost('carousels', config.credits);
   const formats = config.carouselFormats ?? [];
@@ -526,7 +539,7 @@ export const CarouselTool: React.FC = () => {
       const made = await api.repriceCarousel(entry.id, price);
       setEntry(made);
       setHistory((h) => h.map((x) => (x.id === made.id ? made : x)));
-      toast(price === null ? 'Цена — снова по курсу, слайды пересобраны' : 'Слайды пересобраны с вашей ценой');
+      toast(t(price === null ? 'car.toastRate' : 'car.toastPrice'));
     } catch (e) { report(e); } finally { setBusy(false); }
   };
 
@@ -538,21 +551,21 @@ export const CarouselTool: React.FC = () => {
       const made = await api.editCarouselTexts(entry.id, slide, fields);
       setEntry(made);
       setHistory((h) => h.map((x) => (x.id === made.id ? made : x)));
-      toast(Object.values(fields).every((v) => !v.trim()) ? 'Вернули исходный текст, слайды пересобраны' : 'Слайды пересобраны с вашим текстом');
+      toast(t(Object.values(fields).every((v) => !v.trim()) ? 'car.toastTextReset' : 'car.toastText'));
     } catch (e) { report(e); } finally { setBusy(false); }
   };
 
   const remove = async (id: string) => {
     const c = history.find((h) => h.id === id);
     const name = c ? [c.car.brand, c.car.model].filter(Boolean).join(' ') || `№ ${id}` : `№ ${id}`;
-    if (!window.confirm(`Удалить карусель «${name}» со всеми слайдами?`)) return;
+    if (!window.confirm(t('car.confirmDelete', {name}))) return;
     // Пока сервер отвечает — карточка тусклая с «Удаляю…», второй раз не нажать; после — плашка
     setPending((p) => new Set(p).add(id));
     try {
       await api.deleteCarousel(id);
       setHistory((h) => h.filter((x) => x.id !== id));
       setEntry((e) => (e?.id === id ? null : e));
-      toast(`Удалено: ${name}`);
+      toast(t('lot.deleted', {title: name}));
     } catch (e) { report(e); } finally {
       setPending((p) => { const next = new Set(p); next.delete(id); return next; });
     }
@@ -597,10 +610,10 @@ export const CarouselTool: React.FC = () => {
       {/* quick-screen — один экран, как у «Ролика по лоту»: колонки прокручиваются внутри */}
       <div className="quick-screen">
       <QuickLink onLink={fromLink} error={linkError} busy={busy} parse={parseCarouselSource}
-        placeholder={`Вставьте ссылку на объявление Encar, che168 или Carsensor — карусель соберётся сама (слайды на ${slidesLang})`} />
+        placeholder={t('car.placeholder', {lang: slidesLang})} />
       {/* Сборка — 10–20 секунд (замер 30.09: 13 с на 9 слайдов); экран закрыт окном, как у лота по ссылке */}
-      <BusyModal step={busy ? 0 : null} steps={['Собираю карусель: данные и слайды']} label="Сборка карусели"
-        note="Обычно 10–20 секунд. Не закрывайте страницу" />
+      <BusyModal step={busy ? 0 : null} steps={[t('car.busyStep')]} label={t('car.busyLabel')}
+        note={t('car.busyNote')} />
 
       <main className="quick-main">
         <CarouselsPanel items={history} current={entry?.id} formats={formats} busy={busy} cost={cost} pending={pending}
@@ -611,7 +624,7 @@ export const CarouselTool: React.FC = () => {
         <section className="quick-preview">
           {entry
             ? <SlideViewer entry={entry} ratio={ratio} busy={busy} onZoom={setOpen} onEditTexts={editTexts} />
-            : <div className="empty">Вставьте ссылку на объявление Encar, che168 или Carsensor — слайды появятся здесь.</div>}
+            : <div className="empty">{t('car.empty')}</div>}
         </section>
 
         <section className="quick-side">
@@ -623,54 +636,54 @@ export const CarouselTool: React.FC = () => {
           )}
           {/* Сначала стиль, потом формат: семейство задаёт формат (только 4:5), и выбор формата
               больше не сбрасывает стиль */}
-          <div className="quick-label">Стиль</div>
+          <div className="quick-label">{t('car.style')}</div>
           <StyleList value={family} built={entry ? (entry.family ?? null) : undefined} onChange={setFamily} />
-          <div className="quick-label">Формат карусели</div>
+          <div className="quick-label">{t('car.format')}</div>
           <FormatList formats={formats} value={format} built={entry ? (entry.format ?? 'classic') : undefined}
             only={family ? familyFormats(family) : undefined} onChange={setFormat} />
           {/* Пресет меняет вёрстку всех форматов — видно здесь, чтобы не искать причину «чужого» вида в настройках */}
-          {!family && <div className="design-summary">Пресет: {DESIGNS.find((d) => d.id === brand.design)?.title ?? 'Исходный'} · <a href="#/settings/brand">Настроить</a></div>}
+          {!family && <div className="design-summary">{t('car.preset')}: {brand.design ? t.cfg(DESIGNS.find((d) => d.id === brand.design)?.title ?? '') : t('design.original')} · <a href="#/settings/brand">{t('car.setup')}</a></div>}
 
           {entry && (
             <div className="carousel-actions">
               {otherFormat ? (
                 <button className="btn primary big" onClick={() => run(entry.id)} disabled={busy}>
-                  {chosenFamily && (entry.family ?? null) !== family ? `Собрать в стиле «${chosenFamily.title}»` : !family && entry.family && (entry.format ?? 'classic') === format
-                    ? 'Собрать в стиле бренда' : `Собрать в формате «${chosen?.title}»`}{cost}
+                  {chosenFamily && (entry.family ?? null) !== family ? t('car.buildStyle', {style: chosenFamily.title}) : !family && entry.family && (entry.format ?? 'classic') === format
+                    ? t('car.buildBrand') : t('car.buildFormat', {format: t.cfg(chosen?.title ?? '')})}{cost}
                 </button>
               ) : canSaveToGallery ? (
                 <button className="btn primary big" disabled={busy || !slideFiles}
                   onClick={() => slideFiles && shareFiles(slideFiles).catch(report)}>
-                  {slideFiles ? `В галерею: все ${entry.slides.length}` : 'Готовлю слайды…'}
+                  {slideFiles ? t('car.toGallery', {n: entry.slides.length}) : t('car.preparing')}
                 </button>
               ) : canSaveToFolder ? (
                 <button className="btn primary big" onClick={saveAll} disabled={busy || saving !== null}>
-                  {saving !== null ? `Сохраняю ${saving} из ${entry.slides.length}…` : `Скачать все ${entry.slides.length} в папку`}
+                  {saving !== null ? t('car.saving', {a: saving, b: entry.slides.length}) : t('car.toFolder', {n: entry.slides.length})}
                 </button>
               ) : (
-                <a className="btn primary big" href={`/api/carousels/${entry.id}/zip`}>Скачать все {entry.slides.length} · ZIP</a>
+                <a className="btn primary big" href={`/api/carousels/${entry.id}/zip`}>{t('car.zipAll', {n: entry.slides.length})}</a>
               )}
-              {otherFormat && <span className="hint">Сейчас открыта «{entryFormat?.title}»{entry.family ? ` в стиле «${FAMILIES.find((f) => f.id === entry.family)?.title ?? entry.family}»` : ''} — выбрано другое. Карусель у машины одна: новая заменит прежнюю.</span>}
+              {otherFormat && <span className="hint">{t('car.openNow', {format: t.cfg(entryFormat?.title ?? '')})}{entry.family ? ` ${t('car.inStyle', {style: FAMILIES.find((f) => f.id === entry.family)?.title ?? entry.family})}` : ''} — {t('car.otherChosen')}</span>}
               {/* Запасной путь рядом с папкой: архив работает в любом браузере */}
               {!otherFormat && canSaveToFolder && !canSaveToGallery && (
-                <a className="hint" href={`/api/carousels/${entry.id}/zip`}>или одним архивом · ZIP</a>
+                <a className="hint" href={`/api/carousels/${entry.id}/zip`}>{t('car.orZip')}</a>
               )}
               {!otherFormat && savedTo?.id === entry.id && saving === null && (
-                <span className="hint" style={{color: 'var(--ok)'}}>Сохранено {entry.slides.length} слайдов в папку «{savedTo.folder}»</span>
+                <span className="hint" style={{color: 'var(--ok)'}}>{t('car.saved', {slides: t.n('unit.slide', entry.slides.length), folder: savedTo.folder})}</span>
               )}
-              {!otherFormat && canSaveToGallery && <span className="hint">В меню выберите «Сохранить изображения» — слайды попадут в «Фото». Там же можно сразу в Instagram.</span>}
+              {!otherFormat && canSaveToGallery && <span className="hint">{t('car.iosHint')}</span>}
               {!otherFormat && <PriceBox entry={entry} busy={busy} onReprice={reprice} />}
               <div className="btn-row">
                 {!otherFormat && (entry.format !== 'classic' || brand.design || entry.family) && (
                   <button className="btn" onClick={() => run(entry.id)} disabled={busy}
-                    title="Та же машина, другие компоновка и фразы">Другой вариант{cost}</button>
+                    title={t('car.variantTitle')}>{t('car.variant')}{cost}</button>
                 )}
                 {!otherFormat && (
                   <button className="btn ghost" onClick={() => run(entry.id, entry.seed)} disabled={busy}
-                    title="Те же компоновка и фразы, свежие данные и текущий бренд">Пересобрать{cost}</button>
+                    title={t('car.rebuildTitle')}>{t('jobs.rebuild')}{cost}</button>
                 )}
-                <a className="btn ghost" href={entry.lot?.url ?? encarAdUrl(entry.id)} target="_blank" rel="noreferrer">{entry.lot ? 'Открыть лот' : `На ${sourceName(entry.id)}`}</a>
-                <button className="btn ghost" onClick={() => remove(entry.id)} disabled={busy}>Удалить</button>
+                <a className="btn ghost" href={entry.lot?.url ?? encarAdUrl(entry.id)} target="_blank" rel="noreferrer">{entry.lot ? t('car.openLot') : t('car.onSite', {site: sourceName(entry.id)})}</a>
+                <button className="btn ghost" onClick={() => remove(entry.id)} disabled={busy}>{t('common.delete')}</button>
               </div>
             </div>
           )}
@@ -688,8 +701,8 @@ export const CarouselTool: React.FC = () => {
       )}
     </div>
     <MobileTabs value={mtab} onChange={setMtab} tabs={[
-      {id: 'list', label: 'Собранные', icon: <List size={20} />, badge: history.length},
-      {id: 'main', label: 'Карусель', icon: <Images size={20} />},
+      {id: 'list', label: t('car.tabList'), icon: <List size={20} />, badge: history.length},
+      {id: 'main', label: t('car.tabMain'), icon: <Images size={20} />},
     ]} />
     </>
   );

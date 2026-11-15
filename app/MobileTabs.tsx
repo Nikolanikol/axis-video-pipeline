@@ -7,6 +7,7 @@
 // Какой раздел открыт, знает сам инструмент; на .quick он ставит data-mtab, остальное
 // (что прятать) — в styles.css. На компьютере панели нет, и data-mtab ни на что не влияет.
 import React, {useEffect, useSyncExternalStore} from 'react';
+import {tNow} from './i18n';
 
 // Та же граница, что у телефонной раскладки в styles.css (@media (max-width: 900px))
 const PHONE = '(max-width: 900px)';
@@ -21,7 +22,7 @@ export const useIsPhone = () => useSyncExternalStore(subscribe, () => window.mat
 export type MobileTab<T extends string> = {id: T; label: string; icon: React.ReactNode; badge?: number};
 
 export const MobileTabs = <T extends string>({tabs, value, onChange}: {tabs: MobileTab<T>[]; value: T; onChange: (id: T) => void}) => (
-  <nav className="mtabs" aria-label="Разделы">
+  <nav className="mtabs" aria-label={tNow()('foot.sections')}>
     {tabs.map((t) => (
       <button key={t.id} className={t.id === value ? 'mtab on' : 'mtab'} aria-current={t.id === value ? 'page' : undefined}
         onClick={() => onChange(t.id)}>

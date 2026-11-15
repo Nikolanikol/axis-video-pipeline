@@ -20,6 +20,7 @@ import {Preview, type PreviewControl, type SceneSeek} from '../Preview';
 import {LookPanel, lotTheme} from './LookPanel';
 import {compositionTitle, LookStrip, MobileAbout, MobileContent, motionTitle, MotionStrip, PALETTE_TABS, playMotion, type PaletteTab} from './MobileBodies';
 import {SceneScrubber} from './SceneScrubber';
+import {tNow, useT, type Key} from '../i18n';
 
 export type SaveState = 'saved' | 'dirty' | 'saving' | 'error';
 
@@ -38,16 +39,15 @@ type Props = {
 };
 
 // Статусы сохранения словами описания (раздел 8)
-const SAVE_TEXT: Record<SaveState, string> = {saved: 'Сохранено', dirty: 'Есть изменения', saving: 'Сохраняем…', error: 'Не удалось сохранить'};
+const SAVE_TEXT = (s: SaveState): Key => `save.${s}` as Key;
 
-// «4 сцены», «5 сцен»: число сцен у форматов — от 4 до 5, но склоняем честно
-export const scenesWord = (n: number) => `${n} ${n % 10 === 1 && n % 100 !== 11 ? 'сцена' : [2, 3, 4].includes(n % 10) && ![12, 13, 14].includes(n % 100) ? 'сцены' : 'сцен'}`;
+// «4 сцены», «5 сцен» — формы числа по языку (app/i18n)
+export const scenesWord = (n: number) => tNow().n('unit.scene', n);
 export const seconds = (f: FormatMeta) => Math.round(f.durationInFrames / f.fps);
 
 export type BodyProps = Pick<Props, 'lot' | 'market' | 'format' | 'brand' | 'pairs' | 'palettes' | 'onChange' | 'onPhotos' | 'onError' | 'onFormat' | 'scene' | 'onScene' | 'photoSource'>;
 
-export const MotionUnavailable: React.FC = () => <p className="hint">Движение есть у пресетов «Кино», «Редакционный», «Каталог» —
-  выберите стиль во вкладке «Оформление». «Исходный» — прежние форматы со своей анимацией.</p>;
+export const MotionUnavailable: React.FC = () => <p className="hint">{useT()('palette.noMotion')}</p>;
 
 // ——— Состояние интерфейса: вкладка, открыта ли «Настройки» и что в ней (сцена, «О ролике»,
 // «Оформление»). Своё у компьютера, ключ — компания + объявление. Хранилище недоступно — по умолчанию
@@ -63,6 +63,7 @@ const store = (key: string, ui: UI) => { try { localStorage.setItem(key, JSON.st
 export const Palette: React.FC<Props> = (props) => {
   const {lot, input, format, brand, save, onRetrySave, scene, onScene, seek, render} = props;
   const {config} = useConfig();
+  const tr = useT();
   const key = keyOf(config.workspace?.id ?? 'local', lot.id);
   const [ui, setUi] = useState<UI>(() => load(key));
   useEffect(() => { setUi(load(key)); }, [key]);
@@ -78,7 +79,7 @@ export const Palette: React.FC<Props> = (props) => {
   const sceneIndex = Math.max(0, format.scenes.findIndex((s) => s.id === scene));
   const current = format.scenes[sceneIndex];
   const pickScene = (id: string) => { commit({group: 'scene'}); onScene(id); };
-  const title = [lot.brand, lot.model].filter(Boolean).join(' ') || 'Без названия';
+  const title = [lot.brand, lot.model].filter(Boolean).join(' ') || tr('lots.untitled');
 
   return <>
     <section className="quick-preview pd-stage">
@@ -94,17 +95,17 @@ export const Palette: React.FC<Props> = (props) => {
       <div className="palette pd">
         <header className="palette-head">
           <h1>{title} <span className="muted">{lot.year || ''}</span></h1>
-          <div className="palette-scope">Только этот ролик · <SaveStatus save={save} onRetry={onRetrySave} /></div>
+          <div className="palette-scope">{tr('palette.onlyThis')} · <SaveStatus save={save} onRetry={onRetrySave} /></div>
         </header>
 
         {/* Вкладки подчёркиванием — те же, что на телефоне: оформление и три группы анимации */}
-        <div className="mle-tabs pd-tabs" role="tablist" aria-label="Оформление и анимация">
+        <div className="mle-tabs pd-tabs" role="tablist" aria-label={tr('palette.tabsAria')}>
           <div className="mle-tabs-list">
             {PALETTE_TABS.map((t) => <button key={t.id} type="button" role="tab" aria-selected={!ui.settings && ui.tab === t.id}
-              className={`mle-tab${!ui.settings && ui.tab === t.id ? ' on' : ''}`} onClick={() => commit({tab: t.id, settings: false})}>{t.title}</button>)}
+              className={`mle-tab${!ui.settings && ui.tab === t.id ? ' on' : ''}`} onClick={() => commit({tab: t.id, settings: false})}>{tr(t.title)}</button>)}
             {/* «Настройки» — на одном уровне с вкладками (владелец 20.10, только ПК; на телефоне — на превью) */}
             <button type="button" role="tab" aria-selected={ui.settings} className={`mle-tab pd-settings-tab${ui.settings ? ' on' : ''}`}
-              onClick={() => commit({settings: true})}>Настройки</button>
+              onClick={() => commit({settings: true})}>{tr.cfg('Настройки')}</button>
           </div>
         </div>
         {/* Все варианты сразу плитками; выбранное — рамкой, полное название — в подсказке */}
@@ -115,23 +116,23 @@ export const Palette: React.FC<Props> = (props) => {
         </div>}
 
         {/* «Настройки» — на месте плиток; другая вкладка возвращает плитки */}
-        {ui.settings && <section className="mle-side pd-side" role="dialog" aria-label="Настройки ролика">
-          <nav className="mle-side-scenes" aria-label="Что править">
+        {ui.settings && <section className="mle-side pd-side" role="dialog" aria-label={tr('palette.settingsAria')}>
+          <nav className="mle-side-scenes" aria-label={tr('palette.whatAria')}>
             {format.scenes.map((s, i) => <button key={s.id} type="button" aria-pressed={ui.group === 'scene' && i === sceneIndex}
-              className={`mle-scene${ui.group === 'scene' && i === sceneIndex ? ' edit' : ''}`} onClick={() => pickScene(s.id)}>{s.title}</button>)}
+              className={`mle-scene${ui.group === 'scene' && i === sceneIndex ? ' edit' : ''}`} onClick={() => pickScene(s.id)}>{tr.cfg(s.title)}</button>)}
             <button type="button" aria-pressed={ui.group === 'about'} className={`mle-scene${ui.group === 'about' ? ' edit' : ''}`}
-              onClick={() => commit({group: 'about'})}>О ролике</button>
+              onClick={() => commit({group: 'about'})}>{tr('palette.about')}</button>
             {/* «Оформление» — всегда отдельной строкой во всю ширину снизу (владелец 20.10: в общем
                 ряду оно переносилось то на вторую строку, то обратно — меню скакало) */}
             <button type="button" aria-pressed={ui.group === 'look'} className={`mle-scene pd-look-seg${ui.group === 'look' ? ' edit' : ''}`}
-              onClick={() => commit({group: 'look'})}>Оформление</button>
+              onClick={() => commit({group: 'look'})}>{tr('look.style')}</button>
           </nav>
           <div className="mle-body">
             {ui.group === 'scene' && <MobileContent {...props} />}
             {ui.group === 'about' && <>
               <MobileAbout {...props} />
               {/* Заметка — только на компьютере (на телефоне её убрали, владелец 20.10) */}
-              <section className="mle-sec pd-note"><h3>Заметка <span>в ролик не попадает</span></h3>
+              <section className="mle-sec pd-note"><h3>{tr('palette.note')} <span>{tr('palette.noteHint')}</span></h3>
                 <NoteField lot={lot} onChange={props.onChange} /></section>
             </>}
             {ui.group === 'look' && <LookPanel lot={lot} brand={brand} pairs={props.pairs} palettes={props.palettes} onChange={props.onChange} embedded />}
@@ -139,7 +140,7 @@ export const Palette: React.FC<Props> = (props) => {
         </section>}
 
         <footer className="palette-foot">
-          <div className="palette-foot-line"><span>{compositionTitle(theme)}</span><span>{seconds(format)} с · {scenesWord(format.scenes.length)}</span></div>
+          <div className="palette-foot-line"><span>{compositionTitle(theme)}</span><span>{tr('common.sec', {n: seconds(format)})} · {tr.n('unit.scene', format.scenes.length)}</span></div>
           {render}
         </footer>
       </div>
@@ -148,7 +149,10 @@ export const Palette: React.FC<Props> = (props) => {
 };
 
 /** Статус сохранения; при ошибке — кнопка повтора (раздел 8). Общий у компьютера и телефона */
-export const SaveStatus: React.FC<{save: SaveState; onRetry: () => void}> = ({save, onRetry}) => save === 'error'
-  ? <button type="button" className={`save save-${save} link`} onClick={onRetry}>{SAVE_TEXT[save]} — повторить</button>
-  : <span className={`save save-${save}`}>{SAVE_TEXT[save]}</span>;
+export const SaveStatus: React.FC<{save: SaveState; onRetry: () => void}> = ({save, onRetry}) => {
+  const t = useT();
+  return save === 'error'
+    ? <button type="button" className={`save save-${save} link`} onClick={onRetry}>{t(SAVE_TEXT(save))} — {t('save.retry')}</button>
+    : <span className={`save save-${save}`}>{t(SAVE_TEXT(save))}</span>;
+};
 

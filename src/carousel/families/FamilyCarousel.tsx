@@ -53,7 +53,7 @@ export const FamilyCarousel: React.FC<CarouselProps & {texts: CarouselTexts}> = 
     interior: [...first, ...ph.interior.slice().reverse()].filter(Boolean) as string[]}} : props.car;
   // Квадрат (1:1) — вёрстка во весь кадр с высотой 1080; 4:5 и 9:16 — вёрстка 1350 (в 9:16 — в середине)
   const h = height === W ? height : H;
-  const slideProps: FamilySlideProps = {slide, index: index + 1, h, car, tx: carouselText(lang, props.car.origin), ru: lang === 'ru',
+  const slideProps: FamilySlideProps = {slide, index: index + 1, h, car, tx: carouselText(lang, props.car.origin),
     colors: family.colors, content: carouselDesignContent(props, slide, texts.slides[index]?.fields)};
   // Слайд вызываем как функцию, а не элементом: так видно его корневой фон, им заливаются полосы
   // над и под вёрсткой в 9:16. У слайдов семейств нет своих хуков (только у вложенных элементов),

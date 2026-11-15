@@ -2,6 +2,7 @@
 // Знак встроен разметкой, а не <img src="/kok/mark.svg">: анимировать нужно одну точку,
 // а у картинки внутренности недоступны CSS.
 import React from 'react';
+import {tNow} from './i18n';
 
 // Сам знак с пульсирующей точкой — отдельно: его берёт и окно загрузки лота из Encar
 export const RecMark: React.FC = () => (
@@ -11,7 +12,7 @@ export const RecMark: React.FC = () => (
   </svg>
 );
 
-export const Loading: React.FC<{text?: string}> = ({text = 'Загрузка…'}) => (
+export const Loading: React.FC<{text?: string}> = ({text = tNow()('common.loading')}) => (
   <div className="boot" role="status">
     <RecMark />
     <span>{text}</span>

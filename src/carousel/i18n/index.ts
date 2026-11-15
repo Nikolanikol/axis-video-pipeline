@@ -1,9 +1,9 @@
 // Язык слайдов карусели: подписи вёрстки, данные из Encar и числа.
 //
-// Язык берётся из профиля клиента («Язык постов») — тот же, что у рекламы: язык выбран,
-// тексты уже есть. Умеем английский и русский; остальные языки профиля (македонский,
-// албанский…) пока получают английский — как тексты постов откатываются на английский,
-// а не оставляют пустые плашки.
+// Язык берётся из профиля клиента (profile.language) — тот же, что у рекламы. С 15.11 его
+// ставит переключатель языка KOK (RU · EN · SQ): интерфейс, слайды, ролики и письма — на одном
+// языке. Умеем английский, русский и албанский; незнакомый код получает английский — лучше
+// английский, чем пустые плашки.
 //
 // Два источника слов:
 //   • подписи вёрстки («История авто», «Цена в Корее») — здесь, по языкам;
@@ -11,14 +11,17 @@
 //     топлива и коробки взяты из словарей самого kmotors (ru-values.json, генерирует
 //     tools/sync-kmotors-dict.mjs) — на слайде то же слово, что на kmotors.shop/ru.
 //     Цветов в русском словаре kmotors нет — они в COLORS_RU ниже.
+// Албанские слова данных — sq-values.ts (пишутся руками, у kmotors албанского нет).
 // Слово, которого нет в словаре, остаётся английским: лучше английское слово, чем пустое место.
 import dict from './ru-values.json';
 import {copyFor, forOrigin} from './copy';
 import {currencySign} from '../../shared/currencies.js';
+import {SQ_OPTIONS, SQ_VALUES} from './sq-values';
 
-export type CarouselLang = 'en' | 'ru';
-export const CAROUSEL_LANGS: CarouselLang[] = ['en', 'ru'];
-export const carouselLang = (language?: string): CarouselLang => (language === 'ru' ? 'ru' : 'en');
+// Албанский — с 15.11: язык контента идёт за переключателем языка KOK (RU · EN · SQ)
+export type CarouselLang = 'en' | 'ru' | 'sq';
+export const CAROUSEL_LANGS: CarouselLang[] = ['en', 'ru', 'sq'];
+export const carouselLang = (language?: string): CarouselLang => (language === 'ru' ? 'ru' : language === 'sq' ? 'sq' : 'en');
 
 // Цвета: в словаре kmotors по-английски их десять, по-русски нет ни одного. Список с запасом:
 // шлюз отдаёт то, что есть в его английском словаре, и новые цвета появятся там же
@@ -95,7 +98,45 @@ const STRINGS = {
     ctaTitle: 'Хотите эту машину?',
     ctaText: 'Напишите нам — посчитаем полную стоимость с доставкой до вашей страны',
   },
+  // Машинный перевод — перед запуском вычитывает носитель. Страна — «Kore» / «Koreja»:
+  // ORIGIN_SWAP в copy.ts меняет именно эти формы на Китай и Японию
+  sq: {
+    swipe: 'Rrëshqit →',
+    ownerChanges: (n: number) => `${n} ${n === 1 ? 'ndërrim pronari' : 'ndërrime pronari'}`,
+    history: 'Historia e makinës',
+    reportOnRequest: 'Raporti — me kërkesë',
+    noAccidents: 'Pa dëme në sigurime',
+    insuranceClaims: 'Dëme në sigurime',
+    ownerChangesLabel: 'Ndërrime pronari',
+    theft: 'Vjedhje',
+    flood: 'Përmbytje',
+    cleanNote: 'Siguruesit nuk kanë asnjë regjistrim. Raporti i plotë Encar — para blerjes.',
+    nothingHidden: 'Asgjë e fshehur',
+    date: 'Data', fault: 'Faji', paidOut: 'Paguar', own: 'i vetë', other: 'i tjetrit',
+    parts: 'pjesë', labour: 'punë', paint: 'bojë',
+    andMore: (n: number) => `dhe ${n} të tjera në raportin e plotë`,
+    summary: (own: number, other: number, theft: number, flood: number) =>
+      `Me faj: ${own}, pa faj: ${other}. Vjedhje: ${theft} · përmbytje: ${flood}. Raporti i plotë Encar — para blerjes.`,
+    interior: 'Interieri', technology: 'Teknologji dhe siguri', specs: 'Të dhënat teknike',
+    year: 'Viti', engine: 'Motori', fuel: 'Karburanti', transmission: 'Kambio', mileage: 'Kilometrat', seats: 'Vende',
+    price: 'Çmimi', priceInKorea: 'Çmimi në Kore',
+    priceNotes: [
+      'Transporti dhe dogana — veçmas',
+      'Llogarisim koston e plotë deri në vendin tuaj',
+      'Raport inspektimi dhe video para blerjes',
+    ],
+    ctaTitle: 'E doni këtë makinë?',
+    ctaText: 'Na shkruani — llogarisim koston e plotë me transport deri në vendin tuaj',
+  },
 };
+
+// Единицы на крупных цифрах семейств каруселей (src/carousel/families) и дробная запятая
+const UNITS: Record<CarouselLang, {year: string; km: string; l: string; dec: string}> = {
+  en: {year: 'YEAR', km: 'KM', l: 'L', dec: '.'},
+  ru: {year: 'ГОД', km: 'КМ', l: 'Л', dec: ','},
+  sq: {year: 'VITI', km: 'KM', l: 'L', dec: ','},
+};
+const LOCALES: Record<CarouselLang, string> = {en: 'en-US', ru: 'ru-RU', sq: 'sq-AL'};
 
 export type CarouselText = ReturnType<typeof carouselText>;
 
@@ -105,21 +146,24 @@ export type CarouselText = ReturnType<typeof carouselText>;
  * Китая» вместо Кореи, у японской — «Япония» (copy.ts, copyFor). Нет — Корея, как было
  */
 export const carouselText = (lang: CarouselLang, origin?: string) => {
-  const locale = lang === 'ru' ? 'ru-RU' : 'en-US';
+  const locale = LOCALES[lang];
   // В русской записи разряды — пробелом; toLocaleString ставит неразрывный, он и нужен:
   // «239 601 км» не должен переноситься посередине числа
   const n = (v: number) => v.toLocaleString(locale);
   const ru = lang === 'ru';
+  const sq = lang === 'sq';
   return {
     lang,
+    locale,
+    u: UNITS[lang],
     origin: origin === 'CN' || origin === 'JP' ? origin : 'KR',
     s: forOrigin(STRINGS[lang], lang, origin),
     // Тексты слайдов новых форматов (Deck) — уже для страны машины
     copy: copyFor(lang, origin),
     /** Топливо, коробка, цвет, кузов */
-    value: (en: string) => (ru && en ? ((dict.values as Record<string, string>)[en] ?? COLORS_RU[en] ?? en) : en),
+    value: (en: string) => (!en ? en : ru ? ((dict.values as Record<string, string>)[en] ?? COLORS_RU[en] ?? en) : sq ? (SQ_VALUES[en] ?? en) : en),
     /** Название опции */
-    option: (en: string) => (ru ? ((dict.options as Record<string, string>)[en] ?? en) : en),
+    option: (en: string) => (ru ? ((dict.options as Record<string, string>)[en] ?? en) : sq ? (SQ_OPTIONS[en] ?? en) : en),
     num: n,
     km: (v: number | null) => (v === null ? '—' : `${n(v)} ${ru ? 'км' : 'km'}`),
     usd: (v: number | null | undefined) => (v ? `$${n(v)}` : '—'),

@@ -18,7 +18,7 @@ export const upper = (s?: string) => (s ?? '').toLocaleUpperCase('ru');
 export type FamilyColors = {bg: string; text: string; accent: string; light: string};
 // index — номер слайда с 1 (контурный индекс у Contour Plum)
 // h — высота слайда: 1350 (4:5, и 4:5 в середине 9:16) или 1080 (квадрат 1:1, у семейств, которые его умеют)
-export type FamilySlideProps = {slide: string; index: number; h: number; content: DesignContent; car: CarouselCar; tx: CarouselText; ru: boolean; colors: FamilyColors};
+export type FamilySlideProps = {slide: string; index: number; h: number; content: DesignContent; car: CarouselCar; tx: CarouselText; colors: FamilyColors};
 
 /** Логотип бренда слева сверху; on — фон под ним (по нему Logo решает про подложку); line — черта под знаком */
 export const LogoCorner: React.FC<{on: string; line?: string; left?: number; top?: number}> = ({on, line, left = 44, top = 34}) =>
@@ -28,8 +28,8 @@ export const LogoCorner: React.FC<{on: string; line?: string; left?: number; top
   </div>;
 
 /** Пробег числом с разрядами по языку карусели (как на обложке: «67,842» / «67 842») */
-export const kmNumber = (km: number | null, ru: boolean) =>
-  km === null ? '' : new Intl.NumberFormat(ru ? 'ru-RU' : 'en-US').format(km).replace(/\s/g, ' ');
+export const kmNumber = (km: number | null, locale: string) =>
+  km === null ? '' : new Intl.NumberFormat(locale).format(km).replace(/\s/g, ' ');
 
 /** Заголовок фразой: всё, кроме последнего слова, и последнее слово отдельно (две массы заголовка) */
 export const splitLast = (text: string) => {

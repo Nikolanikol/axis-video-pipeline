@@ -4,20 +4,25 @@ import {Pipeline, visiblePipelines} from './pipelines';
 import {href} from './router';
 import {useConfig} from './config';
 import {StartCard} from './Onboarding';
+import {useT} from './i18n';
 
-const ToolList: React.FC<{pipeline: Pipeline}> = ({pipeline}) => (
+const ToolList: React.FC<{pipeline: Pipeline}> = ({pipeline}) => {
+  const t = useT();
+  return (
   <div className="tool-list">
-    {pipeline.tools.map((t) => (
-      <a key={t.id} href={href(pipeline.id, t.id)} className={t.status === 'soon' ? 'tool-link soon' : 'tool-link'}>
-        <span className="tool-title">{t.title}{t.status === 'soon' && <span className="badge">скоро</span>}</span>
-        <span className="muted">{t.description}</span>
+    {pipeline.tools.map((x) => (
+      <a key={x.id} href={href(pipeline.id, x.id)} className={x.status === 'soon' ? 'tool-link soon' : 'tool-link'}>
+        <span className="tool-title">{t.cfg(x.title)}{x.status === 'soon' && <span className="badge">{t('shell.soon')}</span>}</span>
+        <span className="muted">{t.cfg(x.description)}</span>
       </a>
     ))}
   </div>
-);
+  );
+};
 
 export const Home: React.FC = () => {
   const {config} = useConfig();
+  const t = useT();
   const pipelines = visiblePipelines(config.production);
   const main = pipelines.filter((p) => p.kind !== 'settings');
   const settings = pipelines.filter((p) => p.kind === 'settings');
@@ -25,13 +30,13 @@ export const Home: React.FC = () => {
     <div className="page">
       {/* Пока «Первые шаги» не пройдены — карточка над пайплайнами, иначе ничего */}
       <StartCard />
-      <h1 className="page-title">Пайплайны</h1>
+      <h1 className="page-title">{t('shell.pipelines')}</h1>
       <div className="cards">
         {main.map((p) => (
           <section key={p.id} className="card pipeline">
             <a href={href(p.id)} className="card-head">
-              <h2>{p.title}</h2>
-              <p className="muted">{p.description}</p>
+              <h2>{t.cfg(p.title)}</h2>
+              <p className="muted">{t.cfg(p.description)}</p>
             </a>
             <ToolList pipeline={p} />
           </section>
@@ -39,7 +44,7 @@ export const Home: React.FC = () => {
       </div>
       {settings.map((p) => (
         <section key={p.id} className="card settings-card">
-          <h2>{p.title} <span className="muted">{p.description}</span></h2>
+          <h2>{t.cfg(p.title)} <span className="muted">{t.cfg(p.description)}</span></h2>
           <ToolList pipeline={p} />
         </section>
       ))}
@@ -47,13 +52,16 @@ export const Home: React.FC = () => {
   );
 };
 
-export const PipelinePage: React.FC<{pipeline: Pipeline}> = ({pipeline}) => (
+export const PipelinePage: React.FC<{pipeline: Pipeline}> = ({pipeline}) => {
+  const t = useT();
+  return (
   <div className="page">
-    <h1 className="page-title">{pipeline.title}</h1>
-    <p className="muted">{pipeline.description}</p>
+    <h1 className="page-title">{t.cfg(pipeline.title)}</h1>
+    <p className="muted">{t.cfg(pipeline.description)}</p>
     <section className="card">
-      <h2>Инструменты</h2>
+      <h2>{t('shell.tools')}</h2>
       <ToolList pipeline={pipeline} />
     </section>
   </div>
-);
+  );
+};

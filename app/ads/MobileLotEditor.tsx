@@ -22,6 +22,7 @@ import {compositionTitle, LookStrip, MobileAbout, MobileContent, motionTitle, Mo
 import {lotTheme} from './LookPanel';
 import {SceneScrubber} from './SceneScrubber';
 import {SaveStatus, type SaveState} from './Palette';
+import {useT} from '../i18n';
 
 type Props = {
   lot: LotEntry | null; input: AdProps | null; market: Market; format: FormatMeta; brand: Theme;
@@ -81,6 +82,7 @@ const editable = (el: Element | null) => !!el && (el instanceof HTMLTextAreaElem
   || (el instanceof HTMLInputElement && !['checkbox', 'radio', 'button', 'submit', 'file', 'range'].includes(el.type)));
 
 export const MobileLotEditor: React.FC<Props> = (props) => {
+  const tr = useT();
   const {lot, input, format, brand, save, onRetrySave, scene, onScene, seek, listOpen, onList, openContent, onContentOpened,
     list, render, buildRef, building} = props;
   const {config} = useConfig();
@@ -244,19 +246,19 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
   // с iOS 10); ставим только на iPhone/iPad и только пока открыт редактор — Android его не трогаем
   useEffect(() => noFocusZoom(), []);
 
-  const buildLabel = building.starting ? 'Запуск…' : building.running ? 'Собирается…' : 'Собрать';
+  const buildLabel = tr(building.starting ? 'mle.starting' : building.running ? 'mle.building' : 'mle.build');
   // ——— Шапка: одна строка вместо логотипа (по образцу владельца 20.10): слева значок списка
   // объявлений, машина и статус с точкой, справа компактное «Собрать» и бургер Shell. Меню — общее, плюс «Ролики» ———
-  const title = lot ? [lot.model || lot.brand, lot.year].filter(Boolean).join(' ') || 'Без названия' : 'Объявлений нет';
+  const title = lot ? [lot.model || lot.brand, lot.year].filter(Boolean).join(' ') || tr('lots.untitled') : tr('mle.noLots');
   const fullTitle = lot ? [lot.brand, lot.model, lot.trim, lot.year].filter(Boolean).join(' ') : '';
   useHeaderSlot({
     content: <div className="mle-top">
       {/* Слева — список объявлений (владелец 20.10) */}
-      <button type="button" className={`mle-head-btn${listOpen ? ' on' : ''}`} aria-label="Объявления" aria-expanded={listOpen}
+      <button type="button" className={`mle-head-btn${listOpen ? ' on' : ''}`} aria-label={tr('lots.title')} aria-expanded={listOpen}
         onClick={() => { setJobsOpen(false); onList(!listOpen); }}><List size={20} /></button>
       <div className="mle-title" title={fullTitle}>
         <b>{title}</b>
-        {lot && <span><SaveStatus save={save} onRetry={onRetrySave} /> · Этот ролик</span>}
+        {lot && <span><SaveStatus save={save} onRetry={onRetrySave} /> · {tr('mle.thisVideo')}</span>}
       </div>
       {lot && <button type="button" className="btn primary mle-build" disabled={building.starting || building.running || !lot.photos.length}
         onClick={() => buildRef.current?.()}>{buildLabel}</button>}
@@ -264,7 +266,7 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
     // Своих пунктов в меню нет (владелец 20.10: «Ролики» в бургере не нужны); лист с готовыми роликами
     // открывается сам после сборки
     menu: [],
-  }, [title, fullTitle, save, lot?.id, lot?.photos.length, listOpen, jobsOpen, building.starting, building.running]);
+  }, [title, fullTitle, save, lot?.id, lot?.photos.length, listOpen, jobsOpen, building.starting, building.running, tr.lang]);
 
   const sceneIndex = format.scenes.findIndex((s) => s.id === scene);
   const current = format.scenes[Math.max(0, sceneIndex)];
@@ -277,11 +279,11 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
             пересоздаёт — меняется только раскладка вокруг. Полосы управления у плеера нет — своя панель ниже */}
         <Preview key={lot.id} input={input} format={format} autoPlay showScenes={false} controls={false} control={player}
           onPlaying={setIsPlaying} onFrame={(f) => frameFn.current?.(f)} seek={seek} />
-        {view === 'watch' && <button type="button" className="btn primary mle-back" onClick={back}>Вернуть настройки</button>}
+        {view === 'watch' && <button type="button" className="btn primary mle-back" onClick={back}>{tr('mle.back')}</button>}
         {/* «Настройки» — правка надписей, цены и фото (панель справа): серая плашка в правом верхнем
             углу превью, по образцу владельца 20.10 */}
         {view === 'edit' && <button type="button" className={`mle-text-btn${sheet === 'text' ? ' on' : ''}`} aria-expanded={sheet === 'text'}
-          onClick={() => openSheet('text')}>Настройки</button>}
+          onClick={() => openSheet('text')}>{tr.cfg('Настройки')}</button>}
       </div>
       {/* Панель плеера по образцу владельца: ▶, время, полоса перемотки, «Смотреть целиком» */}
       <SceneScrubber format={format} listen={listenFrame} seekFrame={(f) => player.current?.seekFrame(f)}
@@ -289,9 +291,9 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
 
         {/* Вкладки — подчёркиванием: оформление и три группы анимации на одном уровне (владелец 20.10) */}
         <div className="mle-tabs">
-          <div className="mle-tabs-list" role="tablist" aria-label="Настройки ролика">
+          <div className="mle-tabs-list" role="tablist" aria-label={tr('palette.settingsAria')}>
             {TABS.map((t) => <button key={t.id} type="button" role="tab" aria-selected={tab === t.id}
-              className={`mle-tab${tab === t.id ? ' on' : ''}`} onClick={() => pickTab(t.id)}>{t.title}</button>)}
+              className={`mle-tab${tab === t.id ? ' on' : ''}`} onClick={() => pickTab(t.id)}>{tr(t.title)}</button>)}
           </div>
         </div>
         <div className="mle-panel" role="tabpanel" title={tab === 'look' ? compositionTitle(theme) : motionTitle(brand, lot, tab)}>
@@ -304,19 +306,19 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
       {/* Панель «Текст» справа (владелец 20.10: «как было у нас ранее»): 90 % ширины, слева видна
           полоска ролика — нажатие по ней закрывает. Сцену можно сменить прямо в панели */}
       {sheet === 'text' && <>
-        <button type="button" className="mle-scrim" aria-label="Закрыть текст" onClick={() => openSheet(null)} />
-        <section className="mle-side" role="dialog" aria-label="Текст ролика">
+        <button type="button" className="mle-scrim" aria-label={tr('mle.closeSettings')} onClick={() => openSheet(null)} />
+        <section className="mle-side" role="dialog" aria-label={tr('palette.settingsAria')}>
           <div className="mle-side-head">
-            <button type="button" className="mle-icon" aria-label="Закрыть текст" onClick={() => openSheet(null)}><ChevronRight size={20} /></button>
-            <b>Настройки</b>
+            <button type="button" className="mle-icon" aria-label={tr('mle.closeSettings')} onClick={() => openSheet(null)}><ChevronRight size={20} /></button>
+            <b>{tr.cfg('Настройки')}</b>
           </div>
-          <nav className="mle-side-scenes" aria-label="Сцена для правки">
+          <nav className="mle-side-scenes" aria-label={tr('mle.sceneAria')}>
             {format.scenes.map((s, i) => <button key={s.id} type="button" aria-pressed={!ui.about && i === sceneIndex}
               className={`mle-scene${!ui.about && i === sceneIndex ? ' edit' : ''}`} onClick={() => pickScene(s.id)}>
-              <span>{String(i + 1).padStart(2, '0')}</span>{s.title}</button>)}
+              <span>{String(i + 1).padStart(2, '0')}</span>{tr.cfg(s.title)}</button>)}
             {/* Общее для всего ролика — отдельной группой рядом со сценами (владелец 20.10) */}
             <button type="button" aria-pressed={!!ui.about} className={`mle-scene${ui.about ? ' edit' : ''}`}
-              onClick={() => commit({...remember(), about: true}, true)}>О ролике</button>
+              onClick={() => commit({...remember(), about: true}, true)}>{tr('palette.about')}</button>
           </nav>
           <div className="mle-body" ref={body} onScroll={onScroll}>
             {ui.about ? <MobileAbout {...props} lot={lot} /> : <MobileContent {...props} lot={lot} />}
@@ -325,24 +327,24 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
       </>}
     </> : <div className="mle-empty">
       {/* Объявлений нет — вместо пустого плеера понятное действие добавления */}
-      <p>Вставьте ссылку на объявление Encar, che168 или Carsensor — машина, фото и превью появятся сами. Или добавьте объявление вручную.</p>
+      <p>{tr('mle.empty')}</p>
       {list}
     </div>}
 
-    {listOpen && lot && <div className="mle-sheet" role="dialog" aria-label="Объявления">
+    {listOpen && lot && <div className="mle-sheet" role="dialog" aria-label={tr('lots.title')}>
       <div className="mle-sheet-head">
-        <b>Объявления</b>
-        <button type="button" className="mle-icon" aria-label="Вернуться к ролику" onClick={() => onList(false)}><X size={20} /></button>
+        <b>{tr('lots.title')}</b>
+        <button type="button" className="mle-icon" aria-label={tr('mle.backToVideo')} onClick={() => onList(false)}><X size={20} /></button>
       </div>
       <div className="mle-sheet-body">{list}</div>
     </div>}
 
     {/* Готовые ролики и прежние версии — лист из меню. Смонтирован всегда: его сборку вызывает
         «Собрать», а после сборки лист открывается сам */}
-    {lot && <div className={`mle-sheet${jobsOpen ? '' : ' hidden'}`} role="dialog" aria-label="Ролики" aria-hidden={!jobsOpen}>
+    {lot && <div className={`mle-sheet${jobsOpen ? '' : ' hidden'}`} role="dialog" aria-label={tr('jobs.title')} aria-hidden={!jobsOpen}>
       <div className="mle-sheet-head">
-        <b>Ролики · {fullTitle}</b>
-        <button type="button" className="mle-icon" aria-label="Вернуться к ролику" onClick={() => setJobsOpen(false)}><X size={20} /></button>
+        <b>{tr('jobs.title')} · {fullTitle}</b>
+        <button type="button" className="mle-icon" aria-label={tr('mle.backToVideo')} onClick={() => setJobsOpen(false)}><X size={20} /></button>
       </div>
       <div className="mle-sheet-body">{render}</div>
     </div>}

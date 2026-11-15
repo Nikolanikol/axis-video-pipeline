@@ -74,11 +74,11 @@ const Interior: React.FC<FamilySlideProps> = ({car, content, colors, h}) => {
   </AbsoluteFill>;
 };
 
-const Facts: React.FC<FamilySlideProps> = ({car, tx, ru, colors, h}) => {
+const Facts: React.FC<FamilySlideProps> = ({car, tx, colors, h}) => {
   const {y, k} = scale(h);
   const p = photosOf(car);
   const year = car.year ? String(car.year) : '';
-  const km = kmNumber(car.mileageKm, ru);
+  const km = kmNumber(car.mileageKm, tx.locale);
   const rows = [upper(tx.value(car.fuel)), upper(tx.value(car.transmission))].filter(Boolean);
   return <AbsoluteFill style={{background: colors.light}}>
     <LogoCorner on={colors.light} />
@@ -87,11 +87,11 @@ const Facts: React.FC<FamilySlideProps> = ({car, tx, ru, colors, h}) => {
       <div style={{flex: 1, display: 'flex', justifyContent: 'center', ...vertical}}>
         <div style={head(fitW(km, h - 300, 230 * k, 100, .5), colors.bg)}>{km}</div>
       </div>
-      <div style={{...head(72, colors.bg), marginTop: 16}}>{ru ? 'КМ' : 'KM'}</div>
+      <div style={{...head(72, colors.bg), marginTop: 16}}>{tx.u.km}</div>
     </div>}
     <div style={{position: 'absolute', left: 300, top: y(120), bottom: 40, width: 3, background: colors.bg, opacity: .6}} />
     <div style={{position: 'absolute', left: 340, right: 40, top: y(110), bottom: 40, display: 'flex', flexDirection: 'column', gap: 26}}>
-      {year && <div><div style={head(200, colors.bg)}>{year}</div><div style={{fontFamily: BODY, fontWeight: 700, fontSize: 36, color: colors.bg}}>{ru ? 'ГОД' : 'YEAR'}</div></div>}
+      {year && <div><div style={head(200, colors.bg)}>{year}</div><div style={{fontFamily: BODY, fontWeight: 700, fontSize: 36, color: colors.bg}}>{tx.u.year}</div></div>}
       <Photo src={p.detail} style={{position: 'relative', flex: 1, minHeight: 260, borderRadius: 36}} />
       {rows.map((r) => <div key={r} style={{display: 'flex', alignItems: 'center', gap: 24, borderTop: `3px solid ${colors.bg}33`, paddingTop: 20}}>
         <span style={{width: 76, height: 76, borderRadius: 18, background: colors.accent, flex: 'none'}} />

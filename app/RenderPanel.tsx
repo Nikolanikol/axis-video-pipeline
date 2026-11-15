@@ -4,6 +4,7 @@ import {missing} from '../src/shared/model';
 import type {FormatMeta, Requirement} from '../src/shared/types';
 import {api, LotEntry} from './api';
 import {JobsPanel} from './JobsPanel';
+import {useT, type Key} from './i18n';
 
 type Props = {
   lot: LotEntry;
@@ -19,21 +20,19 @@ type Props = {
   onState?: (state: {starting: boolean; running: boolean}) => void;
 };
 
-const MISSING: Record<Requirement, string> = {
-  photos: 'нет фото',
-  specs: 'нет характеристик',
-  price: 'нет цены — будет «XX XXX $»',
-};
+// Чего не хватает объявлению — render.missing.<что> в словаре
+const MISSING = (r: Requirement): Key => `render.missing.${r}` as Key;
 
 export const RenderPanel: React.FC<Props> = ({lot, format, unsavedSettings, beforeRender, onError, folded, hideButton, trigger, onState}) => {
+  const t = useT();
   const warnings = [
-    ...missing(lot, format).map((r) => MISSING[r]),
-    unsavedSettings && 'настройки профиля/бренда не сохранены — рендер возьмёт сохранённые',
+    ...missing(lot, format).map((r) => t(MISSING(r))),
+    unsavedSettings && t('render.unsaved'),
   ].filter(Boolean) as string[];
   return (
     <JobsPanel
       query={{lot: lot.id}}
-      label="Собрать ролик"
+      label={t('render.build')}
       warnings={warnings}
       disabled={!lot.photos.length}
       start={async () => { await beforeRender(); return api.render(lot.id, format.id); }}

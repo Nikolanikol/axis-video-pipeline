@@ -27,6 +27,8 @@ import {AuthCard, AuthMode} from './auth';
 import {Preview} from './Preview';
 import {SiteFooter} from './SiteFooter';
 import {SourcesStrip} from './Sources';
+import {faq as faqI18n} from './i18n/faq';
+import {LangSwitch, T, useT} from './i18n';
 
 type Samples = {
   videos: {title: string; year: number; format: string; palette: string; video: string; poster: string}[];
@@ -37,13 +39,11 @@ type Samples = {
 const useBrowserLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 const usd = (n: number) => `$${n.toLocaleString('en-US', Number.isInteger(n) ? {maximumFractionDigits: 0} : {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-// «7 кредитов», «3 кредита», «1 кредит»
-const credits = (n: number) => {
-  const d = n % 10; const h = n % 100;
-  return `${n} ${d === 1 && h !== 11 ? 'кредит' : d >= 2 && d <= 4 && (h < 12 || h > 14) ? 'кредита' : 'кредитов'}`;
-};
 
 export const Landing: React.FC<{signup: {credits: number; days: number}; notice: string}> = ({signup, notice}) => {
+  const t = useT();
+  // «7 кредитов» / «7 credits» — форма числа по языку (app/i18n)
+  const credits = (n: number) => t.n('unit.credit', n);
   const [mode, setMode] = useState<AuthMode>('register');
   const [authOpen, setAuthOpen] = useState(false);
   const [offer, setOffer] = useState<PublicOffer | null>(null);
@@ -68,37 +68,36 @@ export const Landing: React.FC<{signup: {credits: number; days: number}; notice:
     <div className="landing">
       <header className="land-top">
         <img src="/kok/wordmark.svg" alt="KOK" className="land-logo" />
-        {offer?.preview && <span className="top-preview" title="Превью ветки: тестовая база, не прод">ТЕСТ · PR {offer.preview}</span>}
+        {offer?.preview && <span className="top-preview" title={t('land.preview')}>ТЕСТ · PR {offer.preview}</span>}
         <nav className="land-nav">
-          <a href="#how" onClick={jump('how')}>Как это работает</a>
-          <a href="#samples" onClick={jump('samples')}>Образцы</a>
-          <a href="#pricing" onClick={jump('pricing')}>Цены</a>
-          <a href="#contacts" onClick={jump('contacts')}>Контакты</a>
+          <a href="#how" onClick={jump('how')}>{t('land.nav.how')}</a>
+          <a href="#samples" onClick={jump('samples')}>{t('land.nav.samples')}</a>
+          <a href="#pricing" onClick={jump('pricing')}>{t('land.nav.pricing')}</a>
+          <a href="#contacts" onClick={jump('contacts')}>{t('land.nav.contacts')}</a>
         </nav>
-        <button className="btn ghost" onClick={() => start('login')}>Войти</button>
-        <button className="btn primary land-cta-sm" onClick={() => start('register')}>Попробовать</button>
+        <LangSwitch />
+        <button className="btn ghost" onClick={() => start('login')}>{t('land.login')}</button>
+        <button className="btn primary land-cta-sm" onClick={() => start('register')}>{t('land.try')}</button>
       </header>
 
       <section className="land-hero">
         <div className="land-hero-text">
-          <span className="land-eyebrow"><Sparkles size={15} aria-hidden /> Для автодилеров, продающих машины из Кореи, Китая и Японии</span>
+          <span className="land-eyebrow"><Sparkles size={15} aria-hidden /> {t('land.eyebrow')}</span>
           {/* Слова — как ищет дилер (подсказки Google и Яндекса 19.10, config/seo.json): «реклама / SMM автосалона».
               Прежний «Ролик и карусель по ссылке на объявление» не содержал ни одного запроса */}
-          <h1>Реклама и SMM для&nbsp;автосалона — ролик и карусель <span className="land-accent">по&nbsp;ссылке</span></h1>
-          <p className="land-lead">
-            Вставляете ссылку — KOK сам подбирает фото, характеристики и цену и собирает рекламный ролик
-            для Reels и TikTok и карусель для Instagram в вашем фирменном стиле. Минута вместо вечера в монтаже.
-          </p>
+          {/* Неразрывные пробелы (было «для&nbsp;автосалона», «по&nbsp;ссылке») — в словаре символом \u00a0 */}
+          <h1>{t('land.h1.a')}<span className="land-accent">{t('land.h1.b')}</span></h1>
+          <p className="land-lead">{t('land.lead')}</p>
           <div className="land-actions">
             <button className="btn primary land-cta" onClick={() => start('register')}>
-              Получить {credits(gift.credits)} бесплатно <ArrowRight size={18} aria-hidden />
+              {t('land.cta.gift', {credits: credits(gift.credits)})} <ArrowRight size={18} aria-hidden />
             </button>
-            <a className="btn ghost land-cta" href="#samples" onClick={jump('samples')}>Смотреть образцы</a>
+            <a className="btn ghost land-cta" href="#samples" onClick={jump('samples')}>{t('land.cta.samples')}</a>
           </div>
           <ul className="land-perks">
-            <li><Check size={16} aria-hidden /> Подтвердите почту — {credits(gift.credits)} на {gift.days} дней</li>
-            <li><Check size={16} aria-hidden /> Без карты и без звонков менеджера</li>
-            <li><Check size={16} aria-hidden /> Ролик — {credits(costs.ads ?? 3)}, карусель — {credits(costs.carousels ?? 1)}</li>
+            <li><Check size={16} aria-hidden /> {t('land.perk.verify', {credits: credits(gift.credits), days: t.n('unit.day', gift.days)})}</li>
+            <li><Check size={16} aria-hidden /> {t('land.perk.nocard')}</li>
+            <li><Check size={16} aria-hidden /> {t('land.perk.costs', {video: credits(costs.ads ?? 3), carousel: credits(costs.carousels ?? 1)})}</li>
           </ul>
           {/* Какие площадки поддерживаем — сразу на первом экране, логотипы ведут на сайты (владелец 13.10) */}
           <SourcesStrip className="land-sources" />
@@ -107,77 +106,78 @@ export const Landing: React.FC<{signup: {credits: number; days: number}; notice:
       </section>
 
       <section id="how" className="land-section">
-        <h2 className="land-h2">Три шага — и пост готов</h2>
+        <h2 className="land-h2">{t('land.how.h2')}</h2>
         <div className="land-steps">
-          <Step n={1} icon={<Link2 size={22} />} title="Вставьте ссылку" text="Любое объявление с Encar, che168 или Carsensor. Марку, пробег, цену и лучшие фото KOK возьмёт сам — переводить и выписывать ничего не нужно." />
-          <Step n={2} icon={<Palette size={22} />} title="Выберите формат" text="Ролик с ценой в конце, галерея фото или цена в первую секунду. Логотип, цвета и шрифты — ваши, настраиваются один раз." />
-          <Step n={3} icon={<Download size={22} />} title="Скачайте и публикуйте" text="Ролик 1080×1920 для Reels, TikTok и Shorts, карусель для Instagram. С телефона — сразу в галерею." />
+          <Step n={1} icon={<Link2 size={22} />} title={t('land.how.1.title')} text={t('land.how.1.text')} />
+          <Step n={2} icon={<Palette size={22} />} title={t('land.how.2.title')} text={t('land.how.2.text')} />
+          <Step n={3} icon={<Download size={22} />} title={t('land.how.3.title')} text={t('land.how.3.text')} />
         </div>
       </section>
 
       <section id="samples" className="land-section">
-        <h2 className="land-h2">Так это выглядит</h2>
-        <p className="land-sub">Всё ниже собрано KOK по настоящим объявлениям с площадок — без ручного монтажа. Название, цвета и контакты здесь демо, у вас будут ваши.</p>
+        <h2 className="land-h2">{t('land.samples.h2')}</h2>
+        <p className="land-sub">{t('land.samples.sub')}</p>
         {samples ? <>
-          <h3 className="land-h3">Рекламные ролики</h3>
+          <h3 className="land-h3">{t('land.samples.videos')}</h3>
           <div className="land-videos">
             {samples.videos.map((v) => (
               <figure key={v.video} className="land-video">
                 <AutoVideo src={v.video} poster={v.poster} />
-                <figcaption><b>{v.title} {v.year}</b><span>{v.format} · {v.palette}</span></figcaption>
+                <figcaption><b>{v.title} {v.year}</b><span>{t.cfg(v.format)} · {t.cfg(v.palette)}</span></figcaption>
               </figure>
             ))}
           </div>
-          <h3 className="land-h3">Карусели для Instagram</h3>
-          <Carousels items={samples.carousels} />
-        </> : <p className="land-sub">Образцы загружаются…</p>}
+          <h3 className="land-h3">{t('land.samples.carousels')}</h3>
+          <Carousels items={samples.carousels} t={t} />
+        </> : <p className="land-sub">{t('land.samples.loading')}</p>}
       </section>
 
       <section id="pricing" className="land-section">
-        <h2 className="land-h2">Честные условия</h2>
+        <h2 className="land-h2">{t('land.pricing.h2')}</h2>
         <div className="land-price-cards">
           <div className="land-price-card gift">
-            <span className="land-badge">Бесплатно</span>
+            <span className="land-badge">{t('land.pricing.free')}</span>
             <b className="land-big">{credits(gift.credits)}</b>
-            <p>на {gift.days} дней — сразу после подтверждения почты. Хватит на {Math.floor(gift.credits / (costs.ads ?? 3))} ролика и {gift.credits % (costs.ads ?? 3)} {gift.credits % (costs.ads ?? 3) === 1 ? 'карусель' : 'карусели'} или на {Math.floor(gift.credits / (costs.carousels ?? 1))} каруселей.</p>
+            <p>{t('land.pricing.giftText', {days: t.n('unit.day', gift.days)})} <GiftEnough t={t} credits={gift.credits} ad={costs.ads ?? 3} carousel={costs.carousels ?? 1} /></p>
           </div>
           <div className="land-price-card">
-            <span className="land-badge muted-badge">Сколько стоит</span>
+            <span className="land-badge muted-badge">{t('land.pricing.cost')}</span>
             <ul className="land-costs">
-              <li><span>Рекламный ролик</span><b>{credits(costs.ads ?? 3)}</b></li>
-              <li><span>Карусель</span><b>{credits(costs.carousels ?? 1)}</b></li>
-              <li><span>Превью, настройки, правки</span><b>бесплатно</b></li>
+              <li><span>{t('land.pricing.video')}</span><b>{credits(costs.ads ?? 3)}</b></li>
+              <li><span>{t('land.pricing.carousel')}</span><b>{credits(costs.carousels ?? 1)}</b></li>
+              <li><span>{t('land.pricing.extras')}</span><b>{t('land.pricing.extrasFree')}</b></li>
             </ul>
-            <p className="muted">Кредит списывается только за готовый результат: не собралось — кредит возвращается сам.</p>
+            <p className="muted">{t('land.pricing.refund')}</p>
           </div>
         </div>
-        <Tariffs offer={offer} />
+        <Tariffs offer={offer} t={t} />
       </section>
 
       <section id="faq" className="land-section">
-        <h2 className="land-h2">Вопросы</h2>
-        {/* Вопросы — из config/seo.json: те же уходят в разметку FAQPage для Google (server/seo.mjs) */}
+        <h2 className="land-h2">{t('land.nav.faq')}</h2>
+        {/* Русские вопросы — из config/seo.json: те же уходят в разметку FAQPage для Google (server/seo.mjs);
+            переводы — app/i18n/faq.ts в том же порядке */}
         <div className="land-faq">
-          {seo.faq.map((f) => <details key={f.q}><summary>{f.q}</summary><p><Linked text={f.a} /></p></details>)}
+          {(t.lang === 'ru' ? seo.faq : faqI18n[t.lang]).map((f) => <details key={f.q}><summary>{f.q}</summary><p><Linked text={f.a} /></p></details>)}
         </div>
       </section>
 
       <section className="land-section">
         <div className="land-final">
           <div>
-            <h2 className="land-h2">Начните бесплатно</h2>
+            <h2 className="land-h2">{t('land.final.h2')}</h2>
             <ul className="land-perks">
-              <li><Check size={16} aria-hidden /> {credits(gift.credits)} на {gift.days} дней после подтверждения почты</li>
-              <li><Check size={16} aria-hidden /> Все форматы роликов и каруселей</li>
-              <li><Check size={16} aria-hidden /> Ваш логотип, цвета и контакты</li>
-              <li><Check size={16} aria-hidden /> Без карты и без обязательств</li>
+              <li><Check size={16} aria-hidden /> {t('land.final.gift', {credits: credits(gift.credits), days: t.n('unit.day', gift.days)})}</li>
+              <li><Check size={16} aria-hidden /> {t('land.final.formats')}</li>
+              <li><Check size={16} aria-hidden /> {t('land.final.brand')}</li>
+              <li><Check size={16} aria-hidden /> {t('land.final.noobligation')}</li>
             </ul>
           </div>
           <div className="land-final-actions">
             <button className="btn primary land-cta" onClick={() => start('register')}>
-              Создать кабинет бесплатно <ArrowRight size={18} aria-hidden />
+              {t('land.final.cta')} <ArrowRight size={18} aria-hidden />
             </button>
-            <span className="muted">Уже есть кабинет? <button className="link" onClick={() => start('login')}>Войти</button></span>
+            <span className="muted">{t('land.final.have')} <button className="link" onClick={() => start('login')}>{t('land.login')}</button></span>
           </div>
         </div>
       </section>
@@ -187,10 +187,10 @@ export const Landing: React.FC<{signup: {credits: number; days: number}; notice:
       </AuthModal>}
 
       <SiteFooter offer={offer} service={[
-        {label: 'Как это работает', href: '#how', onClick: jump('how')},
-        {label: 'Образцы', href: '#samples', onClick: jump('samples')},
-        {label: 'Цены', href: '#pricing', onClick: jump('pricing')},
-        {label: 'Вопросы', href: '#faq', onClick: jump('faq')},
+        {label: t('land.nav.how'), href: '#how', onClick: jump('how')},
+        {label: t('land.nav.samples'), href: '#samples', onClick: jump('samples')},
+        {label: t('land.nav.pricing'), href: '#pricing', onClick: jump('pricing')},
+        {label: t('land.nav.faq'), href: '#faq', onClick: jump('faq')},
       ]} />
     </div>
   );
@@ -209,13 +209,14 @@ const AuthModal: React.FC<{mode: AuthMode; onClose: () => void; children: React.
     page?.classList.add('land-locked');
     return () => { window.removeEventListener('keydown', onKey); page?.classList.remove('land-locked'); };
   }, [onClose]);
-  const title = mode === 'login' ? 'Вход в KOK' : mode === 'register' ? 'Кабинет за минуту' : 'Новый пароль';
+  const t = useT();
+  const title = t(mode === 'login' ? 'land.auth.login' : mode === 'register' ? 'land.auth.register' : 'land.auth.reset');
   return (
     <div className="land-modal" onClick={onClose} role="dialog" aria-modal="true" aria-label={title}>
       <div className="land-modal-card" onClick={(e) => e.stopPropagation()}>
         <div className="land-modal-head">
           <b>{title}</b>
-          <button className="land-modal-close" onClick={onClose} aria-label="Закрыть"><X size={20} /></button>
+          <button className="land-modal-close" onClick={onClose} aria-label={t('land.auth.close')}><X size={20} /></button>
         </div>
         {children}
       </div>
@@ -235,6 +236,17 @@ const Linked: React.FC<{text: string}> = ({text}) => <>{text.split(/(\[[^\]]+\]\
   return m ? <a key={i} href={m[2]}>{m[1]}</a> : part;
 })}</>;
 
+// «Хватит на 2 ролика и 1 карусель или на 7 каруселей». Остатка на карусель нет — без «и 0 карусели»
+const GiftEnough: React.FC<{t: T; credits: number; ad: number; carousel: number}> = ({t, credits, ad, carousel}) => {
+  const rest = Math.floor((credits % ad) / carousel);
+  const vars = {
+    videos: t.n('unit.video', Math.floor(credits / ad)),
+    carousels: t.n('unit.carousel', rest),
+    onlyCarousels: t.n('unit.carousel', Math.floor(credits / carousel)),
+  };
+  return <>{t(rest > 0 ? 'land.pricing.enough' : 'land.pricing.enoughNoRest', vars)}</>;
+};
+
 const Step: React.FC<{n: number; icon: React.ReactNode; title: string; text: string}> = ({n, icon, title, text}) => (
   <div className="land-step">
     <span className="land-step-n">{n}</span>
@@ -250,6 +262,7 @@ const Step: React.FC<{n: number; icon: React.ReactNode; title: string; text: str
  * композиция считается в браузере. Демо грузится, когда превью доходит до экрана
  */
 const LiveDemo: React.FC = () => {
+  const t = useT();
   const [lot, setLot] = useState<Lot | null>(null);
   const [format, setFormat] = useState(FORMATS[0].id);
   const [palette, setPalette] = useState(palettes[0].id);
@@ -264,16 +277,16 @@ const LiveDemo: React.FC = () => {
         {input ? <Preview input={input} format={fmt} autoPlay loop /> : <div className="land-phone-empty" />}
       </div>
       <div className="land-demo-controls">
-        <span className="land-try">Попробуйте — ролик меняется сразу</span>
-        <div className="land-chips" role="radiogroup" aria-label="Формат ролика">
+        <span className="land-try">{t('land.demo.try')}</span>
+        <div className="land-chips" role="radiogroup" aria-label={t('land.demo.format')}>
           {FORMATS.map((f) => (
             <button key={f.id} role="radio" aria-checked={f.id === format} className={f.id === format ? 'land-chip on' : 'land-chip'}
-              onClick={() => setFormat(f.id)}>{f.title}</button>
+              onClick={() => setFormat(f.id)}>{t.cfg(f.title)}</button>
           ))}
         </div>
-        <div className="land-swatches" role="radiogroup" aria-label="Палитра">
+        <div className="land-swatches" role="radiogroup" aria-label={t('land.demo.palette')}>
           {palettes.map((p) => (
-            <button key={p.id} role="radio" aria-checked={p.id === palette} title={p.title} aria-label={p.title}
+            <button key={p.id} role="radio" aria-checked={p.id === palette} title={t.cfg(p.title)} aria-label={t.cfg(p.title)}
               className={p.id === palette ? 'land-swatch on' : 'land-swatch'}
               style={{background: `linear-gradient(135deg, ${p.colors.bg} 50%, ${p.colors.copper} 50%)`}}
               onClick={() => setPalette(p.id)} />
@@ -305,7 +318,7 @@ const AutoVideo: React.FC<{src: string; poster: string}> = ({src, poster}) => {
  * (scroll-snap): пальцем листается сама, с инерцией, как в Instagram; соседний слайд
  * выглядывает справа — видно, что дальше есть ещё
  */
-const Carousels: React.FC<{items: Samples['carousels']}> = ({items}) => {
+const Carousels: React.FC<{items: Samples['carousels']; t: T}> = ({items, t}) => {
   const [at, setAt] = useState(0);
   const strip = useRef<HTMLDivElement>(null);
   const c = items[at];
@@ -321,52 +334,53 @@ const Carousels: React.FC<{items: Samples['carousels']}> = ({items}) => {
       <div className="land-chips">
         {items.map((it, i) => (
           <button key={it.title + it.format} className={i === at ? 'land-chip on' : 'land-chip'} onClick={() => setAt(i)}>
-            {it.title} · {it.format}
+            {it.title} · {t.cfg(it.format)}
           </button>
         ))}
       </div>
       <div className="land-strip-wrap">
-        <button className="land-arrow left" onClick={() => step(-1)} aria-label="Назад"><ChevronLeft size={22} /></button>
+        <button className="land-arrow left" onClick={() => step(-1)} aria-label={t('land.prev')}><ChevronLeft size={22} /></button>
         <div className="land-strip" ref={strip} style={{['--slide-ratio' as string]: c.ratio}}>
-          {c.slides.map((s, i) => <img key={s} className="land-slide" src={s} alt={`${c.title}, слайд ${i + 1}`} loading="lazy" />)}
+          {c.slides.map((s, i) => <img key={s} className="land-slide" src={s} alt={t('land.samples.slideAlt', {title: c.title, n: i + 1})} loading="lazy" />)}
         </div>
-        <button className="land-arrow right" onClick={() => step(1)} aria-label="Вперёд"><ChevronRight size={22} /></button>
+        <button className="land-arrow right" onClick={() => step(1)} aria-label={t('land.next')}><ChevronRight size={22} /></button>
       </div>
-      <p className="land-sub">{c.slides.length} слайдов · {c.palette} · листайте вбок</p>
+      <p className="land-sub">{t.n('unit.slide', c.slides.length)} · {t.cfg(c.palette)} · {t('land.samples.swipe')}</p>
     </div>
   );
 };
 
 // Тарифы — из админки, те же, что в кабинете. Без базы (копия на Mac) их нет — тогда
 // только обещание показать после регистрации, а не пустая таблица
-const Tariffs: React.FC<{offer: PublicOffer | null}> = ({offer}) => {
+const Tariffs: React.FC<{offer: PublicOffer | null; t: T}> = ({offer, t}) => {
+  const credits = (n: number) => t.n('unit.credit', n);
   const plans = (offer?.packs ?? []).filter((p) => p.kind === 'plan');
   const topups = (offer?.packs ?? []).filter((p) => p.kind === 'topup');
   // Менеджер — в Telegram (владелец 12.10: обратная связь через Telegram); нет его — WhatsApp
   const tg = offer?.contacts?.telegram?.trim().replace(/^https?:\/\/t\.me\//, '').replace(/^@/, '');
   const wa = offer?.contacts?.whatsapp?.replace(/\D/g, '');
   const ask = tg ? {href: `https://t.me/${tg}`, label: 'Telegram'} : wa ? {href: `https://wa.me/${wa}`, label: 'WhatsApp'} : null;
-  if (!plans.length && !topups.length) return <p className="land-sub">Тарифы и докупка — в кабинете после регистрации.</p>;
+  if (!plans.length && !topups.length) return <p className="land-sub">{t('land.tariffs.later')}</p>;
   return (
     <div className="land-tariffs">
       {plans.map((p) => (
         <div key={p.id} className="land-tariff">
           <span className="land-tariff-title">{p.title}</span>
           <b className="land-big">{usd(p.price_usd)}</b>
-          <span className="muted">в месяц</span>
-          <span>{credits(p.credits)} · {usd(Math.round((p.price_usd / p.credits) * 100) / 100)} за кредит</span>
+          <span className="muted">{t('land.tariffs.month')}</span>
+          <span>{credits(p.credits)} · {t('land.tariffs.perCredit', {price: usd(Math.round((p.price_usd / p.credits) * 100) / 100)})}</span>
         </div>
       ))}
       {topups.length > 0 && (
         <div className="land-tariff topup">
-          <span className="land-tariff-title">Не хватило на месяц</span>
+          <span className="land-tariff-title">{t('land.tariffs.topup')}</span>
           {/* Название пакета часто уже содержит число («+20 кредитов») — тогда не повторяем его */}
           {topups.map((p) => (
             <span key={p.id}>{p.title.includes(String(p.credits)) ? p.title : `${p.title}: ${credits(p.credits)}`} — {usd(p.price_usd)}</span>
           ))}
         </div>
       )}
-      {ask && <a className="btn ghost" href={ask.href} target="_blank" rel="noreferrer">Спросить менеджера в {ask.label}</a>}
+      {ask && <a className="btn ghost" href={ask.href} target="_blank" rel="noreferrer">{t('land.tariffs.ask', {channel: ask.label})}</a>}
     </div>
   );
 };

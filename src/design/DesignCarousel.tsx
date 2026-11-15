@@ -17,17 +17,21 @@ const plain = (s?: string) => (s ? s.replace(/[{}]/g, '').replace(/\s*\n\s*/g, '
 export const carouselDesignContent = (props: CarouselProps, slide: string, t: Record<string, string> = {}): DesignContent => {
   const {car, market} = props;
   const tx = carouselText(carouselLang(market.language), car.origin);
-  const ru = carouselLang(market.language) === 'ru';
-  const labels = ru ? {exterior: 'Экстерьер', rear: 'Внешний вид', engine: 'Двигатель', safety: 'Безопасность',
-    details: 'Детали', gallery: 'Галерея', why: 'О компании'} : {exterior: 'Exterior', rear: 'Exterior', engine: 'Engine', safety: 'Safety',
-    details: 'Details', gallery: 'Gallery', why: 'About us'};
+  const labels = {
+    ru: {exterior: 'Экстерьер', rear: 'Внешний вид', engine: 'Двигатель', safety: 'Безопасность',
+      details: 'Детали', gallery: 'Галерея', why: 'О компании'},
+    en: {exterior: 'Exterior', rear: 'Exterior', engine: 'Engine', safety: 'Safety',
+      details: 'Details', gallery: 'Gallery', why: 'About us'},
+    sq: {exterior: 'Eksterieri', rear: 'Pamja e jashtme', engine: 'Motori', safety: 'Siguria',
+      details: 'Detajet', gallery: 'Galeria', why: 'Rreth nesh'},
+  }[tx.lang];
   const all = Array.from(new Set([car.photos.hero, ...car.photos.exterior, ...car.photos.interior, ...car.photos.other].filter(Boolean))) as string[];
   const base = {title: car.model, eyebrow: car.brand, subtitle: [car.year, car.grade, car.trim].filter(Boolean).join(' · '), photo: car.photos.hero,
     photos: [car.photos.hero, car.photos.exterior[1]].filter(Boolean) as string[]};
   const specFacts = [
     {label: tx.s.year, value: car.year === null ? '' : String(car.year)},
     {label: tx.s.mileage, value: car.mileageKm === null ? '' : tx.km(car.mileageKm)},
-    {label: tx.s.engine, value: [car.displacementCc ? `${(car.displacementCc / 1000).toFixed(1).replace('.', ru ? ',' : '.')} ${ru ? 'л' : 'L'}` : '', tx.value(car.fuel)].filter(Boolean).join(' · ')},
+    {label: tx.s.engine, value: [car.displacementCc ? `${(car.displacementCc / 1000).toFixed(1).replace('.', tx.u.dec)} ${tx.lang === 'ru' ? 'л' : 'L'}` : '', tx.value(car.fuel)].filter(Boolean).join(' · ')},
     {label: tx.s.transmission, value: tx.value(car.transmission)},
   ].filter((f) => f.value);
   // Обложка: надпись над названием и довод под ним (часто из данных машины — «Пробег всего …»)

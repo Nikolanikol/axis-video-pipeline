@@ -64,7 +64,6 @@ const plural = (n: number, one: string, few: string, many: string) => {
 
 /** Подстановки %…% из данных машины */
 const carVars = (car: CarouselCar, tx: CarouselText, brandName: string): Record<string, string> => {
-  const ru = tx.lang === 'ru';
   const opts = car.options?.total ?? 0;
   const seats = car.seats ?? 0;
   return {
@@ -73,8 +72,10 @@ const carVars = (car: CarouselCar, tx: CarouselText, brandName: string): Record<
     engine: tx.liters(car.displacementCc),
     mileage: tx.km(car.mileageKm),
     year: car.year ? String(car.year) : '',
-    options: ru ? `${opts} ${plural(opts, 'опция', 'опции', 'опций')}` : `${opts} features`,
-    seats: ru ? `${seats} ${plural(seats, 'место', 'места', 'мест')}` : `${seats} seats`,
+    options: tx.lang === 'ru' ? `${opts} ${plural(opts, 'опция', 'опции', 'опций')}`
+      : tx.lang === 'sq' ? `${opts} ${opts === 1 ? 'opsion' : 'opsione'}` : `${opts} features`,
+    seats: tx.lang === 'ru' ? `${seats} ${plural(seats, 'место', 'места', 'мест')}`
+      : tx.lang === 'sq' ? `${seats} ${seats === 1 ? 'vend' : 'vende'}` : `${seats} seats`,
   };
 };
 

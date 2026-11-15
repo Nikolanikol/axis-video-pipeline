@@ -10,15 +10,15 @@ import {DangerZone, ProfileCard, SecurityCard} from './AccountProfile';
 import {SetupCard} from './Onboarding';
 import {PaymentReturn, PlansSection} from './AccountPlans';
 import {useConfig} from './config';
+import {locale, useT, type Key} from './i18n';
 
 // Цены тарифов — в долларах (миграция 020, 23.10): целые — без центов ($19), иначе до цента ($0.76)
 export const usd = (n: number) => `$${n.toLocaleString('en-US', Number.isInteger(n) ? {maximumFractionDigits: 0} : {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
-export const when = (iso: string) => new Date(iso).toLocaleString('ru-RU', {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
+export const when = (iso: string) => new Date(iso).toLocaleString(locale(), {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
 // Откуда партия кредитов — подпись в кабинете. «pack» с 29.09 — докупка: пакеты на год
 // стали докупкой к подписке (миграция 006)
-const SOURCE: Record<CreditLot['source'], string> = {
-  signup: 'подарок за регистрацию', subscription: 'подписка', pack: 'докупка', bonus: 'бонус', legacy: 'перенесено',
-};
+// Откуда партия кредитов — ключ словаря acc.source.<источник> (app/i18n)
+const SOURCE = (s: CreditLot['source']): Key => `acc.source.${s}` as Key;
 // За сколько дней до конца подписки предупреждать — клиента плашкой, менеджера списком.
 // Пять дней: успеть написать, оплатить переводом и получить начисление до сгорания
 export const RENEW_DAYS = 5;
@@ -30,12 +30,13 @@ export const RENEW_DAYS = 5;
 
 export const AccountPage: React.FC = () => {
   const {workspace, balance, enabled, isStaff} = useSession();
+  const t = useT();
 
   if (!enabled) {
     return (
       <div className="page"><div className="card">
-        <h1>Кабинет</h1>
-        <p className="muted">Кабинеты работают только с базой. Здесь база не подключена — инструмент работает на одного владельца.</p>
+        <h1>{t('acc.noDbTitle')}</h1>
+        <p className="muted">{t('acc.noDb')}</p>
       </div></div>
     );
   }
@@ -45,13 +46,13 @@ export const AccountPage: React.FC = () => {
     <div className="page account-page">
       <header className="account-head">
         <div>
-          <h1 className="page-title">Мой кабинет</h1>
-          <p className="muted">{workspace?.name}{!isStaff && balance ? ` · ${balance.credits} кр.` : ''}</p>
+          <h1 className="page-title">{t('acc.title')}</h1>
+          <p className="muted">{workspace?.name}{!isStaff && balance ? ` · ${t.n('unit.creditShort', balance.credits)}` : ''}</p>
         </div>
         {!isStaff && (
           <div className="account-head-actions">
             <SupportButton />
-            <button className="btn primary" onClick={toPlans}>{balance?.subscription ? 'Продлить подписку' : 'Оформить подписку'}</button>
+            <button className="btn primary" onClick={toPlans}>{t(balance?.subscription ? 'acc.renewSub' : 'acc.getSub')}</button>
           </div>
         )}
       </header>
@@ -64,7 +65,7 @@ export const AccountPage: React.FC = () => {
         <div className="account-col">
           <section className="card acc-balance">
             <h2>{workspace?.name}</h2>
-            {isStaff ? <p className="note">Сотрудники платформы генерируют без кредитов.</p> : <BalanceFacts balance={balance} />}
+            {isStaff ? <p className="note">{t('acc.staffFree')}</p> : <BalanceFacts balance={balance} />}
           </section>
           <div className="acc-security"><SecurityCard /></div>
         </div>
@@ -88,6 +89,7 @@ export const AccountPage: React.FC = () => {
  * между нажатием и открытием был запрос к серверу
  */
 const SupportButton: React.FC = () => {
+  const t = useT();
   const [on, setOn] = useState(false);
   const [busy, setBusy] = useState(false);
   useEffect(() => { api.offer().then((o) => setOn(Boolean(o.support))).catch(() => setOn(false)); }, []);
@@ -106,33 +108,34 @@ const SupportButton: React.FC = () => {
       setBusy(false);
     }
   };
-  return <button className="btn" onClick={open} disabled={busy}>{busy ? 'Открываю…' : 'Написать в поддержку'}</button>;
+  return <button className="btn" onClick={open} disabled={busy}>{t(busy ? 'acc.opening' : 'acc.support')}</button>;
 };
 
 /** Кредиты, подписка и ближайшее сгорание строками; партии — таблицей, если их несколько */
 const BalanceFacts: React.FC<{balance: Balance | null}> = ({balance}) => {
   const {emailVerified} = useSession();
   const {config} = useConfig();
+  const t = useT();
   if (!balance) return null;
   const sub = balance.subscription;
   return (
     <>
       <dl className="rows">
-        <dt>Кредиты</dt>
-        <dd><b>{balance.credits}</b> <span className="muted">· карусель {config.credits?.carousels ?? 1}, ролик {config.credits?.ads ?? 3}</span></dd>
-        <dt>Подписка</dt>
-        <dd>{sub ? <>«{sub.title}» до {day(sub.until)} <span className="muted">· {daysLeft(sub.until)} дн.</span></> : <span className="muted">нет</span>}</dd>
+        <dt>{t('acc.credits')}</dt>
+        <dd><b>{balance.credits}</b> <span className="muted">· {t('acc.prices', {carousel: config.credits?.carousels ?? 1, video: config.credits?.ads ?? 3})}</span></dd>
+        <dt>{t('acc.sub')}</dt>
+        <dd>{sub ? <>{t('acc.subUntil', {title: sub.title, date: day(sub.until)})} <span className="muted">· {t.n('unit.day', daysLeft(sub.until))}</span></> : <span className="muted">{t('acc.none')}</span>}</dd>
         {balance.nextExpiry && (
-          <><dt>Ближайшее сгорание</dt><dd>{balance.nextExpiry.credits} кр. — {day(balance.nextExpiry.at)}</dd></>
+          <><dt>{t('acc.nextExpiry')}</dt><dd>{t.n('unit.creditShort', balance.nextExpiry.credits)} — {day(balance.nextExpiry.at)}</dd></>
         )}
       </dl>
       {/* Партии показываем, только когда их несколько: одна строка повторила бы факты выше */}
       {balance.lots.length > 1 && (
         <table className="table">
-          <thead><tr><th>Откуда</th><th>Осталось</th><th>Действует до</th></tr></thead>
+          <thead><tr><th>{t('acc.lot.from')}</th><th>{t('acc.lot.left')}</th><th>{t('acc.lot.until')}</th></tr></thead>
           <tbody>
             {balance.lots.map((l) => (
-              <tr key={l.id}><td>{SOURCE[l.source]}</td><td>{l.remaining} из {l.credits}</td><td>{day(l.expiresAt)}</td></tr>
+              <tr key={l.id}><td>{t(SOURCE(l.source))}</td><td>{t('start.of', {a: l.remaining, b: l.credits})}</td><td>{day(l.expiresAt)}</td></tr>
             ))}
           </tbody>
         </table>
@@ -140,7 +143,7 @@ const BalanceFacts: React.FC<{balance: Balance | null}> = ({balance}) => {
       {/* До подтверждения почты про это уже говорят полоса сверху и шаг «Почта» — здесь молчим.
           «Закончились» — только тому, кому кредиты уже дарили */}
       {balance.credits <= 0 && emailVerified && (
-        <p className="notice warn">Кредиты закончились. Готовое можно смотреть и скачивать; новое — после подписки или докупки ниже.</p>
+        <p className="notice warn">{t('acc.out')}</p>
       )}
     </>
   );
@@ -151,6 +154,7 @@ const BalanceFacts: React.FC<{balance: Balance | null}> = ({balance}) => {
  * считает сервер. Остаток изменился (списание, возврат, пакет) — перечитываем текущую страницу
  */
 const LedgerSection: React.FC<{credits?: number}> = ({credits}) => {
+  const t = useT();
   const [data, setData] = useState<LedgerPage | null>(null);
   const [page, setPage] = useState(1);
   const top = useRef<HTMLElement>(null);
@@ -162,22 +166,22 @@ const LedgerSection: React.FC<{credits?: number}> = ({credits}) => {
   return (
     <section className="card ledger-section" ref={top}>
       <div className="section-head">
-        <h2>История кредитов</h2>
-        {data.total > 0 && <span className="muted">{from}–{to} из {data.total}</span>}
+        <h2>{t('acc.ledger')}</h2>
+        {data.total > 0 && <span className="muted">{t('start.of', {a: `${from}–${to}`, b: data.total})}</span>}
       </div>
-      {data.total === 0 ? <p className="muted">Пока пусто — здесь появятся начисления и списания.</p> : (
+      {data.total === 0 ? <p className="muted">{t('acc.ledgerEmpty')}</p> : (
         <div className="table-scroll">
           <table className="table">
-            <thead><tr><th>Когда</th><th>Что</th><th>Кредиты</th><th>Подробности</th></tr></thead>
+            <thead><tr><th>{t('acc.l.when')}</th><th>{t('acc.l.what')}</th><th>{t('acc.credits')}</th><th>{t('acc.l.details')}</th></tr></thead>
             <tbody>
               {data.rows.map((r) => (
                 <tr key={r.id}>
                   <td className="nowrap">{when(r.created_at)}</td>
-                  <td>{KIND[r.kind]}{r.pipeline ? ` · ${WHAT[r.pipeline] ?? r.pipeline}` : ''}</td>
+                  <td>{t(`acc.kind.${r.kind}` as Key)}{r.pipeline ? ` · ${WHAT[r.pipeline] ? t(`acc.what.${r.pipeline}` as Key) : r.pipeline}` : ''}</td>
                   <td className={r.delta > 0 ? 'plus' : 'minus'}>{r.delta > 0 ? `+${r.delta}` : r.delta}</td>
                   <td className="muted">
                     {r.note || '—'}
-                    {r.kind === 'grant' && r.expires_at && ` · до ${day(r.expires_at)}`}
+                    {r.kind === 'grant' && r.expires_at && ` · ${t('acc.until', {date: day(r.expires_at)})}`}
                     {r.price_usd ? ` · ${usd(r.price_usd)}` : ''}
                   </td>
                 </tr>
@@ -188,14 +192,15 @@ const LedgerSection: React.FC<{credits?: number}> = ({credits}) => {
       )}
       {data.pages > 1 && (
         <div className="pager">
-          <button className="btn ghost" disabled={data.page <= 1} onClick={() => go(data.page - 1)}>‹ Назад</button>
-          <span>стр. {data.page} из {data.pages}</span>
-          <button className="btn ghost" disabled={data.page >= data.pages} onClick={() => go(data.page + 1)}>Вперёд ›</button>
+          <button className="btn ghost" disabled={data.page <= 1} onClick={() => go(data.page - 1)}>‹ {t('land.prev')}</button>
+          <span>{t('acc.page', {a: data.page, b: data.pages})}</span>
+          <button className="btn ghost" disabled={data.page >= data.pages} onClick={() => go(data.page + 1)}>{t('land.next')} ›</button>
         </div>
       )}
     </section>
   );
 };
 
+// Русские подписи журнала — для админки (она по-русски); клиенту — acc.kind.* / acc.what.* из словаря
 export const KIND: Record<LedgerRow['kind'], string> = {grant: 'Начислено', charge: 'Списано', refund: 'Возврат', adjust: 'Правка'};
 export const WHAT: Record<string, string> = {ads: 'Ролик', carousels: 'Карусель', reviews: 'Обзор'};

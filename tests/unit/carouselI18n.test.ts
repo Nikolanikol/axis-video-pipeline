@@ -8,9 +8,22 @@ const en = carouselText('en');
 const nbsp = (s: string) => s.replace(/ | /g, ' ');
 
 describe('язык карусели', () => {
-  it('русский — только по профилю ru, остальные языки получают английский', () => {
+  it('русский и албанский — по профилю, остальные языки получают английский', () => {
     expect(carouselLang('ru')).toBe('ru');
-    for (const l of ['en', 'mk', 'sq', undefined]) expect(carouselLang(l)).toBe('en');
+    expect(carouselLang('sq')).toBe('sq');
+    for (const l of ['en', 'mk', undefined]) expect(carouselLang(l)).toBe('en');
+  });
+
+  // Албанский (15.11): язык контента идёт за переключателем KOK
+  it('албанский: данные, единицы и страна машины', () => {
+    const sq = carouselText('sq');
+    expect(sq.value('Gasoline')).toBe('Benzinë');
+    expect(sq.option('Sunroof')).toBe('Tavan diellor');
+    expect(sq.value('Quantum drive')).toBe('Quantum drive');
+    expect(sq.u.year).toBe('VITI');
+    expect(nbsp(sq.km(67842))).toBe('67 842 km');
+    expect(carouselText('sq', 'CN').copy.cover.tagline[0]).toBe('Makina\nnga Kina');
+    expect(carouselText('sq', 'JP').s.priceInKorea).toBe('Çmimi në Japoni');
   });
 
   it('данные Encar переводятся словарями kmotors, цвета — своим', () => {

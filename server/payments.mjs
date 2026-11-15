@@ -462,8 +462,13 @@ const credit = async (o, paymentId, requestId) => {
  */
 // Чем платил клиент — словами для письма. Касса пишет в заказ свой код способа (pay_currency); новая
 // касса — новые строки сюда, незнакомый код выйдет в письме как есть, заглавными
-const PAY_METHODS = {usdttrc20: 'USDT TRC20', sbp: 'СБП', card: 'банковская карта'};
-const payMethod = (code) => (code ? PAY_METHODS[code] ?? String(code).toUpperCase() : null);
+// Способ оплаты словами — на языке письма (язык владельца кабинета, 15.11)
+const PAY_METHODS = {
+  ru: {usdttrc20: 'USDT TRC20', sbp: 'СБП', card: 'банковская карта'},
+  en: {usdttrc20: 'USDT TRC20', sbp: 'SBP', card: 'bank card'},
+  sq: {usdttrc20: 'USDT TRC20', sbp: 'SBP', card: 'kartë bankare'},
+};
+const payMethod = (code, lang) => (code ? (PAY_METHODS[lang] ?? PAY_METHODS.ru)[code] ?? String(code).toUpperCase() : null);
 
 const receipt = async (o, {pack, lot}, paymentId, requestId) => {
   const rlog = log.child({requestId, order: o.id});
@@ -476,8 +481,8 @@ const receipt = async (o, {pack, lot}, paymentId, requestId) => {
     }
     await paymentMail({
       to: u.email, name: u.name, plan: pack.kind === 'plan', title: pack.title ?? pack.id, credits: pack.credits,
-      until: lot.expires_at, paid: {amount: o.amount, currency: o.currency, method: payMethod(o.pay_currency)}, priceUsd: o.price_usd, orderId: o.id, paidAt: new Date(),
-      link: `${appUrl()}/#/account/${o.id}`, sandbox: o.sandbox,
+      until: lot.expires_at, paid: {amount: o.amount, currency: o.currency, method: payMethod(o.pay_currency, u.lang)}, priceUsd: o.price_usd, orderId: o.id, paidAt: new Date(),
+      link: `${appUrl()}/#/account/${o.id}`, sandbox: o.sandbox, lang: u.lang,
     });
     await event(o.id, 'mail', {status: 'paid', data: {to: u.email, paymentId}, requestId});
     rlog.info('mail.sent', {paymentId});

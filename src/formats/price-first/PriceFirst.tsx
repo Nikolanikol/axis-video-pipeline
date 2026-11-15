@@ -47,6 +47,13 @@ const WORDS = {
     owners: (n: number) => `Owner changes: ${n}`,
     clean: 'No theft or flood records', theft: (n: number) => `Theft records: ${n}`, flood: (n: number) => `Flood records: ${n}`,
   },
+  sq: {
+    history: 'Historia e makinës', specs: 'Të dhënat teknike',
+    noClaims: 'Pa dëme në sigurime', claims: (n: number) => `Dëme në sigurime: ${n}`,
+    oneOwner: 'Një pronar',
+    owners: (n: number) => `Ndërrime pronari: ${n}`,
+    clean: 'Pa vjedhje dhe përmbytje', theft: (n: number) => `Vjedhje: ${n}`, flood: (n: number) => `Përmbytje: ${n}`,
+  },
 };
 
 /**

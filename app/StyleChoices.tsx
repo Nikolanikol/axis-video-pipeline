@@ -4,6 +4,7 @@
 import React, {useState} from 'react';
 import {STYLE_CHOICES, resolveStyle} from '../src/design/style/registry.js';
 import type {Theme} from '../src/shared/types';
+import {useT} from './i18n';
 
 export type StyleField = keyof typeof STYLE_CHOICES;
 
@@ -20,6 +21,7 @@ type Props = {
 
 export const StyleChoices: React.FC<Props> = ({theme, fields, onChange, compact = false, look = 'settings'}) => {
   const [more, setMore] = useState(false);
+  const t = useT();
   // Подсвечено действующее: выбранное, а не выбранное — умолчание компоновки
   const current = resolveStyle(theme, theme.design ?? 'catalog');
   const hidden = fields.reduce((n, f) => n + STYLE_CHOICES[f].options.filter((o) => !('main' in o && o.main)).length, 0);
@@ -29,14 +31,14 @@ export const StyleChoices: React.FC<Props> = ({theme, fields, onChange, compact 
       // Выбранный вариант из «Ещё» виден и в свёрнутом виде — иначе не понять, что включено
       const options = compact && !more ? choice.options.filter((o) => ('main' in o && o.main) || o.id === current[field]) : choice.options;
       return <div key={field} className={look === 'side' ? 'style-side' : 'switch-row'}>
-        <span className={look === 'side' ? 'quick-label' : 'switch-label'}>{choice.title}</span>
-        <div className={look === 'side' ? 'motion-row' : 'btn-row'} role="radiogroup" aria-label={choice.title}>
+        <span className={look === 'side' ? 'quick-label' : 'switch-label'}>{t.cfg(choice.title)}</span>
+        <div className={look === 'side' ? 'motion-row' : 'btn-row'} role="radiogroup" aria-label={t.cfg(choice.title)}>
           {options.map((o) => <button key={o.id} type="button" role="radio" aria-checked={current[field] === o.id}
-            className={`btn ${current[field] === o.id ? 'primary' : 'ghost'}`} onClick={() => onChange(field, o.id)}>{o.title}</button>)}
+            className={`btn ${current[field] === o.id ? 'primary' : 'ghost'}`} onClick={() => onChange(field, o.id)}>{t.cfg(o.title)}</button>)}
         </div>
       </div>;
     })}
     {compact && hidden > 0 && <button type="button" className="motion-reset" aria-expanded={more} onClick={() => setMore(!more)}>
-      {more ? 'Только основные' : `Ещё приёмы (${hidden})`}</button>}
+      {more ? t('style.mainOnly') : t('style.more', {n: hidden})}</button>}
   </>;
 };

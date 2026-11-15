@@ -2,6 +2,7 @@
 // Области живут в лоте — их можно поправить или убрать в любой момент.
 import React, {useEffect, useRef, useState} from 'react';
 import {api, LotEntry, PhotoInfo, Region} from './api';
+import {useT} from './i18n';
 
 type Props = {
   lotId: string;
@@ -56,6 +57,7 @@ export const BlurEditor: React.FC<Props> = ({lotId, path, onClose, onSaved, onEr
     setStart(null); setEnd(null);
   };
 
+  const t = useT();
   const dirty = info !== null && JSON.stringify(regions) !== JSON.stringify(info.regions);
   const save = async () => {
     setBusy(true);
@@ -65,14 +67,14 @@ export const BlurEditor: React.FC<Props> = ({lotId, path, onClose, onSaved, onEr
   return (
     <div className="modal-backdrop" onPointerDown={(e) => { if (e.target === e.currentTarget && !busy) onClose(); }}>
       <div className="modal">
-        <h2>Размытие <span className="muted">выдели мышкой номер или всё лишнее; × на рамке — убрать</span></h2>
+        <h2>{t('blur.title')} <span className="muted">{t('blur.hint')}</span></h2>
         <div className="blur-stage">
-          {!info ? <div className="empty">Загрузка…</div> : (
+          {!info ? <div className="empty">{t('common.loading')}</div> : (
             <div ref={canvas} className="blur-canvas" onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
               <img src={info.source} alt="" draggable={false} />
               {regions.map((r, i) => (
                 <div key={i} className="blur-box" style={boxStyle(r)}>
-                  <button className="icon" title="Убрать размытие" onPointerDown={(e) => e.stopPropagation()}
+                  <button className="icon" title={t('blur.remove')} onPointerDown={(e) => e.stopPropagation()}
                     onClick={() => setRegions((rs) => rs.filter((_, j) => j !== i))}>×</button>
                 </div>
               ))}
@@ -81,11 +83,11 @@ export const BlurEditor: React.FC<Props> = ({lotId, path, onClose, onSaved, onEr
           )}
         </div>
         <div className="actions">
-          <button className="btn primary" disabled={!dirty || busy} onClick={save}>{busy ? 'Применяю…' : 'Применить'}</button>
+          <button className="btn primary" disabled={!dirty || busy} onClick={save}>{t(busy ? 'blur.applying' : 'blur.apply')}</button>
           {busy && <div className="bar wait" style={{flex: 1, alignSelf: 'center'}}><div /></div>}
-          <button className="btn" disabled={!regions.length || busy} onClick={() => setRegions([])}>Убрать все</button>
-          <button className="btn ghost" disabled={busy} onClick={onClose}>Отмена</button>
-          <span className="muted">Областей: {regions.length}</span>
+          <button className="btn" disabled={!regions.length || busy} onClick={() => setRegions([])}>{t('blur.removeAll')}</button>
+          <button className="btn ghost" disabled={busy} onClick={onClose}>{t('common.cancel')}</button>
+          <span className="muted">{t('blur.count', {n: regions.length})}</span>
         </div>
       </div>
     </div>

@@ -7,6 +7,7 @@ import {withoutMusic} from '../src/shared/nomusic.js';
 import {backdropSrc, photoSrc} from '../src/shared/ui';
 import {preloadPhotos} from '../src/shared/photoPreload';
 import {RecMark} from './Loading';
+import {SceneTitle} from './i18n/SceneTitle';
 
 // autoPlay — превью само начинает играть. Без loop — один проигрыш и стоп на последнем кадре
 // (владелец 12.10: бесконечный повтор рисовал 1080×1920 по 30 кадров в секунду, пока страница
@@ -180,7 +181,7 @@ export const Preview: React.FC<{input: AdProps; format: FormatMeta; autoPlay?: b
       {showScenes && <div className="scenes">
         {format.scenes.map((s) => (
           <button key={s.id} className={`btn ${onScene && current === s.id ? 'primary' : 'ghost'}`} aria-pressed={onScene ? current === s.id : undefined}
-            onClick={() => goTo(s.id)}>{s.title}</button>
+            onClick={() => goTo(s.id)}><SceneTitle title={s.title} /></button>
         ))}
       </div>}
     </div>

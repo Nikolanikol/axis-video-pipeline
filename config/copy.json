@@ -29,6 +29,16 @@
       "ctaAccent": "за 24 часа",
       "ctaBenefit": "Работаем без комиссии",
       "whatsappLabel": "WhatsApp"
+    },
+    "sq": {
+      "hookTagline": "Nga Koreja",
+      "priceLabel": "Çmimi deri në {port}",
+      "priceNoteIncluded": "Transporti detar i përfshirë.",
+      "priceNoteExcluded": "Detyrimet doganore nuk përfshihen.",
+      "ctaTitle": "Ofertë e plotë",
+      "ctaAccent": "brenda 24 orësh",
+      "ctaBenefit": "Punojmë pa komision",
+      "whatsappLabel": "WhatsApp"
     }
   },
   "domestic": {
@@ -50,6 +60,16 @@
       "ctaTitle": "Запишись на\nтест-драйв",
       "ctaAccent": "сегодня",
       "ctaBenefit": "Без навязывания",
+      "whatsappLabel": "WhatsApp"
+    },
+    "sq": {
+      "hookTagline": "Në gjendje tani",
+      "priceLabel": "Çmimi",
+      "priceNoteIncluded": "",
+      "priceNoteExcluded": "",
+      "ctaTitle": "Rezervoni një\nprovë",
+      "ctaAccent": "sot",
+      "ctaBenefit": "Pa presion, vetëm makina",
       "whatsappLabel": "WhatsApp"
     }
   }
