@@ -80,6 +80,32 @@ export type Profile = {
   texts?: Record<string, Partial<Texts>> | Partial<Texts>;
   // Настройки рекламного ролика, не зависящие от языка
   ad?: {benefitIcon?: boolean};
+  // Коммерческое предложение в PDF: реквизиты и шаблон (src/shared/offer.js, docs/offer-pdf.md)
+  offer?: Partial<OfferSettings>;
+};
+
+// ——— КП дилера (src/shared/offer.js) ———
+export type OfferCostType = 'car' | 'fixed' | 'percent' | 'manual';
+export type OfferCostLine = {
+  id: string; type: OfferCostType; label: string; note?: string;
+  // hidden — в итоге, но не в документе: сумма растворяется в цене машины (маржа)
+  hidden?: boolean; amount?: number | null; percent?: number | null;
+};
+export type OfferDealer = {
+  legalName: string; requisites: {label: string; value: string}[]; address: string;
+  phone: string; email: string; signer: {name: string; position: string}; accent?: string;
+};
+export type OfferTemplate = {
+  numbering: {prefix: string; next: number}; validityDays: number;
+  title: string; intro: string; costLines: OfferCostLine[];
+  totalLabel: string; totalNote: string; showBreakdown: boolean; showPurchasePrice: boolean;
+  disclaimer: string; sections: {title: string; items: string[]}[];
+  show: {requisites: boolean; recipient: boolean; specs: boolean; photos: number; gallery: number; signature: boolean; stamp: boolean};
+};
+export type OfferSettings = {dealer: OfferDealer; template: OfferTemplate};
+export type OfferMeta = {
+  id: string; lotId: string; number: string; createdAt: string; client: string; currency: string;
+  total: number; car: string; sample?: boolean;
 };
 
 // Лот — данные об авто. Любое поле рынка можно переопределить (например, whatsapp: null — скрыть номер).

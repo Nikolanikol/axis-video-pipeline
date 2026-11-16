@@ -110,6 +110,11 @@ const DICT = {
   'Слишком длинный текст поста: до {} знаков': ['The post text is too long: up to {} characters', 'Teksti i postimit është shumë i gjatë: deri në {} karaktere'],
   'Хэштеги — до 5 штук, каждый со знаком # и без пробелов': ['Hashtags: up to 5, each starting with # and without spaces', 'Hashtag-ët: deri në 5, secili me # dhe pa hapësira'],
   'Нет такого объявления': ['No such listing', 'Nuk ka shpallje të tillë'],
+  // КП в PDF (server/offers.mjs)
+  'Сумма в КП — число': ['Offer amounts must be numbers', 'Shumat në ofertë duhet të jenë numra'],
+  'Впишите сумму: {}': ['Enter the amount: {}', 'Shkruani shumën: {}'],
+  'Не удалось собрать PDF — попробуйте ещё раз': ['Could not build the PDF — please try again', 'PDF nuk u krijua — provoni përsëri'],
+  'КП не найдено': ['Offer not found', 'Oferta nuk u gjet'],
   'Ролик этого объявления сейчас собирается — дождитесь или отмените сборку': ['The video for this listing is being built — wait or cancel the build', 'Videoja e kësaj shpalljeje po krijohet — prisni ose anuloni'],
   'Добавь хотя бы одно фото': ['Add at least one photo', 'Shtoni të paktën një foto'],
   'Выберите хотя бы одно фото': ['Select at least one photo', 'Zgjidhni të paktën një foto'],

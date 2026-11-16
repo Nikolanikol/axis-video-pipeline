@@ -1,10 +1,11 @@
 // Клиент API сервера: вход и кабинет, админка, настройки, лоты и фото, обзоры, речь и озвучка,
 // рендеры, карусели. Типы ответов — общие с сервером.
-import type {CarouselCar, FormatMeta, Lot, Market, Profile, Review, Texts, Theme} from '../src/shared/types';
+import type {CarouselCar, FormatMeta, Lot, Market, OfferMeta, OfferSettings, Profile, Review, Texts, Theme} from '../src/shared/types';
 import {getLang, tNow, type Key, type Lang} from './i18n';
 
 export type MarketEntry = Market & {id: string};
 export type ProfileEntry = Profile & {id: string};
+export type OfferRequest = {client: string; amounts: Record<string, number | string>; extraLines: {label: string; note?: string; amount: number | string}[]};
 // Дефолты текстов платформы: режим цены → язык → тексты. Клиент их не пишет, только читает
 export type Copy = Record<string, Record<string, Texts>>;
 // Размытие: [x, y, w, h] в долях кадра, по «стволу» имени файла фото
@@ -279,6 +280,15 @@ export const api = {
   saveMarket: (id: string, market: Market) => request<MarketEntry>('PUT', `/api/markets/${id}`, market),
   saveProfile: (id: string, profile: Profile) => request<ProfileEntry>('PUT', `/api/profiles/${id}`, profile),
   lots: () => request<LotEntry[]>('GET', '/api/lots'),
+  // КП дилера в PDF (server/offers.mjs): сборка за кредиты, образец из настроек — бесплатно
+  offers: {
+    build: (lotId: string, body: OfferRequest) => request<OfferMeta>('POST', `/api/lots/${lotId}/offer`, body),
+    list: (lotId: string) => request<OfferMeta[]>('GET', `/api/lots/${lotId}/offers`),
+    remove: (id: string) => request<{ok: true}>('DELETE', `/api/offers/${id}`),
+    sample: (settings: OfferSettings, lotId?: string) => request<OfferMeta>('POST', '/api/offers/sample', {settings, lotId}),
+    pdfUrl: (m: OfferMeta, download = false) =>
+      `/api/offers/${m.sample ? 'sample/' : ''}${m.id}/pdf${download ? '?download=1' : ''}`,
+  },
   createLot: (data: Partial<Lot>) => request<LotEntry>('POST', '/api/lots', data),
   saveLot: (lot: LotEntry) => request<LotEntry>('PUT', `/api/lots/${lot.id}`, lot),
   // Удалить лот вместе с фото и роликами; копия — новый лот с теми же полями и фото

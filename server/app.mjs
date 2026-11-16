@@ -26,6 +26,7 @@ import {hasKey, hasVoice, synthesize} from './speech.mjs';
 import {hasSeparator} from './ambience.mjs';
 import {clientCarouselFormats, carouselsDir, buildCarousel, deleteCarousel, editCarouselTexts, listCarousels, parsePrice, repriceCarousel, saveCarouselCaption, slideFileName} from './carousel.mjs';
 import {ICON_RULES, LOGO_RULES, brandForRender, saveIcon, saveLogo, setIconVariant, setLogoVariant, withLogoInk} from './brand.mjs';
+import {buildOffer, deleteOffer, listOffers, offerFile, parseOfferRequest, sweepSamples} from './offers.mjs';
 import {balanceOf, billed, creditCosts, ledgerOf, ledgerPage, signupCredits} from './billing.mjs';
 import {parseCarouselSource} from '../src/shared/kmotorsLot.js';
 import {PALETTE_KEYS, isHex} from '../src/shared/contrast.js';
@@ -715,6 +716,33 @@ export const createApp = ({photoOrigin}) => {
   api.post('/carousels/:id/price', wrap((req) => repriceCarousel(checkId(req.params.id), req.body?.price)));
   // Свой текст на слайде — тоже бесплатно: та же машина, формат и вариант, меняются только слова
   api.post('/carousels/:id/texts', wrap((req) => editCarouselTexts(checkId(req.params.id), req.body?.slide, req.body?.fields)));
+  // КП дилера в PDF по объявлению (docs/offer-pdf.md). Документ для клиента — генерация, за кредиты;
+  // образец из настроек — бесплатно, но с надписью «ОБРАЗЕЦ» поперёк и без номера по счётчику
+  api.post('/lots/:id/offer', requireCredits, wrap((req) => {
+    const id = checkId(req.params.id);
+    const request = parseOfferRequest(req.body);
+    return billed({...billOf(req, 'offers'), workspaceId: req.ws,
+      jobId: `offer-${req.ws}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
+      note: request.client.slice(0, 120)}, () => buildOffer(id, request));
+  }));
+  api.get('/lots/:id/offers', wrap((req) => listOffers(checkId(req.params.id))));
+  api.delete('/offers/:id', wrap((req) => deleteOffer(checkId(req.params.id))));
+  api.post('/offers/sample', wrap(async (req) => {
+    await sweepSamples();
+    const lotId = req.body?.lotId ? checkId(String(req.body.lotId)) : null;
+    const settings = req.body?.settings && typeof req.body.settings === 'object' ? req.body.settings : null;
+    return buildOffer(lotId, parseOfferRequest(req.body), {sample: true, settingsOverride: settings});
+  }));
+  const sendOffer = (sample) => async (req, res, next) => {
+    try {
+      const {file, name} = await offerFile(checkId(req.params.id), {sample});
+      // inline — PDF открывается во вкладке браузера; ?download=1 — сразу файлом
+      if (req.query.download) return res.download(file, name);
+      res.type('application/pdf').set('Content-Disposition', `inline; filename*=UTF-8''${encodeURIComponent(name)}`).sendFile(file);
+    } catch (e) { next(e); }
+  };
+  api.get('/offers/:id/pdf', sendOffer(false));
+  api.get('/offers/sample/:id/pdf', sendOffer(true));
   // Текст поста — тоже бесплатно: слайды не трогаются, только подпись в carousel.json
   api.put('/carousels/:id/caption', wrap((req) => saveCarouselCaption(checkId(req.params.id), req.body)));
   api.get('/carousels', wrap(() => listCarousels()));

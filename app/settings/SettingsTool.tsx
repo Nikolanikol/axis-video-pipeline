@@ -64,10 +64,16 @@ const PreviewPanel: React.FC<{lot: LotEntry | null | undefined; market: MarketEn
 // с панелью внизу («Настройки» и «Превью»), как у остальных инструментов. Превью на телефоне
 // монтируется, только когда открыто: плеер в скрытом разделе рисовал бы кадры впустую.
 // Правки формы видны в превью сразу — оно читает те же несохранённые значения
-const SettingsLayout: React.FC<{editor: React.ReactNode; preview: React.ReactNode}> = ({editor, preview}) => {
+export const SettingsLayout: React.FC<{editor: React.ReactNode; preview: React.ReactNode}> = ({editor, preview}) => {
   const phone = useIsPhone();
   const [tab, setTab] = useState<'edit' | 'preview'>('edit');
   const t = useT();
+  // Клик по полю в образце КП (OfferSettings.tsx) просит открыть форму — на телефоне она в соседнем разделе
+  useEffect(() => {
+    const toEdit = () => setTab('edit');
+    window.addEventListener('kok:settings-edit', toEdit);
+    return () => window.removeEventListener('kok:settings-edit', toEdit);
+  }, []);
   return (
     <>
       <main className="grid grid-settings" data-stab={tab}>

@@ -27,7 +27,7 @@ const journal = serverLog('billing');
 // session → accounts → billing → session замкнулись бы в круг импортов
 const authEnabled = () => hasDatabase();
 
-export const PIPELINE_TITLES = {ads: 'ролик', carousels: 'карусель', reviews: 'обзор'};
+export const PIPELINE_TITLES = {ads: 'ролик', carousels: 'карусель', reviews: 'обзор', offers: 'КП в PDF'};
 
 const creditsConfig = () => readJson(path.join(CONFIG_DIR, 'credits.json'));
 

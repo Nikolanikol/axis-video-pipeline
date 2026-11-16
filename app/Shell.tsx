@@ -177,7 +177,7 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
 };
 
 // Инструменты с выдвижными панелями на телефоне (usePanelSwipes) — там подвала на телефоне нет
-const PHONE_PANEL_TOOLS = new Set(['ads/lot', 'carousels/build', 'settings/profile', 'settings/brand', 'settings/ads']);
+const PHONE_PANEL_TOOLS = new Set(['ads/lot', 'carousels/build', 'settings/profile', 'settings/brand', 'settings/ads', 'settings/offer']);
 
 /**
  * Подписка скоро кончится: за RENEW_DAYS дней до конца. Кредиты подписки сгорают, поэтому
