@@ -260,7 +260,7 @@ export const createApp = ({photoOrigin}) => {
   api.post('/auth/logout', (req, res, next) => Promise.resolve(authEnabled() ? dropSession(sessionToken(req)) : null)
     .then(() => { clearSessionCookie(res); res.json({ok: true}); }).catch(next));
 
-  // ——— Витрина гостя (app/Landing.tsx), открыто без сессии ———
+  // ——— Условия для гостя: витрина axis-beauty.com (site/, при сборке) и экран входа (app/GuestEntry.tsx), без сессии ———
   // Владелец 01.10: «прозрачные и заманчивые условия» — до регистрации видно, сколько дарим,
   // сколько стоит ролик и карусель и сколько стоят тарифы. Контакты продаж — для «написать
   // нам». Из пакетов отдаём только то, что и так показывает кабинет: название, кредиты, цену

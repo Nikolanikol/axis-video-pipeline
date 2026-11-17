@@ -1709,6 +1709,23 @@ a.tab { text-decoration: none; }
 @keyframes land-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 .auth-gift { padding: 10px 12px; border-radius: 10px; background: #8e0d2c26; border: 1px solid #c8304f40; color: var(--text); }
 
+/* Экран гостя на app. (app/GuestEntry.tsx, 17.11): витрина переехала на axis-beauty.com, здесь — сразу вход.
+   Фон и шапка — как у витрины, чтобы переход с неё по «Войти» не выглядел как другой сайт */
+.guest { height: 100%; overflow-y: auto; display: flex; flex-direction: column; background:
+  radial-gradient(900px 520px at 78% -8%, #8e0d2c33, transparent 70%), var(--bg); }
+.guest-top { display: flex; align-items: center; gap: 12px; padding: 14px max(20px, calc((100% - 1120px) / 2)); }
+.guest-top > .lang-switch { margin-left: auto; }
+.guest-main { flex: 1 0 auto; width: min(440px, 100%); margin: 0 auto; padding: 28px 16px 48px; display: flex; flex-direction: column; gap: 14px; }
+.guest-title { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -.01em; }
+.guest-main .auth-card { max-width: none; box-shadow: 0 30px 80px #0008; }
+.guest-about { display: inline-flex; align-items: center; gap: 6px; align-self: center; color: var(--muted); font-weight: 600; text-decoration: none; }
+.guest-about:hover { color: var(--text); }
+@media (max-width: 900px) {
+  .guest-top { padding: 10px 14px; }
+  .guest-main { padding: 16px 14px 32px; }
+  .guest-title { font-size: 24px; }
+}
+
 @media (max-width: 900px) {
   .land-nav, .land-cta-sm { display: none; }
   .land-top { padding: 10px 14px; }
@@ -2099,10 +2116,6 @@ a.tab { text-decoration: none; }
 /* Страна не ломается посередине; в узкой колонке подвала на телефоне она уходит под плашку, а не сжимается */
 .source-country { white-space: nowrap; }
 .land-foot-sources .source { flex-wrap: wrap; row-gap: 4px; }
-
-/* Витрина, отрисованная сервером для поисковиков (#prerender, server/seo.mjs). Пока она на экране,
-   экран загрузки React под ней не показываем — иначе под витриной мелькал бы знак «Загрузка…» */
-#prerender ~ #root .boot { display: none; }
 
 /* Плашка согласия на счётчики (app/analytics.tsx). Снизу по центру, не во всю ширину на компьютере:
    не перекрывает кнопку сборки и не прячет витрину. Над окнами входа (z-index 60) не встаёт */

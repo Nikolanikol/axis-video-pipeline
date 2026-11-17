@@ -93,9 +93,3 @@ export const ConsentBar: React.FC = () => {
   );
 };
 
-/**
- * Витрина, отрисованная сервером для гостя (#prerender, server/seo.mjs), стоит на экране, пока React
- * не нарисует своё. Снимаем её, как только своё готово: витрину — при монтировании Landing, всё
- * прочее (кабинет, документ, ошибка) — из AuthGate
- */
-export const dropPrerender = () => document.getElementById('prerender')?.remove();

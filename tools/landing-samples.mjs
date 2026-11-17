@@ -1,4 +1,4 @@
-// Образцы для витрины гостя (app/Landing.tsx): ролики и карусели от имени демо-компании
+// Образцы для витрины KOK (с 17.11 — axis-beauty.com, site/ берёт их из public/landing): ролики и карусели от имени демо-компании
 // «Ваша компания» (src/shared/landingDemo.js) и демо-объявление для живого превью.
 //
 //   node --env-file=.env tools/landing-samples.mjs

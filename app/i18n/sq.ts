@@ -90,6 +90,8 @@ export const sq: Dict = {
   'land.auth.register': 'Llogaria në një minutë',
   'land.auth.reset': 'Fjalëkalim i ri',
   'land.auth.close': 'Mbyll',
+  'guest.about': 'Çfarë është KOK — video dhe karusele nga një lidhje',
+  'guest.site': 'Faqja e KOK',
 
   'foot.about': 'Përmbajtje me një buton: video reklamash dhe karusele për tregtarët e makinave nga shpalljet në Encar, che168 dhe Carsensor.',
   'foot.sections': 'Seksionet',
