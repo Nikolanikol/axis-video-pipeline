@@ -16,14 +16,15 @@ export const APP = (import.meta.env.PUBLIC_APP_URL || 'https://app.axis-beauty.c
 // ?lang= — язык страницы витрины (app/i18n/index.tsx): с английской витрины — в английский кабинет.
 export const signupUrl = (lang: Lang) => `${APP}/register?lang=${lang}`;
 export const loginUrl = (lang: Lang) => `${APP}/login?lang=${lang}`;
-// Оферта и политика пока на app/ (переезжают на корень в P1 — со старых адресов будет 301)
+// Оферта и политика живут в приложении: касса проходила модерацию на этом адресе, а реквизиты
+// владельца на витрину не выводим (решение владельца 18.11, docs/projects/site/plan.md, P1)
 export const OFFER_URL = `${APP}/offer`;
 export const PRIVACY_URL = `${APP}/privacy`;
 
 /** Адрес страницы на языке: русский — без приставки, остальные — /en/, /sq/ */
 export const pathFor = (lang: Lang, page = '/') => (lang === 'ru' ? page : `/${lang}${page}`);
 export const urlFor = (lang: Lang, page = '/') => SITE + pathFor(lang, page);
-export const alternates = (page = '/') => LANGS.map((l) => ({lang: l, href: urlFor(l, page)}));
+export const alternates = (page = '/') => langsOf(page).map((l) => ({lang: l, href: urlFor(l, page)}));
 
 // Заголовок до ~60 знаков, описание до ~160 — длиннее поисковик обрежет. Русские — те же, что у
 // нынешней витрины на app/ (config/seo.json, подобраны по подсказкам Google и Яндекса 19.10).
@@ -40,5 +41,18 @@ export const HOME_SEO: Record<Lang, {title: string; description: string}> = {
   },
 };
 
-/** Страницы сайта для sitemap: адрес без языка → есть на всех трёх языках */
-export const PAGES = ['/'];
+/**
+ * Страницы сайта: адрес без языка → на каких языках она есть. По ним строятся sitemap, hreflang
+ * и переключатель языка. Статья есть не на всех языках: Encar и площадки Кореи — ru/en/sq (их ищут
+ * Албания, Косово и весь мир по-английски), che168 и КП — пока ru (docs/projects/site/wordstat.md);
+ * пустых и машинных переводов план не допускает. Должно совпадать с lib/articles.ts
+ */
+export const PAGES: Record<string, readonly Lang[]> = {
+  '/': LANGS,
+  '/encar/': ['ru', 'en', 'sq'],
+  '/che168/': ['ru'],
+  '/articles/': LANGS,
+  '/korean-car-sites/': LANGS,
+  '/kommercheskoe-predlozhenie-na-avtomobil/': ['ru'],
+};
+export const langsOf = (page: string): readonly Lang[] => PAGES[page] ?? LANGS;

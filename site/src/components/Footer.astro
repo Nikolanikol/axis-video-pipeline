@@ -2,8 +2,9 @@
 // Подвал: о сервисе, разделы, площадки, документы, связь. Реквизитов владельца нет —
 // они только в оферте (решение владельца 17.11, PR #41 в приложении).
 import offer from '../snapshot/offer.json';
+import {ARTICLE_UI} from '../lib/articleUi';
 import {makeT, type Lang} from '../lib/i18n';
-import {OFFER_URL, PRIVACY_URL, pathFor} from '../lib/site';
+import {OFFER_URL, PAGES, PRIVACY_URL, langsOf, pathFor} from '../lib/site';
 import {SOURCES} from '../lib/sources';
 
 interface Props { lang: Lang }
@@ -26,10 +27,14 @@ const year = new Date().getFullYear();
       <a href={`${home}#offer`}>{t('land.nav.offer')}</a>
       <a href={`${home}#pricing`}>{t('land.nav.pricing')}</a>
       <a href={`${home}#faq`}>{t('land.nav.faq')}</a>
+      {langsOf('/articles/').includes(lang) && <a href={pathFor(lang, '/articles/')}>{ARTICLE_UI[lang].articles}</a>}
     </div>
     <div>
       <b>{t('foot.sources')}</b>
-      {SOURCES.map((s) => <a href={s.url} target="_blank" rel="noopener">{s.name} · {t(s.country)}</a>)}
+      {/* Своя страница площадки (пока только по-русски) — внутренней ссылкой, остальные — на сайт площадки */}
+      {SOURCES.map((s) => langsOf(`/${s.id}/`).includes(lang) && `/${s.id}/` in PAGES
+        ? <a href={pathFor(lang, `/${s.id}/`)}>{ARTICLE_UI[lang].inLang(s.name)}</a>
+        : <a href={s.url} target="_blank" rel="noopener">{s.name} · {t(s.country)}</a>)}
     </div>
     <div>
       <b>{t('foot.docs')}</b>

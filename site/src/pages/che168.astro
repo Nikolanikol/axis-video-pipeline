@@ -1,0 +1,9 @@
+---
+import Platform from '../components/Platform.astro';
+import Base from '../layouts/Base.astro';
+import {PLATFORMS} from '../lib/platforms';
+import {platformSchema} from '../lib/schema';
+const lang = 'ru';
+const p = PLATFORMS.che168[lang]!;
+---
+<Base lang={lang} page={p.page} {...p.seo} schema={platformSchema(p, lang)}><Platform p={p} lang={lang} /></Base>

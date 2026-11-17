@@ -23,6 +23,9 @@ describe('ссылки che168', () => {
     expect(parseCarLink('https://global.che168.com/en/detail/60154824')).toEqual(want);
     expect(parseCarLink('https://m.che168.com/cardetail/index?infoid=60154824')).toEqual(want);
     expect(parseCarLink('ch-60154824')).toEqual(want);
+    // Autohome: che168 — его площадка подержанных машин, номер общий (18.11)
+    expect(parseCarLink('https://www.autohome.com.cn/2sc/60154824.html')).toEqual(want);
+    expect(parseCarLink('https://m.autohome.com.cn/2sc/detail?infoid=60154824')).toEqual(want);
   });
 
   it('голый номер — по-прежнему Encar', () => {
@@ -31,6 +34,8 @@ describe('ссылки che168', () => {
 
   it('страница сайта без номера — просим ссылку целиком', () => {
     expect(() => parseCarLink('https://www.che168.com/')).toThrow(/номера/);
+    // Страница модели или списка Autohome — не объявление: подсказываем, где взять ссылку
+    expect(() => parseCarLink('https://car.autohome.com.cn/2sc/110100/index.html')).toThrow(/二手车/);
   });
 
   it('пометка лота, адрес объявления и название источника', () => {

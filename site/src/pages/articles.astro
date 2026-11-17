@@ -1,0 +1,8 @@
+---
+import Articles from '../components/Articles.astro';
+import Base from '../layouts/Base.astro';
+import {ARTICLES_PAGE, ARTICLES_SEO} from '../lib/articles';
+import {articlesSchema} from '../lib/schema';
+const lang = 'ru';
+---
+<Base lang={lang} page={ARTICLES_PAGE} {...ARTICLES_SEO[lang]} schema={articlesSchema(lang)}><Articles lang={lang} /></Base>

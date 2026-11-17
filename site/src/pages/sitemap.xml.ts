@@ -1,11 +1,10 @@
 // Sitemap со всеми языковыми версиями: у каждого адреса — ссылки на соседей по языку (xhtml:link),
 // так Google связывает версии одной страницы даже без чтения самих страниц.
 import type {APIRoute} from 'astro';
-import {LANGS} from '../lib/i18n';
 import {PAGES, alternates, urlFor} from '../lib/site';
 
 export const GET: APIRoute = () => {
-  const urls = PAGES.flatMap((page) => LANGS.map((lang) => {
+  const urls = Object.entries(PAGES).flatMap(([page, langs]) => langs.map((lang) => {
     const links = [...alternates(page).map((a) => `<xhtml:link rel="alternate" hreflang="${a.lang}" href="${a.href}"/>`),
       `<xhtml:link rel="alternate" hreflang="x-default" href="${urlFor('ru', page)}"/>`].join('');
     return `<url><loc>${urlFor(lang, page)}</loc>${links}</url>`;

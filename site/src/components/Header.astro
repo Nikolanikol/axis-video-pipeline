@@ -1,8 +1,10 @@
 ---
 // Шапка: логотип, якоря главной, языки ссылками (не переключателем в памяти браузера —
-// у каждой версии свой адрес для поиска), вход и регистрация — в приложении.
+// у каждой версии свой адрес для поиска), вход и регистрация — в приложении. Страницы только на
+// русском (площадки) ведут на главную другого языка, а не на несуществующий адрес.
+import {ARTICLE_UI} from '../lib/articleUi';
 import {LANGS, LANG_TITLES, makeT, type Lang} from '../lib/i18n';
-import {loginUrl, pathFor, signupUrl} from '../lib/site';
+import {langsOf, loginUrl, pathFor, signupUrl} from '../lib/site';
 
 interface Props { lang: Lang; page: string }
 const {lang, page} = Astro.props;
@@ -17,10 +19,11 @@ const home = pathFor(lang, '/');
     <a href={`${home}#offer`}>{t('land.nav.offer')}</a>
     <a href={`${home}#pricing`}>{t('land.nav.pricing')}</a>
     <a href={`${home}#faq`}>{t('land.nav.faq')}</a>
+        {langsOf('/articles/').includes(lang) && <a href={pathFor(lang, '/articles/')}>{ARTICLE_UI[lang].articles}</a>}
   </nav>
   <nav class="langs" aria-label={t('lang.label')}>
     {LANGS.map((l) => (
-      <a href={pathFor(l, page)} hreflang={l} lang={l} title={LANG_TITLES[l].title}
+      <a href={pathFor(l, langsOf(page).includes(l) ? page : '/')} hreflang={l} lang={l} title={LANG_TITLES[l].title}
         aria-current={l === lang ? 'true' : undefined} class={l === lang ? 'on' : undefined}>{LANG_TITLES[l].short}</a>
     ))}
   </nav>

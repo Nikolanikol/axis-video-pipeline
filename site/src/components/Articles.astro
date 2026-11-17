@@ -1,0 +1,28 @@
+---
+// Список статей на языке страницы (lib/articles.ts)
+import type {Lang} from '../lib/i18n';
+import {ARTICLE_UI} from '../lib/articleUi';
+import {articlesFor} from '../lib/articles';
+import {pathFor} from '../lib/site';
+interface Props { lang: Lang }
+const {lang} = Astro.props;
+const ui = ARTICLE_UI[lang];
+---
+<nav class="crumbs" aria-label={ui.nav}>
+  <a href={pathFor(lang, '/')}>KOK</a><span aria-hidden="true">›</span><span>{ui.articles}</span>
+</nav>
+<section class="section articles-head">
+  <h1>{ui.articles}</h1>
+  <p class="sub">{ui.articlesSub}</p>
+</section>
+<section class="section articles-list">
+  {articlesFor(lang).map((a) => (
+    <a class="article-card" href={pathFor(lang, a.page)}>
+      {a.logo && <img src={a.logo} alt="" width="48" height="48" loading="lazy" />}
+      <span class="eyebrow">{a.eyebrow}</span>
+      <h2>{a.title}</h2>
+      <p class="muted">{a.description}</p>
+      <span class="article-more">{ui.read} →</span>
+    </a>
+  ))}
+</section>

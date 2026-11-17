@@ -1,0 +1,9 @@
+---
+import CarSites from '../components/CarSites.astro';
+import Base from '../layouts/Base.astro';
+import {CAR_SITES, CAR_SITES_PAGE} from '../lib/carSites';
+import {articleSchema} from '../lib/schema';
+const lang = 'ru';
+const a = CAR_SITES[lang];
+---
+<Base lang={lang} page={CAR_SITES_PAGE} {...a.seo} schema={articleSchema(lang, CAR_SITES_PAGE, a.crumb, a.faq)}><CarSites lang={lang} /></Base>
