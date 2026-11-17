@@ -92,7 +92,6 @@ export const en: Dict = {
   'foot.contact': 'Contact us',
   'foot.telegram': 'Message us on Telegram',
   'foot.contactNote': 'Payments, refunds, account help',
-  'foot.regNo': 'Reg. No. {no}',
 
   'src.title': 'Listings from marketplaces',
   'src.titleCompact': 'Marketplaces:',

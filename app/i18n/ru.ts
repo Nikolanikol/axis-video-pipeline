@@ -103,7 +103,6 @@ export const ru = {
   'foot.contact': 'Связаться',
   'foot.telegram': 'Написать в Telegram',
   'foot.contactNote': 'Оплата, возвраты, помощь с кабинетом',
-  'foot.regNo': 'Рег. № {no}',
 
   // Площадки-источники
   'src.title': 'Объявления с площадок',

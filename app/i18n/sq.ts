@@ -94,7 +94,6 @@ export const sq: Dict = {
   'foot.contact': 'Na kontaktoni',
   'foot.telegram': 'Na shkruani në Telegram',
   'foot.contactNote': 'Pagesa, rimbursime, ndihmë me llogarinë',
-  'foot.regNo': 'Nr. regj. {no}',
 
   'src.title': 'Shpallje nga platformat',
   'src.titleCompact': 'Platformat:',
