@@ -948,7 +948,7 @@ const CLIENTS_PAGE = 25;
  */
 const CLIENTS_CTE = `WITH c AS (
   SELECT w.id, w.name, w.created_at, u.id AS user_id, u.news_off_at,
-         u.name AS person, u.email, u.phone, u.platform_role, u.last_seen_at,
+         u.name AS person, u.email, u.phone, u.platform_role, u.last_seen_at, u.source,
          u.email_verified_at IS NOT NULL AS verified,
          COALESCE((SELECT sum(remaining) FROM smmaker_credit_lots t WHERE t.workspace_id = w.id AND t.expires_at > now()), 0)::int AS credits,
          COALESCE((SELECT sum(price_usd) FROM smmaker_credit_lots t WHERE t.workspace_id = w.id AND t.source IN ('pack', 'subscription')), 0)::float8 AS paid_usd,

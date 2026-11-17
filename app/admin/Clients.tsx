@@ -33,6 +33,26 @@ const SORTS: {id: ClientSort; label: string}[] = [
   {id: 'credits', label: 'больше кредитов'},
   {id: 'plan', label: 'подписка кончается раньше'},
 ];
+// Откуда пришёл клиент (18.11, план витрины, P0) — коротко для таблицы: кампания по меткам, иначе
+// сайт, с которого перешли, иначе страница витрины. «—» — без меток (пришёл напрямую или до 17.11)
+const host = (url: string) => { try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; } };
+const sourceShort = (s: ClientRow['source']) => {
+  if (!s) return '—';
+  if (s.utm_source) return [s.utm_source, s.utm_campaign].filter(Boolean).join(' / ');
+  if (s.ref) return host(s.ref);
+  return s.land ? `витрина ${s.land}` : '—';
+};
+// Полностью — в карточке клиента: все метки, как пришли
+const SOURCE_LABELS: [keyof NonNullable<ClientRow['source']>, string][] = [
+  ['utm_source', 'источник'], ['utm_medium', 'канал'], ['utm_campaign', 'кампания'], ['utm_content', 'объявление'],
+  ['utm_term', 'запрос'], ['ref', 'перешёл с'], ['land', 'страница витрины'],
+];
+const SourceFull: React.FC<{source: ClientRow['source']}> = ({source}) => {
+  const rows = SOURCE_LABELS.filter(([k]) => source?.[k]);
+  if (!rows.length) return <>—</>;
+  return <>{rows.map(([k, label], i) => <React.Fragment key={k}>{i > 0 && <br />}<span className="muted">{label}:</span> {source![k]}</React.Fragment>)}</>;
+};
+
 // «Заходил»: свежее — словами, давнее — датой. Менеджеру важно «вчера» против «месяц назад»,
 // а не точное время
 const ago = (iso: string | null) => {
@@ -137,7 +157,7 @@ export const Clients: React.FC<{packs: Pack[]; isAdmin: boolean; onError: (e: st
                       {c.delete_after && <><br /><span className="muted">удаляет аккаунт — до {day(c.delete_after)}</span></>}
                     </td>
                     <td>{c.person ?? '—'}<br /><span className="muted">{c.phone ?? ''} {c.email ?? ''}</span></td>
-                    <td>{day(c.created_at)}</td>
+                    <td>{day(c.created_at)}<br /><span className="muted" title="откуда пришёл">{sourceShort(c.source)}</span></td>
                     <td>{ago(c.last_seen_at)}</td>
                     <td>
                       {c.generations}{c.generations > 0 && <span className="muted"> · за 30 дн. {c.generations_30d}</span>}
@@ -196,6 +216,7 @@ const ClientTile: React.FC<{client: ClientRow; onOpen: () => void; renew?: boole
         : <>
           {c.plan_until ? `«${c.plan_title}» до ${day(c.plan_until)}` : c.had_plan ? 'подписка кончилась' : 'без подписки'}
           {' · '}генераций {c.generations}{' · '}заходил {ago(c.last_seen_at)}
+          {c.source && <>{' · '}{sourceShort(c.source)}</>}
         </>}
     </span>
     {!c.verified && <span className="ct-flag">почта не подтверждена</span>}
@@ -326,6 +347,7 @@ const ClientCard: React.FC<{client: ClientRow; packs: Pack[]; isAdmin: boolean; 
                 <dt>Почта</dt><dd>{client.email ? <a href={`mailto:${client.email}`}>{client.email}</a> : '—'}</dd>
                 <dt>С нами с</dt><dd>{day(client.created_at)} <span className="muted">· заходил {ago(client.last_seen_at)}</span></dd>
                 <dt>Оплачено</dt><dd>{client.paid_usd ? usd(Math.round(client.paid_usd * 100) / 100) : '—'}</dd>
+                <dt>Откуда</dt><dd><SourceFull source={client.source} /></dd>
               </dl>
               {/* Данные сотрудника платформы правит только админ — сервер ответит так же */}
               {(isAdmin || !client.platform_role) && (

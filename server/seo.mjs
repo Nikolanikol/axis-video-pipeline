@@ -96,7 +96,9 @@ export const renderPage = async (html, req) => {
   const primary = await isPrimary(req);
   const {pages, keywords, counters = {}} = await seoConfig();
   const page = pageOf(req.path);
-  const meta = pages[page ?? '/'];
+  // Главная приложения — экран входа: свой заголовок («app»), рекламный «/» — у витрины (site/).
+  // Без «app» в файле — прежний «/»
+  const meta = page ? pages[page] : pages.app ?? pages['/'];
   // Окружение Coolify перекрывает config/seo.json — так код или номер меняют без выкладки. Коды не секрет:
   // их видно в коде страницы любому, поэтому основное место — файл в репозитории
   const pick = (name, field) => process.env[name]?.trim() || counters[field]?.trim() || '';

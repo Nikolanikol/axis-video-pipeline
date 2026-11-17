@@ -6,7 +6,7 @@
 import React, {Suspense, createContext, useCallback, useContext, useEffect, useState} from 'react';
 import {Loading} from './Loading';
 import {lazyNamed} from './errorReport';
-import {track} from './analytics';
+import {track, trackFirstGeneration} from './analytics';
 import {Balance, Me, Registration, User, api, errorText} from './api';
 import {Field} from './LotForm';
 import {useRoute} from './router';
@@ -113,6 +113,11 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
       .catch((e) => setNotice(errorText(e)))
       .finally(() => { window.history.replaceState(null, '', '#/account'); load(); });
   }, [link, load]);
+
+  // Первая генерация — событием в счётчики (app/analytics.tsx): баланс перечитывается при переходах
+  // и возврате во вкладку, так что смена «не было → было» видна вскоре после запуска
+  const wsId = me && signedIn(me) ? me.workspace?.id : undefined;
+  useEffect(() => { trackFirstGeneration(wsId, balance?.generated); }, [wsId, balance?.generated]);
 
   const legal = route.pipeline === 'offer' || route.pipeline === 'privacy';
 
