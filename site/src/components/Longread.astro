@@ -1,0 +1,78 @@
+---
+// Длинная статья (lib/longreads.ts): шапка с датой и временем чтения, заглавная картинка с подписью,
+// колонка текста ~70 знаков и оглавление сбоку (на телефоне — свёрнутым списком над текстом), вопросы,
+// источники и призыв. Подпись к фото — автор, источник, лицензия: этого требуют CC BY / BY-SA.
+import offer from '../snapshot/offer.json';
+import {makeT} from '../lib/i18n';
+import {ARTICLE_UI} from '../lib/articleUi';
+import {readingMinutes, type Longread} from '../lib/longreads';
+import {pathFor, signupUrl} from '../lib/site';
+
+interface Props { l: Longread }
+const {l} = Astro.props;
+const {lang, meta} = l;
+const ui = ARTICLE_UI[lang];
+const t = makeT(lang);
+const credits = (n: number) => t.n('unit.credit', n);
+const gift = offer.signup;
+const Content = l.mod.Content as any;
+const toc = l.mod.getHeadings().filter((h) => h.depth === 2);
+const img = meta.image;
+---
+<nav class="crumbs" aria-label={ui.nav}>
+  <a href={pathFor(lang, '/')}>KOK</a><span aria-hidden="true">›</span><a href={pathFor(lang, '/articles/')}>{ui.articles}</a><span aria-hidden="true">›</span><span>{meta.eyebrow}</span>
+</nav>
+
+<section class="longread">
+  <header class="lr-head">
+    <span class="eyebrow">{meta.eyebrow}</span>
+    <h1>{meta.h1}</h1>
+    <p class="lead">{meta.lead}</p>
+    <p class="lr-meta">{ui.updated} {ui.date(meta.updated)} · {ui.minutes(readingMinutes(l))}</p>
+  </header>
+
+  <figure class={`lr-hero${img.fit === 'contain' ? ' contain' : ''}`}>
+    <img src={img.src} alt={img.alt} width="1200" height="800" fetchpriority="high" />
+    <figcaption>{ui.photo}: {img.author} · <a href={img.source} target="_blank" rel="noopener">{img.sourceName ?? 'Wikimedia Commons'}</a>{img.license && <> · {img.licenseUrl ? <a href={img.licenseUrl} target="_blank" rel="noopener license">{img.license}</a> : img.license}</>}</figcaption>
+  </figure>
+
+  <div class="lr-body">
+    {toc.length > 2 && (
+      <aside class="lr-toc">
+        <details open>
+          <summary>{ui.toc}</summary>
+          <ol>{toc.map((h) => <li><a href={`#${h.slug}`}>{h.text}</a></li>)}</ol>
+        </details>
+      </aside>
+    )}
+    <article class="prose lr-text">
+      <Content />
+
+      {meta.faq?.length ? (
+        <>
+          <h2 id="faq">{ui.faq}</h2>
+          <div class="faq">{meta.faq.map((f) => <details><summary>{f.q}</summary><p>{f.a}</p></details>)}</div>
+        </>
+      ) : null}
+
+      {/* Источники — свёрнутым блоком (владелец 18.11): нужны для доверия и поисковиков, но читать не мешают */}
+      {meta.sources?.length ? (
+        <details class="lr-sources" id="sources">
+          <summary>{ui.sources} ({meta.sources.length})</summary>
+          <ol>{meta.sources.map((s) => <li><a href={s.url} target="_blank" rel="noopener">{s.title}</a></li>)}</ol>
+        </details>
+      ) : null}
+    </article>
+  </div>
+</section>
+
+<section class="section">
+  <div class="final">
+    <div>
+      <h2>{ARTICLE_UI[lang].kokTitle('Encar')}</h2>
+      <p class="sub">{ui.kokSub}</p>
+      <ul class="perks"><li>{t('land.final.gift', {credits: credits(gift.credits), days: t.n('unit.day', gift.days)})}</li></ul>
+    </div>
+    <a class="btn primary big" href={signupUrl(lang)} data-cta={`lr-${l.slug}`}>{ui.tryGift(credits(gift.credits))} →</a>
+  </div>
+</section>

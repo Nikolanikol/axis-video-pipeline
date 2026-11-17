@@ -262,6 +262,58 @@ figcaption span { color: var(--muted); font-size: 14px; }
 .site-host { color: var(--accent-text); font-size: 14px; text-decoration: none; }
 @media (max-width: 760px) { .sites { grid-template-columns: minmax(0, 1fr); } }
 
+/* Длинная статья (components/Longread.astro): журнальная вёрстка — колонка ~70 знаков, крупный кегль,
+   воздух между разделами, оглавление сбоку; на телефоне оглавление над текстом. Выноски — blockquote */
+.longread { padding-top: 8px; }
+.lr-head { max-width: 860px; padding-top: 24px; }
+.lr-head h1 { font-size: clamp(32px, 5vw, 52px); font-weight: 800; letter-spacing: -.02em; margin: 14px 0 18px; }
+.lr-meta { color: var(--muted); font-size: 14px; margin: 16px 0 0; }
+.lr-hero { margin: 32px 0 0; }
+.lr-hero img { width: 100%; height: auto; max-height: 600px; object-fit: cover; border-radius: 18px; background: var(--panel); }
+.lr-hero.contain img { object-fit: contain; max-height: 520px; padding: 24px; }
+.lr-hero figcaption, .prose figcaption { display: block; margin-top: 10px; font-size: 13px; color: var(--muted); }
+.lr-hero figcaption a, .prose figcaption a { color: var(--muted); }
+.lr-body { display: grid; grid-template-columns: minmax(0, 720px) 260px; gap: 64px; justify-content: space-between; margin-top: 48px; }
+.lr-toc { order: 2; }
+.lr-toc details { position: sticky; top: 88px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+.lr-toc summary { font-weight: 700; cursor: pointer; }
+.lr-toc ol { margin: 12px 0 0; padding-left: 20px; display: grid; gap: 8px; font-size: 14px; }
+.lr-toc a { color: var(--muted); text-decoration: none; }
+.lr-toc a:hover { color: var(--text); }
+@media (max-width: 960px) {
+  .lr-body { grid-template-columns: minmax(0, 1fr); gap: 24px; margin-top: 32px; }
+  .lr-toc { order: 0; }
+  .lr-toc details { position: static; }
+}
+.prose { font-size: 18px; line-height: 1.72; color: #ebe5dd; }
+.prose > :first-child { margin-top: 0; }
+.prose h2 { font-size: clamp(24px, 3.2vw, 30px); margin: 56px 0 16px; scroll-margin-top: 88px; }
+.prose h3 { font-size: 20px; margin: 32px 0 10px; scroll-margin-top: 88px; }
+.prose p { margin: 0 0 18px; }
+.prose ul, .prose ol { margin: 0 0 20px; padding-left: 24px; }
+.prose li { margin: 0 0 8px; }
+.prose li::marker { color: var(--accent-text); }
+.prose a { color: var(--accent-text); }
+.prose strong { color: var(--text); }
+.prose code { font: 500 .88em ui-monospace, SFMono-Regular, Menlo, monospace; padding: 2px 6px; border-radius: 6px; background: var(--panel); }
+.prose blockquote { margin: 24px 0; padding: 16px 20px; border-left: 3px solid var(--accent-line); border-radius: 0 12px 12px 0; background: #8e0d2c1f; }
+.prose blockquote p:last-child { margin-bottom: 0; }
+.prose table { display: block; overflow-x: auto; width: 100%; margin: 24px 0; border-collapse: collapse; font-size: 15px; line-height: 1.5; }
+.prose th, .prose td { padding: 10px 14px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.prose th { background: var(--panel); color: var(--muted); font-weight: 600; white-space: nowrap; }
+.prose pre { margin: 20px 0 24px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel) !important;
+  white-space: pre-wrap; overflow-wrap: anywhere; font-size: 15px; line-height: 1.65; }
+.prose pre code { padding: 0; background: none; font-size: inherit; color: var(--text); }
+.prose pre code span { color: inherit !important; }
+.prose figure { margin: 32px 0; }
+.prose figure img { width: 100%; height: auto; border-radius: 14px; background: var(--panel); }
+.prose .faq { margin-top: 0; }
+.lr-sources { margin-top: 40px; padding-top: 16px; border-top: 1px solid var(--line); font-size: 14px; color: var(--muted); }
+.lr-sources summary { cursor: pointer; font-weight: 600; }
+.lr-sources ol { margin: 12px 0 0; padding-left: 20px; }
+.lr-sources a { color: var(--muted); }
+.article-card .article-cover { width: calc(100% + 48px); height: auto; max-width: none; margin: -24px -24px 6px; aspect-ratio: 16 / 9; object-fit: cover; border-radius: 14px 14px 0 0; background: var(--panel); }
+
 .notfound { padding: 96px 0 0; }
 .notfound h1 { font-size: clamp(30px, 5vw, 48px); font-weight: 800; }
 .notfound .btn { margin-top: 24px; }

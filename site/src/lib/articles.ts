@@ -7,8 +7,10 @@ import {PLATFORMS} from './platforms';
 import {SOURCES} from './sources';
 import {OFFER_ARTICLE} from './offerArticle';
 import {CAR_SITES, CAR_SITES_PAGE} from './carSites';
+import {LONGREADS} from './longreads';
 
-export type Article = {page: string; title: string; description: string; eyebrow: string; logo?: string};
+/** logo — значок площадки; cover — картинка длинной статьи (во всю ширину карточки) */
+export type Article = {page: string; title: string; description: string; eyebrow: string; logo?: string; cover?: string};
 
 export const ARTICLES_PAGE = '/articles/';
 export const ARTICLES_SEO: Record<Lang, {title: string; description: string}> = {
@@ -30,7 +32,9 @@ const KOK_ICON = '/shared/kok/icon-512.png';
 
 /** Статьи на языке — в порядке показа в списке */
 export const articlesFor = (lang: Lang): Article[] => {
-  const out: Article[] = [];
+  // Свежие длинные статьи — первыми: новое видно сразу
+  const out: Article[] = LONGREADS.filter((l) => l.lang === lang).sort((a, b) => b.meta.updated.localeCompare(a.meta.updated))
+    .map((l) => ({page: l.page, title: l.meta.h1, description: l.meta.description, eyebrow: l.meta.eyebrow, cover: l.meta.image.src}));
   for (const [id, byLang] of Object.entries(PLATFORMS)) {
     const p = byLang[lang];
     if (p) out.push({page: p.page, title: p.h1, description: p.seo.description, eyebrow: p.eyebrow, logo: SOURCES.find((s) => s.id === id)?.logo});

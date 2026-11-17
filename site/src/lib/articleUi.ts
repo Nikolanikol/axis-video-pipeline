@@ -27,6 +27,8 @@ const RU = {
   finalTitle: (name: string) => `Ссылка на ${name} → готовый пост`,
   articlesSub: 'Как читать объявления корейских и китайских площадок по-русски — и как из ссылки на объявление сделать рекламу машины.',
   read: 'Читать',
+  updated: 'Актуально на', minutes: (n: number) => `${n} мин чтения`, toc: 'Содержание', sources: 'Источники', photo: 'Фото',
+  date: (iso: string) => new Date(iso).toLocaleDateString('ru-RU', {day: 'numeric', month: 'long', year: 'numeric'}),
 };
 type Ui = typeof RU;
 
@@ -54,6 +56,8 @@ const EN: Ui = {
   finalTitle: (name) => `${name} link → ready post`,
   articlesSub: 'How to read Korean and Chinese car listings in English — and how to turn a listing link into a car ad.',
   read: 'Read',
+  updated: 'Updated', minutes: (n) => `${n} min read`, toc: 'Contents', sources: 'Sources', photo: 'Photo',
+  date: (iso) => new Date(iso).toLocaleDateString('en-GB', {day: 'numeric', month: 'long', year: 'numeric'}),
 };
 
 const SQ: Ui = {
@@ -80,6 +84,8 @@ const SQ: Ui = {
   finalTitle: (name) => `Linku i ${name} → postim i gatshëm`,
   articlesSub: 'Si të lexoni njoftimet e makinave koreane dhe kineze në shqip — dhe si ta ktheni linkun e njoftimit në reklamë.',
   read: 'Lexo',
+  updated: 'Përditësuar më', minutes: (n) => `${n} min lexim`, toc: 'Përmbajtja', sources: 'Burimet', photo: 'Foto',
+  date: (iso) => new Date(iso).toLocaleDateString('sq-AL', {day: 'numeric', month: 'long', year: 'numeric'}),
 };
 
 export const ARTICLE_UI: Record<Lang, Ui> = {ru: RU, en: EN, sq: SQ};

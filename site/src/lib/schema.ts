@@ -63,5 +63,5 @@ export const articlesSchema = (lang: Lang) => [
 /** Обычная статья раздела: путь от главной и вопросы (те же, что на странице) */
 export const articleSchema = (lang: Lang, page: string, name: string, faq: {q: string; a: string}[]) => [
   crumbs(lang, {name, path: page}),
-  faqPage(lang, faq),
+  ...(faq.length ? [faqPage(lang, faq)] : []),
 ];
