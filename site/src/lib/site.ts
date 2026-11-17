@@ -3,6 +3,7 @@
 import type {Lang} from './i18n';
 import {LANGS} from './i18n';
 import seo from '../../../config/seo.json';
+import {longreadPages} from './longreads';
 
 export const SITE = 'https://axis-beauty.com';
 // Адрес приложения — настройкой: на проде боевое app., на превью PR — превью приложения
@@ -54,5 +55,12 @@ export const PAGES: Record<string, readonly Lang[]> = {
   '/articles/': LANGS,
   '/korean-car-sites/': LANGS,
   '/kommercheskoe-predlozhenie-na-avtomobil/': ['ru'],
+  // Длинные статьи в Markdown (lib/longreads.ts): адрес — имя файла, языки — папки
+  ...longreadPages(),
 };
 export const langsOf = (page: string): readonly Lang[] => PAGES[page] ?? LANGS;
+/** Язык x-default: русский, если страница на нём есть, иначе английский, иначе первый — не адрес, которого нет */
+export const defaultLang = (page: string): Lang => {
+  const l = langsOf(page);
+  return l.includes('ru') ? 'ru' : l.includes('en') ? 'en' : l[0];
+};

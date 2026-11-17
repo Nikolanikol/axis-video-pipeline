@@ -18,7 +18,8 @@ const ui = ARTICLE_UI[lang];
 <section class="section articles-list">
   {articlesFor(lang).map((a) => (
     <a class="article-card" href={pathFor(lang, a.page)}>
-      {a.logo && <img src={a.logo} alt="" width="48" height="48" loading="lazy" />}
+      {a.cover && <img class="article-cover" src={a.cover} alt="" width="600" height="338" loading="lazy" />}
+      {a.logo && !a.cover && <img src={a.logo} alt="" width="48" height="48" loading="lazy" />}
       <span class="eyebrow">{a.eyebrow}</span>
       <h2>{a.title}</h2>
       <p class="muted">{a.description}</p>

@@ -1,0 +1,18 @@
+---
+// Длинные статьи на языке 'ru' (lib/longreads.ts): адрес — имя файла в src/content/articles/ru/
+import Longread from '../components/Longread.astro';
+import Base from '../layouts/Base.astro';
+import {LONGREADS, type Longread as L} from '../lib/longreads';
+import {articleSchema} from '../lib/schema';
+
+export function getStaticPaths() {
+  return LONGREADS.filter((l) => l.lang === 'ru').map((l) => ({params: {longread: l.slug}, props: {l}}));
+}
+const {l} = Astro.props as {l: L};
+const m = l.meta;
+---
+<Base lang={l.lang} page={l.page} title={m.title} description={m.description} image={m.image.src}
+  schema={[...articleSchema(l.lang, l.page, m.eyebrow, m.faq ?? []), {
+    '@context': 'https://schema.org', '@type': 'Article', headline: m.h1, description: m.description, inLanguage: l.lang,
+    dateModified: m.updated, image: 'https://axis-beauty.com' + m.image.src, publisher: {'@type': 'Organization', name: 'KOK'},
+  }]}><Longread l={l} /></Base>

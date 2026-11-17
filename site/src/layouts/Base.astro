@@ -19,7 +19,7 @@ import Footer from '../components/Footer.astro';
 import Analytics from '../components/Analytics.astro';
 import Source from '../components/Source.astro';
 import {type Lang} from '../lib/i18n';
-import {SITE, alternates, urlFor} from '../lib/site';
+import {SITE, alternates, defaultLang, urlFor} from '../lib/site';
 
 interface Props {
   lang: Lang;
@@ -29,10 +29,12 @@ interface Props {
   schema?: object[];
   /** Служебная страница (404): не в поиск, без canonical и языковых версий */
   noindex?: boolean;
+  /** Картинка превью ссылки (статьи) — путь от корня; нет — общая og.png */
+  image?: string;
 }
-const {lang, page = '/', title, description, schema = [], noindex = false} = Astro.props;
+const {lang, page = '/', title, description, schema = [], noindex = false, image} = Astro.props;
 const canonical = urlFor(lang, page);
-const og = `${SITE}/shared/kok/og.png`;
+const og = image ? `${SITE}${image}` : `${SITE}/shared/kok/og.png`;
 const ogLocale = {ru: 'ru_RU', en: 'en_US', sq: 'sq_AL'}[lang];
 ---
 <!doctype html>
@@ -45,7 +47,7 @@ const ogLocale = {ru: 'ru_RU', en: 'en_US', sq: 'sq_AL'}[lang];
     {noindex ? <meta name="robots" content="noindex" /> : <>
       <link rel="canonical" href={canonical} />
       {alternates(page).map((a) => <link rel="alternate" hreflang={a.lang} href={a.href} />)}
-      <link rel="alternate" hreflang="x-default" href={urlFor('ru', page)} />
+      <link rel="alternate" hreflang="x-default" href={urlFor(defaultLang(page), page)} />
     </>}
     <link rel="icon" href="/shared/kok/favicon.svg" type="image/svg+xml" />
     <link rel="icon" href="/shared/kok/favicon-48.png" sizes="48x48" />
