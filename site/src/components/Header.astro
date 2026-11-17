@@ -1,0 +1,29 @@
+---
+// Шапка: логотип, якоря главной, языки ссылками (не переключателем в памяти браузера —
+// у каждой версии свой адрес для поиска), вход и регистрация — в приложении.
+import {LANGS, LANG_TITLES, makeT, type Lang} from '../lib/i18n';
+import {loginUrl, pathFor, signupUrl} from '../lib/site';
+
+interface Props { lang: Lang; page: string }
+const {lang, page} = Astro.props;
+const t = makeT(lang);
+const home = pathFor(lang, '/');
+---
+<header class="top">
+  <a class="top-logo" href={home} aria-label="KOK"><img src="/shared/kok/wordmark.svg" alt="KOK" width="92" height="28" /></a>
+  <nav class="top-nav" aria-label={t('foot.sections')}>
+    <a href={`${home}#how`}>{t('land.nav.how')}</a>
+    <a href={`${home}#samples`}>{t('land.nav.samples')}</a>
+    <a href={`${home}#offer`}>{t('land.nav.offer')}</a>
+    <a href={`${home}#pricing`}>{t('land.nav.pricing')}</a>
+    <a href={`${home}#faq`}>{t('land.nav.faq')}</a>
+  </nav>
+  <nav class="langs" aria-label={t('lang.label')}>
+    {LANGS.map((l) => (
+      <a href={pathFor(l, page)} hreflang={l} lang={l} title={LANG_TITLES[l].title}
+        aria-current={l === lang ? 'true' : undefined} class={l === lang ? 'on' : undefined}>{LANG_TITLES[l].short}</a>
+    ))}
+  </nav>
+  <a class="btn ghost top-login" href={loginUrl(lang)} data-cta="login">{t('land.login')}</a>
+  <a class="btn primary top-try" href={signupUrl(lang)} data-cta="header">{t('land.try')}</a>
+</header>

@@ -13,6 +13,10 @@ export const names: Record<'en' | 'sq', Record<string, string>> = {
     'Витрина': 'Showcase',
     'Разворот': 'Spread',
     // Палитры — config/palettes.json
+    // Тарифы — названия из админки (smmaker_packs); витрина axis-beauty.com показывает их через t.cfg
+    'Базовый': 'Basic',
+    'Стандарт': 'Standard',
+    'Про': 'Pro',
     'Медь на графите': 'Copper on graphite',
     'Золото на чёрном': 'Gold on black',
     'Сталь на тёмно-синем': 'Steel on navy',
@@ -243,6 +247,9 @@ export const names: Record<'en' | 'sq', Record<string, string>> = {
     'Классика': 'Klasik',
     'Витрина': 'Vitrinë',
     'Разворот': 'Faqe e hapur',
+    'Базовый': 'Bazë',
+    'Стандарт': 'Standard',
+    'Про': 'Pro',
     'Медь на графите': 'Bakër mbi grafit',
     'Золото на чёрном': 'Ar mbi të zezë',
     'Сталь на тёмно-синем': 'Çelik mbi blu të errët',

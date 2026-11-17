@@ -1,0 +1,13 @@
+---
+// Не найдено (и 410 для старых страниц магазина — nginx отдаёт эту же страницу). Не индексируется.
+import Base from '../layouts/Base.astro';
+import {makeT} from '../lib/i18n';
+const t = makeT('ru');
+---
+<Base lang="ru" page="/404/" title="Страница не найдена | KOK" description="Такой страницы нет. Перейдите на главную KOK." noindex>
+  <section class="section notfound">
+    <h1>Такой страницы нет</h1>
+    <p class="sub">Возможно, она была на этом домене раньше. KOK — ролики, карусели и КП для автодилеров по ссылке на объявление.</p>
+    <p><a class="btn primary big" href="/">{t('land.try')} →</a></p>
+  </section>
+</Base>

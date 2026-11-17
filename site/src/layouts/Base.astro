@@ -1,0 +1,73 @@
+---
+// Общий шаблон страницы витрины: заголовки для поисковиков, языковые версии, разметка, шапка и подвал.
+//
+// Правила из плана (docs/projects/site/plan.md, P0): у каждой языковой версии свой canonical,
+// взаимные hreflang с x-default (русская — по умолчанию), свои title/description, Open Graph.
+// Счётчики и плашка согласия — components/Analytics.astro (как в приложении, без cookie до «Принять»).
+import '@fontsource/manrope/cyrillic-400.css';
+import '@fontsource/manrope/latin-400.css';
+import '@fontsource/manrope/latin-ext-400.css';
+import '@fontsource/manrope/cyrillic-600.css';
+import '@fontsource/manrope/latin-600.css';
+import '@fontsource/manrope/latin-ext-600.css';
+import '@fontsource/manrope/cyrillic-800.css';
+import '@fontsource/manrope/latin-800.css';
+import '@fontsource/manrope/latin-ext-800.css';
+import '../styles/global.css';
+import Header from '../components/Header.astro';
+import Footer from '../components/Footer.astro';
+import Analytics from '../components/Analytics.astro';
+import Source from '../components/Source.astro';
+import {type Lang} from '../lib/i18n';
+import {SITE, alternates, urlFor} from '../lib/site';
+
+interface Props {
+  lang: Lang;
+  page?: string;
+  title: string;
+  description: string;
+  schema?: object[];
+  /** Служебная страница (404): не в поиск, без canonical и языковых версий */
+  noindex?: boolean;
+}
+const {lang, page = '/', title, description, schema = [], noindex = false} = Astro.props;
+const canonical = urlFor(lang, page);
+const og = `${SITE}/shared/kok/og.png`;
+const ogLocale = {ru: 'ru_RU', en: 'en_US', sq: 'sq_AL'}[lang];
+---
+<!doctype html>
+<html lang={lang}>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    {noindex ? <meta name="robots" content="noindex" /> : <>
+      <link rel="canonical" href={canonical} />
+      {alternates(page).map((a) => <link rel="alternate" hreflang={a.lang} href={a.href} />)}
+      <link rel="alternate" hreflang="x-default" href={urlFor('ru', page)} />
+    </>}
+    <link rel="icon" href="/shared/kok/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/shared/kok/favicon-48.png" sizes="48x48" />
+    <link rel="apple-touch-icon" href="/shared/kok/apple-touch-icon.png" />
+    <meta name="theme-color" content="#0b0b0d" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="KOK" />
+    <meta property="og:locale" content={ogLocale} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={og} />
+    <meta name="twitter:card" content="summary_large_image" />
+    {schema.map((s) => <script type="application/ld+json" set:html={JSON.stringify(s)} />)}
+  </head>
+  <body>
+    <Header lang={lang} page={page} />
+    <main>
+      <slot />
+    </main>
+    <Footer lang={lang} />
+    {!noindex && <Analytics lang={lang} />}
+    <Source />
+  </body>
+</html>

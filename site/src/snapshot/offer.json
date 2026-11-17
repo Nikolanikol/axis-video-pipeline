@@ -1,0 +1,62 @@
+{
+  "signup": {
+    "credits": 7,
+    "days": 30
+  },
+  "costs": {
+    "ads": 3,
+    "carousels": 1,
+    "offers": 2
+  },
+  "packs": [
+    {
+      "id": "plan-basic",
+      "title": "Базовый",
+      "credits": 25,
+      "price_usd": 19,
+      "valid_days": 30,
+      "kind": "plan",
+      "sort": 1
+    },
+    {
+      "id": "plan-standard",
+      "title": "Стандарт",
+      "credits": 50,
+      "price_usd": 29,
+      "valid_days": 30,
+      "kind": "plan",
+      "sort": 2
+    },
+    {
+      "id": "plan-pro",
+      "title": "Про",
+      "credits": 90,
+      "price_usd": 39,
+      "valid_days": 30,
+      "kind": "plan",
+      "sort": 3
+    },
+    {
+      "id": "start",
+      "title": "+20 кредитов",
+      "credits": 20,
+      "price_usd": 16,
+      "valid_days": 30,
+      "kind": "topup",
+      "sort": 11
+    },
+    {
+      "id": "base",
+      "title": "+50 кредитов",
+      "credits": 50,
+      "price_usd": 32,
+      "valid_days": 30,
+      "kind": "topup",
+      "sort": 12
+    }
+  ],
+  "contacts": {
+    "telegram": "@kok_work_bot",
+    "instagram": "https://www.instagram.com/kontent_odnoj_knopkoj/"
+  }
+}

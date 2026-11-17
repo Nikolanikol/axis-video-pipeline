@@ -39,8 +39,25 @@ const stored = (): Lang | null => {
   try { const v = window.localStorage.getItem(STORE_KEY); return isLang(v) ? v : null; } catch { return null; }
 };
 
+// Язык из ссылки: витрина axis-beauty.com ведёт в приложение с ?lang=en|sq (17.11) — человек читал
+// английскую витрину, и кабинет должен открыться на английском, а не по языку браузера. Запоминаем
+// как выбранный и убираем из адреса, чтобы он не тянулся в закладки и пересылки
+const fromLink = (): Lang | null => {
+  try {
+    const url = new URL(window.location.href);
+    const v = url.searchParams.get('lang');
+    if (!isLang(v)) return null;
+    try { window.localStorage.setItem(STORE_KEY, v); } catch { /* не запомнится — не беда */ }
+    url.searchParams.delete('lang');
+    window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+    return v;
+  } catch { return null; }
+};
+
 const detect = (): Lang => {
   if (typeof window === 'undefined') return 'ru';
+  const linked = fromLink();
+  if (linked) return linked;
   const saved = stored();
   if (saved) return saved;
   // Русский — для всех, кто читает по-русски, в том числе с браузером на украинском, казахском,

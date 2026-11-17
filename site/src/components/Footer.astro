@@ -1,0 +1,46 @@
+---
+// Подвал: о сервисе, разделы, площадки, документы, связь. Реквизитов владельца нет —
+// они только в оферте (решение владельца 17.11, PR #41 в приложении).
+import offer from '../snapshot/offer.json';
+import {makeT, type Lang} from '../lib/i18n';
+import {OFFER_URL, PRIVACY_URL, pathFor} from '../lib/site';
+import {SOURCES} from '../lib/sources';
+
+interface Props { lang: Lang }
+const {lang} = Astro.props;
+const t = makeT(lang);
+const home = pathFor(lang, '/');
+const tg = offer.contacts?.telegram?.trim().replace(/^https?:\/\/t\.me\//, '').replace(/^@/, '');
+const year = new Date().getFullYear();
+---
+<footer class="foot">
+  <div class="foot-grid">
+    <div class="foot-about">
+      <img src="/shared/kok/wordmark.svg" alt="KOK" width="80" height="24" loading="lazy" />
+      <p>{t('foot.about')}</p>
+    </div>
+    <div>
+      <b>{t('foot.service')}</b>
+      <a href={`${home}#how`}>{t('land.nav.how')}</a>
+      <a href={`${home}#samples`}>{t('land.nav.samples')}</a>
+      <a href={`${home}#offer`}>{t('land.nav.offer')}</a>
+      <a href={`${home}#pricing`}>{t('land.nav.pricing')}</a>
+      <a href={`${home}#faq`}>{t('land.nav.faq')}</a>
+    </div>
+    <div>
+      <b>{t('foot.sources')}</b>
+      {SOURCES.map((s) => <a href={s.url} target="_blank" rel="noopener">{s.name} · {t(s.country)}</a>)}
+    </div>
+    <div>
+      <b>{t('foot.docs')}</b>
+      <a href={OFFER_URL}>{t('foot.offer')}</a>
+      <a href={PRIVACY_URL}>{t('foot.privacy')}</a>
+    </div>
+    {tg && <div>
+      <b>{t('foot.contact')}</b>
+      <a href={`https://t.me/${tg}`} target="_blank" rel="noopener">{t('foot.telegram')}</a>
+      <span class="muted">{t('foot.contactNote')}</span>
+    </div>}
+  </div>
+  <p class="foot-copy">© {year} KOK</p>
+</footer>

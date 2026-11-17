@@ -1,0 +1,36 @@
+---
+// Источник гостя для регистрации (план P0, «сквозная аналитика»): при первом заходе на витрину
+// запоминаем метки рекламы utm_*, сайт, с которого пришли, и первую страницу; при нажатии на кнопку,
+// ведущую в приложение (data-cta), дописываем их в ссылку. Приложение заберёт их из адреса и
+// сохранит клиенту при регистрации (app/source.ts, миграция 022).
+//
+// Память вкладки, не cookie: метки никуда не уходят сами и живут до закрытия вкладки. Первое касание
+// важнее последнего — уже запомненное не перезаписываем.
+---
+<script>
+  const KEY = 'kok:source';
+  const FIELDS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'];
+  type Src = Record<string, string>;
+  const read = (): Src | null => { try { return JSON.parse(sessionStorage.getItem(KEY) || 'null'); } catch { return null; } };
+
+  if (!read()) {
+    const q = new URLSearchParams(location.search);
+    const got: Src = {land: location.pathname};
+    for (const f of FIELDS) { const v = q.get(f); if (v) got[f] = v.slice(0, 200); }
+    try {
+      const host = document.referrer ? new URL(document.referrer).hostname : '';
+      if (host && !/(^|\.)axis-beauty\.com$/.test(host) && host !== location.hostname) got.ref = host;
+    } catch { /* без источника */ }
+    try { sessionStorage.setItem(KEY, JSON.stringify(got)); } catch { /* приватный режим — без источника */ }
+  }
+
+  // Дописываем при нажатии, а не при загрузке: ссылки в HTML остаются чистыми для поисковиков
+  document.addEventListener('click', (e) => {
+    const a = (e.target as HTMLElement).closest<HTMLAnchorElement>('a[data-cta]');
+    const src = read();
+    if (!a || !src) return;
+    const url = new URL(a.href);
+    for (const [k, v] of Object.entries(src)) if (v && !url.searchParams.has(k)) url.searchParams.set(k, v);
+    a.href = url.href;
+  }, {capture: true});
+</script>
