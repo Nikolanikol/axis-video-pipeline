@@ -1,19 +1,19 @@
 // Вход в SMMAKER: экран входа и регистрации, контекст «кто вошёл».
 //
 // Интерфейс начинает с /api/auth/me. Вход выключен (нет базы — Mac без DATABASE_URL,
-// тесты) — сразу пускаем внутрь, как было. Включён и никто не вошёл — витрина KOK с формой
-// входа и регистрации (app/Landing.tsx).
-import React, {Suspense, createContext, useCallback, useContext, useEffect, useLayoutEffect, useState} from 'react';
+// тесты) — сразу пускаем внутрь, как было. Включён и никто не вошёл — экран входа и регистрации
+// (app/GuestEntry.tsx; витрина KOK с 17.11 — на axis-beauty.com, site/).
+import React, {Suspense, createContext, useCallback, useContext, useEffect, useState} from 'react';
 import {Loading} from './Loading';
 import {lazyNamed} from './errorReport';
-import {dropPrerender, track} from './analytics';
+import {track} from './analytics';
 import {Balance, Me, Registration, User, api, errorText} from './api';
 import {Field} from './LotForm';
 import {useRoute} from './router';
 import {locale, tNow, useT, type Lang} from './i18n';
 
-// Витрина — отдельным куском сборки: в ней плеер и композиции роликов, вошедшему они не нужны
-const Landing = lazyNamed(() => import('./Landing'), 'Landing');
+// Экран входа гостя — отдельным куском сборки: вошедшему он не нужен
+const GuestEntry = lazyNamed(() => import('./GuestEntry'), 'GuestEntry');
 // Оферта и политика — открыты всем, и гостю, и вошедшему: их открывают по прямой ссылке
 // модератор платёжного сервиса и клиент из окна оплаты
 const LegalPage = lazyNamed(() => import('./Legal'), 'LegalPage');
@@ -61,12 +61,12 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
   // Перечитать, кто вошёл: после подтверждения почты меняются и признак, и баланс
   const load = useCallback(() => {
     api.me().then((m) => { setMe(m); if (signedIn(m)) setBalance(m.balance); })
-      // Поисковому роботу — витрина как гостю, а не экран ошибки: его рендер может не выполнить запрос
+      // Поисковому роботу — экран гостя, а не экран ошибки: его рендер может не выполнить запрос
       // входа (21.10: Google обрывал его с 499, и в поиск уходила плашка «Сервер ответил ошибкой»).
       // Человеку — прежний экран с «Обновить страницу»: ему нужно знать, что вход не проверился
       .catch((e) => {
         if (!IS_BOT) { setError(errorText(e)); return; }
-        // Подарок при регистрации — из условий витрины (тот же источник, что у Landing); не отдались —
+        // Подарок при регистрации — из условий витрины (тот же источник, что у GuestEntry); не отдались —
         // те же умолчания, что у документов (Legal.tsx)
         const guest = (signup: {credits: number; days: number}): Me => ({authRequired: true, user: null, signup});
         api.publicOffer().then((o) => setMe(guest(o?.signup ?? {credits: 7, days: 30}))).catch(() => setMe(guest({credits: 7, days: 30})));
@@ -100,7 +100,7 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
         .finally(() => { window.history.replaceState(null, '', '#/account'); load(); });
       return;
     }
-    // Только что удалили аккаунт — витрина откроет окно входа с этой строкой
+    // Только что удалили аккаунт — экран входа покажет эту строку
     if (window.location.hash.startsWith('#/deleted')) {
       setNotice(tNow()('auth.deleted'));
       window.history.replaceState(null, '', window.location.pathname);
@@ -114,11 +114,7 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
       .finally(() => { window.history.replaceState(null, '', '#/account'); load(); });
   }, [link, load]);
 
-  // Серверная витрина (server/seo.mjs) стоит, пока не ясно, гость ли это: гостю её сменит своя
-  // витрина (Landing), всем прочим — кабинет, документ, сброс пароля или ошибка
   const legal = route.pipeline === 'offer' || route.pipeline === 'privacy';
-  const keep = !error && !legal && link?.kind !== 'reset' && (!me || (me.authRequired && !me.user));
-  useLayoutEffect(() => { if (!keep) dropPrerender(); }, [keep]);
 
   const t = useT();
   const logout = useCallback(() => {
@@ -137,11 +133,11 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
     </div>
   );
   if (!me) return <Loading />;
-  // Гость — витрина KOK с образцами, условиями и формой (владелец 01.10: «зазвать людей»).
-  // #/welcome показывает её и без базы — посмотреть витрину на копии сервера без входа
-  if (me.authRequired && !me.user) return <Suspense fallback={<Loading />}><Landing signup={me.signup} notice={notice} /></Suspense>;
+  // Гость — сразу вход и регистрация (17.11): витрина с образцами и условиями переехала на
+  // axis-beauty.com. #/welcome показывает экран гостя и без базы — посмотреть его на копии сервера
+  if (me.authRequired && !me.user) return <Suspense fallback={<Loading />}><GuestEntry signup={me.signup} notice={notice} /></Suspense>;
   if (!me.authRequired && route.pipeline === 'welcome') {
-    return <Suspense fallback={<Loading />}><Landing signup={{credits: 7, days: 30}} notice="" /></Suspense>;
+    return <Suspense fallback={<Loading />}><GuestEntry signup={{credits: 7, days: 30}} notice="" /></Suspense>;
   }
 
   const session: Session = signedIn(me)
@@ -222,9 +218,8 @@ const EMPTY: Registration = {name: '', email: '', phone: '', password: '', compa
 export type AuthMode = 'login' | 'register' | 'forgot';
 
 /**
- * Форма входа и регистрации. Живёт на витрине гостя (app/Landing.tsx) — режим держит
- * витрина: кнопки «Войти» и «Попробовать бесплатно» в шапке и на первом экране переключают
- * её и подводят к ней
+ * Форма входа и регистрации. Живёт на экране гостя (app/GuestEntry.tsx) — режим держит
+ * он: вход, регистрация (пришёл с витрины по «Попробовать») или «забыли пароль»
  */
 export const AuthCard: React.FC<{signup: {credits: number; days: number}; notice: string; mode: AuthMode; setMode: (m: AuthMode) => void}> = (
   {signup, notice, mode, setMode},

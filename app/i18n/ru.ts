@@ -99,6 +99,8 @@ export const ru = {
   'land.auth.register': 'Кабинет за минуту',
   'land.auth.reset': 'Новый пароль',
   'land.auth.close': 'Закрыть',
+  'guest.about': 'Что такое KOK — ролики и карусели по ссылке',
+  'guest.site': 'Витрина KOK',
 
   // Подвал
   'foot.about': 'Контент одной кнопкой: рекламные ролики и карусели для автодилеров по объявлениям Encar, che168 и Carsensor.',

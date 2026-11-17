@@ -88,6 +88,8 @@ export const en: Dict = {
   'land.auth.register': 'Your account in a minute',
   'land.auth.reset': 'New password',
   'land.auth.close': 'Close',
+  'guest.about': 'What is KOK — videos and carousels from a link',
+  'guest.site': 'KOK website',
 
   'foot.about': 'Content in one click: ad videos and carousels for car dealers from Encar, che168 and Carsensor listings.',
   'foot.sections': 'Sections',

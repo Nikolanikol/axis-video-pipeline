@@ -193,7 +193,7 @@ SMS/WhatsApp-код надёжнее, но платный — вернуться
 домен на аккаунт, 3000 писем в месяц, 100 в день — первый аккаунт занят другим проектом).
 Домен отправки — поддомен **`mail.axis-beauty.com`**, отправитель
 `KOK <noreply@mail.axis-beauty.com>` (до 29.09 — `SMMAKER <…>`: меняется только имя, адрес тот же). DNS домена — в **Cloudflare** (куплен в GoDaddy,
-NS у Cloudflare); сам `axis-beauty.com` и `www` — сайт на Vercel, его не трогаем. Записи
+NS у Cloudflare); сам `axis-beauty.com` и `www` — витрина KOK (с 17.11, до того — чужой сайт на Vercel; docs/projects/site/). Записи
 Resend: DKIM `resend._domainkey.mail`, CNAME `send.mail` → `send.forge.rmta.net` (SPF и MX
 через него), DMARC на корне `p=none`. Поддомен выбран, чтобы записи почты не задели сайт и
 будущую почту основного домена. Вживую проверено: код подтверждения и сброс пароля пришли
