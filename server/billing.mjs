@@ -99,8 +99,14 @@ export const balanceOf = async (workspaceId, client = db()) => {
       WHERE workspace_id = $1 AND remaining > 0 AND expires_at > now() ORDER BY expires_at`,
     [workspaceId]);
   const credits = rows.reduce((s, r) => s + r.remaining, 0);
+  // Было ли у компании хоть одно списание за генерацию — по нему приложение один раз отправляет
+  // событие first_generation в счётчики (app/analytics.tsx, useFirstGeneration; план витрины, P0)
+  const {rows: [g]} = await client.query(
+    `SELECT EXISTS (SELECT 1 FROM smmaker_credit_ledger WHERE workspace_id = $1 AND kind = 'charge') AS generated`,
+    [workspaceId]);
   return {
     credits,
+    generated: Boolean(g?.generated),
     subscription: await subscriptionOf(workspaceId, client),
     nextExpiry: rows[0] ? {at: rows[0].expires_at, credits: rows[0].remaining} : null,
     lots: rows.map((r) => ({id: Number(r.id), remaining: r.remaining, credits: r.credits, expiresAt: r.expires_at,

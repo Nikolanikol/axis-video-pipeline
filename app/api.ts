@@ -70,7 +70,8 @@ export type CreditLot = {
 // Подписка: тариф и до какого числа оплачено (конец последней партии подписки)
 export type Subscription = {planId: string | null; title: string; credits: number; until: string};
 // Баланс для шапки и кабинета; subscription — чтобы показать «подписка до» и полосу продления
-export type Balance = {credits: number; nextExpiry: {at: string; credits: number} | null; lots: CreditLot[]; subscription: Subscription | null};
+// generated — было ли у компании хоть одно списание за генерацию (server/billing.mjs, balanceOf)
+export type Balance = {credits: number; generated?: boolean; nextExpiry: {at: string; credits: number} | null; lots: CreditLot[]; subscription: Subscription | null};
 export type Role = 'admin' | 'manager' | null;
 // lang — язык человека (переключатель RU · EN · SQ); null — зарегистрирован до переводов, язык ещё не выбирал
 export type User = {id: string; email: string; name: string | null; lang: Lang | null; emailVerified: boolean; role: Role; isAdmin: boolean; isStaff: boolean};
@@ -114,6 +115,9 @@ export type ClientRow = {
   delete_after: string | null;
   // Скрыт админом (миграция 018): когда и за что; null — в работе
   hidden_at: string | null; hidden_note: string;
+  // Откуда пришёл (миграция 022, витрина axis-beauty.com): utm_*, ref — сайт, с которого перешли,
+  // land — страница витрины, где нажали «Попробовать». null — без меток или зарегистрирован до 17.11
+  source: Partial<Record<'utm_source' | 'utm_medium' | 'utm_campaign' | 'utm_content' | 'utm_term' | 'ref' | 'land', string>> | null;
 };
 // Быстрые фильтры и сортировки админки — те же имена, что CLIENT_FILTERS/CLIENT_SORTS в server/accounts.mjs
 // Рассылка (server/mailing.mjs). segment — фильтр клиентов админки; counts — получатели по состояниям

@@ -13,6 +13,7 @@ import {createPortal} from 'react-dom';
 import {Check, Send} from 'lucide-react';
 import {Offer, Pack, PayMethod, Payment, api, errorText} from './api';
 import {usd} from './Account';
+import {trackPurchase} from './analytics';
 import {day, useSession} from './auth';
 import {useConfig} from './config';
 import {useRoute} from './router';
@@ -238,7 +239,7 @@ export const PaymentReturn: React.FC = () => {
     const tick = () => api.pay.get(id).then((r) => {
       if (stop) return;
       setP(r);
-      if (r.credited) refresh();
+      if (r.credited) { refresh(); trackPurchase(r); }
       if (!settled(r) && Date.now() < until) timer = window.setTimeout(tick, 5000);
     }).catch((e) => !stop && setError(errorText(e)));
     tick();

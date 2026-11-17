@@ -63,10 +63,50 @@ const start = () => {
  * Событие в обе системы: в GA4 — событием, в Метрике — целью с тем же именем. В GA4 уходит и без
  * согласия — тег сам шлёт его без cookie (Consent Mode); в Метрику — только после «Принять»
  */
-export const track = (name: string) => {
-  window.gtag?.('event', name);
+export const track = (name: string, params?: Record<string, string | number>) => {
+  window.gtag?.('event', name, params);
   const a = ids();
-  if (started && a?.ym) window.ym?.(Number(a.ym), 'reachGoal', name);
+  // Доход цели Метрика берёт только из order_price (+ currency); у Google то же самое — value
+  const ym = params?.value !== undefined ? {order_price: params.value, currency: params.currency} : params;
+  if (started && a?.ym) window.ym?.(Number(a.ym), 'reachGoal', name, ym);
+};
+
+// Отметки «уже отправлено» в этом браузере. Нет localStorage (приватный режим) — событие может уйти
+// повторно; для отчётов это меньшая беда, чем не отправить вовсе
+const mark = {
+  get: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } },
+  set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* приватный режим */ } },
+};
+
+/**
+ * Первая генерация компании (18.11, план витрины, P0) — шаг между регистрацией и оплатой: видно,
+ * сколько зарегистрировавшихся вообще попробовали сервис. Сервер отдаёт в балансе generated — было
+ * ли хоть одно списание (server/billing.mjs). Отправляем, только когда этот браузер сам видел «ещё
+ * не было» и потом «уже было»: иначе после выкладки событие разом ушло бы от всех давних клиентов.
+ * Генерация бесплатная (без списания) или в другом браузере — не считается; для воронки это редкость
+ */
+export const trackFirstGeneration = (workspaceId: string | undefined, generated: boolean | undefined) => {
+  if (!workspaceId || generated === undefined) return;
+  const key = `kok:first-gen:${workspaceId}`;
+  const was = mark.get(key);
+  if (!generated) { if (!was) mark.set(key, 'wait'); return; }
+  if (was !== 'wait') return;
+  mark.set(key, 'sent');
+  track('first_generation');
+};
+
+/**
+ * Оплата (18.11): экран возврата из кассы увидел, что заказ зачислен. Сумма — в долларах, как цена
+ * пакета на витрине; transaction_id — номер заказа: GA4 по нему сам отбрасывает повторы, а мы ещё и
+ * помним отправленные в этом браузере (возврат из кассы открывают и по ссылке из письма). Тестовые
+ * заказы (sandbox) не шлём. Оплата по реквизитам через менеджера сюда не попадает — её видно в админке
+ */
+export const trackPurchase = (p: {id: string; priceUsd: number; packId: string; sandbox: boolean}) => {
+  if (p.sandbox) return;
+  const key = `kok:purchase:${p.id}`;
+  if (mark.get(key)) return;
+  mark.set(key, 'sent');
+  track('purchase', {transaction_id: p.id, value: p.priceUsd, currency: 'USD', item_id: p.packId});
 };
 
 /**
