@@ -1,0 +1,65 @@
+---
+// Статья «Где искать машины в Корее» (lib/carSites.ts) — на языке страницы.
+import offer from '../snapshot/offer.json';
+import {makeT, type Lang} from '../lib/i18n';
+import {ARTICLE_UI} from '../lib/articleUi';
+import {CAR_SITES} from '../lib/carSites';
+import {pathFor, signupUrl} from '../lib/site';
+
+interface Props { lang: Lang }
+const {lang} = Astro.props;
+const a = CAR_SITES[lang];
+const ui = ARTICLE_UI[lang];
+const t = makeT(lang);
+const credits = (n: number) => t.n('unit.credit', n);
+const gift = offer.signup;
+---
+<nav class="crumbs" aria-label={ui.nav}>
+  <a href={pathFor(lang, '/')}>KOK</a><span aria-hidden="true">›</span><a href={pathFor(lang, '/articles/')}>{ui.articles}</a><span aria-hidden="true">›</span><span>{a.crumb}</span>
+</nav>
+
+<section class="section articles-head">
+  <span class="eyebrow">{a.eyebrow}</span>
+  <h1 class="article-h1">{a.h1}</h1>
+  <p class="lead">{a.lead}</p>
+</section>
+
+<section class="section">
+  <h2>{a.sitesTitle}</h2>
+  <div class="sites">
+    {a.sites.map((s) => (
+      <article class="card site-card">
+        <div class="site-head">
+          <h3>{s.name}</h3>
+          <span class={`badge${s.kok ? '' : ' muted-badge'}`}>{s.kok ? a.kokYes : a.kokNo}</span>
+        </div>
+        {s.url ? <a class="site-host" href={s.url} target="_blank" rel="noopener nofollow">{s.host} ↗</a> : <span class="site-host muted">{s.host}</span>}
+        <p>{s.what}</p>
+        <p class="muted"><b>{a.whoLabel}:</b> {s.who}</p>
+        <p class="muted"><b>{a.tipLabel}:</b> {s.tip}</p>
+        {s.kok && <a class="article-more" href={pathFor(lang, '/encar/')}>{ui.inLang('Encar')} →</a>}
+      </article>
+    ))}
+  </div>
+</section>
+
+<section class="section">
+  <h2>{a.howTitle}</h2>
+  <ul class="perks checks">{a.how.map((h) => <li>{h}</li>)}</ul>
+</section>
+
+<section class="section">
+  <div class="final">
+    <div>
+      <h2>{a.kokTitle}</h2>
+      <p class="sub">{a.kokText}</p>
+      <ul class="perks"><li>{t('land.final.gift', {credits: credits(gift.credits), days: t.n('unit.day', gift.days)})}</li></ul>
+    </div>
+    <a class="btn primary big" href={signupUrl(lang)} data-cta="sites-final">{a.kokCta} →</a>
+  </div>
+</section>
+
+<section id="faq" class="section">
+  <h2>{ui.faq}</h2>
+  <div class="faq">{a.faq.map((f) => <details><summary>{f.q}</summary><p>{f.a}</p></details>)}</div>
+</section>

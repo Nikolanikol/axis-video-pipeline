@@ -1,0 +1,71 @@
+---
+// Статья «КП на автомобиль» (lib/offerArticle.ts). Только по-русски.
+import offer from '../snapshot/offer.json';
+import Base from '../layouts/Base.astro';
+import {makeT} from '../lib/i18n';
+import {OFFER_ARTICLE as a} from '../lib/offerArticle';
+import {articleSchema} from '../lib/schema';
+import {pathFor, signupUrl} from '../lib/site';
+const t = makeT('ru');
+const credits = (n: number) => t.n('unit.credit', n);
+const gift = offer.signup;
+---
+<Base lang="ru" page={a.page} {...a.seo} schema={articleSchema('ru', a.page, 'КП на автомобиль', a.faq)}>
+  <nav class="crumbs" aria-label="Навигация">
+    <a href={pathFor('ru', '/')}>KOK</a><span aria-hidden="true">›</span><a href={pathFor('ru', '/articles/')}>Статьи</a><span aria-hidden="true">›</span><span>КП на автомобиль</span>
+  </nav>
+
+  <section class="section offer platform-hero">
+    <div class="offer-text">
+      <span class="eyebrow">{a.eyebrow}</span>
+      <h1 class="article-h1">{a.h1}</h1>
+      <p class="lead">{a.lead}</p>
+      <div class="actions">
+        <a class="btn primary big" href={signupUrl('ru')} data-cta="kp-hero">Собрать КП по ссылке →</a>
+        <a class="btn ghost big" href="#structure">Из чего состоит</a>
+      </div>
+    </div>
+    <img class="offer-sheet" src="/offer/sample-ru.jpg" alt="Образец коммерческого предложения на автомобиль: первая страница" width="900" height="1273" />
+  </section>
+
+  <section id="structure" class="section">
+    <h2>Из чего состоит КП на автомобиль</h2>
+    <p class="sub">Семь блоков — сверху вниз, в том порядке, в каком их читает клиент.</p>
+    <ol class="example">
+      {a.blocks.map((b, i) => <li><span class="step-n">{i + 1}</span><div><b>{b.title}</b><p>{b.text}</p></div></li>)}
+    </ol>
+  </section>
+
+  <section class="section">
+    <h2>Как написать, чтобы клиент дочитал</h2>
+    <ul class="perks checks">{a.tips.map((tip) => <li>{tip}</li>)}</ul>
+  </section>
+
+  <section id="kok" class="section">
+    <h2>КП по ссылке на объявление</h2>
+    <p class="sub">В KOK коммерческое предложение собирается из объявления: фото и характеристики подтягиваются сами, вы вводите только суммы.</p>
+    <ol class="steps">
+      {a.kok.map((s, i) => <li><span class="step-n">{i + 1}</span><h3>{s.title}</h3><p>{s.text}</p></li>)}
+    </ol>
+    <p class="url-tip">Образец в настройках — бесплатно, настоящее КП — {credits(offer.costs.offers)}. При регистрации — {credits(gift.credits)} в подарок.</p>
+  </section>
+
+  <section id="faq" class="section">
+    <h2>Вопросы</h2>
+    <div class="faq">{a.faq.map((f) => <details><summary>{f.q}</summary><p>{f.a}</p></details>)}</div>
+  </section>
+
+  <section class="section">
+    <div class="final">
+      <div>
+        <h2>КП на машину — за минуту</h2>
+        <ul class="perks">
+          <li>{t('land.final.gift', {credits: credits(gift.credits), days: t.n('unit.day', gift.days)})}</li>
+          <li>PDF с вашим логотипом и реквизитами</li>
+          <li>{t('land.final.noobligation')}</li>
+        </ul>
+      </div>
+      <a class="btn primary big" href={signupUrl('ru')} data-cta="kp-final">{t('land.final.cta')} →</a>
+    </div>
+  </section>
+</Base>

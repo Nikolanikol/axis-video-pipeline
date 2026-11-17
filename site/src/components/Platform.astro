@@ -1,0 +1,177 @@
+---
+// Страница площадки (Encar, che168): польза для того, кто читает объявление, потом — KOK для того,
+// кто продаёт. Тексты — src/lib/platforms.ts, подписи — lib/articleUi.ts. Языки статьи — PAGES в lib/site.ts.
+import offer from '../snapshot/offer.json';
+import samples from '../../../public/landing/samples.json';
+import {makeT, type Lang} from '../lib/i18n';
+import {ARTICLE_UI} from '../lib/articleUi';
+import {pathFor, signupUrl} from '../lib/site';
+import {SOURCES} from '../lib/sources';
+import type {Platform} from '../lib/platforms';
+
+interface Props { p: Platform; lang: Lang }
+const {p, lang} = Astro.props;
+const t = makeT(lang);
+const ui = ARTICLE_UI[lang];
+const credits = (n: number) => t.n('unit.credit', n);
+const gift = offer.signup;
+const costs = offer.costs;
+const source = SOURCES.find((s) => s.id === p.id)!;
+const shared = (s: string) => s.replace(/^\/landing\//, '/shared/landing/');
+const carousel = samples.carousels[0];
+// Образцы сняты по объявлениям Encar (в кадре его зал). Своего образца с che168 пока нет — берём
+// другой ролик, чтобы страницы не повторяли друг друга; появится образец с che168 — поставить его
+const video = samples.videos[p.id === 'encar' ? 0 : 1];
+// Язык оригинала для lang= (шрифт и чтение экранными дикторами)
+const orig = p.id === 'encar' ? 'ko' : 'zh';
+---
+<nav class="crumbs" aria-label={ui.nav}>
+  <a href={pathFor(lang, '/')}>KOK</a><span aria-hidden="true">›</span><a href={pathFor(lang, '/articles/')}>{ui.articles}</a><span aria-hidden="true">›</span><span>{ui.inLang(p.label ?? p.name)}</span>
+</nav>
+
+<section class="hero platform-hero">
+  <div class="hero-text">
+    <span class="eyebrow">{p.eyebrow}</span>
+    <h1>{p.h1}</h1>
+    <p class="lead">{p.lead}</p>
+    <div class="actions">
+      <a class="btn primary big" href={signupUrl(lang)} data-cta={`${p.id}-hero`}>{ui.heroCta} →</a>
+      <a class="btn ghost big" href="#terms">{ui.termsBtn}</a>
+    </div>
+    <a class="source" href={source.url} target="_blank" rel="noopener nofollow">
+      <img src={source.logo} alt="" width="36" height="36" /><span>{source.name}<small>{t(source.country)} · {ui.openSite}</small></span>
+    </a>
+  </div>
+  <div class="phone">
+    <video src={shared(video.video)} poster={shared(video.poster)} autoplay muted loop playsinline preload="metadata" width="1080" height="1920"
+      aria-label={ui.videoAria(`${video.title} ${video.year}`)}></video>
+  </div>
+</section>
+
+<section class="section prose">
+  <h2>{ui.whatIs(p.label ?? p.name)}</h2>
+  {p.about.map((text) => <p>{text}</p>)}
+</section>
+
+<section id="link" class="section">
+  <h2>{ui.linkTitle}</h2>
+  <p class="sub">{ui.linkSub}</p>
+  <div class="urls">
+    {p.urls.map((u) => (
+      <figure class="url">
+        <figcaption><b>{u.title}</b><span>{u.note}</span></figcaption>
+        <div class="url-parts" translate="no">
+          {u.parts.map((part) => (
+            <span class={`url-part${part.key ? ' key' : ''}${part.label ? ' labeled' : ''}`}>
+              <code>{part.text}</code>{part.label && <small>{part.label}</small>}
+            </span>
+          ))}
+        </div>
+      </figure>
+    ))}
+  </div>
+  <p class="url-tip">{p.urlTip}</p>
+</section>
+
+<section class="section">
+  <h2>{ui.openTitle}</h2>
+  <ol class="steps">
+    {p.open.map((s, i) => <li><span class="step-n">{i + 1}</span><h3>{s.title}</h3><p>{s.text}</p></li>)}
+  </ol>
+</section>
+
+<section id="terms" class="section">
+  <h2>{p.terms.title}</h2>
+  <p class="sub">{p.terms.sub}</p>
+  <div class="terms" role="table" aria-label={p.terms.title}>
+    <div class="terms-row terms-head" role="row">
+      <span role="columnheader">{ui.colOrig}</span><span role="columnheader">{ui.colLang}</span><span role="columnheader">{ui.colLook}</span>
+    </div>
+    {p.terms.rows.map((r) => (
+      <div class="terms-row" role="row">
+        <span role="cell" class="terms-orig" lang={orig}>{r.orig}</span>
+        <span role="cell"><b>{r.ru}</b></span>
+        <span role="cell" class="muted">{r.note}</span>
+      </div>
+    ))}
+  </div>
+</section>
+
+<section id="example" class="section">
+  <h2>{p.example.title}</h2>
+  <p class="sub">{p.example.sub}</p>
+  <ol class="example">
+    {p.example.lines.map((l, i) => (
+      <li class={l.warn ? 'warn' : undefined}>
+        <span class="step-n">{i + 1}</span>
+        <div>
+          <code lang={orig}>{l.field}</code><small>{l.value}</small>
+          <p>{l.read}</p>
+        </div>
+      </li>
+    ))}
+  </ol>
+</section>
+
+<section class="section">
+  <h2>{p.extras.title}</h2>
+  <p class="sub">{p.extras.sub}</p>
+  <div class="extras">
+    {p.extras.groups.map((g) => (
+      <div class="card">
+        <h3>{g.title}</h3>
+        <dl>{g.rows.map((r) => <><dt lang={orig}>{r.orig}</dt><dd>{r.ru}</dd></>)}</dl>
+      </div>
+    ))}
+  </div>
+</section>
+
+<section class="section">
+  <h2>{p.numbers.title}</h2>
+  <div class="cards cards-3">
+    {p.numbers.items.map((n) => <div class="card"><h3>{n.title}</h3><p class="muted">{n.text}</p></div>)}
+  </div>
+</section>
+
+<section class="section">
+  <h2>{p.checks.title}</h2>
+  <ul class="perks checks">{p.checks.items.map((c) => <li>{c}</li>)}</ul>
+</section>
+
+<section id="kok" class="section">
+  <h2>{ui.kokTitle(p.name)}</h2>
+  <p class="sub">{ui.kokSub}</p>
+  <div class="cards cards-3">
+    <div class="card"><h3>{ui.carousel[0]}</h3><p class="muted">{ui.carousel[1]} — {credits(costs.carousels)}.</p></div>
+    <div class="card"><h3>{ui.video[0]}</h3><p class="muted">{ui.video[1]} — {credits(costs.ads)}.</p></div>
+    <div class="card"><h3>{ui.offer[0]}</h3><p class="muted">{ui.offer[1]} — {credits(costs.offers)}.</p></div>
+  </div>
+  <figure class="carousel platform-sample">
+    <figcaption><b>{carousel.title} {carousel.year}</b><span>{ui.sample} · {t.n('unit.slide', carousel.slides.length)} · {ui.swipe}</span></figcaption>
+    <div class="strip" style={`--ratio: ${carousel.ratio}`}>
+      {carousel.slides.map((s, i) => <img src={shared(s)} alt={`${carousel.title}: ${ui.slide} ${i + 1}`} loading="lazy" decoding="async" />)}
+    </div>
+  </figure>
+  <p><a class="btn primary big" href={signupUrl(lang)} data-cta={`${p.id}-kok`}>{ui.tryGift(credits(gift.credits))} →</a></p>
+</section>
+
+<section id="faq" class="section">
+  <h2>{ui.faq}</h2>
+  <div class="faq">
+    {p.faq.map((f) => <details><summary>{f.q}</summary><p>{f.a}</p></details>)}
+  </div>
+</section>
+
+<section class="section">
+  <div class="final">
+    <div>
+      <h2>{ui.finalTitle(p.name)}</h2>
+      <ul class="perks">
+        <li>{t('land.final.gift', {credits: credits(gift.credits), days: t.n('unit.day', gift.days)})}</li>
+        <li>{t('land.final.formats')}</li>
+        <li>{t('land.final.noobligation')}</li>
+      </ul>
+    </div>
+    <a class="btn primary big" href={signupUrl(lang)} data-cta={`${p.id}-final`}>{t('land.final.cta')} →</a>
+  </div>
+</section>

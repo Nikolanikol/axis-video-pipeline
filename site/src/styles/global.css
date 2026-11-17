@@ -19,10 +19,14 @@
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; -webkit-text-size-adjust: 100%; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+/* Подвал всегда внизу экрана: шапка и main вместе занимают всю высоту, main растягивается
+   (владелец 18.11 — на короткой странице «Статьи» подвал висел посередине) */
 body {
   margin: 0; background: var(--bg); color: var(--text);
   font: 400 16px/1.55 Manrope, system-ui, sans-serif;
+  min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column;
 }
+body > main { flex: 1 0 auto; }
 img, video { max-width: 100%; display: block; }
 a { color: inherit; }
 h1, h2, h3 { line-height: 1.15; margin: 0; }
@@ -177,6 +181,86 @@ figcaption span { color: var(--muted); font-size: 14px; }
   .offer { grid-template-columns: minmax(0, 1fr); gap: 32px; }
   .offer-sheet { width: min(360px, 100%); margin: 0 auto; transform: none; }
 }
+
+/* Страницы площадок (components/Platform.astro) */
+.crumbs { width: var(--page); margin: 0 auto; display: flex; gap: 8px; align-items: center; padding-top: 20px; font-size: 14px; color: var(--muted); }
+.crumbs a { color: var(--muted); text-decoration: none; }
+.crumbs a:hover { color: var(--text); }
+.platform-hero { padding-top: 24px; }
+.platform-hero .source { display: inline-flex; }
+.prose p { color: #e4ded6; max-width: 760px; margin: 14px 0 0; }
+/* Словарь: три колонки на компьютере, на телефоне — карточкой (оригинал и перевод строкой, подсказка ниже) */
+.terms { margin-top: 24px; border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.terms-row { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.2fr) minmax(0, 2fr); gap: 16px; padding: 12px 18px; border-top: 1px solid var(--line); }
+.terms-row:first-child { border-top: 0; }
+.terms-head { background: var(--panel); color: var(--muted); font-size: 14px; font-weight: 600; }
+.terms-orig { font-size: 17px; }
+@media (max-width: 640px) {
+  .terms-head { display: none; }
+  .terms-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4px 12px; }
+  .terms-row > :last-child { grid-column: 1 / -1; font-size: 14px; }
+  .terms-row:nth-child(2) { border-top: 0; }
+}
+/* Схема ссылки: адрес по кускам, под значимыми — подпись; номер машины — винным. Перенос — между
+   кусками, не посреди: на телефоне адрес складывается в несколько строк, подписи остаются под своим куском */
+.urls { display: grid; gap: 16px; margin-top: 24px; }
+.url { margin: 0; padding: 20px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); }
+.url figcaption { margin: 0 0 14px; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: baseline; }
+.url-parts { display: flex; flex-wrap: wrap; align-items: flex-start; row-gap: 12px; }
+.url-part { display: inline-grid; justify-items: start; gap: 6px; }
+.url-part code { font: 500 clamp(14px, 2.2vw, 18px)/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--muted); word-break: break-all; }
+.url-part.labeled code { color: var(--text); padding: 4px 6px; margin-right: 2px; border-radius: 6px; background: #ffffff0d; border-bottom: 2px solid var(--line); }
+.url-part.key code { color: #fff; background: #8e0d2c66; border-bottom-color: var(--accent-line); }
+.url-part small { font-size: 12px; color: var(--muted); padding-left: 6px; }
+.url-part.key small { color: var(--accent-text); font-weight: 600; }
+.url-tip { color: var(--muted); max-width: 760px; margin: 16px 0 0; }
+/* Разбор объявления по шагам: поле как на сайте → что значит; ловушки — винной рамкой */
+.example { list-style: none; padding: 0; margin: 24px 0 0; display: grid; gap: 10px; max-width: 860px; }
+.example li { display: flex; gap: 16px; align-items: flex-start; padding: 16px 20px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+.example li.warn { border-color: var(--accent-line); }
+.example .step-n { flex: none; margin: 0; width: 30px; height: 30px; font-size: 14px; }
+.example code { font: 600 17px/1.3 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.example small { color: var(--muted); margin-left: 10px; font-size: 13px; }
+.example p { margin: 6px 0 0; color: #e4ded6; }
+.example li.warn p { color: var(--accent-text); font-weight: 600; }
+/* Опции, кузов, цвет — три карточки-словаря */
+.extras { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 16px; margin-top: 24px; align-items: start; }
+.extras dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px 14px; margin: 14px 0 0; }
+.extras dt { color: var(--text); }
+.extras dd { margin: 0; color: var(--muted); }
+@media (max-width: 860px) { .extras { grid-template-columns: minmax(0, 1fr); } }
+.cards-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.cards-3 .card p { margin: 10px 0 0; }
+@media (max-width: 860px) { .cards-3 { grid-template-columns: minmax(0, 1fr); } }
+.checks { margin-top: 20px; max-width: 860px; }
+.platform-sample { margin: 28px 0 24px; }
+
+/* Раздел «Статьи» (pages/articles.astro) */
+.articles-head h1 { font-size: clamp(32px, 5vw, 48px); font-weight: 800; letter-spacing: -.02em; }
+.articles-head { padding-top: 24px; }
+.articles-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding-top: 32px; }
+.article-card {
+  display: grid; gap: 10px; align-content: start; padding: 24px; text-decoration: none;
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); transition: border-color .15s;
+}
+.article-card:hover { border-color: var(--accent-line); }
+.article-card img { width: 48px; height: 48px; border-radius: 10px; background: #fff; object-fit: contain; }
+.article-card h2 { font-size: 24px; }
+.article-card p { margin: 0; }
+.article-more { color: var(--accent-text); font-weight: 600; }
+@media (max-width: 760px) { .articles-list { grid-template-columns: minmax(0, 1fr); } }
+
+.article-h1 { font-size: clamp(32px, 5vw, 50px); font-weight: 800; letter-spacing: -.02em; margin: 14px 0 18px; }
+.example li b { display: block; font-size: 17px; }
+
+/* «Где искать машины в Корее» (components/CarSites.astro): карточка на площадку */
+.sites { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 24px; }
+.site-card { display: grid; gap: 8px; align-content: start; }
+.site-card p { margin: 0; }
+.site-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 12px; }
+.site-head h3 { font-size: 22px; }
+.site-host { color: var(--accent-text); font-size: 14px; text-decoration: none; }
+@media (max-width: 760px) { .sites { grid-template-columns: minmax(0, 1fr); } }
 
 .notfound { padding: 96px 0 0; }
 .notfound h1 { font-size: clamp(30px, 5vw, 48px); font-weight: 800; }

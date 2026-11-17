@@ -1,0 +1,85 @@
+// Подписи статей (крошки, кнопки, заголовки разделов) на языках витрины. Тексты самих статей — в
+// lib/platforms.ts, lib/carSites.ts, lib/offerArticle.ts. Албанский перед публикацией вычитывает носитель
+// (план, «Критерии приёмки»: без машинных переводов-заглушек).
+import type {Lang} from './i18n';
+
+const RU = {
+  nav: 'Навигация',
+  articles: 'Статьи',
+  inLang: (name: string) => `${name} на русском`,
+  heroCta: 'Сделать пост по ссылке',
+  termsBtn: 'Словарь полей',
+  openSite: 'открыть сайт',
+  videoAria: (title: string) => `Ролик KOK по объявлению: ${title}`,
+  whatIs: (name: string) => `Что такое ${name}`,
+  linkTitle: 'Как устроена ссылка на объявление',
+  linkSub: 'Ссылку берут из адресной строки браузера или кнопкой «Поделиться». Вот из чего она состоит:',
+  openTitle: 'Как открыть объявление по-русски',
+  colOrig: 'На сайте', colLang: 'По-русски', colLook: 'На что смотреть',
+  kokTitle: (name: string) => `Продаёте машины с ${name}? Пост — по ссылке`,
+  kokSub: 'KOK — сервис для автодилеров и перекупщиков. Вставляете ссылку на объявление — он сам забирает фото и характеристики и собирает рекламу с вашим логотипом и контактами.',
+  carousel: ['Карусель для Instagram', 'Слайды с фото, ценой и характеристиками и готовый текст поста'],
+  video: ['Ролик для Reels и TikTok', 'Вертикальное видео с музыкой и ценой'],
+  offer: ['КП в PDF', 'Коммерческое предложение клиенту с расчётом'],
+  sample: 'Карусель KOK по ссылке', swipe: 'листайте', slide: 'слайд',
+  tryGift: (credits: string) => `Попробовать: ${credits} в подарок`,
+  faq: 'Вопросы',
+  finalTitle: (name: string) => `Ссылка на ${name} → готовый пост`,
+  articlesSub: 'Как читать объявления корейских и китайских площадок по-русски — и как из ссылки на объявление сделать рекламу машины.',
+  read: 'Читать',
+};
+type Ui = typeof RU;
+
+const EN: Ui = {
+  nav: 'Breadcrumbs',
+  articles: 'Articles',
+  inLang: (name) => `${name} in English`,
+  heroCta: 'Make a post from a link',
+  termsBtn: 'Listing glossary',
+  openSite: 'open the site',
+  videoAria: (title) => `KOK video made from a listing: ${title}`,
+  whatIs: (name) => `What is ${name}`,
+  linkTitle: 'What a listing link is made of',
+  linkSub: 'Copy the link from the browser address bar or the Share button. Here is what it consists of:',
+  openTitle: 'How to read a listing in English',
+  colOrig: 'On the site', colLang: 'In English', colLook: 'What to check',
+  kokTitle: (name) => `Selling cars from ${name}? A post from one link`,
+  kokSub: 'KOK is a service for car dealers and exporters. Paste a listing link — it pulls the photos and specs and builds an ad with your logo and contacts.',
+  carousel: ['Instagram carousel', 'Slides with photos, price and specs plus a ready post caption'],
+  video: ['Reels and TikTok video', 'A vertical video with music and the price'],
+  offer: ['PDF quotation', 'A commercial offer for your client with the full calculation'],
+  sample: 'KOK carousel from a link', swipe: 'swipe', slide: 'slide',
+  tryGift: (credits) => `Try it: ${credits} free`,
+  faq: 'Questions',
+  finalTitle: (name) => `${name} link → ready post`,
+  articlesSub: 'How to read Korean and Chinese car listings in English — and how to turn a listing link into a car ad.',
+  read: 'Read',
+};
+
+const SQ: Ui = {
+  nav: 'Navigimi',
+  articles: 'Artikuj',
+  inLang: (name) => `${name} në shqip`,
+  heroCta: 'Bëj postim nga linku',
+  termsBtn: 'Fjalorth i njoftimit',
+  openSite: 'hap faqen',
+  videoAria: (title) => `Video KOK nga njoftimi: ${title}`,
+  whatIs: (name) => `Çfarë është ${name}`,
+  linkTitle: 'Nga se përbëhet linku i njoftimit',
+  linkSub: 'Linkun e merrni nga shiriti i adresës në shfletues ose me butonin «Shpërndaj». Ja nga se përbëhet:',
+  openTitle: 'Si ta lexoni njoftimin në shqip',
+  colOrig: 'Në faqe', colLang: 'Në shqip', colLook: 'Çfarë të kontrolloni',
+  kokTitle: (name) => `Shitni makina nga ${name}? Postimi — nga një link`,
+  kokSub: 'KOK është shërbim për tregtarët e makinave dhe importuesit. Ngjitni linkun e njoftimit — ai merr vetë fotot dhe të dhënat dhe bën reklamën me logon dhe kontaktet tuaja.',
+  carousel: ['Karusel për Instagram', 'Slajde me foto, çmim dhe të dhëna, plus tekst i gatshëm i postimit'],
+  video: ['Video për Reels dhe TikTok', 'Video vertikale me muzikë dhe çmim'],
+  offer: ['Ofertë në PDF', 'Ofertë tregtare për klientin me llogaritjen e plotë'],
+  sample: 'Karusel KOK nga linku', swipe: 'rrëshqitni', slide: 'slajdi',
+  tryGift: (credits) => `Provoni: ${credits} dhuratë`,
+  faq: 'Pyetje',
+  finalTitle: (name) => `Linku i ${name} → postim i gatshëm`,
+  articlesSub: 'Si të lexoni njoftimet e makinave koreane dhe kineze në shqip — dhe si ta ktheni linkun e njoftimit në reklamë.',
+  read: 'Lexo',
+};
+
+export const ARTICLE_UI: Record<Lang, Ui> = {ru: RU, en: EN, sq: SQ};

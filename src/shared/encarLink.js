@@ -5,7 +5,8 @@
 // видах — с номером в параметре и с номером в пути, — а поделиться можно любой из них.
 //
 // С 11.10 второй источник — che168 (Китай, Autohome): данные отдаёт отдельное ядро
-// cores/che168 (см. server/che168.mjs). Номер машины у него тоже 8-значный и мог бы совпасть
+// cores/che168 (см. server/che168.mjs). С 18.11 — и ссылки autohome.com.cn с номером машины: che168 —
+// площадка подержанных машин Autohome, номер у них общий. Номер машины у него тоже 8-значный и мог бы совпасть
 // с номером Encar, поэтому наш id машины из Китая — с приставкой: «ch-60154824». Он же имя
 // папки карусели и пометка лота «che168 60154824».
 //
@@ -21,6 +22,10 @@ const che168 = (ref) => ({source: 'che168', id: `${CHE168_PREFIX}${ref}`, ref});
 const carsensor = (ref) => ({source: 'carsensor', id: `${CARSENSOR_PREFIX}${ref.toLowerCase()}`, ref: ref.toUpperCase()});
 const CARSENSOR_REF = /^[A-Z]{2}\d{8,12}$/i;
 
+// Номер машины в ссылке che168 — общий у всех версий сайта
+const che168Id = (u) => u.searchParams.get('infoid') || u.searchParams.get('infoId')
+  || (u.pathname.match(/\/detail\/(\d+)/) || [])[1] || (u.pathname.match(/\/(\d{5,12})\.html$/) || [])[1] || null;
+
 const PATTERNS = [
   {
     source: 'encar',
@@ -34,8 +39,18 @@ const PATTERNS = [
     // www.che168.com/dealer/513988/60154824.html, global.che168.com/en/detail/60152276,
     // m.che168.com/cardetail/index?infoid=60154824 — номер общий у всех версий сайта
     host: /(^|\.)che168\.com$/i,
-    id: (u) => u.searchParams.get('infoid') || (u.pathname.match(/\/detail\/(\d+)/) || [])[1]
-      || (u.pathname.match(/\/(\d{5,12})\.html$/) || [])[1] || null,
+    id: che168Id,
+  },
+  {
+    // Autohome (汽车之家, 18.11): che168 — его площадка подержанных машин, и карточки машин из раздела
+    // 二手车 на autohome.com.cn открываются на che168.com (проверено на car.autohome.com.cn/2sc/…).
+    // Если же номер машины пришёл в адресе самого Autohome (infoid=…, …/60154824.html) — это та же
+    // машина che168. Без номера это страница модели или списка, а не объявление — говорим об этом
+    source: 'che168',
+    host: /(^|\.)autohome\.com\.cn$/i,
+    // Номер машины — 8 цифр; короче — код города в адресе списка (/2sc/110100/), это не машина
+    id: (u) => { const id = che168Id(u); return id && id.length >= 7 ? id : null; },
+    missing: 'Это страница Autohome без объявления (модель или список). Откройте машину в разделе 二手车 — она откроется на che168.com — и вставьте эту ссылку',
   },
   {
     source: 'carsensor',
@@ -115,9 +130,9 @@ export const parseCarLink = (raw) => {
     if (!p.host.test(url.hostname)) continue;
     const id = p.id(url);
     const ok = p.source === 'carsensor' ? CARSENSOR_REF.test(id ?? '') : /^\d{5,12}$/.test(id ?? '');
-    if (!ok) throw new Error('В ссылке нет номера машины — скопируй её целиком из адресной строки');
+    if (!ok) throw new Error(p.missing ?? 'В ссылке нет номера машины — скопируй её целиком из адресной строки');
     if (p.source === 'carsensor') return carsensor(id);
     return p.source === 'che168' ? che168(id) : {source: p.source, id};
   }
-  throw new Error(`Пока умею ссылки encar.com, che168.com и carsensor.net, а это ${url.hostname}`);
+  throw new Error(`Пока умею ссылки encar.com, che168.com (и Autohome), carsensor.net, а это ${url.hostname}`);
 };
