@@ -2,6 +2,7 @@
 // рендеры, карусели. Типы ответов — общие с сервером.
 import type {CarouselCar, FormatMeta, Lot, Market, OfferMeta, OfferSettings, Profile, Review, Texts, Theme} from '../src/shared/types';
 import {getLang, tNow, type Key, type Lang} from './i18n';
+import {getSource} from './source';
 
 export type MarketEntry = Market & {id: string};
 export type ProfileEntry = Profile & {id: string};
@@ -209,7 +210,8 @@ export const api = {
   me: () => request<Me>('GET', '/api/auth/me'),
   login: (email: string, password: string) => request<{ok: true}>('POST', '/api/auth/login', {email, password}),
   // Язык переключателя на витрине — язык писем, интерфейса и постов новой компании
-  register: (data: Registration) => request<{ok: true}>('POST', '/api/auth/register', {...data, lang: getLang()}),
+  // Откуда пришёл (метки витрины и рекламы, app/source.ts) — один раз, в базу клиента (миграция 022)
+  register: (data: Registration) => request<{ok: true}>('POST', '/api/auth/register', {...data, lang: getLang(), source: getSource()}),
   logout: () => request<{ok: true}>('POST', '/api/auth/logout'),
   verify: (code: string) => request<{ok: true}>('POST', '/api/auth/verify', {code}),
   resendVerify: () => request<{sent: boolean}>('POST', '/api/auth/verify/resend'),

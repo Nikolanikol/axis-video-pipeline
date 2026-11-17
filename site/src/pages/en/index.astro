@@ -1,0 +1,8 @@
+---
+import Home from '../../components/Home.astro';
+import Base from '../../layouts/Base.astro';
+import {homeSchema} from '../../lib/schema';
+import {HOME_SEO} from '../../lib/site';
+const lang = 'en';
+---
+<Base lang={lang} {...HOME_SEO[lang]} schema={homeSchema(lang)}><Home lang={lang} /></Base>

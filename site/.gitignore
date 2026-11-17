@@ -1,0 +1,7 @@
+node_modules/
+dist/
+.astro/
+# Копируется из приложения перед сборкой (scripts/shared.mjs)
+public/shared/
+public/favicon.ico
+.claude/

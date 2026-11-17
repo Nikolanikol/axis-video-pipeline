@@ -1,0 +1,188 @@
+---
+// Главная витрины — те же разделы и тексты, что у нынешней витрины в приложении (app/Landing.tsx):
+// первый экран → как это работает → образцы → условия и тарифы → вопросы → призыв.
+//
+// Чем отличается: здесь чистый HTML без React. Живое превью с плеером Remotion заменено настоящим
+// роликом-образцом — плеер весит сотни килобайт скриптов и не пускал бы страницу в 95+ по Lighthouse.
+// Вход и регистрация — ссылкой в приложение, а не окном поверх страницы.
+import offer from '../snapshot/offer.json';
+import samples from '../../../public/landing/samples.json';
+import {faqFor, makeT, type Lang} from '../lib/i18n';
+import {APP, signupUrl} from '../lib/site';
+import {SOURCES} from '../lib/sources';
+
+interface Props { lang: Lang }
+const {lang} = Astro.props;
+const t = makeT(lang);
+const credits = (n: number) => t.n('unit.credit', n);
+const gift = offer.signup;
+const costs = offer.costs;
+// Образцы лежат у приложения под /landing — к нам копируются в /shared/landing (scripts/shared.mjs)
+const shared = (p: string) => p.replace(/^\/landing\//, '/shared/landing/');
+const videos = samples.videos.map((v) => ({...v, video: shared(v.video), poster: shared(v.poster)}));
+const carousels = samples.carousels.map((c) => ({...c, slides: c.slides.map(shared)}));
+const hero = videos[0];
+
+const usd = (n: number) => `$${n.toLocaleString('en-US', Number.isInteger(n) ? {maximumFractionDigits: 0} : {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+const plans = offer.packs.filter((p) => p.kind === 'plan').sort((a, b) => a.sort - b.sort);
+const topups = offer.packs.filter((p) => p.kind === 'topup').sort((a, b) => a.sort - b.sort);
+
+// «Хватит на 2 ролика и 1 карусель или на 7 каруселей»; остатка на карусель нет — без «и 0 каруселей»
+const rest = Math.floor((gift.credits % costs.ads) / costs.carousels);
+const enough = t(rest > 0 ? 'land.pricing.enough' : 'land.pricing.enoughNoRest', {
+  videos: t.n('unit.video', Math.floor(gift.credits / costs.ads)),
+  carousels: t.n('unit.carousel', rest),
+  onlyCarousels: t.n('unit.carousel', Math.floor(gift.credits / costs.carousels)),
+});
+
+// «[оферте](/offer)» в ответах — ссылкой; относительные адреса ведут в приложение, где живут документы
+const linked = (text: string) => text.replace(/[&<>"]/g, (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'})[c]!)
+  .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_m, label, href) => `<a href="${href.startsWith('/') ? APP + href : href}">${label}</a>`);
+const faq = faqFor(lang);
+---
+<section class="hero">
+  <div class="hero-text">
+    <span class="eyebrow">{t('land.eyebrow')}</span>
+    <h1>{t('land.h1.a')}<span class="accent">{t('land.h1.b')}</span></h1>
+    <p class="lead">{t('land.lead')}</p>
+    <div class="actions">
+      <a class="btn primary big" href={signupUrl(lang)} data-cta="hero">{t('land.cta.gift', {credits: credits(gift.credits)})} →</a>
+      <a class="btn ghost big" href="#samples">{t('land.cta.samples')}</a>
+    </div>
+    <ul class="perks">
+      <li>{t('land.perk.verify', {credits: credits(gift.credits), days: t.n('unit.day', gift.days)})}</li>
+      <li>{t('land.perk.nocard')}</li>
+      <li>{t('land.perk.costs', {video: credits(costs.ads), carousel: credits(costs.carousels)})}</li>
+    </ul>
+    <div class="sources">
+      <span class="muted">{t('src.title')}</span>
+      {SOURCES.map((s) => (
+        <a class="source" href={s.url} target="_blank" rel="noopener" title={t('src.open', {name: s.name, country: t(s.country)})}>
+          <img src={s.logo} alt="" width="36" height="36" loading="lazy" /><span>{s.name}<small>{t(s.country)}</small></span>
+        </a>
+      ))}
+    </div>
+  </div>
+  <div class="phone">
+    <video src={hero.video} poster={hero.poster} autoplay muted loop playsinline preload="metadata" width="1080" height="1920"
+      aria-label={`${hero.title} ${hero.year} · ${t.cfg(hero.format)}`}></video>
+  </div>
+</section>
+
+<section id="how" class="section">
+  <h2>{t('land.how.h2')}</h2>
+  <ol class="steps">
+    {[1, 2, 3].map((n) => (
+      <li><span class="step-n">{n}</span><h3>{t(`land.how.${n}.title` as 'land.how.1.title')}</h3><p>{t(`land.how.${n}.text` as 'land.how.1.text')}</p></li>
+    ))}
+  </ol>
+</section>
+
+<section id="samples" class="section">
+  <h2>{t('land.samples.h2')}</h2>
+  <p class="sub">{t('land.samples.sub')}</p>
+  <h3>{t('land.samples.videos')}</h3>
+  <div class="videos">
+    {videos.map((v) => (
+      <figure>
+        <video data-autoplay src={v.video} poster={v.poster} muted loop playsinline preload="none" width="1080" height="1920"></video>
+        <figcaption><b>{v.title} {v.year}</b><span>{t.cfg(v.format)} · {t.cfg(v.palette)}</span></figcaption>
+      </figure>
+    ))}
+  </div>
+  <h3>{t('land.samples.carousels')}</h3>
+  {carousels.map((c) => (
+    <figure class="carousel">
+      <figcaption><b>{c.title} {c.year}</b><span>{t.cfg(c.format)} · {t.n('unit.slide', c.slides.length)} · {t('land.samples.swipe')}</span></figcaption>
+      <div class="strip" style={`--ratio: ${c.ratio}`}>
+        {c.slides.map((s, i) => <img src={s} alt={t('land.samples.slideAlt', {title: c.title, n: i + 1})} loading="lazy" decoding="async" />)}
+      </div>
+    </figure>
+  ))}
+</section>
+
+<section id="offer" class="section offer">
+  <div class="offer-text">
+    <h2>{t('land.offer.h2')}</h2>
+    <p class="sub">{t('land.offer.text')}</p>
+    <ul class="perks">
+      <li>{t('land.offer.p1')}</li>
+      <li>{t('land.offer.p2')}</li>
+      <li>{t('land.offer.p3')}</li>
+    </ul>
+    <p class="offer-cost"><b>{t('land.pricing.offer')}</b> — {credits(costs.offers)}</p>
+  </div>
+  <!-- Первая страница настоящего образца из настроек КП (scripts/offer-sample.mjs) -->
+  <img class="offer-sheet" src={`/offer/sample-${lang}.jpg`} alt={t('land.offer.alt')} width="900" height="1273" loading="lazy" decoding="async" />
+</section>
+
+<section id="pricing" class="section">
+  <h2>{t('land.pricing.h2')}</h2>
+  <div class="cards">
+    <div class="card gift">
+      <span class="badge">{t('land.pricing.free')}</span>
+      <b class="big-num">{credits(gift.credits)}</b>
+      <p>{t('land.pricing.giftText', {days: t.n('unit.day', gift.days)})} {enough}</p>
+    </div>
+    <div class="card">
+      <span class="badge muted-badge">{t('land.pricing.cost')}</span>
+      <ul class="costs">
+        <li><span>{t('land.pricing.video')}</span><b>{credits(costs.ads)}</b></li>
+        <li><span>{t('land.pricing.carousel')}</span><b>{credits(costs.carousels)}</b></li>
+        <li><span>{t('land.pricing.offer')}</span><b>{credits(costs.offers)}</b></li>
+        <li><span>{t('land.pricing.extras')}</span><b>{t('land.pricing.extrasFree')}</b></li>
+      </ul>
+      <p class="muted">{t('land.pricing.refund')}</p>
+    </div>
+  </div>
+  <div class="tariffs">
+    {plans.map((p) => (
+      <div class="tariff">
+        <span class="tariff-title">{t.cfg(p.title)}</span>
+        <b class="big-num">{usd(p.price_usd)}</b>
+        <span class="muted">{t('land.tariffs.month')}</span>
+        <span>{credits(p.credits)} · {t('land.tariffs.perCredit', {price: usd(Math.round((p.price_usd / p.credits) * 100) / 100)})}</span>
+      </div>
+    ))}
+    {topups.length > 0 && (
+      <div class="tariff topup">
+        <span class="tariff-title">{t('land.tariffs.topup')}</span>
+        {topups.map((p) => <span>{credits(p.credits)} — {usd(p.price_usd)}</span>)}
+      </div>
+    )}
+  </div>
+</section>
+
+<section id="faq" class="section">
+  <h2>{t('land.nav.faq')}</h2>
+  <div class="faq">
+    {faq.map((f) => <details><summary>{f.q}</summary><p set:html={linked(f.a)} /></details>)}
+  </div>
+</section>
+
+<section class="section">
+  <div class="final">
+    <div>
+      <h2>{t('land.final.h2')}</h2>
+      <ul class="perks">
+        <li>{t('land.final.gift', {credits: credits(gift.credits), days: t.n('unit.day', gift.days)})}</li>
+        <li>{t('land.final.formats')}</li>
+        <li>{t('land.final.brand')}</li>
+        <li>{t('land.final.noobligation')}</li>
+      </ul>
+    </div>
+    <a class="btn primary big" href={signupUrl(lang)} data-cta="final">{t('land.final.cta')} →</a>
+  </div>
+</section>
+
+<script>
+  // Образцы играют только на экране: три одновременных ролика тормозили бы прокрутку на телефоне,
+  // а грузить их до экрана незачем (preload="none")
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      const v = e.target as HTMLVideoElement;
+      if (e.isIntersecting) v.play().catch(() => {}); else v.pause();
+    }
+  }, {threshold: 0.4});
+  document.querySelectorAll<HTMLVideoElement>('video[data-autoplay]').forEach((v) => io.observe(v));
+</script>

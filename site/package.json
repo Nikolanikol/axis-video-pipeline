@@ -1,0 +1,17 @@
+{
+  "name": "kok-site",
+  "private": true,
+  "type": "module",
+  "description": "Витрина и блог KOK на axis-beauty.com — отдельный от приложения сайт (docs/projects/site/plan.md)",
+  "scripts": {
+    "shared": "node scripts/shared.mjs",
+    "dev": "npm run shared && astro dev --port 4321",
+    "build": "npm run shared && astro build",
+    "preview": "astro preview --port 4321",
+    "offer-sample": "node scripts/offer-sample.mjs"
+  },
+  "dependencies": {
+    "@fontsource/manrope": "5.3.0",
+    "astro": "7.3.8"
+  }
+}

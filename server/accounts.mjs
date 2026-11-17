@@ -212,7 +212,20 @@ const starterProfile = (company, lang) => ({
  * адреса. Письмо с кодом уходит после записи; не ушло — человек запросит ещё раз из кабинета.
  * Компания необязательна: не указана — берём имя человека (его можно поменять в профиле).
  */
-export const register = async ({name, email, phone, password, company, news = true, lang}, meta = {}) => {
+// Откуда пришёл клиент (миграция 022): только известные поля, короткими строками. Метки приходят из
+// адреса страницы — их может подставить кто угодно, поэтому ничего, кроме этих строк, не храним
+const SOURCE_KEYS = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'ref', 'land'];
+export const cleanSource = (src) => {
+  if (!src || typeof src !== 'object' || Array.isArray(src)) return null;
+  const out = {};
+  for (const k of SOURCE_KEYS) {
+    const v = typeof src[k] === 'string' ? src[k].trim().slice(0, 200) : '';
+    if (v) out[k] = v;
+  }
+  return Object.keys(out).length ? out : null;
+};
+
+export const register = async ({name, email, phone, password, company, news = true, lang, source}, meta = {}) => {
   const person = checkName(name);
   const mail = normEmail(email);
   const key = emailKey(mail);
@@ -234,9 +247,9 @@ export const register = async ({name, email, phone, password, company, news = tr
     const workspaceId = `ws-${crypto.randomBytes(5).toString('hex')}`;
     const {rows: [user]} = await client.query(
       // Галочка «Получать новости KOK» (миграция 019): согласие — с датой, снятая — сразу «отказался»
-      `INSERT INTO smmaker_users (email, email_key, password_hash, name, phone, news_consent_at, news_off_at, lang)
-       VALUES ($1, $2, $3, $4, $5, CASE WHEN $6 THEN now() END, CASE WHEN $6 THEN NULL ELSE now() END, $7) RETURNING id`,
-      [mail, key, hash, person, tel, news !== false, normLang(lang)]);
+      `INSERT INTO smmaker_users (email, email_key, password_hash, name, phone, news_consent_at, news_off_at, lang, source)
+       VALUES ($1, $2, $3, $4, $5, CASE WHEN $6 THEN now() END, CASE WHEN $6 THEN NULL ELSE now() END, $7, $8) RETURNING id`,
+      [mail, key, hash, person, tel, news !== false, normLang(lang), cleanSource(source)]);
     await client.query(
       'INSERT INTO smmaker_workspaces (id, name, brand, profile) VALUES ($1, $2, $3, $4)',
       [workspaceId, title, brand, starterProfile(title, lang)]);

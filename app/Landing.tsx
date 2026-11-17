@@ -24,6 +24,7 @@ import type {AdProps, Lot, Market, Theme} from '../src/shared/types';
 import {dropPrerender} from './analytics';
 import {api, PublicOffer} from './api';
 import {AuthCard, AuthMode} from './auth';
+import {takeEntryIntent} from './entry';
 import {Preview} from './Preview';
 import {SiteFooter} from './SiteFooter';
 import {SourcesStrip} from './Sources';
@@ -56,6 +57,14 @@ export const Landing: React.FC<{signup: {credits: number; days: number}; notice:
   }, []);
   // Пришёл по ссылке из письма (подтверждение почты, сброс) — сразу окно входа
   useEffect(() => { if (notice) { setMode('login'); setAuthOpen(true); } }, [notice]);
+  // Пришёл с витрины axis-beauty.com по кнопке «Попробовать» / «Войти» (/register, /login, 17.11) —
+  // сразу нужное окно, без второй витрины. Адрес уже почищен в app/entry.ts
+  useEffect(() => {
+    const m = takeEntryIntent();
+    if (!m) return;
+    setMode(m);
+    setAuthOpen(true);
+  }, []);
 
   const gift = offer?.signup ?? signup;
   const costs = offer?.costs ?? {ads: 3, carousels: 1};

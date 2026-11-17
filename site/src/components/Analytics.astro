@@ -1,0 +1,104 @@
+---
+// Счётчики витрины — по тем же правилам, что в приложении (app/analytics.tsx, server/seo.mjs, 19.10):
+// - Google Analytics 4 в режиме согласия Consent Mode v2: тег в странице у всех, но до «Принять» —
+//   без cookie, обезличенно; consent default обязан идти раньше config;
+// - Яндекс Метрика режима согласия не имеет — грузится только после «Принять», без Вебвизора;
+// - выбор помнит браузер (localStorage, тот же ключ, что в приложении).
+// Номера — те же счётчики, что у приложения (config/seo.json → counters): витрина и кабинет в одной
+// статистике, путь «витрина → регистрация» виден целиком. Работают только на боевом адресе: локально
+// и на проверочном адресе Coolify статистику прода не пишем.
+//
+// Хранилище браузера у витрины и у app. своё (разные адреса) — согласие на витрине не переносится
+// в кабинет, там плашка спросит ещё раз. Это осознанно: так проще и честнее, чем общая cookie.
+import seo from '../../../config/seo.json';
+import {makeT, type Lang} from '../lib/i18n';
+import {PRIVACY_URL} from '../lib/site';
+
+interface Props { lang: Lang }
+const {lang} = Astro.props;
+const t = makeT(lang);
+const ids = {ga: seo.counters.gaMeasurementId, ym: seo.counters.yandexMetrikaId};
+---
+<script is:inline define:vars={{ids}}>
+  window.__KOK_ANALYTICS = /^(www\.)?axis-beauty\.com$/.test(location.hostname) ? ids : null;
+  if (window.__KOK_ANALYTICS && ids.ga) {
+    window.dataLayer = window.dataLayer || [];
+    window.gtag = function () { dataLayer.push(arguments); };
+    gtag('consent', 'default', {ad_storage: 'denied', ad_user_data: 'denied', ad_personalization: 'denied', analytics_storage: 'denied'});
+    try { if (localStorage.getItem('kok:analytics-consent') === 'yes') gtag('consent', 'update', {analytics_storage: 'granted'}); } catch (e) {}
+    gtag('js', new Date());
+    gtag('config', ids.ga);
+    const s = document.createElement('script');
+    s.async = true;
+    s.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(ids.ga);
+    document.head.appendChild(s);
+  }
+</script>
+
+<div class="consent" role="dialog" aria-label={t('consent.aria')} hidden>
+  <p>{t('consent.text')} {t('consent.more')}<a href={PRIVACY_URL}>{t('consent.policy')}</a>.</p>
+  <div class="consent-actions">
+    <button class="btn ghost" type="button" data-choice="no">{t('consent.no')}</button>
+    <button class="btn primary" type="button" data-choice="yes">{t('consent.yes')}</button>
+  </div>
+</div>
+
+<script>
+  type Ids = {ga: string; ym: string};
+  const w = window as unknown as {__KOK_ANALYTICS: Ids | null; gtag?: (...a: unknown[]) => void; ym?: (...a: unknown[]) => void};
+  const KEY = 'kok:analytics-consent';
+  const read = () => { try { return localStorage.getItem(KEY); } catch { return null; } };
+  const save = (v: string) => { try { localStorage.setItem(KEY, v); } catch { /* приватный режим — спросим снова */ } };
+
+  let started = false;
+  const start = () => {
+    const a = w.__KOK_ANALYTICS;
+    if (!a || started) return;
+    started = true;
+    if (a.ga) w.gtag?.('consent', 'update', {analytics_storage: 'granted'});
+    if (a.ym) {
+      // Очередь вызовов до загрузки tag.js — как в официальном коде Метрики
+      type Queue = {(...args: unknown[]): void; a?: unknown[]; l?: number};
+      const ym: Queue = function (...args: unknown[]) { (ym.a = ym.a || []).push(args); };
+      ym.l = Date.now();
+      w.ym = ym;
+      ym(Number(a.ym), 'init', {clickmap: true, trackLinks: true, accurateTrackBounce: true});
+      const s = document.createElement('script');
+      s.async = true;
+      s.src = 'https://mc.yandex.ru/metrika/tag.js';
+      document.head.appendChild(s);
+    }
+  };
+
+  /** Событие: в GA4 — и без согласия (тег сам шлёт его без cookie), в Метрику — целью, после «Принять» */
+  const track = (name: string, params: Record<string, string> = {}) => {
+    w.gtag?.('event', name, params);
+    const a = w.__KOK_ANALYTICS;
+    if (started && a?.ym) w.ym?.(Number(a.ym), 'reachGoal', name, params);
+  };
+
+  const bar = document.querySelector<HTMLElement>('.consent');
+  if (w.__KOK_ANALYTICS && bar) {
+    const choice = read();
+    if (choice === 'yes') start();
+    else if (!choice) bar.hidden = false;
+    bar.addEventListener('click', (e) => {
+      const v = (e.target as HTMLElement).closest<HTMLElement>('[data-choice]')?.dataset.choice;
+      if (!v) return;
+      save(v);
+      bar.hidden = true;
+      if (v === 'yes') start();
+    });
+  }
+
+  // Кнопки, ведущие в приложение (data-cta: место на странице), и просмотр тарифов — события воронки
+  document.addEventListener('click', (e) => {
+    const a = (e.target as HTMLElement).closest<HTMLElement>('[data-cta]');
+    if (a) track(a.dataset.cta === 'login' ? 'login_click' : 'cta_click', {place: a.dataset.cta ?? '', lang: document.documentElement.lang});
+  });
+  const pricing = document.getElementById('pricing');
+  if (pricing && 'IntersectionObserver' in window) {
+    const io = new IntersectionObserver(([e]) => { if (e.isIntersecting) { track('pricing_view'); io.disconnect(); } }, {threshold: 0.3});
+    io.observe(pricing);
+  }
+</script>
