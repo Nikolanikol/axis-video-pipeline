@@ -1,7 +1,7 @@
 // Подвал KOK — общий для витрины гостя и рабочих экранов (владелец 12.10: «футер виден всегда,
 // как у нормальных сайтов, но не мешает»). О сервисе и каналы связи, разделы, документы,
 // реквизиты продавца внизу. Модерации платёжного сервиса нужны контакты и оферта на виду.
-// Каналы и продавец — из config/platform.json через /api/public/offer (он открыт и вошедшему).
+// Каналы связи — из config/platform.json через /api/public/offer (он открыт и вошедшему).
 //
 // На рабочих экранах подвал стоит под рабочей зоной высотой в экран (Shell.tsx): работе он не
 // мешает, а дойти до него — прокрутить чуть ниже.
@@ -35,7 +35,6 @@ export const SiteFooter: React.FC<Props> = ({service, offer: given, className}) 
 
   const links = contactLinks(offer?.contacts);
   const tg = links.find((c) => c.label === 'Telegram');
-  const l = offer?.legal;
   const icon = (label: string) => label === 'WhatsApp' ? <MessageCircle size={18} aria-hidden />
     : label === 'Telegram' ? <Send size={18} aria-hidden />
     : label === 'Instagram' ? <Instagram size={18} aria-hidden /> : <Mail size={18} aria-hidden />;
@@ -83,9 +82,9 @@ export const SiteFooter: React.FC<Props> = ({service, offer: given, className}) 
         </div>
       </div>
       <div className="land-foot-legal">
-        <span>© {new Date().getFullYear()} {l?.seller || 'KOK'}</span>
-        {l?.regNo && <span>{t('foot.regNo', {no: l.regNo.replace(/\s*\(.*\)$/, '')})}</span>}
-        {l?.country && <span>{l.country}</span>}
+        {/* Данные владельца (ИП, рег. №, страна) в подвал не выводим — по решению Николая 17.11.
+            Они остаются только на страницах оферты и политики. */}
+        <span>© {new Date().getFullYear()} KOK</span>
       </div>
     </footer>
   );
