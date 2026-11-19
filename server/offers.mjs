@@ -10,12 +10,8 @@
 // печатей разом не пускаем (OFFER_CONCURRENCY): пачка запросов не съест память рендера.
 // Подробно — docs/offer-pdf.md.
 
-import {execFile} from 'node:child_process';
 import fs from 'node:fs/promises';
-import {existsSync, readdirSync} from 'node:fs';
 import path from 'node:path';
-import {promisify} from 'node:util';
-import {pathToFileURL} from 'node:url';
 import sharp from 'sharp';
 import {
   DEFAULT_PROFILE, HttpError, ROOT, checkId, getBrand, getLot, getProfile, readJson, saveProfile,
@@ -28,32 +24,11 @@ import {calcOffer, carPriceIn, docNumber, offerSettings, sampleAmounts} from '..
 import {companyContacts, offerDocument, sampleClient, sampleCompany, sampleDealer} from '../src/shared/offerHtml.js';
 import {currencyCode} from '../src/shared/currencies.js';
 import {inkContrast} from '../src/shared/logoPlate.js';
+import {printOfferPdf} from './offerPdf.mjs';
 
 const log = serverLog('offers');
-const run = promisify(execFile);
 
 export const offersDir = () => path.join(workspaceDir(), 'offers');
-
-// ——— Браузер ———
-// Remotion кладёт chrome-headless-shell в node_modules/.remotion/<режим>/<платформа>/…; имя
-// платформенной папки и файла у него разное (mac-arm64, linux64, headless_shell на ARM-линуксе),
-// поэтому ищем, а не собираем путь. CHROME_PATH — свой браузер, если понадобится
-let chromePath;
-const findChrome = () => {
-  if (chromePath) return chromePath;
-  if (process.env.CHROME_PATH) return (chromePath = process.env.CHROME_PATH);
-  const base = path.join(ROOT, 'node_modules', '.remotion', 'chrome-headless-shell');
-  for (const platform of existsSync(base) ? readdirSync(base, {withFileTypes: true}).filter((d) => d.isDirectory()).map((d) => d.name) : []) {
-    const dir = path.join(base, platform);
-    for (const sub of readdirSync(dir).filter((d) => d.startsWith('chrome-headless-shell'))) {
-      for (const exe of ['chrome-headless-shell', 'headless_shell', 'chrome-headless-shell.exe']) {
-        const p = path.join(dir, sub, exe);
-        if (existsSync(p)) return (chromePath = p);
-      }
-    }
-  }
-  throw new Error('Не найден chrome-headless-shell Remotion (ensureBrowser в Dockerfile)');
-};
 
 // Не больше двух печатей разом: остальные ждут в очереди (секунды), а не запускают по браузеру
 const LIMIT = Number(process.env.OFFER_CONCURRENCY) || 2;
@@ -65,13 +40,7 @@ const slot = async (fn) => {
   try { return await fn(); } finally { active--; waiting.shift()?.(); }
 };
 
-const printPdf = (htmlFile, pdfFile) => slot(() => run(findChrome(), [
-  '--headless', '--disable-gpu', '--no-sandbox', '--no-pdf-header-footer',
-  // Шрифт встроен в HTML, но декодируется не мгновенно: без бюджета времени Chromium
-  // печатал раньше и выходил PDF без единой буквы (прототип, 16.11)
-  '--run-all-compositor-stages-before-draw', '--virtual-time-budget=5000',
-  `--print-to-pdf=${pdfFile}`, pathToFileURL(htmlFile).href,
-], {timeout: 60_000}));
+const printPdf = (htmlFile, pdfFile) => slot(() => printOfferPdf(htmlFile, pdfFile));
 
 // ——— Шрифт: Manrope встраиваем в файл — у сервера нет сети к Google Fonts, а PDF должен
 // выглядеть одинаково везде ———
