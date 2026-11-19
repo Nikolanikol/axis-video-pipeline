@@ -7,12 +7,13 @@
 //   лента квадратных плиток выбранной вкладки (постоянной высоты — превью не прыгает).
 // «Настройки» — панель справа на 90 % ширины: сцены сегментами и группа «О ролике»; в сцене — только
 // её поля (цена — «Рассчитать / Указать сумму», фото — только в «Галерее»).
-// Список объявлений и готовые ролики (открываются сами после сборки) — листы на весь экран.
+// Список объявлений и ролики — листы на весь экран. «Ролики» доступны с превью постоянно;
+// при начале и окончании сборки лист открывается сам.
 // Данные ролика — те же, что у компьютера: editLot / saveLot / beforeRender из LotTool, второй копии нет.
 // Состояние интерфейса (вкладка, лист, сцена, прокрутка листа, раскрытые группы) — в localStorage по
 // компании и объявлению; навигация ролик не меняет и сборку не запускает.
-import React, {useCallback, useEffect, useLayoutEffect, useRef, useState} from 'react';
-import {ChevronRight, List, X} from 'lucide-react';
+import React, {useCallback, useEffect, useId, useLayoutEffect, useRef, useState} from 'react';
+import {ChevronRight, Film, List, X} from 'lucide-react';
 import type {AdProps, FormatMeta, Market, Theme} from '../../src/shared/types';
 import type {FontPair, LotEntry, Palette as PaletteColors} from '../api';
 import {useConfig} from '../config';
@@ -23,6 +24,8 @@ import {lotTheme} from './LookPanel';
 import {SceneScrubber} from './SceneScrubber';
 import {SaveStatus, type SaveState} from './Palette';
 import {useT} from '../i18n';
+import {useCost} from '../auth';
+import type {JobPanelState} from '../JobsPanel';
 
 type Props = {
   lot: LotEntry | null; input: AdProps | null; market: Market; format: FormatMeta; brand: Theme;
@@ -39,7 +42,7 @@ type Props = {
   /** Ссылка, «Добавить вручную» и список — из LotTool, тот же путь импорта, что на компьютере */
   list: React.ReactNode;
   /** Готовые ролики (RenderPanel без своей кнопки); запуск — buildRef, его же вызывает «Собрать» */
-  render: React.ReactNode; buildRef: React.MutableRefObject<(() => void) | null>; building: {starting: boolean; running: boolean};
+  render: React.ReactNode; buildRef: React.MutableRefObject<(() => void) | null>; building: JobPanelState;
   photoSource?: React.ReactNode;
 };
 
@@ -86,6 +89,7 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
   const {lot, input, format, brand, save, onRetrySave, scene, onScene, seek, listOpen, onList, openContent, onContentOpened,
     list, render, buildRef, building} = props;
   const {config} = useConfig();
+  const cost = useCost('ads', config.credits);
   const root = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
   const player = useRef<PreviewControl | null>(null);
@@ -95,6 +99,15 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
   uiRef.current = ui;
   const [view, setView] = useState<'edit' | 'watch'>('edit');
   const [jobsOpen, setJobsOpen] = useState(false);
+  const jobsId = useId();
+  const jobsButton = useRef<HTMLButtonElement>(null);
+  const jobsSheet = useRef<HTMLDivElement>(null);
+  // После смены объявления сводка прежнего может оставаться до первого эффекта новой панели.
+  const renderState = building.query.lot === lot?.id ? building : null;
+  const starting = renderState?.starting ?? false;
+  const running = renderState?.running ?? false;
+  const jobCount = renderState?.count ?? 0;
+  const activeJob = renderState?.active;
   const [keyboard, setKeyboard] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   // Кадр плеера — подпиской для полосы прокрутки: каждый кадр не перерисовывает весь редактор
@@ -170,12 +183,21 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
     commit({...uiRef.current, sheet: 'text', about: true}, true);
     onContentOpened();
   }, [openContent, lot?.id]); // eslint-disable-line react-hooks/exhaustive-deps
-  // Сборка закончилась — лист «Ролики» открывается сам: результат и скачивание сразу под рукой
-  const wasRunning = useRef(false);
+  // При начале/возобновлении сборки видны этап и отмена; после завершения — результат.
+  // Переключение объявления не считаем окончанием чужого задания.
+  const wasRunning = useRef<{lotId?: string; running: boolean}>({lotId: lot?.id, running: false});
   useEffect(() => {
-    if (wasRunning.current && !building.running) setJobsOpen(true);
-    wasRunning.current = building.running;
-  }, [building.running]);
+    const previous = wasRunning.current;
+    if (renderState && previous.lotId === lot?.id && previous.running !== running) setJobsOpen(true);
+    wasRunning.current = {lotId: lot?.id, running};
+  }, [lot?.id, renderState?.query.lot, running]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!jobsOpen) return;
+    jobsSheet.current?.querySelector<HTMLButtonElement>('button')?.focus();
+    const escape = (e: KeyboardEvent) => { if (e.key === 'Escape') setJobsOpen(false); };
+    window.addEventListener('keydown', escape);
+    return () => { window.removeEventListener('keydown', escape); jobsButton.current?.focus(); };
+  }, [jobsOpen]);
   // Список или ролики закрывают превью — плеер на паузе (раздел 8)
   useEffect(() => { if (listOpen || jobsOpen) player.current?.pause(); }, [listOpen, jobsOpen]);
 
@@ -246,9 +268,9 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
   // с iOS 10); ставим только на iPhone/iPad и только пока открыт редактор — Android его не трогаем
   useEffect(() => noFocusZoom(), []);
 
-  const buildLabel = tr(building.starting ? 'mle.starting' : building.running ? 'mle.building' : 'mle.build');
+  const buildLabel = tr(starting ? 'mle.starting' : running ? 'mle.building' : 'mle.build') + (!starting && !running ? cost : '');
   // ——— Шапка: одна строка вместо логотипа (по образцу владельца 20.10): слева значок списка
-  // объявлений, машина и статус с точкой, справа компактное «Собрать» и бургер Shell. Меню — общее, плюс «Ролики» ———
+  // объявлений, машина и статус с точкой, справа компактное «Собрать» и бургер Shell с общим меню ———
   const title = lot ? [lot.model || lot.brand, lot.year].filter(Boolean).join(' ') || tr('lots.untitled') : tr('mle.noLots');
   const fullTitle = lot ? [lot.brand, lot.model, lot.trim, lot.year].filter(Boolean).join(' ') : '';
   useHeaderSlot({
@@ -260,13 +282,12 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
         <b>{title}</b>
         {lot && <span><SaveStatus save={save} onRetry={onRetrySave} /> · {tr('mle.thisVideo')}</span>}
       </div>
-      {lot && <button type="button" className="btn primary mle-build" disabled={building.starting || building.running || !lot.photos.length}
+      {lot && <button type="button" className="btn primary mle-build" disabled={starting || running || !lot.photos.length}
         onClick={() => buildRef.current?.()}>{buildLabel}</button>}
     </div>,
-    // Своих пунктов в меню нет (владелец 20.10: «Ролики» в бургере не нужны); лист с готовыми роликами
-    // открывается сам после сборки
+    // История доступна на превью: пункт в бургере не нужен.
     menu: [],
-  }, [title, fullTitle, save, lot?.id, lot?.photos.length, listOpen, jobsOpen, building.starting, building.running, tr.lang]);
+  }, [title, fullTitle, save, lot?.id, lot?.photos.length, listOpen, jobsOpen, starting, running, cost, tr.lang]);
 
   const sceneIndex = format.scenes.findIndex((s) => s.id === scene);
   const current = format.scenes[Math.max(0, sceneIndex)];
@@ -282,8 +303,18 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
         {view === 'watch' && <button type="button" className="btn primary mle-back" onClick={back}>{tr('mle.back')}</button>}
         {/* «Настройки» — правка надписей, цены и фото (панель справа): серая плашка в правом верхнем
             углу превью, по образцу владельца 20.10 */}
-        {view === 'edit' && <button type="button" className={`mle-text-btn${sheet === 'text' ? ' on' : ''}`} aria-expanded={sheet === 'text'}
-          onClick={() => openSheet('text')}>{tr.cfg('Настройки')}</button>}
+        {view === 'edit' && <div className="mle-stage-tools">
+          <button ref={jobsButton} type="button" className="mle-text-btn mle-jobs-btn" aria-controls={jobsId} aria-expanded={jobsOpen}
+            onClick={() => { onList(false); setJobsOpen(true); }}>
+            <span className="mle-jobs-title"><Film size={17} aria-hidden="true" />{tr('jobs.title')}{jobCount > 0 ? ` · ${jobCount}` : ''}</span>
+            {activeJob && <span className="mle-jobs-stage">
+              <span>{tr.cfg(activeJob.stage)}</span>
+              {activeJob.status === 'running' && <b>{activeJob.progress}%</b>}
+            </span>}
+          </button>
+          <button type="button" className={`mle-text-btn${sheet === 'text' ? ' on' : ''}`} aria-expanded={sheet === 'text'}
+            onClick={() => openSheet('text')}>{tr.cfg('Настройки')}</button>
+        </div>}
       </div>
       {/* Панель плеера по образцу владельца: ▶, время, полоса перемотки, «Смотреть целиком» */}
       <SceneScrubber format={format} listen={listenFrame} seekFrame={(f) => player.current?.seekFrame(f)}
@@ -339,9 +370,8 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
       <div className="mle-sheet-body">{list}</div>
     </div>}
 
-    {/* Готовые ролики и прежние версии — лист из меню. Смонтирован всегда: его сборку вызывает
-        «Собрать», а после сборки лист открывается сам */}
-    {lot && <div className={`mle-sheet${jobsOpen ? '' : ' hidden'}`} role="dialog" aria-label={tr('jobs.title')} aria-hidden={!jobsOpen}>
+    {/* Тот же список смонтирован всегда: сборка и опрос продолжаются при закрытом листе. */}
+    {lot && <div ref={jobsSheet} id={jobsId} className={`mle-sheet${jobsOpen ? '' : ' hidden'}`} role="dialog" aria-label={tr('jobs.title')} aria-hidden={!jobsOpen}>
       <div className="mle-sheet-head">
         <b>{tr('jobs.title')} · {fullTitle}</b>
         <button type="button" className="mle-icon" aria-label={tr('mle.backToVideo')} onClick={() => setJobsOpen(false)}><X size={20} /></button>

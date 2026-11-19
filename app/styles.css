@@ -1053,6 +1053,18 @@ a.tab { text-decoration: none; }
   padding: 0 14px; border-radius: 12px; border: 1px solid #ffffff14; background: #2b2b30e6; color: #fff;
   font: 400 14px var(--font); cursor: pointer; box-shadow: 0 4px 14px #0006; -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
 .mle-text-btn.on { background: #8e0d2c40; }
+/* Постоянный вход в ролики рядом с настройками, поверх превью: его высота не уменьшается.
+   Контейнер не перехватывает касания между кнопками; длинный этап не вытесняет процент. */
+.mle-stage-tools { position: absolute; top: 14px; left: 14px; right: 14px; z-index: 3;
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; pointer-events: none; }
+.mle-stage-tools .mle-text-btn { position: static; min-height: 44px; height: auto; pointer-events: auto; flex: none; }
+.mle-stage-tools .mle-jobs-btn { display: flex; flex-direction: column; align-items: stretch; justify-content: center;
+  min-width: 0; max-width: calc(100% - 110px); padding: 7px 12px; gap: 3px; }
+.mle-jobs-title { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.mle-jobs-title svg { flex: none; }
+.mle-jobs-stage { display: flex; align-items: baseline; gap: 6px; font-size: 11px; color: #ddd; text-align: left; }
+.mle-jobs-stage span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mle-jobs-stage b { flex: none; font-weight: 500; font-variant-numeric: tabular-nums; }
 /* Превью — главное на экране: всё свободное место. Своя ▶ справа снизу и увеличение справа сверху */
 /* flex-basis 0 — высота сцены определённая, и плеер вписывает кадр в неё целиком, а не по своей
    пропорции 9:16 (иначе при открытом листе низ кадра обрезался) */

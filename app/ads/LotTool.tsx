@@ -15,6 +15,7 @@ import {useConfig} from '../config';
 import {EncarImport} from './EncarImport';
 import {Preview} from '../Preview';
 import {RenderPanel} from '../RenderPanel';
+import type {JobPanelState} from '../JobsPanel';
 import {OfferButton} from './OfferButton';
 import {lastFormat, lastLot} from '../router';
 import {ImportModal, LotsPanel, QuickLink, type ImportStage} from './QuickLot';
@@ -151,7 +152,7 @@ export const LotTool: React.FC = () => {
   const pickScene = (id: string) => { setScene(id); setSeek((s) => ({id, n: (s?.n ?? 0) + 1})); };
   // Мобильная «Собрать» в верхней строке вызывает сборку RenderPanel (одна защита от двойного нажатия)
   const buildRef = useRef<(() => void) | null>(null);
-  const [building, setBuilding] = useState({starting: false, running: false});
+  const [building, setBuilding] = useState<JobPanelState>({query: {}, starting: false, running: false, count: 0, active: null});
   // Перед сборкой — последние правки; не записались — сборка не стартует со старыми значениями
   const beforeRender = async () => {
     if (save === 'saved') return;
@@ -275,7 +276,7 @@ export const LotTool: React.FC = () => {
           onCopy={copyLot} onDelete={deleteLot} onDeleteEmpty={deleteEmpty} />
       </div>}
       render={lot && <>
-        <RenderPanel lot={lot} format={format} unsavedSettings={unsavedSettings} beforeRender={beforeRender} onError={report}
+        <RenderPanel key={lot.id} lot={lot} format={format} unsavedSettings={unsavedSettings} beforeRender={beforeRender} onError={report}
           hideButton trigger={buildRef} onState={setBuilding} />
         <OfferButton lot={lot} />
       </>}
