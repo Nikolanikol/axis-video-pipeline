@@ -3,7 +3,7 @@ import React from 'react';
 import {missing} from '../src/shared/model';
 import type {FormatMeta, Requirement} from '../src/shared/types';
 import {api, LotEntry} from './api';
-import {JobsPanel} from './JobsPanel';
+import {JobsPanel, type JobPanelState} from './JobsPanel';
 import {useT, type Key} from './i18n';
 
 type Props = {
@@ -17,7 +17,7 @@ type Props = {
   // Мобильная палитра: кнопка сборки — в верхней строке экрана (см. JobsPanel)
   hideButton?: boolean;
   trigger?: React.MutableRefObject<(() => void) | null>;
-  onState?: (state: {starting: boolean; running: boolean}) => void;
+  onState?: (state: JobPanelState) => void;
 };
 
 // Чего не хватает объявлению — render.missing.<что> в словаре

@@ -7,6 +7,10 @@ import {useIsPhone} from './MobileTabs';
 import {canSaveToGallery, phoneKind, shareFiles, usePreparedFilesProgress} from './saveFiles';
 import {locale, tNow, useT} from './i18n';
 
+export type JobPanelState = {
+  query: JobQuery; starting: boolean; running: boolean; count: number; active: Job | null;
+};
+
 type Props = {
   query: JobQuery;
   label: string;
@@ -24,7 +28,7 @@ type Props = {
   // нажатия и проверка сохранения общие), onState сообщает, идёт ли сборка — для подписи кнопки
   hideButton?: boolean;
   trigger?: React.MutableRefObject<(() => void) | null>;
-  onState?: (state: {starting: boolean; running: boolean}) => void;
+  onState?: (state: JobPanelState) => void;
 };
 
 const time = (iso: string) => new Date(iso).toLocaleString(locale(), {day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'});
@@ -106,7 +110,11 @@ export const JobsPanel: React.FC<Props> = ({query, label, warnings, disabled, st
     return () => clearInterval(t);
   }, [running, refresh]);
 
-  useEffect(() => { onState?.({starting, running}); }, [starting, running, onState]);
+  // Мобильный вход в историю показывает сводку того же списка, без второго запроса/опроса.
+  // query позволяет не показать состояние прежнего объявления при переключении.
+  useEffect(() => {
+    onState?.({query: JSON.parse(key), starting, running, count: jobs.length, active: jobs.find(active) ?? null});
+  }, [key, starting, running, jobs, onState]);
   // Ролик досчитался — свёрнутый список открывается сам: результат и скачивание сразу видны
   useEffect(() => { if (finished && folded) setListOpen(true); }, [finished, folded]);
   const run = async () => {
