@@ -2,9 +2,10 @@
 import React from 'react';
 import {missing} from '../src/shared/model';
 import type {FormatMeta, Requirement} from '../src/shared/types';
-import {api, LotEntry} from './api';
+import {api, ApiError, LotEntry} from './api';
 import {JobsPanel, type JobPanelState} from './JobsPanel';
 import {useT, type Key} from './i18n';
+import {useConfig} from './config';
 
 type Props = {
   lot: LotEntry;
@@ -25,6 +26,7 @@ const MISSING = (r: Requirement): Key => `render.missing.${r}` as Key;
 
 export const RenderPanel: React.FC<Props> = ({lot, format, unsavedSettings, beforeRender, onError, folded, hideButton, trigger, onState}) => {
   const t = useT();
+  const {savingSettings} = useConfig();
   const warnings = [
     ...missing(lot, format).map((r) => t(MISSING(r))),
     unsavedSettings && t('render.unsaved'),
@@ -34,8 +36,11 @@ export const RenderPanel: React.FC<Props> = ({lot, format, unsavedSettings, befo
       query={{lot: lot.id}}
       label={t('render.build')}
       warnings={warnings}
-      disabled={!lot.photos.length}
-      start={async () => { await beforeRender(); return api.render(lot.id, format.id); }}
+      disabled={!lot.photos.length || unsavedSettings || savingSettings}
+      start={async () => {
+        if (unsavedSettings || savingSettings) throw new ApiError(t('settings.beforeBuild'), 0);
+        await beforeRender(); return api.render(lot.id, format.id);
+      }}
       onError={onError}
       pipeline="ads"
       folded={folded}

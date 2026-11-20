@@ -4,7 +4,7 @@ import React, {createContext, useCallback, useContext, useEffect, useMemo, useRe
 import {Loading} from './Loading';
 import {useSession} from './auth';
 import type {Theme} from '../src/shared/types';
-import {api, Config, ProfileEntry} from './api';
+import {api, Config, ProfileEntry, errorText} from './api';
 import {getLang, isLang, setLang, useLang} from './i18n';
 
 type Ctx = {
@@ -17,6 +17,9 @@ type Ctx = {
   setBrand: (t: Theme) => void;
   brandSaved: (t: Theme) => void;
   unsaved: boolean;
+  savingSettings: boolean;
+  settingsError: string;
+  saveSettings: () => Promise<void>;
   report: (e: unknown) => void;
 };
 
@@ -34,6 +37,9 @@ export const ConfigProvider: React.FC<{report: (e: unknown) => void; children: R
   const [config, setConfig] = useState<Config | null>(null);
   const [brand, setBrandDraft] = useState<Theme | null>(null);
   const [profile, setProfileDraft] = useState<ProfileEntry | null>(null);
+  const [savingSettings, setSavingSettings] = useState(false);
+  const [settingsError, setSettingsError] = useState('');
+  const saving = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
     api.config().then((cfg) => {
@@ -87,13 +93,50 @@ export const ConfigProvider: React.FC<{report: (e: unknown) => void; children: R
     setConfig((c) => c && {...c, profiles: [...c.profiles.filter((x) => x.id !== p.id), p].sort(byId)});
   }, [refresh]);
 
+  // Снимок записываем отдельно по профилю и бренду. Успех одной записи не маскирует отказ
+  // другой, а правки, сделанные во время запроса, не заменяются его поздним ответом.
+  const saveSettings = useCallback((): Promise<void> => {
+    if (saving.current) return saving.current;
+    if (!config || !profile || !brand) return Promise.resolve();
+    const profileChanged = JSON.stringify(profile) !== JSON.stringify(config.profiles.find((p) => p.id === profile.id));
+    const brandChanged = JSON.stringify(brand) !== JSON.stringify(config.brand);
+    if (!profileChanged && !brandChanged) return Promise.resolve();
+    setSavingSettings(true); setSettingsError('');
+    const task = (async () => {
+      try {
+        if (profileChanged) {
+          const {id, ...data} = profile;
+          const saved = await api.saveProfile(id, data);
+          setConfig((c) => c && {...c, profiles: [...c.profiles.filter((p) => p.id !== id), saved].sort(byId)});
+          setProfileDraft((d) => d === profile ? saved : d);
+          refresh();
+        }
+        if (brandChanged) {
+          const saved = await api.saveBrand(brand);
+          setConfig((c) => c && {...c, brand: saved});
+          setBrandDraft((d) => d === brand ? saved : d);
+        }
+      } catch (e) { setSettingsError(errorText(e)); throw e; }
+      finally { setSavingSettings(false); saving.current = null; }
+    })();
+    saving.current = task;
+    return task;
+  }, [config, profile, brand, refresh]);
+
+  const unsaved = !!config && !!brand && !!profile && (JSON.stringify(brand) !== JSON.stringify(config.brand)
+    || JSON.stringify(profile) !== JSON.stringify(config.profiles.find((p) => p.id === profile.id)));
+  useEffect(() => {
+    if (!unsaved) return;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [unsaved]);
+
   const value = useMemo<Ctx | null>(() => {
     if (!config || !brand || !profile) return null;
-    const savedProfile = config.profiles.find((p) => p.id === profile.id);
-    const unsaved = brand !== config.brand || profile !== savedProfile;
     return {config, brand, profile, setProfile: setProfileDraft, profileSaved,
-      setBrand: setBrandDraft, brandSaved, unsaved, report};
-  }, [config, brand, profile, profileSaved, report]);
+      setBrand: setBrandDraft, brandSaved, unsaved, savingSettings, settingsError, saveSettings, report};
+  }, [config, brand, profile, profileSaved, unsaved, savingSettings, settingsError, saveSettings, report]);
 
   if (!value) return <Loading />;
   return <ConfigCtx.Provider value={value}>{children}</ConfigCtx.Provider>;

@@ -737,6 +737,13 @@ a.tab { text-decoration: none; }
 /* Колонка настроек — до 460 px (docs/palette.md). Превью от этого не сжимается: его ширину задаёт
    высота окна (9:16), а сетка центрирована и по краям остаётся 110–380 px (замер 20.10) */
 .quick-screen { display: flex; flex-direction: column; gap: 18px; }
+.settings-save-notice { display: flex; flex: none; align-items: center; flex-wrap: wrap; gap: 10px;
+  padding: 12px 14px; border: 1px solid #b88b4655; border-radius: 10px; background: #b88b4612; font-size: 13px; }
+.settings-save-notice > span { flex: 1 1 220px; }
+.settings-save-notice .error { flex-basis: 100%; margin: 0; }
+.draft-status { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+  margin: 12px 0; color: var(--muted); font-size: 12px; }
+.draft-fields { display: contents; border: 0; padding: 0; margin: 0; min-width: 0; }
 .quick-preview .player-box { height: min(calc(100vh - 250px), 760px); }
 .quick-side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .quick-title h1 { margin: 0 0 4px; font: 800 26px var(--font); letter-spacing: -.01em; }

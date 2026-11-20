@@ -17,6 +17,7 @@ import {Preview} from '../Preview';
 import {RenderPanel} from '../RenderPanel';
 import type {JobPanelState} from '../JobsPanel';
 import {OfferButton} from './OfferButton';
+import {SettingsSaveNotice} from '../SettingsSaveNotice';
 import {lastFormat, lastLot} from '../router';
 import {ImportModal, LotsPanel, QuickLink, type ImportStage} from './QuickLot';
 import {Palette} from './Palette';
@@ -35,7 +36,7 @@ type SaveState = 'saved' | 'dirty' | 'saving' | 'error';
 export const lotTitle = (l: LotEntry) => [l.brand, l.model, l.year].filter(Boolean).join(' ') || tNow()('lots.untitled');
 
 export const LotTool: React.FC = () => {
-  const {config, profile, brand, report} = useConfig();
+  const {config, profile, brand, unsaved: unsavedSettings, savingSettings, report} = useConfig();
   const t = useT();
   const [lots, setLots] = useState<LotEntry[]>([]);
   const [lot, setLot] = useState<LotEntry | null>(null);
@@ -250,8 +251,6 @@ export const LotTool: React.FC = () => {
   // В бренде лежит своё старое name, и превью показывало его (на превью PR 13 — «QWEDSAZXC»),
   // хотя в готовом ролике всё верно
   const input = useMemo(() => (lot ? {lot, market, theme: {...brand, name: market.name}} : null), [lot, market, brand]);
-  const savedProfile = config.profiles.find((p) => p.id === profile.id);
-  const unsavedSettings = profile !== savedProfile || brand !== config.brand;
 
   // Цена в карточке — та же, что в ролике: валюта профиля, фрахт
   const priceOf = (l: LotEntry) => {
@@ -280,7 +279,8 @@ export const LotTool: React.FC = () => {
           hideButton trigger={buildRef} onState={setBuilding} />
         <OfferButton lot={lot} />
       </>}
-      buildRef={buildRef} building={building}
+      buildRef={buildRef} building={building} buildDisabled={unsavedSettings || savingSettings}
+      notice={<SettingsSaveNotice />}
       photoSource={lot && <EncarImport lot={lot} onApply={applyFromCar} onError={report} />} />
   </>;
 
@@ -291,6 +291,7 @@ export const LotTool: React.FC = () => {
       {/* quick-screen — ровно один экран: ссылка и три колонки. Колонки не растут вместе с
           содержимым, длинные списки (лоты, ролики) прокручиваются внутри себя */}
       <div className="quick-screen">
+      <SettingsSaveNotice />
       <QuickLink onLink={quickFromLink} error={quickError} busy={!!stage} />
 
       {/* Три колонки: лоты — превью — палитра (владелец, 30.09 и 20.10). Ссылка — над ними:
