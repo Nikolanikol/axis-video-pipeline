@@ -706,7 +706,7 @@ export const en: Dict = {
   'cprice.rebuild': "Rebuild with this price",
   // Текст поста под слайдами карусели (app/carousels/PostCaption.tsx)
   'post.title': "Post text",
-  'videoPost.hint': "Text from the listing, without the price. Edits are saved automatically with this listing. Free, no video render needed.",
+  'videoPost.hint': "Free · no price included. Edits are saved automatically.",
   'videoPost.empty': "Enter the make or model in Content to get text for your post here.",
   'post.hint': "No price — it is on the slide. Edits are saved with the carousel",
   'post.copy': "Copy",

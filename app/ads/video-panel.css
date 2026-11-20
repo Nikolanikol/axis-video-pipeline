@@ -10,8 +10,22 @@
 .video-post-tags input { width: 140px; max-width: 100%; }
 .video-post .btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .video-post .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
-.video-mobile .video-post textarea, .video-mobile .video-post input { font-size: 16px; }
 @media (pointer: coarse) { .video-post .btn, .video-post-tag button { min-height: 44px; } .video-post-tag button { min-width: 44px; } }
+/* В мобильной панели свои размеры: общий минимум 240 px у поля и крупные крестики
+   растягивали подпись и каждый хэштег. Настройки других форм здесь не меняем. */
+.video-mobile .mle-side .video-post { gap: 8px; }
+.video-mobile .mle-side .video-post > .label { display: none; }
+.video-mobile .mle-side .video-post > .hint { font-size: 11px; line-height: 1.35; }
+.video-mobile .mle-side .video-post textarea { font-size: 14px; line-height: 1.4; padding: 8px 10px; height: clamp(140px, 32dvh, 220px); min-height: 140px; max-height: 220px; field-sizing: fixed; resize: none; overflow-y: auto; }
+.video-mobile .mle-side .video-post-tags { gap: 6px; }
+.video-mobile .mle-side .video-post-tag { gap: 2px; padding: 2px 3px 2px 8px; border-radius: 16px; font-size: 12px; line-height: 1.25; }
+.video-mobile .mle-side .video-post-tag button { width: 28px; height: 28px; min-width: 28px; min-height: 28px; padding: 0; }
+.video-mobile .mle-side .video-post-tag svg { width: 12px; height: 12px; }
+.video-mobile .mle-side .video-post-tags input { width: 126px; min-width: 0; height: 32px; padding: 5px 8px; font-size: 14px; }
+.video-mobile .mle-side .video-post .btn-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; margin: 0; }
+.video-mobile .mle-side .video-post .btn { min-width: 0; min-height: 40px; padding: 7px 6px; gap: 5px; font-size: 12px; line-height: 1.3; letter-spacing: normal; white-space: normal; }
+.video-mobile .mle-side .video-post .btn svg { flex: none; width: 14px; height: 14px; }
+.video-mobile .mle-side .video-post .btn:nth-child(3) { grid-column: 1 / -1; }
 .video-palette .video-body { padding: 16px 20px; }
 .video-appearance { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
 .video-palette .video-appearance > .mle-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px; padding: 0; overflow: visible; }

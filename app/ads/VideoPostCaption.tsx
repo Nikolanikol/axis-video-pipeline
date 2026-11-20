@@ -47,7 +47,7 @@ export const VideoPostCaption: React.FC<{
   return <section className="video-post">
     <label htmlFor={textId} className="label">{t('post.title')}</label>
     <p className="hint">{t(ready ? 'videoPost.hint' : 'videoPost.empty')}</p>
-    <textarea id={textId} value={ready ? text : ''} rows={10} disabled={!ready}
+    <textarea id={textId} aria-label={t('post.title')} value={ready ? text : ''} rows={10} disabled={!ready}
       onChange={(e) => change({text: e.target.value})} />
     <div className="video-post-tags">
       {ready && tags.map((value) => <span key={value} className="video-post-tag">{value}
