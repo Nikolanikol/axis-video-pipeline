@@ -708,6 +708,8 @@ export const sq: Dict = {
   'cprice.rebuild': "Rikrijo me këtë çmim",
   // Текст поста под слайдами карусели (app/carousels/PostCaption.tsx)
   'post.title': "Teksti i postimit",
+  'videoPost.hint': "Tekst nga të dhënat e njoftimit, pa çmim. Ndryshimet ruhen automatikisht me këtë njoftim. Falas, pa krijuar videon.",
+  'videoPost.empty': "Plotësoni markën ose modelin te Përmbajtja për të marrë tekstin e postimit këtu.",
   'post.hint': "Pa çmim — është në slajd. Ndryshimet ruhen bashkë me karuselin",
   'post.copy': "Kopjo",
   'post.copied': "Teksti u kopjua — ngjiteni në Instagram ose TikTok",

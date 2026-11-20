@@ -716,12 +716,16 @@ export const CarouselTool: React.FC = () => {
               <p className="hint">{t('car.draftNote')}</p>
             </div>
             : entry
-              ? <SlideViewer entry={entry} ratio={ratio} busy={busy} onZoom={setOpen} at={slideAt} setAt={setSlideAt} onEdit={() => {
+              ? <>
+                <SlideViewer entry={entry} ratio={ratio} busy={busy} onZoom={setOpen} at={slideAt} setAt={setSlideAt} onEdit={() => {
                   setSection('content');
                   const tab = document.getElementById(`${settingsId}-content`);
                   if (phone) tab?.closest('.carousel-settings')?.scrollIntoView({block: 'start'});
                   tab?.focus({preventScroll: true});
                 }} />
+                {/* Подпись к публикации — под превью, независимо от вкладки параметров. */}
+                <PostCaption entry={entry} onSaved={(made) => { setEntry(made); setHistory((h) => h.map((x) => x.id === made.id ? made : x)); }} />
+              </>
               : <div className="empty">{t('car.empty')}</div>}
         </section>
 
@@ -749,14 +753,12 @@ export const CarouselTool: React.FC = () => {
                 only={family ? familyFormats(family) : undefined} onChange={setFormat} />
               {!family && <div className="design-summary">{t('car.preset')}: {brand.design ? t.cfg(DESIGNS.find((d) => d.id === brand.design)?.title ?? '') : t('design.original')} · <a href="#/settings/brand">{t('car.setup')}</a></div>}
             </div>
-            {/* Скрытие не размонтирует форму: переключение вкладок не теряет правки подписи. */}
             <div className="carousel-settings-section" hidden={section !== 'content'}>
               {draft && <NextPrice car={draft.car} id={draft.car.id} value={nextPrice} onChange={setNextPrice} />}
               {!draft && entry && <>
                 {otherFormat ? <NextPrice car={entry.car} id={entry.id} value={nextPrice} onChange={setNextPrice} /> : <PriceBox entry={entry} busy={busy} onReprice={reprice} />}
                 <h3>{t('slides.nOf', {n: slideAt + 1, total: entry.slides.length})}</h3>
                 <SlideTextEditor entry={entry} at={slideAt} busy={busy} onSave={editTexts} />
-                <PostCaption entry={entry} onSaved={(made) => { setEntry(made); setHistory((h) => h.map((x) => x.id === made.id ? made : x)); }} />
               </>}
               {draft || entry ? <details className="car-summary-detail"><summary>{t('palette.carData')}</summary>
                 <CarSummary entry={draft ? {id: draft.car.id, car: draft.car} : entry!} />

@@ -1,5 +1,17 @@
-.video-tabs { width: 100%; gap: 12px; }
-.video-tabs .mle-tab { flex: 1; min-width: 0; text-align: center; font-size: 13px; }
+.video-tabs { width: 100%; }
+.video-palette .pd-tabs .video-tabs, .video-mobile .video-tabs { gap: 8px; }
+.video-tabs .mle-tab { flex: 1 0 auto; min-width: max-content; padding-inline: 3px; text-align: center; font-size: 13px; white-space: nowrap; }
+.video-post { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.video-post > .label, .video-post > .hint { margin: 0; }
+.video-post textarea { width: 100%; min-height: 240px; resize: vertical; font: inherit; line-height: 1.5; }
+.video-post-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
+.video-post-tag { display: inline-flex; align-items: center; max-width: 100%; overflow-wrap: anywhere; gap: 4px; padding: 3px 4px 3px 10px; border-radius: 20px; background: #8e0d2c33; color: var(--accent-text); font-size: 13px; }
+.video-post-tag button { flex: none; display: grid; place-items: center; width: 28px; height: 28px; border: 0; background: none; color: inherit; cursor: pointer; }
+.video-post-tags input { width: 140px; max-width: 100%; }
+.video-post .btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.video-post .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.video-mobile .video-post textarea, .video-mobile .video-post input { font-size: 16px; }
+@media (pointer: coarse) { .video-post .btn, .video-post-tag button { min-height: 44px; } .video-post-tag button { min-width: 44px; } }
 .video-palette .video-body { padding: 16px 20px; }
 .video-appearance { min-width: 0; display: flex; flex-direction: column; gap: 16px; }
 .video-palette .video-appearance > .mle-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 10px; padding: 0; overflow: visible; }

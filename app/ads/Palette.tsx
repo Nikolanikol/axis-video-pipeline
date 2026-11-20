@@ -1,4 +1,4 @@
-// Рабочая панель видео: оформление, содержание и анимация. Данные, превью и сборка прежние;
+// Рабочая панель видео: оформление, содержание, анимация и текст поста.
 // шапка и основное действие остаются на месте, прокручиваются параметры выбранного раздела.
 import React, {useCallback, useEffect, useId, useRef, useState} from 'react';
 import type {AdProps, FormatMeta, Market, Theme} from '../../src/shared/types';
@@ -10,6 +10,7 @@ import {lotTheme} from './LookPanel';
 import {compositionTitle, playMotion, type MotionTab} from './MobileBodies';
 import {VideoAppearance, VideoContent, VideoMotion, VideoTabs, type VideoSection} from './VideoPanel';
 import {SceneScrubber} from './SceneScrubber';
+import {VideoPostCaption} from './VideoPostCaption';
 import {tNow, useT, type Key} from '../i18n';
 
 export type SaveState = 'saved' | 'dirty' | 'saving' | 'error';
@@ -33,7 +34,7 @@ const keyOf = (ws: string, lot: string) => `kok.palette.desk.v3:${ws}:${lot}`;
 const load = (key: string): UI => {
   try {
     const v = JSON.parse(localStorage.getItem(key) ?? 'null');
-    if (v) return {tab: ['look','content','motion'].includes(v.tab) ? v.tab : 'look', motion: ['textMotion','photoMotion','sceneTransition'].includes(v.motion) ? v.motion : 'textMotion', about: !!v.about};
+    if (v) return {tab: ['look','content','motion','post'].includes(v.tab) ? v.tab : 'look', motion: ['textMotion','photoMotion','sceneTransition'].includes(v.motion) ? v.motion : 'textMotion', about: !!v.about};
     const old = JSON.parse(localStorage.getItem(key.replace('.v3:', '.v2:')) ?? 'null');
     return old ? {tab: old.settings ? old.group === 'look' ? 'look' : 'content' : old.tab === 'look' ? 'look' : 'motion', motion: ['textMotion','photoMotion','sceneTransition'].includes(old.tab) ? old.tab : 'textMotion', about: old.group === 'about'} : FRESH;
   } catch { return FRESH; }
@@ -76,6 +77,7 @@ export const Palette: React.FC<Props> = (props) => {
             {ui.about && <section className="mle-sec pd-note"><h3>{t('palette.note')}</h3><NoteField lot={lot} onChange={props.onChange} /></section>}
           </>}
           {ui.tab === 'motion' && <VideoMotion {...props} value={ui.motion} onTab={(motion) => commit({motion})} onPicked={showMotion} />}
+          {ui.tab === 'post' && <VideoPostCaption key={lot.id} lot={lot} market={props.market} onChange={props.onChange} onError={props.onError} />}
         </div>
         <footer className="palette-foot"><div className="palette-foot-line"><span>{compositionTitle(theme)}</span><span>{t('common.sec', {n: seconds(format)})} · {t.n('unit.scene', format.scenes.length)}</span></div>{render}</footer>
       </div>

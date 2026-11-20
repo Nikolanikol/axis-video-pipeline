@@ -110,6 +110,9 @@ export type OfferMeta = {
   total: number; car: string; sample?: boolean;
 };
 
+// Подпись к публикации видео хранится отдельно от надписей внутри ролика.
+export type LotPostCaption = {text: string; hashtags: string[]; seed: number};
+
 // Лот — данные об авто. Любое поле рынка можно переопределить (например, whatsapp: null — скрыть номер).
 export type Lot = Partial<Omit<Market, 'texts'>> & {
   market?: string;
@@ -138,6 +141,7 @@ export type Lot = Partial<Omit<Market, 'texts'>> & {
   // нет ключа — «авто», место по порядку. См. src/shared/photoSlots.ts
   slots?: Record<string, 'auto' | 'hook' | 'stack' | 'gallery' | 'skip'>;
   texts?: Partial<Texts>;
+  postCaption?: LotPostCaption | null;
 };
 
 // Вход любого формата

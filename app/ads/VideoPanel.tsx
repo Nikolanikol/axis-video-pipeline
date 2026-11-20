@@ -1,5 +1,5 @@
 // Одна структура параметров для телефона и ПК; формы и данные принадлежат прежним модулям.
-import React from 'react';
+import React, {useEffect, useRef} from 'react';
 import './video-panel.css';
 import {FORMATS} from '../../src/shared/model';
 import type {AdProps} from '../../src/shared/types';
@@ -10,11 +10,21 @@ import {LookStrip, MobileAbout, MobileContent, MotionStrip, motionTitle, type Mo
 import {seconds, type BodyProps} from './Palette';
 import {VisualThemePicker} from './VisualThemePicker';
 
-export type VideoSection = 'look' | 'content' | 'motion';
+export type VideoSection = 'look' | 'content' | 'motion' | 'post';
 export const VideoTabs: React.FC<{value: VideoSection; onChange: (v: VideoSection) => void; panelId: string}> = ({value, onChange, panelId}) => {
   const t = useT();
-  const items = [{id: 'look', title: t('look.style')}, {id: 'content', title: t('workspace.content')}, {id: 'motion', title: t('workspace.animation')} ] as const;
-  return <div className="mle-tabs-list video-tabs" role="tablist" aria-label={t('palette.settingsAria')}>
+  const tabs = useRef<HTMLDivElement>(null);
+  const items = [{id: 'look', title: t('look.style')}, {id: 'content', title: t('workspace.content')}, {id: 'motion', title: t('workspace.animation')}, {id: 'post', title: t('post.title')}] as const;
+  useEffect(() => {
+    // Узкая панель прокручивает только строку вкладок, выбранная подпись остаётся видимой.
+    const list = tabs.current;
+    const active = list?.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!list || !active) return;
+    const row = list.getBoundingClientRect(), button = active.getBoundingClientRect();
+    if (button.left < row.left) list.scrollLeft += button.left - row.left;
+    else if (button.right > row.right) list.scrollLeft += button.right - row.right;
+  }, [value, t.lang]);
+  return <div ref={tabs} className="mle-tabs-list video-tabs" role="tablist" aria-label={t('palette.settingsAria')}>
     {items.map((item, i) => <button key={item.id} id={`${panelId}-${item.id}`} type="button" role="tab" tabIndex={value === item.id ? 0 : -1} aria-selected={value === item.id}
       aria-controls={panelId} className={`mle-tab${value === item.id ? ' on' : ''}`} onClick={() => onChange(item.id)}
       onKeyDown={(e) => {

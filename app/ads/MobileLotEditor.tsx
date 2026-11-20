@@ -1,4 +1,4 @@
-// Мобильный редактор ролика: оформление, содержание и анимация (docs/palette-mobile.md).
+// Мобильный редактор ролика: оформление, содержание, анимация и текст поста (docs/palette-mobile.md).
 // Содержание и тонкая настройка открываются в правой панели; группы движения — в ленте
 // с короткими превью. Плеер и доступ к роликам сохраняются при переключении разделов.
 // Данные, автосохранение и запуск принадлежат LotTool; здесь только навигация и компоновка.
@@ -14,6 +14,7 @@ import {MobileAbout, MobileContent, playMotion, type MotionTab, type PaletteTab}
 import {LookPanel} from './LookPanel';
 import {VideoAppearance, VideoMotion, VideoTabs, type VideoSection} from './VideoPanel';
 import {SceneScrubber} from './SceneScrubber';
+import {VideoPostCaption} from './VideoPostCaption';
 import {SaveStatus, type SaveState} from './Palette';
 import {useT} from '../i18n';
 import {useCost} from '../auth';
@@ -45,7 +46,7 @@ type Props = {
 // («Текст» — по сцене). Ключ — компания + объявление; из версии 2 берём сцену и раздел
 // tab хранит прежнее значение; section задаёт новый верхний уровень, motionTab — группу движения.
 type Tab = PaletteTab;
-type Sheet = 'text' | 'look';
+type Sheet = 'text' | 'look' | 'post';
 // about — в панели открыта группа «О ролике», а не сцена
 type UI = {version: 3; tab: Tab; section?: VideoSection; sheet: Sheet | null; about?: boolean; sceneId?: string; scrollByView: Record<string, number>; expandedGroups: Record<string, boolean>; motionTab?: MotionTab};
 // Прежняя вкладка «Анимация» — та группа, что была открыта внутри неё
@@ -112,7 +113,8 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
   const {sheet} = ui;
   // Через tabOf и здесь: в памяти может остаться прежняя «motion» (до обновления страницы)
   const tab = tabOf(ui.tab, ui.motionTab);
-  const section = ui.section ?? (sheet === 'text' ? 'content' : tab === 'look' ? 'look' : 'motion');
+  const section = ui.section ?? (sheet === 'post' ? 'post' : sheet === 'text' ? 'content' : tab === 'look' ? 'look' : 'motion');
+  const sheetTitle = tr(sheet === 'post' ? 'post.title' : sheet === 'look' ? 'workspace.fine' : 'workspace.content');
   const viewKey = sheet === 'text' ? (ui.about ? `about:${format.id}` : `content:${format.id}:${scene}`) : sheet ? `${sheet}:${format.id}` : '';
 
   // Запись в хранилище — с задержкой, не на каждый пиксель прокрутки; перед сменой контекста — сразу
@@ -165,11 +167,11 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
   };
 
   // Вкладка ленты закрывает лист; лист: нажали — открыть, нажали снова — закрыть
-  const pickSection = (next: VideoSection) => commit({...remember(), section: next, sheet: next === 'content' ? 'text' : null,
+  const pickSection = (next: VideoSection) => commit({...remember(), section: next, sheet: next === 'content' ? 'text' : next === 'post' ? 'post' : null,
     tab: next === 'motion' ? ui.motionTab ?? (tab === 'look' ? 'textMotion' : tab) : 'look'}, true);
   const openSheet = (id: Sheet | null) => {
     const next = sheet === id ? null : id;
-    commit({...remember(), sheet: next, section: next === 'text' ? 'content' : 'look'}, true);
+    commit({...remember(), sheet: next, section: next === 'text' ? 'content' : next === 'post' ? 'post' : 'look'}, true);
   };
   useEffect(() => {
     if (!sheet) return;
@@ -333,7 +335,7 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
       <SceneScrubber format={format} listen={listenFrame} seekFrame={(f) => player.current?.seekFrame(f)}
         playing={isPlaying} onToggle={() => player.current?.toggle()} onExpand={view === 'edit' ? watch : undefined} />
 
-        {/* Вкладки — подчёркиванием: оформление и три группы анимации на одном уровне (владелец 20.10) */}
+        {/* Вкладки разделов с полными названиями; на узком экране строка прокручивается. */}
         <div className="mle-tabs">
           <VideoTabs value={section} onChange={pickSection} panelId={panelId} />
         </div>
@@ -344,16 +346,17 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
           {section === 'motion' && <VideoMotion {...props} lot={lot} input={input} value={tab === 'look' ? 'textMotion' : tab}
             onTab={(motionTab) => commit({...remember(), motionTab, tab: motionTab, section: 'motion'}, true)} onPicked={showMotion} />}
           {section === 'content' && <button type="button" className="video-fine-open" onClick={() => openSheet('text')}>{tr('workspace.content')}</button>}
+          {section === 'post' && <button type="button" className="video-fine-open" onClick={() => openSheet('post')}>{tr('post.title')}</button>}
         </div>
 
       {/* Панель «Текст» справа (владелец 20.10: «как было у нас ранее»): 90 % ширины, слева видна
           полоска ролика — нажатие по ней закрывает. Сцену можно сменить прямо в панели */}
       {sheet && <>
         <button type="button" className="mle-scrim" aria-label={tr('mle.closeSettings')} onClick={() => openSheet(null)} />
-        <section ref={side} className="mle-side" role="dialog" aria-modal="true" aria-label={tr(sheet === 'look' ? 'workspace.fine' : 'workspace.content')}>
+        <section ref={side} className="mle-side" role="dialog" aria-modal="true" aria-label={sheetTitle}>
           <div className="mle-side-head">
             <button type="button" className="mle-icon" aria-label={tr('mle.closeSettings')} onClick={() => openSheet(null)}><ChevronRight size={20} /></button>
-            <b>{tr(sheet === 'look' ? 'workspace.fine' : 'workspace.content')}</b>
+            <b>{sheetTitle}</b>
           </div>
           {sheet === 'text' && <nav className="mle-side-scenes" aria-label={tr('mle.sceneAria')}>
             {format.scenes.map((s, i) => <button key={s.id} type="button" aria-pressed={!ui.about && i === sceneIndex}
@@ -364,7 +367,8 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
               onClick={() => commit({...remember(), about: true}, true)}>{tr('palette.about')}</button>
           </nav>}
           <div className="mle-body" ref={body} onScroll={onScroll}>
-            {sheet === 'look' ? <LookPanel {...props} lot={lot} embedded detailsOnly />
+            {sheet === 'post' ? <VideoPostCaption key={lot.id} lot={lot} market={props.market} onChange={props.onChange} onError={props.onError} />
+              : sheet === 'look' ? <LookPanel {...props} lot={lot} embedded detailsOnly />
               : ui.about ? <MobileAbout {...props} lot={lot} showFormat={false} /> : <MobileContent {...props} lot={lot} />}
           </div>
         </section>
