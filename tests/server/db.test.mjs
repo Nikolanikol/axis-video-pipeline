@@ -30,10 +30,17 @@ describe('схема SMMAKER', () => {
 });
 
 describe('миграции', () => {
-  it('идут по номерам без пропусков, начиная с 001', async () => {
+  it('идут по уникальным номерам с 001; 015 зарезервирован партнёркой', async () => {
     const list = await listMigrations();
     expect(list.length).toBeGreaterThan(0);
-    list.forEach((m, i) => expect(m.version).toBe(i + 1));
+    const versions = list.map((m) => m.version);
+    expect(versions[0]).toBe(1);
+    expect(versions).toEqual([...new Set(versions)].sort((a, b) => a - b));
+    // Причина резерва записана в 016_anypay.sql. Применённые версии не перенумеровываем;
+    // если партнёрка добавит 015, список останется допустимым. Другие пропуски — ошибка.
+    const missing = Array.from({length: Math.max(...versions)}, (_, i) => i + 1)
+      .filter((v) => !versions.includes(v));
+    expect(missing.filter((v) => v !== 15)).toEqual([]);
   });
 
   // В одном Supabase живут kmotors и caranalizer. Всё, что создаём мы, должно читаться

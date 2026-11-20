@@ -1,5 +1,7 @@
 // Очередь рендера: один ролик за раз, прогресс в памяти, история — JSON рядом с mp4.
 // Очередь общая на все компании, но каждое задание знает свою (ws) и пишет только в её папку.
+import {applyLook} from '../src/design/style/look.js';
+import {preflightTextFrames} from './textFit.mjs';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {bundle} from '@remotion/bundler';
@@ -81,6 +83,7 @@ const storyboardFromVideo = async (video, frames, fps, out) => {
 
 const jobs = new Map();
 const queue = [];
+const preparingText = new Set();
 // Задание ещё не отработало: ждёт очереди или считается прямо сейчас
 const ACTIVE = new Set(['queued', 'running']);
 let running = false;
@@ -120,9 +123,26 @@ export const enqueue = async ({owner, composition, compositionTitle, title, fram
       : 'Этот ролик уже в очереди на рендер');
   }
   if (authEnabled() && !bill?.free) {
-    const mine = [...jobs.values()].filter((j) => j.ws === ws && ACTIVE.has(j.status)).length;
+    const mine = [...jobs.values()].filter((j) => j.ws === ws && ACTIVE.has(j.status)).length
+      + [...preparingText].filter((key) => key.startsWith(`${ws}:`)).length;
     if (mine >= MAX_PER_WORKSPACE) {
       throw new HttpError(429, `У вас уже ${mine} роликов в очереди — дождитесь, пока часть соберётся`);
+    }
+  }
+  const preparationKey = `${ws}:${ownerId}`;
+  if (preparingText.has(preparationKey)) throw new HttpError(409, 'Текст этого ролика уже проверяется — дождитесь результата');
+  const theme = applyLook(inputProps.theme ?? {}, inputProps.lot?.look);
+  if (inputProps.textFitVersion === 1 && ['catalog', 'cinema', 'editorial'].includes(theme.design)) {
+    preparingText.add(preparationKey);
+    let browser;
+    try {
+      const serveUrl = await getServeUrl();
+      browser = await openBrowser('chrome', {browserExecutable});
+      const meta = await selectComposition({serveUrl, id: composition, inputProps, puppeteerInstance: browser});
+      await preflightTextFrames({serveUrl, composition: meta, inputProps, browser, frames});
+    } finally {
+      try { if (browser) await browser.close({silent: true}); }
+      finally { preparingText.delete(preparationKey); }
     }
   }
   const id = `${ownerId}-${composition}-${stamp}`;

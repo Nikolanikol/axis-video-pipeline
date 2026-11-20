@@ -1,0 +1,12 @@
+[
+  {"id":"short","title":"Короткий заголовок","kind":"title","text":"Салон, в котором хочется ехать"},
+  {"id":"long-title","title":"Длинный заголовок","kind":"title","text":"Mercedes-Benz S 580 4MATIC Long AMG Line Premium Plus с панорамной крышей и расширенным пакетом систем помощи водителю"},
+  {"id":"ru-description","title":"Описание RU","kind":"body","text":"Просторный салон с вентиляцией и памятью положения сидений. Панорамная крыша, камеры кругового обзора, адаптивный круиз-контроль и современная мультимедийная система. Состояние и комплектацию проверим перед покупкой; точный расчёт доставки подготовим по вашему маршруту."},
+  {"id":"en-description","title":"Описание EN","kind":"body","text":"Comfortable seats with ventilation and memory settings, panoramic roof, surround-view cameras and adaptive cruise control. We will verify the vehicle condition and available equipment before purchase, then prepare an individual delivery estimate for your destination."},
+  {"id":"sq-description","title":"Описание SQ","kind":"body","text":"Sallon i gjerë me sedilje me ventilim dhe memorie, çati panoramike dhe kamera me pamje 360°. Kontrollojmë gjendjen dhe pajisjet përpara blerjes; më pas përgatisim një përllogaritje të transportit sipas destinacionit tuaj."},
+  {"id":"unbroken","title":"Длинное слово","kind":"body","text":"MercedesBenzS5804MATICLongAMGLinePremiumPlusExecutiveRearSeatPackageNightPackagePanoramicRoofBurmesterSurroundSound360CameraAdaptiveCruiseControl"},
+  {"id":"linebreaks","title":"Ручные переносы","kind":"title","text":"Салон с характером\nКомфорт в каждой детали\nПроверенная комплектация"},
+  {"id":"symbols","title":"Диакритика и эмодзи","kind":"title","text":"Ёлка, gjendje e shkëlqyer — familja 👨‍👩‍👧‍👦, çati panoramike 🚗"},
+  {"id":"critical","title":"Длинный контакт","kind":"single","text":"sales-international-department@example.test"},
+  {"id":"too-long","title":"Текст за пределами блока","kind":"title","text":"Подробное описание автомобиля с полным перечнем оборудования, дополнительными условиями покупки и доставки, расширенными сведениями о состоянии кузова и салона, технических особенностях двигателя и трансмиссии, порядке проверки документов и индивидуальном расчёте расходов для выбранного города назначения."}
+]

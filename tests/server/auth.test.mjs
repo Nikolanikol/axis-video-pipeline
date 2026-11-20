@@ -345,7 +345,7 @@ suite('вход и кабинеты SMMAKER', () => {
     const credits = async () => (await me(b)).balance.credits;
 
     it('цены приходят в настройках интерфейса', async () => {
-      expect((await b.call('GET', '/api/config')).body.credits).toEqual({carousels: 1, ads: 3, reviews: 10});
+      expect((await b.call('GET', '/api/config')).body.credits).toEqual({carousels: 1, ads: 3, reviews: 10, offers: 2});
     });
 
     it('списание, возврат один раз, закрытие', async () => {

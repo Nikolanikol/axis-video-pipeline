@@ -3,6 +3,7 @@
 import type {CarouselCar, FormatMeta, Lot, Market, OfferMeta, OfferSettings, Profile, Review, Texts, Theme} from '../src/shared/types';
 import {getLang, tNow, type Key, type Lang} from './i18n';
 import {getSource} from './source';
+import {withCreditActivity} from './creditActivity';
 
 export type MarketEntry = Market & {id: string};
 export type ProfileEntry = Profile & {id: string};
@@ -288,7 +289,7 @@ export const api = {
   lots: () => request<LotEntry[]>('GET', '/api/lots'),
   // КП дилера в PDF (server/offers.mjs): сборка за кредиты, образец из настроек — бесплатно
   offers: {
-    build: (lotId: string, body: OfferRequest) => request<OfferMeta>('POST', `/api/lots/${lotId}/offer`, body),
+    build: (lotId: string, body: OfferRequest) => withCreditActivity(() => request<OfferMeta>('POST', `/api/lots/${lotId}/offer`, body)),
     list: (lotId: string) => request<OfferMeta[]>('GET', `/api/lots/${lotId}/offers`),
     remove: (id: string) => request<{ok: true}>('DELETE', `/api/offers/${id}`),
     sample: (settings: OfferSettings, lotId?: string) => request<OfferMeta>('POST', '/api/offers/sample', {settings, lotId}),
@@ -317,10 +318,10 @@ export const api = {
   blurPhoto: (id: string, path: string, regions: Region[]) =>
     request<LotEntry>('PUT', `/api/lots/${id}/photo`, {path, regions}),
   render: (id: string, format: string) =>
-    request<Job>('POST', `/api/lots/${id}/render`, {format}),
+    withCreditActivity(() => request<Job>('POST', `/api/lots/${id}/render`, {format})),
   jobs: (q: JobQuery) => request<Job[]>('GET', `/api/renders?${new URLSearchParams(q as Record<string, string>)}`),
   cancelRender: (id: string) => request<Job>('POST', `/api/renders/${id}/cancel`),
-  retryRender: (id: string) => request<Job>('POST', `/api/renders/${id}/retry`),
+  retryRender: (id: string) => withCreditActivity(() => request<Job>('POST', `/api/renders/${id}/retry`)),
   deleteRender: (id: string) => request<{id: string; deleted: boolean}>('DELETE', `/api/renders/${id}`),
   reviews: () => request<ReviewEntry[]>('GET', '/api/reviews'),
   review: (id: string) => request<ReviewEntry>('GET', `/api/reviews/${id}`),
@@ -355,7 +356,7 @@ export const api = {
   // Карусели: ссылка Encar → слайды формата; seed — зерно варианта (нет — случайное)
   // price: число — своя цена на слайде, null — расчёт по курсу, undefined — не трогать (у пересборки — прежняя)
   buildCarousel: (link: string, format?: string, seed?: number, family?: string | null, price?: number | null) =>
-    request<CarouselEntry>('POST', '/api/carousels', {link, format, seed, family: family ?? null, ...(price !== undefined ? {price} : {})}),
+    withCreditActivity(() => request<CarouselEntry>('POST', '/api/carousels', {link, format, seed, family: family ?? null, ...(price !== undefined ? {price} : {})})),
   carousels: () => request<CarouselEntry[]>('GET', '/api/carousels'),
   // Пересобрать со своей ценой — бесплатно: машина, формат и вариант прежние; null — вернуть расчёт
   repriceCarousel: (id: string, price: number | null) => request<CarouselEntry>('POST', `/api/carousels/${id}/price`, {price}),

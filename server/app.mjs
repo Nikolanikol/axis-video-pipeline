@@ -29,6 +29,7 @@ import {ICON_RULES, LOGO_RULES, brandForRender, saveIcon, saveLogo, setIconVaria
 import {buildOffer, deleteOffer, listOffers, offerFile, parseOfferRequest, sweepSamples} from './offers.mjs';
 import {balanceOf, billed, creditCosts, ledgerOf, ledgerPage, signupCredits} from './billing.mjs';
 import {parseCarouselSource} from '../src/shared/kmotorsLot.js';
+import {ACCENT_ROLE_KEYS} from '../src/shared/visualThemes.js';
 import {PALETTE_KEYS, isHex} from '../src/shared/contrast.js';
 import {plateError} from '../src/shared/logoPlate.js';
 import {isDesign} from '../src/shared/design.js';
@@ -118,6 +119,7 @@ const checkLotLook = async (lot) => {
   const styleProblem = styleError(look);
   if (styleProblem) throw new HttpError(400, styleProblem);
   for (const k of PALETTE_KEYS) if (!isHex(look[k])) throw new HttpError(400, `Цвет «${k}» — в виде #RRGGBB`);
+  for (const k of ACCENT_ROLE_KEYS) if (look[k] !== undefined && !isHex(look[k])) throw new HttpError(400, `Цвет «${k}» — в виде #RRGGBB`);
   // Своя пара бренда (вписанная в brand.json руками) тоже годится: снимок оформления её копирует,
   // и иначе смена одной палитры у ролика упиралась бы в отказ по шрифтам
   const pairs = [...await readJson(path.join(CONFIG_DIR, 'fonts.json')), (await getBrand()).fonts ?? {}];
@@ -151,7 +153,7 @@ const checkBrand = (input) => {
     }
   }
   // Цвет попадает прямо в стили вёрстки рендера — только #RRGGBB, никаких строк со стороны
-  for (const k of PALETTE_KEYS) {
+  for (const k of [...PALETTE_KEYS, ...ACCENT_ROLE_KEYS]) {
     if (theme[k] !== undefined && !isHex(theme[k])) throw new HttpError(400, `Цвет «${k}» — в виде #RRGGBB`);
   }
   if (theme.design !== undefined && !isDesign(theme.design)) {
@@ -612,7 +614,7 @@ export const createApp = ({photoOrigin}) => {
     const theme = {...brand, name: market.name};
     const title = [lot.brand, lot.model, lot.year].filter(Boolean).join(' ') || lot.id;
     // Музыка убрана из продукта: сохранённый в лоте трек в ролик не идёт (src/shared/nomusic.js)
-    const inputProps = {lot: withAbsolutePhotos(withoutMusic(lot), photoOrigin), market, theme: themeForRender(photoOrigin, theme)};
+    const inputProps = {lot: withAbsolutePhotos(withoutMusic(lot), photoOrigin), market, textFitVersion: 1, theme: themeForRender(photoOrigin, theme)};
     return enqueue({
       owner: {lotId: lot.id}, composition: format.id, compositionTitle: format.title, title,
       frames: storyboardFrames(format), inputProps, bill: billOf(req, 'ads'),
@@ -704,14 +706,14 @@ export const createApp = ({photoOrigin}) => {
       }
       next();
     } catch (e) { next(new HttpError(400, e.message)); }
-  }, wrap((req) => billed(
-    {...billOf(req, 'carousels'), workspaceId: req.ws,
+  }, wrap((req) => buildCarousel(req.body?.link, {
+    format: req.body?.format, seed: req.body?.seed, family: req.body?.family,
+    bill: {...billOf(req, 'carousels'), workspaceId: req.ws,
       jobId: `carousel-${req.ws}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
       note: String(req.body?.link ?? '').slice(0, 120)},
-    // price — своя цена на слайде сразу при сборке (владелец 16.11: «править цену до первой генерации»).
-    // Нет поля в запросе — как раньше: у пересборки остаётся прежняя своя цена, у новой — расчёт
-    () => buildCarousel(req.body?.link, {format: req.body?.format, seed: req.body?.seed, family: req.body?.family,
-      ...('price' in (req.body ?? {}) ? {priceOverride: parsePrice(req.body.price)} : {})}))));
+    ...('price' in (req.body ?? {}) ? {priceOverride: parsePrice(req.body.price)} : {}),
+  })));
+
   // Пересобрать со своей ценой — бесплатно: та же машина, формат и вариант (repriceCarousel)
   api.post('/carousels/:id/price', wrap((req) => repriceCarousel(checkId(req.params.id), req.body?.price)));
   // Свой текст на слайде — тоже бесплатно: та же машина, формат и вариант, меняются только слова

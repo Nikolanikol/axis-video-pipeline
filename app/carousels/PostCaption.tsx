@@ -1,6 +1,5 @@
-// «Текст поста» под слайдами карусели (владелец 16.11): подпись для Instagram и TikTok.
-// Под слайдами, а не в правой колонке — так выглядит сам пост (картинки, под ними подпись), а
-// справа и без того стиль, формат, цена и кнопки. На телефоне блок встаёт под слайды сам.
+// Подпись для Instagram/TikTok — под превью карусели, как в самой публикации.
+// Выбор вкладки параметров не скрывает и не размонтирует редактор подписи.
 // Текст — шаблон из данных машины (src/carousel/postCaption.ts), без цены; правки дилера
 // сохраняются в карусели (PUT /carousels/:id/caption) и переживают пересборку.
 import React, {useEffect, useMemo, useState} from 'react';
@@ -83,7 +82,7 @@ export const PostCaption: React.FC<{entry: CarouselEntry; onSaved: (e: CarouselE
         <h3>{t('post.title')}</h3>
         <span className="hint">{t('post.hint')}</span>
       </div>
-      <textarea value={text} rows={9} onChange={(e) => { setText(e.target.value); setDirty(true); }} />
+      <textarea aria-label={t('post.title')} value={text} rows={9} onChange={(e) => { setText(e.target.value); setDirty(true); }} />
       <div className="post-tags">
         {tags.map((tg) => (
           <span key={tg} className="post-tag">{tg}

@@ -11,12 +11,12 @@ import {FineColors, PaletteField, PlateField, StyleField} from '../SettingsForms
 import {useT} from '../i18n';
 
 // embedded — внутри секции «Оформление» палитры: без своей шапки и «Готово»; onClose тогда не нужен
-type Props = {lot: Lot; brand: Theme; pairs: FontPair[]; palettes: Palette[]; onChange: (patch: Partial<Lot>) => void; onClose?: () => void; embedded?: boolean};
+type Props = {lot: Lot; brand: Theme; pairs: FontPair[]; palettes: Palette[]; onChange: (patch: Partial<Lot>) => void; onClose?: () => void; embedded?: boolean; detailsOnly?: boolean};
 
 // Тема ролика объявления: бренд, поверх — своё оформление. Ею же пользуются кнопки движения
 export const lotTheme = (brand: Theme, lot: Pick<Lot, 'look'> | null | undefined): Theme => applyLook(brand, lot?.look) as Theme;
 
-export const LookPanel: React.FC<Props> = ({lot, brand, pairs, palettes, onChange, onClose, embedded = false}) => {
+export const LookPanel: React.FC<Props> = ({lot, brand, pairs, palettes, onChange, onClose, embedded = false, detailsOnly = false}) => {
   const theme = lotTheme(brand, lot);
   const t = useT();
   // Любая правка — снимок оформления целиком (почему не разница с брендом — src/design/style/look.js)
@@ -30,7 +30,7 @@ export const LookPanel: React.FC<Props> = ({lot, brand, pairs, palettes, onChang
       {t(lot.look ? 'look.own' : 'look.brand')}
       {lot.look && <> <button type="button" className="motion-reset" onClick={() => onChange({look: undefined})}>{t('look.reset')}</button></>}
     </p>
-    <DesignField theme={theme} onChange={set} motion={false}
+    <DesignField theme={theme} onChange={set} motion={false} presets={!detailsOnly}
       note={t('look.designNote')} />
     {/* Шрифтов здесь нет (владелец 20.10: «не так важны»): пара приходит с пресетом, выбрать свою —
         в «Настройки → Бренд» для всей компании */}

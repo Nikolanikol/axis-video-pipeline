@@ -21,6 +21,9 @@ import {SourcesStrip} from './Sources';
 import {HeaderSlotProvider, useHeaderSlotValue} from './headerSlot';
 import {useIsPhone} from './MobileTabs';
 import {LangSwitch, locale, useT} from './i18n';
+import {CreditBar} from './CreditBar';
+import {WorkspaceNav, WORKSPACE_TOOLS} from './WorkspaceNav';
+import {ActionError} from './ActionError';
 
 export const Shell: React.FC = () => {
   const [error, setError] = useState('');
@@ -41,6 +44,7 @@ export const Shell: React.FC = () => {
 
 const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearError}) => {
   const route = useRoute();
+  useEffect(() => { clearError(); }, [route.pipeline, route.tool]);
   const {config} = useConfig();
   const session = useSession();
   const outOfCredits = useOutOfCredits();
@@ -54,7 +58,10 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
 
   // Разделы одним списком: на компьютере это вкладки в шапке, на телефоне — пункты меню-бургера
   const navItems = [
-    ...main.map((p) => ({key: p.id, to: href(p.id, firstReady(p)?.id), label: t.cfg(p.title), active: p.id === pipeline?.id})),
+    ...main.map((p) => {
+      const work = WORKSPACE_TOOLS.find((x) => x.pipeline === p.id);
+      return {key: p.id, to: href(p.id, firstReady(p)?.id), label: work ? t(work.label) : t.cfg(p.title), active: p.id === pipeline?.id};
+    }),
     ...(settings ? [{key: settings.id, to: href(settings.id, firstReady(settings)?.id), label: t.cfg(settings.title), active: settings.id === pipeline?.id}] : []),
     ...(session.enabled && session.isStaff ? [{key: 'admin', to: href('admin'), label: t('shell.admin'), active: route.pipeline === 'admin'}] : []),
   ];
@@ -79,6 +86,7 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
   // панели, нижние вкладки и кнопка сборки закреплены поверх экрана и закрывали бы подвал, а верх
   // панелей (--mtop) меряется без учёта прокрутки страницы
   const fixedPanels = !!pipeline && !!tool && PHONE_PANEL_TOOLS.has(toolKey(pipeline.id, tool.id)) && !isClosed(pipeline.id, config.production);
+  const workingTool = WORKSPACE_TOOLS.some((item) => item.pipeline === route.pipeline && item.tool === route.tool);
   const service = [
     ...main.map((p) => ({label: t.cfg(p.title), href: href(p.id, firstReady(p)?.id)})),
     ...(session.enabled && !session.isStaff ? [{label: t('shell.accountPlans'), href: href('account')}] : []),
@@ -86,7 +94,8 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
 
   return (
     <>
-    <div className="app">
+    <CreditBar />
+    <div className={`${session.enabled ? 'app app-with-credits' : 'app'}${workingTool ? ' workspace-app' : ''}`}>
       <div className={menuOpen ? 'menu-scrim open' : 'menu-scrim'} onClick={() => setMenuOpen(false)} aria-hidden="true" />
       <header className={own ? 'top top-slot' : 'top'}>
         {/* Нажали что-то в строке экрана (например, «Ролики») при открытом меню — меню закрывается, а не
@@ -111,12 +120,6 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
         {session.enabled && <AccountChip />}
         {/* Язык — последним, после «Выйти»: в шапке он вторичен; на телефоне он в меню */}
         <LangSwitch compact className="top-lang" />
-        {/* Только телефон: остаток кредитов всегда на виду, остальное — в меню */}
-        {session.enabled && !session.isStaff && session.balance && (
-          <a className="top-credits" href={href('account')} title={t('shell.accountPlansTitle')} aria-label={`${t('shell.account')}, ${t.n('unit.creditShort', session.balance.credits)}`}>
-            <CircleUserRound size={18} aria-hidden />{t.n('unit.creditShort', session.balance.credits)}
-          </a>
-        )}
         </>}
         <button className="burger" onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen} aria-controls="menu-sheet"
           aria-label={t(menuOpen ? 'shell.menuClose' : 'shell.menuOpen')}>
@@ -138,6 +141,7 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
           <RatesChip />
         </div>
       </header>
+      <WorkspaceNav />
 
       {pipeline && pipeline.tools.length > 1 && (
         <nav className="subnav">
@@ -149,7 +153,7 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
         </nav>
       )}
 
-      {error && <div className="error" onClick={clearError}>{error} <span className="muted">{t('shell.tapToHide')}</span></div>}
+      {error && <ActionError message={error} onDismiss={clearError} />}
       <VerifyBanner />
       {outOfCredits && (
         <div className="readonly">
@@ -177,7 +181,7 @@ const Frame: React.FC<{error: string; clearError: () => void}> = ({error, clearE
 };
 
 // Инструменты с выдвижными панелями на телефоне (usePanelSwipes) — там подвала на телефоне нет
-const PHONE_PANEL_TOOLS = new Set(['ads/lot', 'carousels/build', 'settings/profile', 'settings/brand', 'settings/ads', 'settings/offer']);
+const PHONE_PANEL_TOOLS = new Set(['ads/lot', 'carousels/build', 'offers/build', 'settings/profile', 'settings/brand', 'settings/ads', 'settings/offer']);
 
 /**
  * Подписка скоро кончится: за RENEW_DAYS дней до конца. Кредиты подписки сгорают, поэтому
@@ -229,7 +233,7 @@ const RatesChip: React.FC = () => {
   );
 };
 
-// Компания и кредиты в шапке: клиент видит остаток, не заходя в кабинет. Иконка профиля —
+// Компания в шапке; остаток вынесен в общую строку CreditBar. Иконка профиля —
 // чтобы было понятно, что это вход в личный кабинет (владелец 12.10: одно название компании
 // не читалось как ссылка)
 const AccountChip: React.FC = () => {
@@ -242,9 +246,7 @@ const AccountChip: React.FC = () => {
         title={`${t('shell.account')}${soon ? ` · ${t('shell.burnAt', {credits: t.n('unit.creditShort', soon.credits), date: day(soon.at)})}` : email ? ` · ${email}` : ''}`}>
         <CircleUserRound className="account-icon" size={22} aria-hidden />
         <b>{workspace?.name}</b>
-        <span className="muted">
-          {isStaff ? ` · ${t(isAdmin ? 'shell.owner' : 'shell.manager')}` : ` · ${t.n('unit.creditShort', balance?.credits ?? 0)}`}
-        </span>
+        {isStaff && <span className="muted"> · {t(isAdmin ? 'shell.owner' : 'shell.manager')}</span>}
       </a>
       <button className="btn ghost" onClick={logout}>{t('shell.logout')}</button>
     </div>

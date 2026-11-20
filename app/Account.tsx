@@ -4,7 +4,7 @@
 // месяц или докупку. Поэтому кабинет — это остаток, подписка, прайс и кнопка «написать»,
 // а админка — лиды, кому пора продлевать, и начисление.
 import React, {useEffect, useRef, useState} from 'react';
-import {Balance, LedgerPage, CreditLot, LedgerRow, api} from './api';
+import {Balance, LedgerPage, CreditLot, LedgerRow, api, errorText} from './api';
 import {day, daysLeft, useSession} from './auth';
 import {DangerZone, ProfileCard, SecurityCard} from './AccountProfile';
 import {SetupCard} from './Onboarding';
@@ -90,6 +90,7 @@ export const AccountPage: React.FC = () => {
  */
 const SupportButton: React.FC = () => {
   const t = useT();
+  const {report} = useConfig();
   const [on, setOn] = useState(false);
   const [busy, setBusy] = useState(false);
   useEffect(() => { api.offer().then((o) => setOn(Boolean(o.support))).catch(() => setOn(false)); }, []);
@@ -102,8 +103,9 @@ const SupportButton: React.FC = () => {
       if (url && tab) tab.location.href = url;
       else if (url) window.location.href = url;
       else tab?.close();
-    } catch {
+    } catch (e) {
       tab?.close();
+      report(e);
     } finally {
       setBusy(false);
     }
@@ -122,11 +124,11 @@ const BalanceFacts: React.FC<{balance: Balance | null}> = ({balance}) => {
     <>
       <dl className="rows">
         <dt>{t('acc.credits')}</dt>
-        <dd><b>{balance.credits}</b> <span className="muted">· {t('acc.prices', {carousel: config.credits?.carousels ?? 1, video: config.credits?.ads ?? 3})}</span></dd>
+        <dd><b>{balance.credits}</b> <span className="muted">· {t('acc.prices', {carousel: config.credits?.carousels ?? 1, video: config.credits?.ads ?? 3, offer: config.credits?.offers ?? 2})}</span></dd>
         <dt>{t('acc.sub')}</dt>
         <dd>{sub ? <>{t('acc.subUntil', {title: sub.title, date: day(sub.until)})} <span className="muted">· {t.n('unit.day', daysLeft(sub.until))}</span></> : <span className="muted">{t('acc.none')}</span>}</dd>
         {balance.nextExpiry && (
-          <><dt>{t('acc.nextExpiry')}</dt><dd>{t.n('unit.creditShort', balance.nextExpiry.credits)} — {day(balance.nextExpiry.at)}</dd></>
+          <><dt>{t('acc.nextExpiry')}</dt><dd>{t.n('unit.creditShort', balance.nextExpiry.credits)} — {when(balance.nextExpiry.at)}</dd></>
         )}
       </dl>
       {/* Партии показываем, только когда их несколько: одна строка повторила бы факты выше */}
@@ -135,11 +137,17 @@ const BalanceFacts: React.FC<{balance: Balance | null}> = ({balance}) => {
           <thead><tr><th>{t('acc.lot.from')}</th><th>{t('acc.lot.left')}</th><th>{t('acc.lot.until')}</th></tr></thead>
           <tbody>
             {balance.lots.map((l) => (
-              <tr key={l.id}><td>{t(SOURCE(l.source))}</td><td>{t('start.of', {a: l.remaining, b: l.credits})}</td><td>{day(l.expiresAt)}</td></tr>
+              <tr key={l.id}><td>{t(SOURCE(l.source))}</td><td>{t('start.of', {a: l.remaining, b: l.credits})}</td><td>{when(l.expiresAt)}</td></tr>
             ))}
           </tbody>
         </table>
       )}
+      <details className="credit-help">
+        <summary>{t('acc.creditHelp')}</summary>
+        <p>{t('acc.creditUsage')}</p>
+        <p>{t('acc.creditExpiry')}</p>
+        <p>{t('acc.creditRefund')}</p>
+      </details>
       {/* До подтверждения почты про это уже говорят полоса сверху и шаг «Почта» — здесь молчим.
           «Закончились» — только тому, кому кредиты уже дарили */}
       {balance.credits <= 0 && emailVerified && (
@@ -157,9 +165,22 @@ const LedgerSection: React.FC<{credits?: number}> = ({credits}) => {
   const t = useT();
   const [data, setData] = useState<LedgerPage | null>(null);
   const [page, setPage] = useState(1);
+  const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
   const top = useRef<HTMLElement>(null);
-  useEffect(() => { api.ledger(page).then(setData).catch(() => setData(null)); }, [page, credits]);
-  if (!data) return null;
+  useEffect(() => {
+    let live = true;
+    setData(null); setError('');
+    api.ledger(page).then((data) => { if (live) setData(data); })
+      .catch((e) => { if (live) setError(errorText(e)); });
+    return () => { live = false; };
+  }, [page, credits, attempt]);
+  if (!data) return <section className="card ledger-section" ref={top}>
+    <h2>{t('acc.ledger')}</h2>
+    {error ? <div className="notice warn" role="alert"><p>{error}</p>
+      <button type="button" className="btn" onClick={() => setAttempt((n) => n + 1)}>{t('common.retry')}</button></div>
+      : <p className="hint" role="status">{t('acc.ledgerLoading')}</p>}
+  </section>;
   const go = (p: number) => { setPage(p); top.current?.scrollIntoView({behavior: 'smooth', block: 'start'}); };
   const from = (data.page - 1) * data.pageSize + 1;
   const to = from + data.rows.length - 1;
@@ -203,4 +224,4 @@ const LedgerSection: React.FC<{credits?: number}> = ({credits}) => {
 
 // Русские подписи журнала — для админки (она по-русски); клиенту — acc.kind.* / acc.what.* из словаря
 export const KIND: Record<LedgerRow['kind'], string> = {grant: 'Начислено', charge: 'Списано', refund: 'Возврат', adjust: 'Правка'};
-export const WHAT: Record<string, string> = {ads: 'Ролик', carousels: 'Карусель', reviews: 'Обзор'};
+export const WHAT: Record<string, string> = {ads: 'Ролик', carousels: 'Карусель', reviews: 'Обзор', offers: 'КП'};

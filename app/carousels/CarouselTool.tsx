@@ -10,7 +10,7 @@
 // Отличие от ролика: превью ролика живое, и формат там меняется бесплатно, а карусель надо
 // собрать — это кредит. Поэтому клик по формату только выбирает его, пересборка — отдельной
 // кнопкой, а ссылка на уже собранную машину открывает готовую карусель, а не собирает заново.
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useId, useMemo, useRef, useState} from 'react';
 import {encarAdUrl, sourceName} from '../../src/shared/encarLink.js';
 import {DESIGNS} from '../../src/shared/designs';
 import {FAMILIES, FAMILY_FORMAT, familyFormats} from '../../src/carousel/families/registry.js';
@@ -18,7 +18,7 @@ import {thumb} from '../thumb';
 import {parseCarouselSource} from '../../src/shared/kmotorsLot.js';
 import {QuickLink} from '../ads/QuickLot';
 import {Check, ChevronLeft, ChevronRight, Download, ExternalLink, Images, List, RefreshCw, Trash2, X} from 'lucide-react';
-import {MobileTabs, usePanelSwipes} from '../MobileTabs';
+import {MobileTabs, useIsPhone, usePanelSwipes} from '../MobileTabs';
 import {toast} from '../Toast';
 import {api, CarouselEntry, CarouselFormat, errorText} from '../api';
 import type {CarouselCar} from '../../src/shared/types';
@@ -27,6 +27,7 @@ import {useCost, useSession} from '../auth';
 import {carouselLang} from '../../src/carousel/i18n';
 import {TEXT_FIELDS, TEXT_MAX, accentField} from '../../src/carousel/texts';
 import {BusyModal} from '../BusyModal';
+import {useModalFocus} from '../useModalFocus';
 import {PostCaption} from './PostCaption';
 import {carouselPrice} from '../../src/carousel/price';
 import {currencySign} from '../../src/shared/currencies';
@@ -225,9 +226,10 @@ const SlideTrack: React.FC<{slides: string[]; at: number; v: string; imgProps?: 
  */
 const Lightbox: React.FC<{entry: CarouselEntry; at: number; onClose: () => void; onMove: (d: number) => void}> =
   ({entry, at, onClose, onMove}) => {
+    const dialog = useRef<HTMLDivElement>(null);
+    useModalFocus(dialog, true, onClose);
     useEffect(() => {
       const onKey = (e: KeyboardEvent) => {
-        if (e.key === 'Escape') onClose();
         if (e.key === 'ArrowLeft') onMove(-1);
         if (e.key === 'ArrowRight') onMove(1);
       };
@@ -243,7 +245,7 @@ const Lightbox: React.FC<{entry: CarouselEntry; at: number; onClose: () => void;
     // поведение». Раньше внутренний блок во весь экран глотал клик, и закрыть можно было
     // только кнопкой. Клик по самой картинке не закрывает: по ней возят курсором и разглядывают
     return (
-      <div className="lightbox" onClick={onClose} role="dialog" aria-modal="true" aria-label={t('slides.nOf', {n: at + 1, total: entry.slides.length})}>
+      <div ref={dialog} tabIndex={-1} className="lightbox" onClick={onClose} role="dialog" aria-modal="true" aria-label={t('slides.nOf', {n: at + 1, total: entry.slides.length})}>
         <button className="lightbox-close" onClick={onClose} aria-label={t('land.auth.close')}><X size={22} /></button>
         <div className="lightbox-inner">
           {/* Картинка — ровно по размеру слайда, а поле вокруг неё — подложка: раньше картинка
@@ -408,13 +410,11 @@ const SlideTextEditor: React.FC<{entry: CarouselEntry; at: number; busy: boolean
  * во весь экран (решения по дизайну принимаются по мелочам).
  */
 const SlideViewer: React.FC<{entry: CarouselEntry; ratio: string; busy: boolean; onZoom: (i: number) => void;
-  onEditTexts: (slide: string, fields: Record<string, string>) => Promise<void>}> = ({entry, ratio, busy, onZoom, onEditTexts}) => {
-  const [at, setAt] = useState(0);
+  at: number; setAt: React.Dispatch<React.SetStateAction<number>>; onEdit: () => void}> = ({entry, ratio, busy, onZoom, at, setAt, onEdit}) => {
   const t = useT();
-  const [editing, setEditing] = useState(false);
   // Другая машина — с первого слайда; пересборка той же (своя цена, свой текст) — на том же
   // слайде: человек только что правил его и хочет увидеть результат, а не обложку
-  useEffect(() => { setAt(0); setEditing(false); }, [entry.id]);
+  useEffect(() => { setAt(0); }, [entry.id]);
   useEffect(() => setAt((i) => Math.min(i, entry.slides.length - 1)), [entry.updatedAt, entry.slides.length]);
   const n = entry.slides.length;
   const go = (d: number) => setAt((i) => Math.min(n - 1, Math.max(0, i + d)));
@@ -427,21 +427,22 @@ const SlideViewer: React.FC<{entry: CarouselEntry; ratio: string; busy: boolean;
       <div className="slide-stage" style={{aspectRatio: ratio}} ref={stage}>
         {/* ?v= — время сборки: иначе браузер покажет прежнюю картинку из кэша */}
         <SlideTrack slides={entry.slides} at={at} v={v}
-          imgProps={(i) => ({onClick: () => onZoom(i), title: t('slides.zoom')})} />
+          imgProps={(i) => ({onClick: () => onZoom(i), title: t('slides.zoom'), role: 'button', tabIndex: i === at ? 0 : -1,
+            'aria-label': `${t('slides.zoom')}: ${t('slides.n', {n: i + 1})}`,
+            onKeyDown: (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onZoom(i); } }})} />
         {at > 0 && <button className="slide-arrow left" onClick={() => go(-1)} aria-label={t('slides.prev')}>‹</button>}
         {at < n - 1 && <button className="slide-arrow right" onClick={() => go(1)} aria-label={t('slides.next')}>›</button>}
       </div>
       <div className="slide-bar">
         <span className="muted">{at + 1} / {n}</span>
         <a className="link" href={`/api/carousels/${entry.id}/slide/${at + 1}/download`}>{t('slides.downloadThis')}</a>
-        <button type="button" className="link" aria-expanded={editing} onClick={() => setEditing((v) => !v)}>
-          {t(editing ? 'slides.hideEdit' : 'slides.edit')}
+        <button type="button" className="link" onClick={onEdit}>
+          {t('slides.edit')}
         </button>
       </div>
-      {editing && <SlideTextEditor entry={entry} at={at} busy={busy} onSave={onEditTexts} />}
       <div className="slide-thumbs">
         {entry.slides.map((src, i) => (
-          <button key={src} className={i === at ? 'slide-thumb on' : 'slide-thumb'} onClick={() => setAt(i)} style={{aspectRatio: ratio}}>
+          <button key={src} className={i === at ? 'slide-thumb on' : 'slide-thumb'} aria-pressed={i === at} onClick={() => setAt(i)} style={{aspectRatio: ratio}}>
             <img src={thumb(`${src}${v}`, 160)} alt={t('slides.n', {n: i + 1})} loading="lazy" />
           </button>
         ))}
@@ -498,6 +499,10 @@ const CAROUSEL_PANELS = {list: 'left'} as const;
 export const CarouselTool: React.FC = () => {
   const {config, profile, brand, report} = useConfig();
   const t = useT();
+  const phone = useIsPhone();
+  const settingsId = useId();
+  const [section, setSection] = useState<'look' | 'content'>('look');
+  const [slideAt, setSlideAt] = useState(0);
   // Язык слайдов — из профиля: виден здесь, чтобы не удивляться английской карусели
   const slidesLang = t(({ru: 'car.langRu', en: 'car.langEn', sq: 'car.langSq'} as const)[carouselLang(profile.language)]);
   const {refresh: refreshAccess} = useSession();
@@ -584,6 +589,7 @@ export const CarouselTool: React.FC = () => {
     try {
       const car = await api.lookupCar(link);
       setDraft({link, car});
+      setSection('content');
       setNextPrice('');
       setMtab('main');
     } catch (e) { setLinkError(errorText(e)); } finally { setLooking(false); }
@@ -668,14 +674,29 @@ export const CarouselTool: React.FC = () => {
   }, [otherFormat, entry?.id]);
   const price = typedPrice(nextPrice);
   const famFor = (fmt: string) => (family && familyFormats(family).includes(fmt) ? family : null);
+  const primaryAction = () => draft ? (
+    <button className="btn primary big" onClick={() => run(draft.link, undefined, format, famFor(format), price)} disabled={busy || price === undefined}>
+      {chosenFamily ? t('car.buildStyle', {style: chosenFamily.title}) : t('car.buildFormat', {format: t.cfg(chosen?.title ?? '')})}{cost}
+    </button>
+  ) : entry ? otherFormat ? (
+    <button className="btn primary big" onClick={() => run(entry.id, undefined, format, famFor(format), price)} disabled={busy || price === undefined}>
+      {chosenFamily && (entry.family ?? null) !== family ? t('car.buildStyle', {style: chosenFamily.title}) : !family && entry.family && (entry.format ?? 'classic') === format ? t('car.buildBrand') : t('car.buildFormat', {format: t.cfg(chosen?.title ?? '')})}{cost}
+    </button>
+  ) : canSaveToGallery ? (
+    <button className="btn primary big" disabled={busy || !slideFiles} onClick={() => slideFiles && shareFiles(slideFiles).catch(report)}>{slideFiles ? t('car.toGallery', {n: entry.slides.length}) : t('car.preparing')}</button>
+  ) : canSaveToFolder ? (
+    <button className="btn primary big" onClick={saveAll} disabled={busy || saving !== null}>{saving !== null ? t('car.saving', {a: saving, b: entry.slides.length}) : t('car.toFolder', {n: entry.slides.length})}</button>
+  ) : <a className="btn primary big" href={`/api/carousels/${entry.id}/zip`}>{t('car.zipAll', {n: entry.slides.length})}</a>
+    : <button className="btn primary big" disabled>{t('mle.build')}{cost}</button>;
+  const shownCar = draft?.car ?? entry?.car;
   const draftPhoto = draft ? draft.car.photos.hero ?? draft.car.photos.exterior[0] ?? null : null;
 
   return (
     <>
-    <div className="quick" data-mtab={mtab} ref={quickRef}>
+    <div className="quick carousel-workspace" data-mtab={mtab} ref={quickRef}>
       {/* quick-screen — один экран, как у «Ролика по лоту»: колонки прокручиваются внутри */}
       <div className="quick-screen">
-      <QuickLink onLink={fromLink} error={linkError} busy={busy} parse={parseCarouselSource}
+      <QuickLink onLink={fromLink} error={linkError} onClearError={() => setLinkError('')} busy={busy || looking} parse={parseCarouselSource}
         placeholder={t('car.placeholder', {lang: slidesLang})} />
       {/* Сборка — 10–20 секунд (замер 30.09: 13 с на 9 слайдов); экран закрыт окном, как у лота по ссылке */}
       <BusyModal step={busy ? 0 : null} steps={[t('car.busyStep')]} label={t('car.busyLabel')}
@@ -696,91 +717,77 @@ export const CarouselTool: React.FC = () => {
             </div>
             : entry
               ? <>
-                <SlideViewer entry={entry} ratio={ratio} busy={busy} onZoom={setOpen} onEditTexts={editTexts} />
-                {/* Подпись к посту — под слайдами, как в самом посте (владелец 16.11) */}
-                <PostCaption entry={entry} onSaved={(made) => { setEntry(made); setHistory((h) => h.map((x) => (x.id === made.id ? made : x))); }} />
+                <SlideViewer entry={entry} ratio={ratio} busy={busy} onZoom={setOpen} at={slideAt} setAt={setSlideAt} onEdit={() => {
+                  setSection('content');
+                  const tab = document.getElementById(`${settingsId}-content`);
+                  if (phone) tab?.closest('.carousel-settings')?.scrollIntoView({block: 'start'});
+                  tab?.focus({preventScroll: true});
+                }} />
+                {/* Подпись к публикации — под превью, независимо от вкладки параметров. */}
+                <PostCaption entry={entry} onSaved={(made) => { setEntry(made); setHistory((h) => h.map((x) => x.id === made.id ? made : x)); }} />
               </>
               : <div className="empty">{t('car.empty')}</div>}
         </section>
 
-        <section className="quick-side">
-          {draft && (
-            <div className="quick-title">
-              <h1>{[draft.car.brand, draft.car.model].filter(Boolean).join(' ') || `№ ${draft.car.id}`} <span className="muted">{draft.car.year ?? ''}</span></h1>
-              <CarSummary entry={{id: draft.car.id, car: draft.car}} />
+        <section className="quick-side carousel-settings">
+          <header className="carousel-settings-head">
+            <h1>{draft || entry ? [shownCar?.brand, shownCar?.model, shownCar?.year].filter(Boolean).join(' ') : t('workspace.carousels')}</h1>
+            <div className="carousel-mobile-action">{primaryAction()}</div>
+            <div className="workspace-section-tabs" role="tablist" aria-label={t('workspace.parameters')}>
+              {(['look', 'content'] as const).map((id) => <button key={id} type="button" role="tab" id={`${settingsId}-${id}`}
+                aria-selected={section === id} tabIndex={section === id ? 0 : -1} aria-controls={`${settingsId}-body`} onClick={() => setSection(id)}
+                onKeyDown={(e) => {
+                  if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(e.key)) return;
+                  e.preventDefault();
+                  const next = e.key === 'Home' ? 'look' : e.key === 'End' ? 'content' : id === 'look' ? 'content' : 'look';
+                  setSection(next); document.getElementById(`${settingsId}-${next}`)?.focus();
+                }}>{t(id === 'look' ? 'look.style' : 'workspace.content')}</button>)}
             </div>
-          )}
-          {!draft && entry && (
-            <div className="quick-title">
-              <h1>{[entry.car.brand, entry.car.model].filter(Boolean).join(' ') || `№ ${entry.id}`} <span className="muted">{entry.car.year ?? ''}</span></h1>
-              <CarSummary entry={entry} />
+          </header>
+          <div className="carousel-settings-body" id={`${settingsId}-body`} role="tabpanel" aria-labelledby={`${settingsId}-${section}`}>
+            <div className="carousel-settings-section" hidden={section !== 'look'}>
+              <div className="quick-label">{t('car.style')}</div>
+              <StyleList value={family} built={!draft && entry ? (entry.family ?? null) : undefined} onChange={setFamily} />
+              <div className="quick-label">{t('car.format')}</div>
+              <FormatList formats={formats} value={format} built={!draft && entry ? (entry.format ?? 'classic') : undefined}
+                only={family ? familyFormats(family) : undefined} onChange={setFormat} />
+              {!family && <div className="design-summary">{t('car.preset')}: {brand.design ? t.cfg(DESIGNS.find((d) => d.id === brand.design)?.title ?? '') : t('design.original')} · <a href="#/settings/brand">{t('car.setup')}</a></div>}
             </div>
-          )}
-          {/* Сначала стиль, потом формат: семейство задаёт формат (только 4:5), и выбор формата
-              больше не сбрасывает стиль */}
-          <div className="quick-label">{t('car.style')}</div>
-          <StyleList value={family} built={entry ? (entry.family ?? null) : undefined} onChange={setFamily} />
-          <div className="quick-label">{t('car.format')}</div>
-          <FormatList formats={formats} value={format} built={entry ? (entry.format ?? 'classic') : undefined}
-            only={family ? familyFormats(family) : undefined} onChange={setFormat} />
-          {/* Пресет меняет вёрстку всех форматов — видно здесь, чтобы не искать причину «чужого» вида в настройках */}
-          {!family && <div className="design-summary">{t('car.preset')}: {brand.design ? t.cfg(DESIGNS.find((d) => d.id === brand.design)?.title ?? '') : t('design.original')} · <a href="#/settings/brand">{t('car.setup')}</a></div>}
-
-          {draft && (
-            <div className="carousel-actions">
-              <NextPrice car={draft.car} id={draft.car.id} value={nextPrice} onChange={setNextPrice} />
-              <button className="btn primary big" onClick={() => run(draft.link, undefined, format, famFor(format), price)} disabled={busy || price === undefined}>
-                {chosenFamily ? t('car.buildStyle', {style: chosenFamily.title}) : t('car.buildFormat', {format: t.cfg(chosen?.title ?? '')})}{cost}
-              </button>
-              <div className="btn-row">
-                <button className="btn ghost" onClick={() => { setDraft(null); setNextPrice(''); }} disabled={busy}>{t('common.cancel')}</button>
-              </div>
+            <div className="carousel-settings-section" hidden={section !== 'content'}>
+              {draft && <NextPrice car={draft.car} id={draft.car.id} value={nextPrice} onChange={setNextPrice} />}
+              {!draft && entry && <>
+                {otherFormat ? <NextPrice car={entry.car} id={entry.id} value={nextPrice} onChange={setNextPrice} /> : <PriceBox entry={entry} busy={busy} onReprice={reprice} />}
+                <h3>{t('slides.nOf', {n: slideAt + 1, total: entry.slides.length})}</h3>
+                <SlideTextEditor entry={entry} at={slideAt} busy={busy} onSave={editTexts} />
+              </>}
+              {draft || entry ? <details className="car-summary-detail"><summary>{t('palette.carData')}</summary>
+                <CarSummary entry={draft ? {id: draft.car.id, car: draft.car} : entry!} />
+              </details> : <p className="hint">{t('car.empty')}</p>}
             </div>
-          )}
-          {!draft && entry && (
-            <div className="carousel-actions">
-              {otherFormat && <NextPrice car={entry.car} id={entry.id} value={nextPrice} onChange={setNextPrice} />}
-              {otherFormat ? (
-                <button className="btn primary big" onClick={() => run(entry.id, undefined, format, famFor(format), price)} disabled={busy || price === undefined}>
-                  {chosenFamily && (entry.family ?? null) !== family ? t('car.buildStyle', {style: chosenFamily.title}) : !family && entry.family && (entry.format ?? 'classic') === format
-                    ? t('car.buildBrand') : t('car.buildFormat', {format: t.cfg(chosen?.title ?? '')})}{cost}
-                </button>
-              ) : canSaveToGallery ? (
-                <button className="btn primary big" disabled={busy || !slideFiles}
-                  onClick={() => slideFiles && shareFiles(slideFiles).catch(report)}>
-                  {slideFiles ? t('car.toGallery', {n: entry.slides.length}) : t('car.preparing')}
-                </button>
-              ) : canSaveToFolder ? (
-                <button className="btn primary big" onClick={saveAll} disabled={busy || saving !== null}>
-                  {saving !== null ? t('car.saving', {a: saving, b: entry.slides.length}) : t('car.toFolder', {n: entry.slides.length})}
-                </button>
-              ) : (
-                <a className="btn primary big" href={`/api/carousels/${entry.id}/zip`}>{t('car.zipAll', {n: entry.slides.length})}</a>
-              )}
-              {otherFormat && <span className="hint">{t('car.openNow', {format: t.cfg(entryFormat?.title ?? '')})}{entry.family ? ` ${t('car.inStyle', {style: FAMILIES.find((f) => f.id === entry.family)?.title ?? entry.family})}` : ''} — {t('car.otherChosen')}</span>}
-              {/* Запасной путь рядом с папкой: архив работает в любом браузере */}
-              {!otherFormat && canSaveToFolder && !canSaveToGallery && (
+          </div>
+          <footer className="carousel-actions">
+            {draft ? <>
+              <div className="carousel-desktop-action">{primaryAction()}</div>
+              <button className="btn ghost" onClick={() => { setDraft(null); setNextPrice(''); }} disabled={busy}>{t('common.cancel')}</button>
+            </> : entry ? <>
+              {otherFormat ? <>
+                <div className="carousel-desktop-action">{primaryAction()}</div>
+                <span className="hint">{t('car.openNow', {format: t.cfg(entryFormat?.title ?? '')})}{entry.family ? ` ${t('car.inStyle', {style: FAMILIES.find((f) => f.id === entry.family)?.title ?? entry.family})}` : ''} — {t('car.otherChosen')}</span>
                 <a className="hint" href={`/api/carousels/${entry.id}/zip`}>{t('car.orZip')}</a>
-              )}
-              {!otherFormat && savedTo?.id === entry.id && saving === null && (
-                <span className="hint" style={{color: 'var(--ok)'}}>{t('car.saved', {slides: t.n('unit.slide', entry.slides.length), folder: savedTo.folder})}</span>
-              )}
-              {!otherFormat && canSaveToGallery && <span className="hint">{t('car.iosHint')}</span>}
-              {!otherFormat && <PriceBox entry={entry} busy={busy} onReprice={reprice} />}
-              <div className="btn-row">
-                {!otherFormat && (entry.format !== 'classic' || brand.design || entry.family) && (
-                  <button className="btn" onClick={() => run(entry.id)} disabled={busy}
-                    title={t('car.variantTitle')}>{t('car.variant')}{cost}</button>
-                )}
-                {!otherFormat && (
-                  <button className="btn ghost" onClick={() => run(entry.id, entry.seed)} disabled={busy}
-                    title={t('car.rebuildTitle')}>{t('jobs.rebuild')}{cost}</button>
-                )}
+              </> : <>
+                <div className="carousel-desktop-action">{primaryAction()}</div>
+                {canSaveToFolder && !canSaveToGallery && <a className="hint" href={`/api/carousels/${entry.id}/zip`}>{t('car.orZip')}</a>}
+                {savedTo?.id === entry.id && saving === null && <span className="hint" style={{color: 'var(--ok)'}}>{t('car.saved', {slides: t.n('unit.slide', entry.slides.length), folder: savedTo.folder})}</span>}
+                {canSaveToGallery && <span className="hint">{t('car.iosHint')}</span>}
+              </>}
+              <details><summary>{t('workspace.moreActions')}</summary><div className="btn-row">
+                {!otherFormat && (entry.format !== 'classic' || brand.design || entry.family) && <button className="btn" onClick={() => run(entry.id)} disabled={busy} title={t('car.variantTitle')}>{t('car.variant')}{cost}</button>}
+                {!otherFormat && <button className="btn ghost" onClick={() => run(entry.id, entry.seed)} disabled={busy} title={t('car.rebuildTitle')}>{t('jobs.rebuild')}{cost}</button>}
                 <a className="btn ghost" href={entry.lot?.url ?? encarAdUrl(entry.id)} target="_blank" rel="noreferrer">{entry.lot ? t('car.openLot') : t('car.onSite', {site: sourceName(entry.id)})}</a>
                 <button className="btn ghost" onClick={() => remove(entry.id)} disabled={busy}>{t('common.delete')}</button>
-              </div>
-            </div>
-          )}
+              </div></details>
+            </> : <div className="carousel-desktop-action">{primaryAction()}</div>}
+          </footer>
         </section>
       </main>
       </div>

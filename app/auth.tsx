@@ -3,7 +3,7 @@
 // Интерфейс начинает с /api/auth/me. Вход выключен (нет базы — Mac без DATABASE_URL,
 // тесты) — сразу пускаем внутрь, как было. Включён и никто не вошёл — экран входа и регистрации
 // (app/GuestEntry.tsx; витрина KOK с 17.11 — на axis-beauty.com, site/).
-import React, {Suspense, createContext, useCallback, useContext, useEffect, useState} from 'react';
+import React, {Suspense, createContext, useCallback, useContext, useEffect, useRef, useState} from 'react';
 import {Loading} from './Loading';
 import {lazyNamed} from './errorReport';
 import {track, trackFirstGeneration} from './analytics';
@@ -11,6 +11,7 @@ import {Balance, Me, Registration, User, api, errorText} from './api';
 import {Field} from './LotForm';
 import {useRoute} from './router';
 import {locale, tNow, useT, type Lang} from './i18n';
+import {creditRequestsPending, watchCreditActivity} from './creditActivity';
 
 // Экран входа гостя — отдельным куском сборки: вошедшему он не нужен
 const GuestEntry = lazyNamed(() => import('./GuestEntry'), 'GuestEntry');
@@ -52,6 +53,15 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
   const [me, setMe] = useState<Me | null>(null);
   const [error, setError] = useState('');
   const [balance, setBalance] = useState<Balance | null>(null);
+  const sequence = useRef(0);
+  const applied = useRef(0);
+  // Ответ старого запроса не должен откатывать уже полученное списание или возврат.
+  const accept = useCallback((m: Me, id: number) => {
+    if (id < applied.current) return;
+    applied.current = id;
+    setMe(m);
+    setBalance(signedIn(m) ? m.balance : null);
+  }, []);
 
   // Ссылка из письма: #/verify?t=… или #/reset?t=…. Читаем один раз при загрузке
   const [link] = useState(readEmailLink);
@@ -60,7 +70,8 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
 
   // Перечитать, кто вошёл: после подтверждения почты меняются и признак, и баланс
   const load = useCallback(() => {
-    api.me().then((m) => { setMe(m); if (signedIn(m)) setBalance(m.balance); })
+    const id = ++sequence.current;
+    api.me().then((m) => accept(m, id))
       // Поисковому роботу — экран гостя, а не экран ошибки: его рендер может не выполнить запрос
       // входа (21.10: Google обрывал его с 499, и в поиск уходила плашка «Сервер ответил ошибкой»).
       // Человеку — прежний экран с «Обновить страницу»: ему нужно знать, что вход не проверился
@@ -71,15 +82,31 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
         const guest = (signup: {credits: number; days: number}): Me => ({authRequired: true, user: null, signup});
         api.publicOffer().then((o) => setMe(guest(o?.signup ?? {credits: 7, days: 30}))).catch(() => setMe(guest({credits: 7, days: 30})));
       });
-  }, []);
+  }, [accept]);
 
   // Баланс меняется и в других вкладках (собрали там ролик, оплатили тариф). Раньше он читался
   // один раз при открытии, и вкладка показывала старое число до перезагрузки (тест Дмитрия, PR 13).
-  // Перечитываем при возврате во вкладку и при переходе между разделами — только баланс
+  // Перечитываем при возврате во вкладку и при переходе между разделами. Ошибка фонового
+  // обновления не должна закрывать рабочий экран, как ошибка первого входа.
   const signed = !!me && signedIn(me);
   const freshBalance = useCallback(() => {
-    if (signed && document.visibilityState === 'visible') api.me().then((m) => { if (signedIn(m)) setBalance(m.balance); }).catch(() => {});
-  }, [signed]);
+    if (!signed || document.visibilityState !== 'visible') return;
+    const id = ++sequence.current;
+    api.me().then((m) => accept(m, id)).catch(() => {});
+  }, [signed, accept]);
+  const paying = signed && !me.user.isStaff;
+  useEffect(() => {
+    if (!paying) return;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const activity = (pending: number) => {
+      freshBalance();
+      if (pending && !timer) timer = setInterval(freshBalance, 1000);
+      if (!pending && timer) { clearInterval(timer); timer = undefined; }
+    };
+    const unwatch = watchCreditActivity(activity);
+    if (creditRequestsPending()) activity(creditRequestsPending());
+    return () => { unwatch(); clearInterval(timer); };
+  }, [paying, freshBalance]);
   useEffect(() => {
     document.addEventListener('visibilitychange', freshBalance);
     window.addEventListener('focus', freshBalance);
@@ -147,7 +174,7 @@ export const AuthGate: React.FC<{children: React.ReactNode}> = ({children}) => {
 
   const session: Session = signedIn(me)
     ? {enabled: true, email: me.user.email, name: me.user.name, lang: me.user.lang ?? null, isAdmin: me.user.isAdmin, isStaff: me.user.isStaff,
-      emailVerified: me.user.emailVerified, workspace: me.workspace, balance, refresh: load, logout}
+      emailVerified: me.user.emailVerified, workspace: me.workspace, balance, refresh: freshBalance, logout}
     : {enabled: false, email: null, name: null, lang: null, isAdmin: true, isStaff: true, emailVerified: true, workspace: null, balance: null,
       refresh: load, logout};
   return (

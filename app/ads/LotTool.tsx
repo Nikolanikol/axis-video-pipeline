@@ -250,7 +250,7 @@ export const LotTool: React.FC = () => {
   // Название компании — из профиля, как у рендера (theme.name = market.name в server/store.mjs).
   // В бренде лежит своё старое name, и превью показывало его (на превью PR 13 — «QWEDSAZXC»),
   // хотя в готовом ролике всё верно
-  const input = useMemo(() => (lot ? {lot, market, theme: {...brand, name: market.name}} : null), [lot, market, brand]);
+  const input = useMemo(() => (lot ? {lot, market, textFitVersion: 1 as const, theme: {...brand, name: market.name}} : null), [lot, market, brand]);
 
   // Цена в карточке — та же, что в ролике: валюта профиля, фрахт
   const priceOf = (l: LotEntry) => {
@@ -270,7 +270,7 @@ export const LotTool: React.FC = () => {
       listOpen={mtab === 'list'} onList={(open) => setMtab(open ? 'list' : 'main')}
       openContent={mtab === 'edit'} onContentOpened={() => setMtab('main')}
       list={<div className="mle-list-content">
-        <QuickLink onLink={quickFromLink} error={quickError} busy={!!stage} />
+        <QuickLink onLink={quickFromLink} error={quickError} onClearError={() => setQuickError('')} busy={!!stage} />
         <LotsPanel lots={lots} current={lot?.id} pending={pending} onOpen={selectLot} onBlank={newLot} price={priceOf}
           onCopy={copyLot} onDelete={deleteLot} onDeleteEmpty={deleteEmpty} />
       </div>}
@@ -292,7 +292,7 @@ export const LotTool: React.FC = () => {
           содержимым, длинные списки (лоты, ролики) прокручиваются внутри себя */}
       <div className="quick-screen">
       <SettingsSaveNotice />
-      <QuickLink onLink={quickFromLink} error={quickError} busy={!!stage} />
+      <QuickLink onLink={quickFromLink} error={quickError} onClearError={() => setQuickError('')} busy={!!stage} />
 
       {/* Три колонки: лоты — превью — палитра (владелец, 30.09 и 20.10). Ссылка — над ними:
           это первое действие, и новый лот из неё появляется в колонке лотов */}

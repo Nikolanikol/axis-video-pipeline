@@ -70,7 +70,7 @@ export const Facts: React.FC<Props> = ({kind, facts, notes, width, dense, compac
           const big = n ? n.number : splitDot(fact.value).main;
           const small = n ? n.rest : splitDot(fact.value).note;
           return <div key={key(fact, i)} style={{...piece(i), minWidth: 0}}>
-            <div style={{fontFamily: HEAD, fontWeight: 700, lineHeight: 1, color: i === 0 ? C.copper : C.white, overflowWrap: 'anywhere',
+            <div style={{fontFamily: HEAD, fontWeight: 700, lineHeight: 1, color: i === 0 ? C.accentInk ?? C.copper : C.white, overflowWrap: 'anywhere',
               fontSize: fit(big, width / cols - 16, n ? (dense ? 84 : 104) : (dense ? 44 : 54), 28)}}>{big}</div>
             {(fact.label || small) && <div style={caption(compact ? 20 : 24, {...upper, marginTop: 10})}>{[fact.label, small].filter(Boolean).join(' · ')}</div>}
           </div>;
@@ -87,7 +87,7 @@ export const Facts: React.FC<Props> = ({kind, facts, notes, width, dense, compac
         {facts.map((fact, i) => {
           const Icon = factIcon(`${fact.label ?? ''} ${fact.value}`);
           return <div key={key(fact, i)} style={{...piece(i), display: 'flex', alignItems: 'center', gap: compact ? 16 : 22, minWidth: 0}}>
-            <span style={{flex: 'none', width: size, height: size, borderRadius: round(size / 2), background: C.panel, color: C.copper,
+            <span style={{flex: 'none', width: size, height: size, borderRadius: round(size / 2), background: C.panel, color: C.accentInk ?? C.copper,
               display: 'flex', alignItems: 'center', justifyContent: 'center'}}><Icon size={size * .5} strokeWidth={1.9} /></span>
             <div style={{minWidth: 0}}>
               {fact.label && <div style={caption(compact ? 20 : 23, {marginBottom: 4})}>{fact.label}</div>}
@@ -130,7 +130,7 @@ export const Facts: React.FC<Props> = ({kind, facts, notes, width, dense, compac
       display: 'flex', flexDirection: 'column', gap: compact ? 16 : 26}}>
       {facts.map((fact, i) => <div key={key(fact, i)} style={piece(i)}>
         <div style={{fontFamily: HEAD, fontWeight: 700, fontSize: fit(fact.value, width - 64, dense ? 50 : 62, 28), lineHeight: 1.08,
-          color: i === 0 ? C.copper : C.white, overflowWrap: 'anywhere'}}>{fact.value}</div>
+          color: i === 0 ? C.accentInk ?? C.copper : C.white, overflowWrap: 'anywhere'}}>{fact.value}</div>
         {fact.label && <div style={caption(compact ? 18 : 21, {...upper, marginTop: 6})}>{fact.label}</div>}
       </div>)}
       {notes}

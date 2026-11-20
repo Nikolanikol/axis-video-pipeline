@@ -1,11 +1,13 @@
 // Окно «идёт работа» поверх всего экрана: шаги с отметками, экран под ним не нажимается.
 // Общее для лота по ссылке Encar и сборки карусели (владелец 30.09: «такой же индикатор
 // с блокировкой экрана»). Окно — в body через портал, #root на время — inert: затемнение
-// закрывает мышь, а inert — ещё и Tab с клавиатуры. Отмены нет: работа уже идёт на сервере,
+// закрывает мышь, а общий useModalFocus — фон и Tab с клавиатуры. Отмены нет: работа уже идёт на сервере,
 // прерванная оставила бы лот или карусель наполовину собранными.
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {RecMark} from './Loading';
+import {useModalFocus} from './useModalFocus';
+import {useT} from './i18n';
 
 type Props = {
   // null — окна нет
@@ -18,19 +20,20 @@ type Props = {
 /** step — индекс текущего шага (что до него — отмечено галочкой), null — окна нет */
 export const BusyModal: React.FC<Props> = ({step, steps, label, note}) => {
   const open = step !== null;
+  const dialog = useRef<HTMLDivElement>(null);
+  const t = useT();
+  useModalFocus(dialog, open);
   // Секунды с начала — когда шаг один и долгий (сборка карусели), видно, что дело идёт
   const [secs, setSecs] = useState(0);
   useEffect(() => {
-    const root = document.getElementById('root');
-    if (!open || !root) return;
-    root.inert = true;
+    if (!open) return;
     setSecs(0);
     const t = setInterval(() => setSecs((s) => s + 1), 1000);
-    return () => { root.inert = false; clearInterval(t); };
+    return () => clearInterval(t);
   }, [open]);
   if (!open) return null;
   return createPortal(
-    <div className="modal-backdrop import-backdrop" role="dialog" aria-modal="true" aria-label={label}>
+    <div ref={dialog} tabIndex={-1} className="modal-backdrop import-backdrop" role="dialog" aria-modal="true" aria-label={label}>
       <div className="import-modal" role="status">
         <RecMark />
         <ol className="import-steps">
@@ -40,7 +43,7 @@ export const BusyModal: React.FC<Props> = ({step, steps, label, note}) => {
             </li>
           ))}
         </ol>
-        <div className="muted import-note">{note}{secs >= 3 ? ` · ${secs}\u00a0с` : ''}</div>
+        <div className="muted import-note">{note}{secs >= 3 ? ` · ${t('common.sec', {n: secs})}` : ''}</div>
       </div>
     </div>,
     document.body,

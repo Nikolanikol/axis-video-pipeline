@@ -10,14 +10,14 @@ import './designs.css';
 import {useT} from './i18n';
 
 // motion = false — на экране ролика: движение там выбирается отдельными кнопками под форматом
-export const DesignField: React.FC<{theme: Theme; onChange: (theme: Theme) => void; motion?: boolean; note?: string}> = ({theme, onChange, motion: showMotion = true, note}) => {
+export const DesignField: React.FC<{theme: Theme; onChange: (theme: Theme) => void; motion?: boolean; note?: string; presets?: boolean}> = ({theme, onChange, motion: showMotion = true, note, presets = true}) => {
   const t = useT();
   const design = DESIGNS.find((d) => d.id === theme.design);
   const current = matchDesignPreset(theme);
   // «Исходный» снимает только компоновку: свои цвета и шрифты компании остаются как были
   const original = () => { const {design: _design, designVariant: _variant, ...rest} = theme; onChange(rest); };
   return <>
-    <h2>{t('design.title')}</h2>
+    {presets && <><h2>{t('design.title')}</h2>
     <p className="note">{note ?? t('design.note')}</p>
     <div className="design-list" role="radiogroup" aria-label={t('design.aria')}>
       <button type="button" role="radio" aria-checked={!design} className={`design-choice${!design ? ' on' : ''}`} onClick={original}>
@@ -37,7 +37,7 @@ export const DesignField: React.FC<{theme: Theme; onChange: (theme: Theme) => vo
           <span className="design-choice-note">{t.cfg(item.note)}</span>
         </button>;
       }))}
-    </div>
+    </div></>}
     {design && <>
       {!current && <p className="hint">{t('design.edited', {title: t.cfg(design.title)})}</p>}
       <div className="switch-row"><span className="switch-label">{t('design.layout')}</span><div className="btn-row">

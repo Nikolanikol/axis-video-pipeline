@@ -4,7 +4,8 @@
 // Всё, что можно решить за человека, решается само: поиск машины, лот, поля, курс,
 // подзаголовок, фото (autoPickPhotos), формат — последний использованный. Ручное
 // управление не убрано, а спрятано под «Изменить» и нигде не обязательно.
-import React, {useRef, useState} from 'react';
+import React, {useId, useRef, useState} from 'react';
+import {ActionError} from '../ActionError';
 import {encarAdUrl, idFromNote, parseCarLink, sourceName} from '../../src/shared/encarLink.js';
 import {FORMATS} from '../../src/shared/model';
 import type {FormatMeta} from '../../src/shared/types';
@@ -14,7 +15,7 @@ import {Copy, ExternalLink, Link2, Search, Trash2} from 'lucide-react';
 import {lotIsBlank} from '../../src/shared/lotFromCar';
 import {thumb} from '../thumb';
 import {SourcesStrip} from '../Sources';
-import {useT} from '../i18n';
+import {useT, type Key} from '../i18n';
 
 /** Где сейчас загрузка лота по ссылке: шаг 0 — поиск машины, 1 — лот, 2 — фото */
 export type ImportStage = {step: 0 | 1 | 2; photos?: number} | null;
@@ -33,37 +34,50 @@ export const ImportModal: React.FC<{stage: ImportStage}> = ({stage}) => {
  * сам, без кнопки «Подтянуть». Набранную руками ссылку запускает Enter или кнопка.
  */
 export const QuickLink: React.FC<{
-  onLink: (link: string) => void; error: string; busy: boolean; placeholder?: string;
+  onLink: (link: string) => void; error: string; onClearError: () => void; busy: boolean; placeholder?: string;
   // Какие ссылки принимает экран: по умолчанию — Encar; карусели добавляют лоты аукционов
   parse?: (link: string) => unknown;
 }> = (
-  {onLink, error, busy, placeholder, parse = parseCarLink},
+  {onLink, error, onClearError, busy, placeholder, parse = parseCarLink},
 ) => {
   const t = useT();
   const [value, setValue] = useState('');
+  const [invalid, setInvalid] = useState<Key | null>(null);
+  const errorId = useId();
+  const clear = () => { setInvalid(null); onClearError(); };
   const ref = useRef<HTMLInputElement>(null);
-  const go = (link: string) => {
-    try { parse(link); } catch { return false; }
+  const go = (link: string, explain = true) => {
+    try { parse(link); } catch (e) {
+      if (explain) {
+        const message = e instanceof Error ? e.message : '';
+        setInvalid(!link.trim() ? 'link.required' : message.includes('Autohome') && message.includes('без объявления') ? 'link.autohome'
+          : message.includes('номера') ? 'link.missingId' : 'link.invalid');
+        ref.current?.focus();
+      }
+      return false;
+    }
+    clear();
+    setValue(link.trim());
     onLink(link);
-    setValue('');
     return true;
   };
   return (
     <div className="quick-link">
       {/* Пустое поле кнопку не гасит: погашенная винная кнопка выглядит сломанной, а строка —
           первое действие на экране. Нажали с пустым полем — ставим курсор в поле */}
-      <form className="link-bar" onSubmit={(e) => { e.preventDefault(); if (!value.trim()) ref.current?.focus(); else go(value); }}>
+      <form className="link-bar" onSubmit={(e) => { e.preventDefault(); go(value); }}>
         <Link2 className="link-bar-icon" size={20} aria-hidden />
         <input ref={ref} value={value} disabled={busy} autoFocus
           placeholder={placeholder ?? t('link.placeholder')} aria-label={t('link.aria')}
-          onChange={(e) => setValue(e.target.value)}
+          aria-invalid={!!invalid} aria-describedby={!busy && (invalid || error) ? errorId : undefined}
+          onChange={(e) => { setValue(e.target.value); clear(); }}
           onPaste={(e) => {
             // Вставили ссылку — сразу в работу; не ссылку — пусть ляжет в поле как текст
-            if (go(e.clipboardData.getData('text'))) e.preventDefault();
+            if (go(e.clipboardData.getData('text'), false)) e.preventDefault();
           }} />
         <button className="btn primary link-go" disabled={busy}><Search size={17} aria-hidden />{t('link.find')}</button>
       </form>
-      {!busy && error && <div className="error" style={{margin: '8px 0 0'}}>{error}</div>}
+      {!busy && (invalid || error) && <ActionError id={errorId} message={invalid ? t(invalid) : error} onDismiss={clear} />}
       {/* Откуда брать ссылки — логотипы площадок со ссылками на их сайты (владелец 13.10). На широком
           экране их показывает шапка (.top-sources), здесь — только на узких: см. .quick-sources. Без подписи
           «Площадки:» — на телефоне место дороже, а логотипы узнают и так (владелец 13.10) */}

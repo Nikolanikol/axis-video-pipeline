@@ -9,7 +9,7 @@
 //
 // Без базы (копия на Mac) входа нет и почты нет — шаг почты считается пройденным;
 // #/start/unverified показывает его неподтверждённым, чтобы посмотреть карточку кода.
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Check, ChevronRight, Mail} from 'lucide-react';
 import {api, errorText} from './api';
 import {useSession} from './auth';
@@ -33,23 +33,39 @@ export const useOnboarding = () => {
   const {profile, brand} = useConfig();
   const ws = session.workspace?.id ?? 'local';
   const key = (k: string) => `kok:start:${ws}:${k}`;
-  const [lots, setLots] = useState<number | null>(null);
+  const [result, setResult] = useState<{ws: string; done: boolean | null; failed: boolean}>({ws, done: null, failed: false});
+  const resultRequest = useRef(0);
+  const checkingResult = useRef(false);
   const [, bump] = useState(0);
-  // Готовые работы: объявления роликов и собранные карусели. Считаем не один раз при открытии, а и
-  // при возврате на страницу: шапка с «3 из 4» живёт всё время, и после первого ролика она
-  // продолжала звать «соберите первый ролик» до перезагрузки (тест Дмитрия, PR 13)
+  // Объявление, очередь, ошибка и отмена — ещё не готовый материал. Засчитываем только
+  // завершённый ролик объявления или карусель со слайдами. Сбой списка не означает успех.
+  const checkResult = useCallback(async () => {
+    if (checkingResult.current) return;
+    checkingResult.current = true;
+    const request = ++resultRequest.current;
+    try {
+      const [jobs, carousels] = await Promise.allSettled([api.jobs({}), api.carousels()]);
+      if (request !== resultRequest.current) return;
+      const done = jobs.status === 'fulfilled' && jobs.value.some((j) => j.lotId && j.status === 'done' && j.video)
+        || carousels.status === 'fulfilled' && carousels.value.some((c) => c.slides.length > 0);
+      const failed = jobs.status === 'rejected' || carousels.status === 'rejected';
+      setResult({ws, done: done ? true : failed ? null : false, failed: !done && failed});
+    } finally { if (request === resultRequest.current) checkingResult.current = false; }
+  }, [ws]);
   useEffect(() => {
-    const count = () => Promise.all([api.lots(), api.carousels().catch(() => [])])
-      .then(([l, c]) => setLots(l.length + c.length)).catch(() => setLots(null));
-    count();
-    const onVisible = () => { if (document.visibilityState === 'visible') count(); };
-    window.addEventListener('hashchange', count);
+    void checkResult();
+    const onVisible = () => { if (document.visibilityState === 'visible') void checkResult(); };
+    const timer = setInterval(onVisible, 15000);
+    window.addEventListener('hashchange', checkResult);
     document.addEventListener('visibilitychange', onVisible);
     return () => {
-      window.removeEventListener('hashchange', count);
+      resultRequest.current++;
+      checkingResult.current = false;
+      clearInterval(timer);
+      window.removeEventListener('hashchange', checkResult);
       document.removeEventListener('visibilitychange', onVisible);
     };
-  }, []);
+  }, [checkResult]);
 
   const preview = !session.enabled && window.location.hash.includes('unverified');
   const c = profile.contacts ?? {whatsapp: null, site: ''};
@@ -60,12 +76,13 @@ export const useOnboarding = () => {
     ['email', session.enabled ? session.emailVerified : !preview],
     ['company', !!profile.company?.trim() && !!(c.whatsapp || c.site || c.telegram)],
     ['brand', ownBrand],
-    ['first', (lots ?? 0) > 0],
+    ['first', result.ws === ws && result.done === true],
   ];
   const steps: Step[] = raw.map(([id, done]) => ({id, done, skipped: !done && store.get(key(`skip-${id}`)) === '1'}));
   const passed = steps.filter((s) => s.done || s.skipped).length;
   return {
-    steps, passed, total: steps.length,
+    steps, passed, total: steps.length, checkResult,
+    resultStatus: result.ws !== ws || result.done === null ? result.ws === ws && result.failed ? 'unavailable' : 'checking' : null,
     allDone: passed === steps.length,
     hidden: store.get(key('hidden')) === '1',
     // Сотрудникам платформы (они не платят и не настраивают свой бренд) список не нужен
@@ -116,7 +133,8 @@ export const StartPage: React.FC = () => {
                     <p className="muted">
                       {s.id === 'email'
                         ? <>{tr('start.emailDone')}{balance ? <>{tr('start.onAccount')}<b className="start-ok">{tr.n('unit.creditShort', balance.credits)}</b></> : null}</>
-                        : locked ? tr('start.locked') : t.why}
+                        : locked ? tr('start.locked') : s.id === 'first' && o.resultStatus ? tr(o.resultStatus === 'checking' ? 'start.resultChecking' : 'start.resultUnavailable')
+                          : s.id === 'first' && s.done ? tr('start.firstDone') : t.why}
                     </p>
                     {/* Пройденный шаг можно поправить: профиль и бренд меняются когда угодно */}
                     {s.done && t.link && s.id !== 'first' && (
@@ -125,7 +143,8 @@ export const StartPage: React.FC = () => {
                     {!s.done && t.link && (
                       <div className="btn-row">
                         <a className={`btn ${s.id === o.steps.find((x) => !x.done && !x.skipped)?.id ? 'primary' : ''}`}
-                          href={t.link} aria-disabled={locked}>{t.go} <ChevronRight size={16} aria-hidden /></a>
+                          href={locked ? undefined : t.link} aria-disabled={locked} tabIndex={locked ? -1 : undefined}>{t.go} <ChevronRight size={16} aria-hidden /></a>
+                        {s.id === 'first' && o.resultStatus === 'unavailable' && <button type="button" className="btn" onClick={o.checkResult}>{tr('common.retry')}</button>}
                         {(s.id === 'company' || s.id === 'brand') && !s.skipped && (
                           <button className="btn ghost" onClick={() => o.skip(s.id)}>{tr('start.skip')}</button>
                         )}

@@ -1,10 +1,10 @@
 // Пайплайн «КП для клиентов» → «Сформировать КП» (владелец 16.11: КП — отдельный пайплайн
 // в верхнем ряду, рядом с рекламой и каруселями).
-// Компьютер: ссылка сверху, ниже три колонки — объявления, форма КП (кому, суммы), живой лист
-// документа с логотипом и реквизитами компании. Телефон — те же части одной лентой.
+// Компьютер: объявления слева, живой документ по центру, расчёт и история справа.
+// Телефон: сворачиваемые объявления и виды «Расчёт / Предпросмотр / Собранные КП».
 // Объявления общие с «Рекламой авто»: ссылка здесь заводит такое же объявление, и в рекламе
 // оно появится тоже — второй копии машины не делаем.
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useEffect, useId, useMemo, useState} from 'react';
 import {autoPickPhotos, lotFieldsFromCar} from '../../src/shared/lotFromCar';
 import {sourceNote} from '../../src/shared/encarLink.js';
 import {marketFromProfile} from '../../src/shared/profile';
@@ -19,24 +19,46 @@ import {lotTitle} from '../ads/LotTool';
 import {thumb} from '../thumb';
 import {useIsPhone} from '../MobileTabs';
 import {useT} from '../i18n';
-import {OfferBuilder, useOfferDraft} from './OfferBuilder';
+import {OfferActions, OfferFields, OfferHistory, useOfferBuild, useOfferDraft} from './OfferBuilder';
 import {OfferSheet} from './OfferSheet';
 
 const Draft: React.FC<{lot: LotEntry}> = ({lot}) => {
   const t = useT();
+  const phone = useIsPhone();
   const draft = useOfferDraft(lot);
-  return (
-    <>
-      <section className="panel offer-form-col">
-        <h2>{t('of.dialog')}</h2>
-        <OfferBuilder draft={draft} />
-      </section>
-      <section className="panel offer-sheet-col">
-        <p className="hint">{t('of.previewNote')}</p>
-        {draft.preview ? <OfferSheet body={draft.preview} /> : <div className="empty">{t('of.building')}</div>}
-      </section>
-    </>
-  );
+  const action = useOfferBuild(draft);
+  const [view, setView] = useState<'form' | 'preview' | 'results'>('form');
+  const active = !phone && view === 'preview' ? 'form' : view;
+  const id = useId();
+  return <div className="offer-workspace" data-view={active}>
+    <section className="panel offer-sheet-col" id={`${id}-preview`} role={phone ? 'tabpanel' : undefined} aria-labelledby={phone ? `${id}-preview-tab` : undefined}>
+      <p className="hint">{t('of.previewNote')}</p>
+      {draft.preview ? <OfferSheet body={draft.preview} /> : <div className="empty">{t('of.building')}</div>}
+    </section>
+    <section className="offer-control-panel">
+      <header className="offer-workspace-head">
+        <h2>{lotTitle(lot)}</h2><a href="#/settings/offer">{t('of.template')}</a>
+        <div className="workspace-section-tabs" role="tablist" aria-label={t('of.dialog')}>
+          {(['form', 'preview', 'results'] as const).map((v) => <button key={v} type="button" role="tab" id={`${id}-${v}-tab`}
+            className={v === 'preview' ? 'offer-preview-tab' : undefined} aria-selected={active === v} tabIndex={active === v ? 0 : -1}
+            aria-controls={`${id}-${v === 'preview' ? 'preview' : 'body'}`} onClick={() => setView(v)} onKeyDown={(e) => {
+              const items: (typeof v)[] = phone ? ['form', 'preview', 'results'] : ['form', 'results'];
+              const at = items.indexOf(v);
+              const index = e.key === 'ArrowRight' ? (at + 1) % items.length : e.key === 'ArrowLeft' ? (at + items.length - 1) % items.length : e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1 : -1;
+              if (index < 0) return;
+              e.preventDefault(); setView(items[index]); document.getElementById(`${id}-${items[index]}-tab`)?.focus();
+            }}>
+            {t(v === 'form' ? 'workspace.calculation' : v === 'preview' ? 'workspace.preview' : 'of.history')}{v === 'results' && draft.list.length > 0 ? ` · ${draft.list.length}` : ''}
+          </button>)}
+        </div>
+      </header>
+      <div className="offer-workspace-body" id={`${id}-body`} role="tabpanel" aria-labelledby={`${id}-${active}-tab`}>
+        <div hidden={active !== 'form'}><OfferFields draft={draft} busy={action.busy} context={false} /></div>
+        <div hidden={active !== 'results'}><OfferHistory draft={draft} action={action} /></div>
+      </div>
+      <div className="offer-workspace-actions" hidden={active === 'results'}><OfferActions draft={draft} action={action} /></div>
+    </section>
+  </div>;
 };
 
 export const OfferTool: React.FC = () => {
@@ -46,6 +68,7 @@ export const OfferTool: React.FC = () => {
   const [lots, setLots] = useState<LotEntry[] | null>(null);
   const [current, setCurrent] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [lotsOpen, setLotsOpen] = useState(false);
   const [stage, setStage] = useState<ImportStage>(null);
   const [linkError, setLinkError] = useState('');
   const market = useTodayMarket(useMemo(() => marketFromProfile(profile, config.copy) as Market, [profile, config.copy]));
@@ -59,7 +82,7 @@ export const OfferTool: React.FC = () => {
     }).catch((e) => { report(e); setLots([]); });
   }, [report]);
 
-  const open = (id: string) => { setCurrent(id); lastLot.set(id); };
+  const open = (id: string) => { setCurrent(id); lastLot.set(id); setLotsOpen(false); };
 
   // Ссылка → объявление: те же шаги, что в «Рекламе авто» (LotTool.quickFromLink), без ролика
   const fromLink = async (link: string) => {
@@ -96,11 +119,14 @@ export const OfferTool: React.FC = () => {
   return (
     <div className="page offer-tool">
       <ImportModal stage={stage} />
-      <QuickLink onLink={fromLink} error={linkError} busy={!!stage} />
+      <QuickLink onLink={fromLink} error={linkError} onClearError={() => setLinkError('')} busy={!!stage} />
       <main className={phone ? 'offer-main phone' : 'offer-main'}>
-        <section className="panel offer-lots">
-          <h2>{t('of.lots')} <span className="muted">{shown.length}</span></h2>
-          <input className="offer-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('of.search')} />
+        <aside className="panel offer-lots">
+          {phone ? <button type="button" className="offer-lots-toggle" aria-expanded={lotsOpen || !lot} onClick={() => setLotsOpen(!lotsOpen)}>
+            {t('of.lots')} · {shown.length} ▾{lot && <span className="offer-selected-lot">{lotTitle(lot)}</span>}
+          </button> : <h2>{t('of.lots')} <span className="muted">{shown.length}</span></h2>}
+          <div className="offer-lots-content" hidden={phone && !lotsOpen && !!lot}>
+          <input className="offer-search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('of.search')} aria-label={t('of.search')} />
           <div className="offer-lot-list">
             {shown.map((l) => (
               <button key={l.id} type="button" className={l.id === current ? 'offer-lot active' : 'offer-lot'} onClick={() => open(l.id)}>
@@ -110,7 +136,8 @@ export const OfferTool: React.FC = () => {
             ))}
             {!shown.length && <p className="hint">{t('of.noLots')}</p>}
           </div>
-        </section>
+          </div>
+        </aside>
         {lot ? <Draft key={lot.id} lot={lot} /> : <section className="panel"><div className="empty">{t('of.pickLot')}</div></section>}
       </main>
     </div>

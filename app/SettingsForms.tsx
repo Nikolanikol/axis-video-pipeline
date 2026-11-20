@@ -1,5 +1,6 @@
 // Формы настроек: профиль клиента (компания, язык постов, модель цены, контакты), бренд
 // (логотип, шрифты, оформление, палитра) и надписи рекламных роликов.
+import {withoutAccentRoles} from '../src/shared/visualThemes.js';
 import React, {useEffect, useRef, useState} from 'react';
 import {POST_LANGUAGES} from '../src/shared/languages';
 import type {Profile, Theme} from '../src/shared/types';
@@ -43,7 +44,7 @@ export const PaletteField: React.FC<{theme: Theme; palettes: Palette[]; onChange
           return (
             <button key={p.id} type="button" className={`pair palette${p.id === current?.id ? ' on' : ''}`}
               style={{background: c.bg, color: c.white, borderColor: p.id === current?.id ? c.copper : c.line}}
-              onClick={() => onChange({...theme, ...c} as Theme)}>
+              onClick={() => onChange({...withoutAccentRoles(theme), ...c} as Theme)}>
               <span className="pair-head">{t.cfg(p.title)}</span>
               <span className="palette-demo">
                 <span className="palette-price" style={{backgroundImage: `linear-gradient(115deg, ${c.copperDark}, ${c.copper} 35%, ${c.copperLight} 55%, ${c.copper} 80%, ${c.copperDark})`, color: c.bg}}>$10 349</span>
@@ -74,8 +75,8 @@ export const FineColors: React.FC<{theme: Theme; custom: boolean; onChange: (t: 
       <p className="note">{t('color.fineNote')}</p>
       {COLOR_FIELDS.map((key) => (
         <div className="color" key={key}>
-          <input type="color" value={theme[key]} onChange={(e) => onChange({...theme, [key]: e.target.value.toUpperCase()})} />
-          <input value={theme[key]} maxLength={7} onChange={(e) => onChange({...theme, [key]: e.target.value})} />
+          <input type="color" value={theme[key]} onChange={(e) => onChange({...withoutAccentRoles(theme), [key]: e.target.value.toUpperCase()} as Theme)} />
+          <input value={theme[key]} maxLength={7} onChange={(e) => onChange({...withoutAccentRoles(theme), [key]: e.target.value} as Theme)} />
           <span>{t(`color.${key}` as Key)}</span>
         </div>
       ))}

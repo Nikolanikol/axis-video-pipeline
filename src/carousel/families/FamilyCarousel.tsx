@@ -3,6 +3,13 @@
 // своя у семейства. Тема — бренд компании (логотип, название, подложка логотипа), поверх — палитра
 // и шрифты семейства: три цвета пакета разложены на роли темы, чтобы общие части (Logo, подложка)
 // видели настоящий фон и акцент.
+import {FitScope} from '../../design/text/FitText';
+import {COBALT_FIT_SLIDES} from './CobaltFit';
+import {TYPE_DRIVE_FIT} from './fit/TypeDrive';
+import {PULSE_GRID_FIT} from './fit/PulseGrid';
+import {WIDE_FORM_FIT} from './fit/WideForm';
+import {URBAN_OLIVE_FIT} from './fit/UrbanOlive';
+import {CONTOUR_PLUM_FIT} from './fit/ContourPlum';
 import React from 'react';
 import {AbsoluteFill, useCurrentFrame, useVideoConfig} from 'remotion';
 import {carouselDesignContent} from '../../design/DesignCarousel';
@@ -23,6 +30,8 @@ import {familyById} from './registry.js';
 const LAYOUTS: Record<string, Record<string, React.FC<FamilySlideProps>>> = {cobalt_shift: COBALT_SLIDES, type_drive: TYPE_DRIVE_SLIDES,
   pulse_grid: PULSE_GRID_SLIDES, wide_form: WIDE_FORM_SLIDES, urban_olive: URBAN_OLIVE_SLIDES,
   contour_plum: CONTOUR_PLUM_SLIDES};
+const FIT_LAYOUTS: typeof LAYOUTS = {cobalt_shift: COBALT_FIT_SLIDES, type_drive: TYPE_DRIVE_FIT,
+  pulse_grid: PULSE_GRID_FIT, wide_form: WIDE_FORM_FIT, urban_olive: URBAN_OLIVE_FIT, contour_plum: CONTOUR_PLUM_FIT};
 
 export const FamilyCarousel: React.FC<CarouselProps & {texts: CarouselTexts}> = ({texts, ...props}) => {
   const frame = useCurrentFrame();
@@ -34,11 +43,15 @@ export const FamilyCarousel: React.FC<CarouselProps & {texts: CarouselTexts}> = 
   // приглушённый, оттенки акцента — сам акцент (градиент у семейства не используется)
   const theme = {...brand, design: undefined, bg, panel: bg, line: accent, grey: text, white: text,
     copper: accent, copperLight: accent, copperDark: accent, fonts: family.fonts};
+  // Семейство задаёт собственную палитру и не наследует роли другой темы бренда.
+  delete theme.accentInk; delete theme.onAccent;
   const slides = carouselSlides(props.format, props.includeHistory !== false, props.skip);
   const index = Math.min(slides.length - 1, Math.max(0, frame));
   const slide = slides[index];
   const lang = carouselLang(props.market.language);
-  const layouts = LAYOUTS[family.id] ?? {};
+  const sceneLabel = `${lang === 'ru' ? 'Слайд' : lang === 'sq' ? 'Sllajdi' : 'Slide'} ${index + 1}`;
+  const protectedText = props.textFitVersion === 1;
+  const layouts = (protectedText ? FIT_LAYOUTS : LAYOUTS)[family.id] ?? {};
   // Слайды, которых нет в пакете (шесть слайдов 4:5), — вёрсткой того же семейства: «Технологии»,
   // «Безопасность» и «Детали» — как салон, но со своими фото первыми (иначе повторились бы фото
   // салона); «Вид сзади» — как экстерьер; «Почему мы» — как контакты; «Галерея» и «История» — свои,
@@ -73,7 +86,7 @@ export const FamilyCarousel: React.FC<CarouselProps & {texts: CarouselTexts}> = 
     <AbsoluteFill style={{background: band}}>
       {top > 0 && <div style={{position: 'absolute', left: 0, right: 0, top: 0, height: top, background: bandTop}} />}
       {top > 0 && <div style={{position: 'absolute', left: 0, right: 0, bottom: 0, height: top, background: bandBottom}} />}
-      <div style={{position: 'absolute', left: 0, top, width: W, height: h, overflow: 'hidden'}}>{node}</div>
+      <div style={{position: 'absolute', left: 0, top, width: W, height: h, overflow: 'hidden'}}><FitScope enabled={protectedText} auditOnly={props.textFitOnly} scene={sceneLabel} language={lang}>{node}</FitScope></div>
     </AbsoluteFill>
   </ThemeProvider>;
 };

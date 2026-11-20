@@ -3,6 +3,7 @@
 import registry from '../../config/designs.json';
 import fonts from '../../config/fonts.json';
 import {PALETTE_KEYS} from './contrast.js';
+import {withoutAccentRoles} from './visualThemes.js';
 import type {DesignId, Theme} from './types';
 
 export type DesignPreset = {id: string; title: string; fontPair: string; colors: Pick<Theme,
@@ -15,7 +16,7 @@ export const applyDesignPreset = (theme: Theme, presetId: string): Theme => {
   const preset = design?.presets.find((p) => p.id === presetId);
   const pair = fonts.find((p) => p.id === preset?.fontPair);
   if (!design || !preset || !pair) throw new Error(`Неизвестное сочетание дизайна: ${presetId}`);
-  return {...theme, ...preset.colors, design: design.id, designVariant: theme.designVariant ?? 0, style: {gradient: false, radius: design.id === 'catalog' ? 0.6 : 0},
+  return {...withoutAccentRoles(theme), ...preset.colors, design: design.id, designVariant: theme.designVariant ?? 0, style: {gradient: false, radius: design.id === 'catalog' ? 0.6 : 0},
     fonts: {head: pair.head, body: pair.body, url: pair.url}};
 };
 

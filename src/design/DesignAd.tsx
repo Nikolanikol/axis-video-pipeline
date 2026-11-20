@@ -1,5 +1,6 @@
 // Сценарий ролика остаётся из formats.json: оформление меняет только его подачу.
 // Фото по местам и сведения о страховых случаях — те же, что у прежних форматов.
+import {FitScope} from './text/FitText';
 import React from 'react';
 import {AbsoluteFill, Sequence, interpolate, useCurrentFrame, useVideoConfig} from 'remotion';
 import {carouselLang, carouselText} from '../carousel/i18n';
@@ -84,8 +85,8 @@ export const DesignAd: React.FC<AdProps & {formatId: string}> = ({formatId, ...p
   return <ThemeProvider value={theme}><AbsoluteFill style={{background: theme.bg, overflow: 'hidden'}}>
     {format.scenes.map((s, i) => <Sequence key={s.id} name={s.title} from={s.from}
       durationInFrames={s.frames + (i === format.scenes.length - 1 ? 0 : overlap)} premountFor={format.fps}>
-      <SceneMove id={transition} first={i === 0} last={i === format.scenes.length - 1} frames={s.frames} overlap={overlap}><DesignedScene ad={ad} scene={s.id} formatId={formatId} index={i + 1} total={format.scenes.length}
-        variant={theme.designVariant ?? 0} photos={scenePhotos(s.id)} /></SceneMove>
+      <SceneMove id={transition} first={i === 0} last={i === format.scenes.length - 1} frames={s.frames} overlap={overlap}><FitScope enabled={props.textFitVersion === 1 && !!theme.design} auditOnly={props.textFitOnly} scene={s.title} language={ad.language}><DesignedScene ad={ad} scene={s.id} formatId={formatId} index={i + 1} total={format.scenes.length}
+        variant={theme.designVariant ?? 0} photos={scenePhotos(s.id)} /></FitScope></SceneMove>
     </Sequence>)}
     <BackgroundMusic music={ad.music} bpm={format.bpm} />
   </AbsoluteFill></ThemeProvider>;

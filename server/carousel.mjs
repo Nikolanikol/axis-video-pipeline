@@ -8,9 +8,12 @@
 // Рендерим не видео, а кадры: композиция carousel — кадр на слайд, каждый снимается
 // renderStill; размер кадра и число слайдов композиция берёт из формата. Поэтому карусель живёт в общем движке рядом с роликами и
 // получает тот же брендбук из настроек приложения.
+import {preflightTextFrames} from './textFit.mjs';
+import {billed} from './billing.mjs';
 import {familyById, familyFormats} from '../src/carousel/families/registry.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import {randomUUID} from 'node:crypto';
 import {bundle} from '@remotion/bundler';
 import {openBrowser, renderStill, selectComposition} from '@remotion/renderer';
 import {LOT_SKIP_SLIDES, carFromLot, lotPageUrl, missingForCarousel, parseCarouselSource} from '../src/shared/kmotorsLot.js';
@@ -202,6 +205,33 @@ const publicMeta = (meta) => {
 const running = new Set();
 const runKey = (id) => `${currentWorkspace()}:${id}`;
 
+// Старый комплект доступен до полной сборки нового. При неудачной замене каталога
+// возвращаем прежний; резерв не удаляем, если восстановить его не удалось.
+const stageCarousel = async (dir, write) => {
+  const stage = await fs.mkdtemp(path.join(path.dirname(dir), `.build-${path.basename(dir)}-`));
+  const backup = `${dir}.previous-${randomUUID()}`;
+  try {
+    for (const file of await fs.readdir(dir)) {
+      if (file !== 'carousel.json' && !/^slide-\d+\.png$/.test(file)) {
+        await fs.cp(path.join(dir, file), path.join(stage, file), {recursive: true});
+      }
+    }
+    const result = await write(stage);
+    await fs.rename(dir, backup);
+    try { await fs.rename(stage, dir); }
+    catch (error) {
+      await fs.rename(backup, dir).catch((restoreError) => {
+        log.error('carousel.restore_failed', {backup, error: restoreError});
+      });
+      throw error;
+    }
+    await fs.rm(backup, {recursive: true, force: true}).catch((error) => log.warn('carousel.backup_cleanup', {backup, error: error.message}));
+    return result;
+  } finally {
+    await fs.rm(stage, {recursive: true, force: true}).catch((error) => log.warn('carousel.stage_cleanup', {stage, error: error.message}));
+  }
+};
+
 /**
  * Собрать карусель по ссылке или номеру.
  * @param {string} link — ссылка Encar / che168 / Carsensor, голый номер Encar или наш id («ch-60154824», «cs-au…», «km-…»)
@@ -274,58 +304,52 @@ export const buildCarousel = async (link, opts = {}) => {
     if (lot) car = await localizePhotos(car, dir, id, origin);
     // У лота нет цены, истории и опций: эти слайды не рисуем, а не заполняем прочерками.
     // У машины из Китая нет истории: лист осмотра в рекламу не идёт (решение владельца 11.10)
-    const inputProps = {car, market, theme: {...theme, assets}, includeHistory: INCLUDE_HISTORY, format, seed, family,
+    const inputProps = {car, market, textFitVersion: 1, theme: {...theme, assets}, includeHistory: INCLUDE_HISTORY, format, seed, family,
       skip: lot ? LOT_SKIP_SLIDES : china ? CHE168_SKIP_SLIDES : japan ? CARSENSOR_SKIP_SLIDES : [], priceOverride,
       recent, textOverrides};
-    // Старые кадры убираем перед сборкой: та же машина, пересобранная на проде, даёт шесть
-    // слайдов вместо прежних семи, и осиротевший slide-7.png остался бы на диске — со старой
-    // историей. Ответ ссылается только на новые шесть, но файл-призрак в томе ни к чему.
-    for (const f of await fs.readdir(dir)) {
-      if (/^slide-\d+\.png$/.test(f)) await fs.rm(path.join(dir, f), {force: true}).catch(() => {});
-    }
     const serveUrl = await getServeUrl();
     const browser = await openBrowser('chrome', {browserExecutable: process.env.CHROME_PATH || null});
-    let count = 0;
-    let texts = null;
     try {
       const composition = await selectComposition({serveUrl, id: 'carousel', inputProps, puppeteerInstance: browser});
-      count = composition.durationInFrames;
-      // Тексты по слайдам кладёт calculateMetadata (src/Root.tsx) — по ним окно правки под слайдом
-      texts = composition.props?.resolvedTexts ?? null;
-      for (let frame = 0; frame < count; frame++) {
-        await renderStill({
-          composition, serveUrl, frame, inputProps, puppeteerInstance: browser,
-          imageFormat: 'png', output: path.join(dir, `slide-${frame + 1}.png`),
-        });
-      }
+      const count = composition.durationInFrames;
+      const texts = composition.props?.resolvedTexts ?? null;
+      if (family) await preflightTextFrames({serveUrl, composition, inputProps, browser,
+        frames: Array.from({length: count}, (_, i) => i)});
+      const renderAndSave = async () => stageCarousel(dir, async (stage) => {
+        // Проверка прошла: платная работа пишет отдельный комплект, прежний не трогаем.
+        for (let frame = 0; frame < count; frame++) {
+          await renderStill({composition, serveUrl, frame, inputProps, puppeteerInstance: browser,
+            imageFormat: 'png', output: path.join(stage, `slide-${frame + 1}.png`)});
+        }
+        const meta = {
+          id,
+          car,
+          slides: Array.from({length: count}, (_, i) => `${workspaceUrl()}/carousels/${id}/slide-${i + 1}.png`),
+          updatedAt: new Date().toISOString(),
+          format, seed, textFitVersion: 1,
+          ...(family ? {family} : {}),
+          ...(priceOverride ? {priceOverride} : {}),
+          // Тексты слайдов — для окна правки; свои правки клиента; снимок памяти — для пересборки тем же вариантом
+          ...(texts ? {texts: texts.slides} : {}),
+          ...(textOverrides && Object.keys(textOverrides).length ? {textOverrides} : {}),
+          ...(recent ? {recent} : {}),
+          // Откуда лот: «Пересобрать» идёт по нему, кнопка «Открыть лот» — по адресу
+          ...(lot ? {lot: {...lot, url: lotPageUrl(lot.house, lot.id)}} : {}),
+          // Текст поста, который дилер поправил, переживает пересборку: машина та же, текст его
+          ...(prev?.caption ? {caption: prev.caption} : {}),
+        };
+        await writeJson(path.join(stage, 'carousel.json'), meta);
+        // Новый вариант — в память дилера: следующая карусель обойдёт эти фразы. Сбой памяти не
+        // должен ронять готовую карусель — за неё уже заплачено; худшее — повтор фразы
+        if (!sameVariant && texts?.picked) {
+          await rememberPicks(texts.picked).catch((e) => log.warn('recent.save', {error: e.message}));
+        }
+        return publicMeta(meta);
+      });
+      return opts.bill ? await billed(opts.bill, renderAndSave) : await renderAndSave();
     } finally {
       await browser.close({silent: true});
     }
-
-    const meta = {
-      id,
-      car,
-      slides: Array.from({length: count}, (_, i) => `${workspaceUrl()}/carousels/${id}/slide-${i + 1}.png`),
-      updatedAt: new Date().toISOString(),
-      format, seed,
-      ...(family ? {family} : {}),
-      ...(priceOverride ? {priceOverride} : {}),
-      // Тексты слайдов — для окна правки; свои правки клиента; снимок памяти — для пересборки тем же вариантом
-      ...(texts ? {texts: texts.slides} : {}),
-      ...(textOverrides && Object.keys(textOverrides).length ? {textOverrides} : {}),
-      ...(recent ? {recent} : {}),
-      // Откуда лот: «Пересобрать» идёт по нему, кнопка «Открыть лот» — по адресу
-      ...(lot ? {lot: {...lot, url: lotPageUrl(lot.house, lot.id)}} : {}),
-      // Текст поста, который дилер поправил, переживает пересборку: машина та же, текст его
-      ...(prev?.caption ? {caption: prev.caption} : {}),
-    };
-    await writeJson(path.join(dir, 'carousel.json'), meta);
-    // Новый вариант — в память дилера: следующая карусель обойдёт эти фразы. Сбой памяти не
-    // должен ронять готовую карусель — за неё уже заплачено; худшее — повтор фразы
-    if (!sameVariant && texts?.picked) {
-      await rememberPicks(texts.picked).catch((e) => log.warn('recent.save', {error: e.message}));
-    }
-    return publicMeta(meta);
   } finally {
     running.delete(key);
   }
@@ -364,6 +388,27 @@ export const repriceCarousel = async (id, price) => {
   return buildCarousel(id, {format: saved.format, seed: saved.seed, family: saved.family ?? null, priceOverride});
 };
 
+// Правки сверяются с существующим материалом до сети; платная новая сборка всё равно
+// проверяет свежую карточку ещё раз. Проверка не удаляет старые PNG и не пишет черновик.
+const preflightSavedTexts = async (saved, textOverrides) => {
+  if (!saved.family) return;
+  const [market, brand] = await Promise.all([renderMarket(), getBrand().then(brandForRender)]);
+  const origin = process.env.SELF_ORIGIN || `http://127.0.0.1:${process.env.PORT || 3210}`;
+  const assets = brand.assets ? Object.fromEntries(Object.entries(brand.assets).map(([k, v]) => [k,
+    typeof v === 'string' && v.startsWith('/') ? origin + v : v])) : brand.assets;
+  const inputProps = {car: saved.car, market, theme: {...brand, name: market.name, assets}, textFitVersion: 1,
+    includeHistory: INCLUDE_HISTORY, format: saved.format, seed: saved.seed, family: saved.family,
+    priceOverride: saved.priceOverride, recent: saved.recent, textOverrides,
+    skip: saved.lot ? LOT_SKIP_SLIDES : saved.car.origin === 'CN' ? CHE168_SKIP_SLIDES : saved.car.origin === 'JP' ? CARSENSOR_SKIP_SLIDES : []};
+  const serveUrl = await getServeUrl();
+  const browser = await openBrowser('chrome', {browserExecutable: process.env.CHROME_PATH || null});
+  try {
+    const composition = await selectComposition({serveUrl, id: 'carousel', inputProps, puppeteerInstance: browser});
+    await preflightTextFrames({serveUrl, composition, inputProps, browser,
+      frames: Array.from({length: composition.durationInFrames}, (_, i) => i)});
+  } finally { await browser.close({silent: true}); }
+};
+
 /**
  * Свой текст на слайде — бесплатно, как своя цена: машина, формат и вариант те же, меняются только
  * поля этого слайда. fields — {поле: текст}; пустой текст — вернуть фразу варианта.
@@ -387,6 +432,7 @@ export const editCarouselTexts = async (id, slide, fields) => {
   }
   const textOverrides = {...(saved.textOverrides ?? {})};
   if (Object.keys(next).length) textOverrides[slide] = next; else delete textOverrides[slide];
+  await preflightSavedTexts(saved, textOverrides);
   return buildCarousel(id, {format: saved.format, seed: saved.seed, family: saved.family ?? null, textOverrides});
 };
 
@@ -422,7 +468,7 @@ export const saveCarouselCaption = async (id, body) => {
 
 export const listCarousels = async () => {
   await fs.mkdir(carouselsDir(), {recursive: true});
-  const dirs = (await fs.readdir(carouselsDir(), {withFileTypes: true})).filter((d) => d.isDirectory());
+  const dirs = (await fs.readdir(carouselsDir(), {withFileTypes: true})).filter((d) => d.isDirectory() && !d.name.startsWith('.') && !d.name.includes('.previous-'));
   const all = await Promise.all(dirs.map((d) => {
     const file = path.join(carouselsDir(), d.name, 'carousel.json');
     return readJson(file).catch(skipUnreadable('карусель', file));

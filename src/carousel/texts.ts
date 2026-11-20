@@ -171,7 +171,7 @@ export const carouselTexts = (props: CarouselProps): CarouselTexts => {
     const own = props.textOverrides?.[slide] ?? {};
     for (const key of Object.keys(f)) {
       const v = own[key];
-      if (typeof v === 'string' && v.trim()) f[key] = v.slice(0, TEXT_MAX);
+      if (typeof v === 'string' && v.trim()) f[key] = props.textFitVersion === 1 && props.family ? v : v.slice(0, TEXT_MAX);
     }
     if (family) {
       const keys = family.fields[slide] ?? [];
