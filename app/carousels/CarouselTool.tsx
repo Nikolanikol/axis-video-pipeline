@@ -741,7 +741,7 @@ export const CarouselTool: React.FC = () => {
             </div>
           </header>
           <div className="carousel-settings-body" id={`${settingsId}-body`} role="tabpanel" aria-labelledby={`${settingsId}-${section}`}>
-            <div hidden={section !== 'look'}>
+            <div className="carousel-settings-section" hidden={section !== 'look'}>
               <div className="quick-label">{t('car.style')}</div>
               <StyleList value={family} built={!draft && entry ? (entry.family ?? null) : undefined} onChange={setFamily} />
               <div className="quick-label">{t('car.format')}</div>
@@ -750,7 +750,7 @@ export const CarouselTool: React.FC = () => {
               {!family && <div className="design-summary">{t('car.preset')}: {brand.design ? t.cfg(DESIGNS.find((d) => d.id === brand.design)?.title ?? '') : t('design.original')} · <a href="#/settings/brand">{t('car.setup')}</a></div>}
             </div>
             {/* Скрытие не размонтирует форму: переключение вкладок не теряет правки подписи. */}
-            <div hidden={section !== 'content'}>
+            <div className="carousel-settings-section" hidden={section !== 'content'}>
               {draft && <NextPrice car={draft.car} id={draft.car.id} value={nextPrice} onChange={setNextPrice} />}
               {!draft && entry && <>
                 {otherFormat ? <NextPrice car={entry.car} id={entry.id} value={nextPrice} onChange={setNextPrice} /> : <PriceBox entry={entry} busy={busy} onReprice={reprice} />}
