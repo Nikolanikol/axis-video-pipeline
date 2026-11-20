@@ -15,27 +15,39 @@ import {useConfig} from '../config';
 import {href} from '../router';
 import {toast} from '../Toast';
 import {useT} from '../i18n';
+import {useDeviceDraft} from '../deviceDraft';
+import {validOfferValues, type OfferValues} from './draft';
+import {SettingsSaveNotice} from '../SettingsSaveNotice';
 
 type Extra = {label: string; amount: string};
+const hasAmounts = (d: OfferValues) => Object.values(d.amounts).some(Boolean) || d.extra.some((x) => Boolean(x.amount));
 
-/** Черновик КП объявления: шаблон — сохранённый (документ собирает сервер по сохранённому профилю) */
+/** Черновик КП объявления. Общие правки видны в превью; до сборки их нужно сохранить. */
 export const useOfferDraft = (lot: LotEntry) => {
   const {config, profile, brand} = useConfig();
-  const saved = config.profiles.find((p) => p.id === profile.id) ?? profile;
-  const settings = useMemo(() => offerSettings(saved) as OfferSettings, [saved]);
-  const currency = saved.pricing.currency;
+  const settings = useMemo(() => offerSettings(profile) as OfferSettings, [profile]);
+  const currency = profile.pricing.currency;
+  const fresh = useMemo<OfferValues>(() => ({client: '', amounts: {}, extra: [], currency}), [currency]);
+  const key = `kok.offer-draft.v1:${config.workspace.id}:${profile.id}:${lot.id}`;
+  const {value, setValue, persisted} = useDeviceDraft(key, fresh, validOfferValues);
+  const {client, amounts, extra} = value;
+  const setClient = (client: string) => setValue((d) => ({...d, client}));
+  const setAmounts = (amounts: Record<string, string>) => setValue((d) => ({...d, amounts, currency: hasAmounts(d) ? d.currency : currency}));
+  const setExtra = (extra: Extra[]) => setValue((d) => ({...d, extra, currency: hasAmounts(d) ? d.currency : currency}));
+  const reset = () => setValue(fresh);
+  const acceptCurrency = () => setValue((d) => ({...d, currency}));
+  const currencyChanged = value.currency !== currency && hasAmounts(value);
   const [usdRates, setUsdRates] = useState<Record<string, number> | null>(null);
-  const [client, setClient] = useState('');
-  const [amounts, setAmounts] = useState<Record<string, string>>({});
-  const [extra, setExtra] = useState<Extra[]>([]);
   const [list, setList] = useState<OfferMeta[]>([]);
 
   useEffect(() => { api.rates().then((r) => setUsdRates(r.usdRates)).catch(() => setUsdRates({})); }, []);
-  // Другое объявление — чистый черновик: суммы прошлой машины к новой не относятся
+  // История приходит отдельно от черновика. Поздний ответ прежней машины не меняет новую.
   useEffect(() => {
-    setClient(''); setAmounts({}); setExtra([]); setList([]);
-    api.offers.list(lot.id).then(setList).catch(() => {});
-  }, [lot.id]);
+    let current = true;
+    setList([]);
+    api.offers.list(lot.id).then((list) => { if (current) setList(list); }).catch(() => {});
+    return () => { current = false; };
+  }, [key]);
 
   const carPrice = usdRates ? carPriceIn(lot, currency, usdRates) : null;
   const calc = calcOffer({carPrice, template: settings.template, amounts, extraLines: extra});
@@ -51,19 +63,20 @@ export const useOfferDraft = (lot: LotEntry) => {
       plate: ink && inkContrast(ink, '#ffffff') < 3 ? brand?.bg || '#111111' : null} : null;
     const photos = lot.photos || [];
     const date = new Date();
-    return offerBody({language: saved.language, currency, settings, lot, calc, date, client,
-      company: {name: saved.company || brand?.name || '', contacts: companyContacts(settings.dealer, saved.contacts), logo},
+    return offerBody({language: profile.language, currency, settings, lot, calc, date, client,
+      company: {name: profile.company || brand?.name || '', contacts: companyContacts(settings.dealer, profile.contacts), logo},
       number: docNumber(t.numbering, date), accent: brand?.copper,
       images: {hero: photos[0] ?? null, grid: photos.slice(1, 1 + (Number(t.show?.photos) || 0)),
         gallery: photos.slice(1, 1 + (Number(t.show?.gallery) || 0))}});
-  }, [usdRates, settings, saved, brand, lot, calc, client, currency]);
+  }, [usdRates, settings, profile, brand, lot, calc, client, currency]);
 
-  return {lot, settings, currency, carPrice, calc, client, setClient, amounts, setAmounts, extra, setExtra, list, setList, preview};
+  return {lot, settings, currency, carPrice, calc, client, setClient, amounts, setAmounts, extra, setExtra, list, setList, preview,
+    persisted, reset, currencyChanged, previousCurrency: value.currency, acceptCurrency};
 };
 export type OfferDraft = ReturnType<typeof useOfferDraft>;
 
 export const OfferBuilder: React.FC<{draft: OfferDraft}> = ({draft}) => {
-  const {config} = useConfig();
+  const {config, unsaved, savingSettings} = useConfig();
   const t = useT();
   const {lot, settings, currency, carPrice, calc, client, setClient, amounts, setAmounts, extra, setExtra, list, setList} = draft;
   const sign = currencySign(currency);
@@ -81,6 +94,7 @@ export const OfferBuilder: React.FC<{draft: OfferDraft}> = ({draft}) => {
   };
 
   const build = async () => {
+    if (busy || unsaved || savingSettings || draft.currencyChanged) return;
     setBusy(true); setError('');
     try {
       const meta = await api.offers.build(lot.id, {client, amounts, extraLines: extra});
@@ -96,6 +110,15 @@ export const OfferBuilder: React.FC<{draft: OfferDraft}> = ({draft}) => {
   return (
     <div className="offer-builder">
       <p className="hint">{[lot.brand, lot.model, lot.year].filter(Boolean).join(' ')} · <a href={href('settings', 'offer')}>{t('of.template')}</a></p>
+      <SettingsSaveNotice />
+      <div className="draft-status" role="status">
+        <span>{t(draft.persisted ? 'draft.deviceSaved' : 'draft.memoryOnly')}</span>
+        <button type="button" className="btn ghost" disabled={busy} onClick={() => window.confirm(t('of.resetDraftConfirm')) && draft.reset()}>{t('of.resetDraft')}</button>
+      </div>
+      {draft.currencyChanged && <div className="note" role="alert">
+        <p>{t('of.draftCurrency', {from: draft.previousCurrency, to: currency})}</p>
+        <button type="button" className="btn" onClick={draft.acceptCurrency}>{t('of.acceptCurrency', {currency})}</button>
+      </div>}
 
       {settings.template.show.recipient && (
         <label className="field"><span className="label">{t('of.client')}</span>
@@ -127,7 +150,7 @@ export const OfferBuilder: React.FC<{draft: OfferDraft}> = ({draft}) => {
       <div className="offer-total"><span>{settings.template.totalLabel}</span><b>{money(calc.total)}</b></div>
       {calc.missing.length > 0 && <p className="hint">{t('of.missing', {what: calc.missing.join(', ')})}</p>}
       {error && <p className="error">{error}</p>}
-      <button className="btn primary" disabled={busy || calc.missing.length > 0} onClick={build}>
+      <button className="btn primary" disabled={busy || unsaved || savingSettings || draft.currencyChanged || calc.missing.length > 0} onClick={build}>
         {busy ? t('of.building') : t('of.build', {cost: t.n('unit.credit', cost)})}
       </button>
 

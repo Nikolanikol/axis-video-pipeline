@@ -3,7 +3,10 @@
 // страница рассылки с ходом отправки. Сервер — server/mailing.mjs, вёрстка письма — cores/mailing.
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {ClientFilter, Mailing, MailingDraft, MailingSegment, Recipient, api, errorText} from '../api';
-import {day} from '../auth';
+import {day, useSession} from '../auth';
+import {useConfig} from '../config';
+import {useDeviceDraft, writeDeviceDraft} from '../deviceDraft';
+import {FRESH, mailingDraftKey, validMailingScratch, type MailingScratch} from './mailingDraft';
 import {Field} from '../LotForm';
 import {useIsPhone} from '../MobileTabs';
 import {toast} from '../Toast';
@@ -11,7 +14,6 @@ import {when} from '../Account';
 import {FILTERS} from './Clients';
 import {Sheet} from './Sheet';
 
-const EMPTY: MailingDraft = {subject: '', body: '', button_label: '', button_url: '', segment: 'all', user_ids: []};
 // Кому можно слать: фильтры клиентов без «Скрытых» (им не шлём) и «Почта не подтверждена» (на
 // непроверенные адреса сервер не шлёт — сегмент всегда пустой, выбор только путал бы)
 const SEGMENTS = FILTERS.filter((f) => f.id !== 'hidden' && f.id !== 'unverified');
@@ -20,6 +22,11 @@ const segmentLabel = (id: MailingSegment) => (id === 'pick' ? 'Выбранны�
 const STATUS: Record<Mailing['status'], string> = {draft: 'Черновик', sending: 'Отправляется', done: 'Отправлена', cancelled: 'Остановлена'};
 
 export const Mailings: React.FC<{onError: (e: string) => void}> = ({onError}) => {
+  const {email} = useSession();
+  const {config} = useConfig();
+  const scope = `${config.workspace.id}:${email ?? 'local'}`;
+  const {value: scratch} = useDeviceDraft(mailingDraftKey(scope), FRESH, validMailingScratch);
+  const hasScratch = JSON.stringify(scratch.draft) !== scratch.savedAs;
   const [list, setList] = useState<Mailing[] | null>(null);
   // Что открыто: id рассылки, «new» — новый черновик, null — список
   const [open, setOpen] = useState<number | 'new' | null>(null);
@@ -29,16 +36,17 @@ export const Mailings: React.FC<{onError: (e: string) => void}> = ({onError}) =>
 
   if (open !== null) {
     const m = open === 'new' ? null : list?.find((x) => x.id === open) ?? null;
+    if (open !== 'new' && !m) return <p role="status">Загружаю черновик…</p>;
     return m && m.status !== 'draft'
       ? <MailingReport id={m.id} onBack={back} onCopy={(id) => { load(); setOpen(id); }} onError={onError} />
-      : <MailingEditor id={m?.id} onBack={back} onSaved={(id) => { load(); setOpen(id); }} onError={onError} />;
+      : <MailingEditor key={m?.id ?? 'new'} scope={scope} id={m?.id} onBack={back} onSaved={(id) => { load(); setOpen(id); }} onError={onError} />;
   }
 
   return (
     <section className="card mailings">
       <div className="section-head">
         <h2>Рассылки</h2>
-        <button type="button" className="btn primary" onClick={() => setOpen('new')}>+ Новая рассылка</button>
+        <button type="button" className="btn primary" onClick={() => setOpen('new')}>{hasScratch ? 'Продолжить черновик на устройстве' : '+ Новая рассылка'}</button>
       </div>
       <p className="hint">Только служебные новости: новые функции, изменения, плановые работы. Письма уходят клиентам с подтверждённой почтой, кто не отписался; в каждом есть «Отписаться».</p>
       {list && !list.length && <p className="muted">Рассылок пока не было.</p>}
@@ -67,45 +75,58 @@ export const Mailings: React.FC<{onError: (e: string) => void}> = ({onError}) =>
  * чтобы тест ушёл с последней правкой. Проблемы (нет темы, неизвестная {подстановка}) считает
  * сервер тем же кодом, что проверяет перед отправкой
  */
-const MailingEditor: React.FC<{id?: number; onBack: () => void; onSaved: (id: number) => void; onError: (e: string) => void}> = (
-  {id, onBack, onSaved, onError},
+const MailingEditor: React.FC<{scope: string; id?: number; onBack: () => void; onSaved: (id: number) => void; onError: (e: string) => void}> = (
+  {scope, id, onBack, onSaved, onError},
 ) => {
   const phone = useIsPhone();
-  const [draft, setDraft] = useState<MailingDraft>(EMPTY);
-  const [savedAs, setSavedAs] = useState<string>(JSON.stringify(EMPTY));
+  const key = mailingDraftKey(scope, id);
+  const {value: scratch, setValue: setScratch, persisted} = useDeviceDraft(key, FRESH, validMailingScratch);
+  const {draft, savedAs, picked} = scratch;
+  const [loading, setLoading] = useState(!!id);
+  const [loadError, setLoadError] = useState('');
+  const [conflict, setConflict] = useState<{server: MailingScratch; local: MailingScratch} | null>(null);
   const [audience, setAudience] = useState<Record<ClientFilter, number> | null>(null);
   const [preview, setPreview] = useState<{to: string; html: string; problems: string[]} | null>(null);
   // Выбранные поимённо — целиком (имя, почта, причина), в черновик уходят только их id
-  const [picked, setPicked] = useState<Recipient[]>([]);
   const [showPreview, setShowPreview] = useState(false);
   const [busy, setBusy] = useState('');
   const body = useRef<HTMLTextAreaElement>(null);
-  const set = (patch: Partial<MailingDraft>) => setDraft((d) => ({...d, ...patch}));
+  const set = (patch: Partial<MailingDraft>) => setScratch((s) => ({...s, draft: {...s.draft, ...patch}}));
   const dirty = JSON.stringify(draft) !== savedAs;
 
   useEffect(() => {
     api.admin.audience().then(setAudience).catch((e) => onError(errorText(e)));
     if (!id) return;
+    let current = true;
+    setLoading(true); setLoadError('');
     api.admin.mailing(id).then((m) => {
+      if (!current) return;
       const d = {subject: m.subject, body: m.body, button_label: m.button_label, button_url: m.button_url, segment: m.segment, user_ids: m.user_ids ?? []};
-      setDraft(d);
-      setPicked(m.picked ?? []);
-      setSavedAs(JSON.stringify(d));
-    }).catch((e) => onError(errorText(e)));
-  }, [id, onError]);
+      const server = {draft: d, picked: m.picked ?? [], savedAs: JSON.stringify(d)};
+      // Другой сотрудник мог изменить серверный черновик. Обе версии сохраняем до выбора.
+      if (JSON.stringify(scratch.draft) !== scratch.savedAs) {
+        if (scratch.savedAs !== server.savedAs) setConflict({server, local: scratch});
+      } else setScratch(server);
+    }).catch((e) => { if (current) setLoadError(errorText(e)); })
+      .finally(() => { if (current) setLoading(false); });
+    return () => { current = false; };
+  }, [id, onError]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Предпросмотр и проблемы — после паузы в наборе: сборка письма на каждую букву гоняла бы сервер
   useEffect(() => {
-    const t = setTimeout(() => { api.admin.previewMailing(draft).then(setPreview).catch(() => setPreview(null)); }, 500);
-    return () => clearTimeout(t);
+    let current = true;
+    const t = setTimeout(() => { api.admin.previewMailing(draft).then((p) => { if (current) setPreview(p); }).catch(() => { if (current) setPreview(null); }); }, 500);
+    return () => { current = false; clearTimeout(t); };
   }, [draft]);
 
   /** Сохранить, если есть что, и вернуть id. Новый черновик получает id при первом сохранении */
   const save = async (): Promise<number> => {
     if (id && !dirty) return id;
+    const snapshot = {draft, picked, savedAs: JSON.stringify(draft)};
     const m = await api.admin.saveMailing(draft, id);
-    setSavedAs(JSON.stringify(draft));
-    if (!id) onSaved(m.id);
+    writeDeviceDraft(mailingDraftKey(scope, m.id), snapshot);
+    if (!id) { setScratch(FRESH); onSaved(m.id); }
+    else setScratch(snapshot);
     return m.id;
   };
   const run = async (what: string, fn: () => Promise<void>) => {
@@ -124,7 +145,7 @@ const MailingEditor: React.FC<{id?: number; onBack: () => void; onSaved: (id: nu
 
   const pick = draft.segment === 'pick';
   const count = pick ? picked.filter((r) => r.ok).length : audience?.[draft.segment as ClientFilter] ?? 0;
-  const setPick = (list: Recipient[]) => { setPicked(list); set({user_ids: list.map((r) => r.user_id)}); };
+  const setPick = (picked: Recipient[]) => setScratch((s) => ({...s, picked, draft: {...s.draft, user_ids: picked.map((r) => r.user_id)}}));
   const problems = preview?.problems ?? [];
   const send = () => run('send', async () => {
     const mid = await save();
@@ -140,11 +161,23 @@ const MailingEditor: React.FC<{id?: number; onBack: () => void; onSaved: (id: nu
 
   return (
     <div className="mail-editor">
-      <button type="button" className="btn ghost mail-back" onClick={onBack}>‹ Все рассылки</button>
+      <button type="button" className="btn ghost mail-back" disabled={!!busy} onClick={onBack}>‹ Все рассылки</button>
+      <p className="hint" role="status">{dirty
+        ? persisted ? 'Правки сохранены на этом устройстве. «Сохранить» записывает черновик на сервер.' : 'Запись на устройство недоступна. Правки только в памяти до закрытия страницы — сохраните на сервер.'
+        : id ? 'Черновик совпадает с сохранённой версией.' : 'Новый черновик. Правки сохраняются на этом устройстве.'}</p>
+      {loadError && <p className="error" role="alert">{loadError}</p>}
+      {conflict && <div className="note" role="alert">
+        <p>Сохранённая версия изменилась после ваших правок. Выберите, с каким черновиком продолжить.</p>
+        <div className="btn-row">
+          <button type="button" className="btn" onClick={() => { setScratch({...conflict.local, savedAs: conflict.server.savedAs}); setConflict(null); }}>Мои правки на устройстве</button>
+          <button type="button" className="btn" onClick={() => { setScratch(conflict.server); setConflict(null); }}>Сохранённая версия</button>
+        </div>
+      </div>}
       <div className="mail-grid">
         <section className="card">
           <h2>{id ? 'Черновик' : 'Новая рассылка'}{dirty && <span className="muted"> · не сохранено</span>}</h2>
           <form className="form" onSubmit={(e) => { e.preventDefault(); run('save', async () => { await save(); toast('Черновик сохранён'); }); }}>
+            <fieldset className="draft-fields" disabled={!!busy || loading || !!loadError || !!conflict}>
             <Field label="Кому" hint={audience ? `получат ${count} — с подтверждённой почтой и без отписки` : undefined}>
               <select value={draft.segment} onChange={(e) => set({segment: e.target.value as MailingSegment})}>
                 {SEGMENTS.map((s) => <option key={s.id} value={s.id}>{s.label}{audience ? ` — ${audience[s.id] ?? 0}` : ''}</option>)}
@@ -181,11 +214,12 @@ const MailingEditor: React.FC<{id?: number; onBack: () => void; onSaved: (id: nu
               </button>
               {id && (
                 <button type="button" className="btn ghost danger" disabled={!!busy}
-                  onClick={() => window.confirm('Удалить черновик?') && run('del', async () => { await api.admin.deleteMailing(id); toast('Черновик удалён'); onBack(); })}>
+                  onClick={() => window.confirm('Удалить черновик?') && run('del', async () => { await api.admin.deleteMailing(id); setScratch(FRESH); toast('Черновик удалён'); onBack(); })}>
                   Удалить
                 </button>
               )}
             </div>
+            </fieldset>
           </form>
         </section>
         {/* На компьютере письмо видно сразу справа и меняется при наборе; на телефоне — по кнопке, панелью */}

@@ -43,6 +43,8 @@ type Props = {
   list: React.ReactNode;
   /** Готовые ролики (RenderPanel без своей кнопки); запуск — buildRef, его же вызывает «Собрать» */
   render: React.ReactNode; buildRef: React.MutableRefObject<(() => void) | null>; building: JobPanelState;
+  buildDisabled?: boolean;
+  notice?: React.ReactNode;
   photoSource?: React.ReactNode;
 };
 
@@ -282,18 +284,19 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
         <b>{title}</b>
         {lot && <span><SaveStatus save={save} onRetry={onRetrySave} /> · {tr('mle.thisVideo')}</span>}
       </div>
-      {lot && <button type="button" className="btn primary mle-build" disabled={starting || running || !lot.photos.length}
+      {lot && <button type="button" className="btn primary mle-build" disabled={starting || running || props.buildDisabled || !lot.photos.length}
         onClick={() => buildRef.current?.()}>{buildLabel}</button>}
     </div>,
     // История доступна на превью: пункт в бургере не нужен.
     menu: [],
-  }, [title, fullTitle, save, lot?.id, lot?.photos.length, listOpen, jobsOpen, starting, running, cost, tr.lang]);
+  }, [title, fullTitle, save, lot?.id, lot?.photos.length, listOpen, jobsOpen, starting, running, props.buildDisabled, cost, tr.lang]);
 
   const sceneIndex = format.scenes.findIndex((s) => s.id === scene);
   const current = format.scenes[Math.max(0, sceneIndex)];
   const theme = lot ? lotTheme(brand, lot) : brand;
 
   return <div ref={root} className={`mle${view === 'watch' ? ' watch' : ''}${sheet ? ' sheet-open' : ''}${keyboard ? ' kb' : ''}`}>
+    {props.notice}
     {lot && input ? <>
       <div className="mle-stage">
         {/* key — по объявлению: другое начинает свой ролик заново. Смена листа или просмотра плеер не
