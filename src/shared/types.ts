@@ -13,13 +13,15 @@ export type StyleFields = {textMotion?: TextMotionId; photoMotion?: PhotoMotionI
 /** Тон логотипа по файлу (сервер, withLogoInk): тёмный и светлый край яркости и пропорция */
 export type LogoInk = {lo: number; hi: number; ratio: number};
 export type Theme = typeof brandTheme & {design?: DesignId; designVariant?: 0 | 1} & StyleFields & {
+  /** Раздельные цвета надписи акцентом и текста на акцентной заливке. Нет — прежние copper/bg. */
+  accentInk?: string; onAccent?: string;
   /** Тон логотипов по адресу файла — считает сервер, в бренде не хранится */
   logoInk?: Record<string, LogoInk>;
   /** Подложка логотипа (src/shared/logoPlate.js): когда ставить и какой формы */
   logoPlate?: {mode: string; shape: string};
 };
 /** Снимок оформления объявления поверх бренда — src/design/style/look.js */
-export type LotLook = {design: DesignId | null; designVariant: 0 | 1; fonts: Theme['fonts']; style: Theme['style']; logoPlate?: Theme['logoPlate']} & StyleFields
+export type LotLook = {design: DesignId | null; designVariant: 0 | 1; fonts: Theme['fonts']; style: Theme['style']; logoPlate?: Theme['logoPlate']; accentInk?: string; onAccent?: string} & StyleFields
   & Pick<Theme, 'bg' | 'panel' | 'line' | 'grey' | 'white' | 'copper' | 'copperLight' | 'copperDark'>;
 
 // Тексты рынка (язык ролика). Какие ключи нужны — описывает формат в config/formats.json.
@@ -139,7 +141,7 @@ export type Lot = Partial<Omit<Market, 'texts'>> & {
 };
 
 // Вход любого формата
-export type AdProps = {lot: Lot; market: Market; theme?: Partial<Theme>};
+export type AdProps = {lot: Lot; market: Market; theme?: Partial<Theme>; textFitVersion?: 1; textFitOnly?: boolean};
 
 // Лот после наложения на настройки рынка
 export type Ad = Lot & Omit<Market, 'texts' | 'music'> & {texts: Texts; music: Music};
@@ -318,7 +320,7 @@ export type CarouselCar = {
 // skip — слайды, которые не рисуем вовсе (лот аукциона без цены, истории и опций).
 // format — id из config/carousel-formats.json (нет — «Классика»); seed — зерно варианта:
 // то же зерно даёт те же компоновку и фразы, «Другой вариант» — новое зерно
-export type CarouselProps = {car: CarouselCar; market: Market; theme?: Partial<Theme>; includeHistory?: boolean; skip?: string[]; format?: string; seed?: number;
+export type CarouselProps = {textFitVersion?: 1; textFitOnly?: boolean; car: CarouselCar; market: Market; theme?: Partial<Theme>; includeHistory?: boolean; skip?: string[]; format?: string; seed?: number;
   // Семейство из пакета KOK_handoff_v1 (src/carousel/families/registry.js) — своя вёрстка карусели; нет — бренд
   family?: string | null;
   // Своя цена клиента на слайде цены, в валюте профиля (src/carousel/price.ts)

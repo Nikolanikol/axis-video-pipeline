@@ -50,7 +50,8 @@ export const CONTRAST_CHECKS = [
  * Цвет, который ещё не допечатан в поле (#12), считается проблемой — проверять нечего.
  */
 export const contrastIssues = (colors) => CONTRAST_CHECKS.flatMap((c) => {
-  const fg = colors?.[c.fg];
+  const fg = c.fg === 'copper' && colors?.accentInk ? colors.accentInk
+    : c.fg === 'bg' && ['copper', 'copperDark'].includes(c.bg) && colors?.onAccent ? colors.onAccent : colors?.[c.fg];
   const bg = colors?.[c.bg];
   if (!isHex(fg) || !isHex(bg)) return [{what: c.what, ratio: 0, min: c.min}];
   const ratio = contrast(fg, bg);

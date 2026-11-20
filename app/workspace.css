@@ -1,0 +1,109 @@
+/* На рабочих экранах активная вкладка уже указывает раздел; длинный путь съедал второй ряд. */
+@media (min-width: 901px) {
+  .workspace-app > .top { gap: 16px; }
+  .workspace-app > .top .crumbs { display: none; }
+}
+.workspace-nav { display: none; }
+@media (max-width: 900px) {
+  .workspace-nav { display: flex; flex: none; min-height: 40px; padding: 0 12px; gap: 8px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  .workspace-nav a { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: center; min-height: 40px; padding: 0 6px; border-bottom: 2px solid transparent; color: var(--muted); text-decoration: none; font-size: 13px; }
+  .workspace-nav a[aria-current=page] { color: var(--text); border-bottom-color: var(--accent); }
+}
+/* Панели карусели: параметры отдельно от действия и результата. */
+.carousel-workspace .carousel-settings { display: flex; flex-direction: column; min-height: 0; gap: 0; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); overflow: hidden; }
+.carousel-settings-head { padding: 16px 16px 0; border-bottom: 1px solid var(--line); }
+.carousel-settings-head .workspace-section-tabs { margin: 12px -16px 0; }
+.carousel-settings-head h1 { font-size: 20px; margin: 0; }
+.carousel-settings .workspace-section-tabs { flex: none; }
+.workspace-section-tabs { display: flex; gap: 10px; padding: 0 16px; border-bottom: 1px solid var(--line); }
+.workspace-section-tabs button { flex: 1; min-width: 0; min-height: 44px; padding: 0 4px; background: none; border: 0; border-bottom: 2px solid transparent; color: var(--muted); font: 13px var(--font); cursor: pointer; }
+.workspace-section-tabs button[aria-selected=true] { color: var(--text); border-bottom-color: var(--accent); }
+.carousel-settings-body { flex: 1; min-height: 0; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; }
+.carousel-settings-body .carousel-price { margin: 0; }
+.carousel-settings .carousel-actions { flex: none; padding: 14px 16px; margin: 0; border-top: 1px solid var(--line); }
+.carousel-settings .carousel-actions > .btn-row { margin-top: 0; }
+.carousel-settings .carousel-actions details { border-top: 1px solid var(--line); padding-top: 10px; }
+.carousel-settings .carousel-actions summary { cursor: pointer; font-size: 13px; color: var(--muted); min-height: 32px; }
+.carousel-settings .carousel-actions details > .btn-row { margin-top: 8px; }
+.carousel-workspace .carousel-center { min-width: 0; }
+.carousel-workspace .carousel-settings .car-summary-detail { margin-top: 10px; }
+@media (min-width: 901px) { .carousel-workspace .quick-side.carousel-settings { overflow: hidden; padding-right: 0; margin-right: 0; } }
+@media (max-width: 900px) {
+  .carousel-workspace .carousel-settings { overflow: visible; }
+  .carousel-workspace .carousel-settings-body { overflow: visible; }
+  .carousel-workspace .carousel-actions { background: var(--panel); }
+}
+/* КП: документ по центру, форма и основное действие справа. На телефоне — один вид. */
+.offer-tool .offer-main { grid-template-columns: 220px minmax(0, 1fr); flex: 1; min-height: 0; }
+.offer-workspace { min-width: 0; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 16px; }
+.offer-tool .offer-workspace .offer-sheet-col { min-width: 0; min-height: 0; padding: 12px; overflow-y: auto; background: var(--panel-2); border: 1px solid var(--line); border-radius: 14px; }
+.offer-workspace .of-live { max-height: none; }
+.offer-control-panel { display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.offer-workspace-head { flex: none; padding: 16px 16px 0; }
+.offer-workspace-head h2 { margin: 0 0 5px; font: 600 17px/1.35 var(--font); text-transform: none; letter-spacing: 0; }
+.offer-workspace-head > a { font-size: 12px; }
+.offer-workspace-head .workspace-section-tabs { margin: 12px -16px 0; padding: 0 12px; gap: 8px; }
+.offer-workspace .offer-preview-tab { display: none; }
+.offer-workspace-body { min-height: 0; flex: 1; padding: 14px 16px; overflow-y: auto; }
+.offer-workspace-actions { padding: 14px 16px; border-top: 1px solid var(--line); flex: none; background: var(--panel); }
+.offer-fields, .offer-build-actions { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.offer-fields > .hint { margin: 0; }
+.offer-build-actions > .btn { width: 100%; }
+.offer-workspace-actions .offer-total { padding-top: 0; border-top: 0; }
+.offer-selected-lot { display: block; font-size: 12px; color: var(--muted); font-weight: 400; margin-top: 3px; }
+.offer-workspace .offer-item { grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.offer-workspace .offer-item > .muted { grid-column: 1 / -1; grid-row: 2; white-space: normal; }
+.offer-workspace .offer-item > a:first-child { font-weight: 500; }
+@media (min-width: 901px) {
+  .page.offer-tool { max-width: none; padding: 16px 24px 20px; overflow: hidden; }
+  .offer-tool .offer-main { overflow: hidden; }
+  .offer-tool .offer-lots { max-height: none; height: 100%; }
+  .offer-tool .offer-lot-list { max-height: none; }
+  .offer-tool .offer-main { align-items: stretch; grid-template-rows: minmax(0, 1fr); }
+  .offer-workspace { grid-template-rows: minmax(0, 1fr); }
+}
+@media (max-width: 1100px) and (min-width: 901px) {
+  .offer-tool .offer-main { grid-template-columns: 180px minmax(0, 1fr); }
+  .offer-workspace { grid-template-columns: minmax(0, 1fr) 300px; gap: 12px; }
+}
+@media (max-width: 900px) {
+  /* На телефоне высота определяется содержимым: sticky-действие ограничено всем документом. */
+  .offer-tool .offer-main.phone { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; flex: none; min-height: auto; }
+  .offer-tool .offer-main.phone .offer-lots { max-height: 300px; }
+  .offer-workspace { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: 'tabs' 'body' 'preview' 'actions'; gap: 0; }
+  .offer-control-panel { display: contents; }
+  .offer-workspace-head { position: sticky; top: 0; z-index: 4; grid-area: tabs; background: var(--panel); border: 1px solid var(--line); border-radius: 12px 12px 0 0; padding-top: 12px; }
+  .offer-workspace .offer-preview-tab { display: block; }
+  .offer-workspace .workspace-section-tabs button { font-size: 12px; }
+  .offer-workspace-body { grid-area: body; overflow: visible; background: var(--panel); border-inline: 1px solid var(--line); }
+  .offer-tool .offer-workspace .offer-sheet-col { grid-area: preview; display: none; margin-top: 10px; padding: 6px; border-radius: 0; }
+  .offer-workspace[data-view=preview] .offer-sheet-col { display: block; }
+  .offer-workspace[data-view=preview] .offer-workspace-body { display: none; }
+  .offer-workspace-actions { grid-area: actions; position: sticky; bottom: 0; z-index: 3; border: 1px solid var(--line); border-radius: 0 0 12px 12px; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+  .offer-workspace input, .offer-workspace textarea { font-size: 16px; }
+}
+.carousel-mobile-action { display: none; }
+@media (max-width: 900px) {
+  .carousel-workspace .carousel-settings-head { position: sticky; top: 0; z-index: 3; background: var(--panel); border-radius: 14px 14px 0 0; }
+  .carousel-mobile-action { display: block; margin-top: 12px; }
+  .carousel-mobile-action > .btn { width: 100%; }
+  .carousel-desktop-action { display: none; }
+}
+.offer-lots-content { display: flex; flex-direction: column; flex: 1; min-height: 0; gap: 10px; }
+.offer-lots-content[hidden] { display: none; }
+.offer-lots-toggle { padding: 0; border: 0; background: none; color: var(--text); text-align: left; font: 500 14px var(--font); min-height: 40px; cursor: pointer; }
+@media (min-width: 901px) and (max-width: 1450px) {
+  .workspace-app > .top .account-link b { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}
+@media (min-width: 901px) and (max-width: 1350px) {
+  .workspace-app > .top { gap: 10px; }
+  .workspace-app > .top .account-link b { max-width: 80px; }
+}
+@media (min-width: 901px) {
+  .carousel-workspace .carousel-settings > .carousel-settings-body { flex: 1 1 auto; }
+  .carousel-settings-body > * { flex: none; }
+}
+@media (max-width: 900px) {
+  /* Превью — часть общей ленты: contain у прежнего внутреннего скролла запирал колесо над слайдом. */
+  .carousel-workspace .carousel-center { overflow: visible; overscroll-behavior: auto; }
+}

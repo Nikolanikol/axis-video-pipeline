@@ -3,6 +3,9 @@
 // Слайд только раскладывает блоки по сетке компоновки; как они двигаются и выглядят — модули:
 // motion/text (заголовок, цена), motion/photo (фото), plates/Facts (подача данных).
 // Выбор приёмов — стиль темы (style/registry.js); на слайде карусели (animated = false) движения нет.
+import {CatalogFitSlide} from './CatalogFitSlide';
+import {LayeredFitSlide} from './LayeredFitSlide';
+import {useFitScope} from './text/FitText';
 import React from 'react';
 import {AbsoluteFill, Img, interpolate, staticFile, useCurrentFrame, useVideoConfig} from 'remotion';
 import type {DesignId} from '../shared/types';
@@ -27,7 +30,7 @@ export type DesignContent = {
 
 const asset = (url: string) => /^(https?:|data:|blob:|\/)/.test(url) ? url : staticFile(url);
 
-export const DesignSlide: React.FC<{content: DesignContent; design: DesignId; index?: number; total?: number;
+const LegacyDesignSlide: React.FC<{content: DesignContent; design: DesignId; index?: number; total?: number;
   animated?: boolean; variant?: number}> = ({content: c, design, index = 1, total = 1, animated = false, variant = 0}) => {
   const C = useTheme();
   const {width: w, height: h, fps, durationInFrames} = useVideoConfig();
@@ -86,12 +89,12 @@ export const DesignSlide: React.FC<{content: DesignContent; design: DesignId; in
   );
   const heading = (size = titleSize, color = C.white) => <>
     {c.kicker && <div style={{fontFamily: BODY, fontWeight: 600, fontSize: compact ? 24 : 28, letterSpacing: '.08em', textTransform: 'uppercase',
-      color: C.copper, marginBottom: compact ? 12 : 18, overflowWrap: 'anywhere', ...(animated ? {opacity: entrance} : {})}}>{c.kicker}</div>}
+      color: C.accentInk ?? C.copper, marginBottom: compact ? 12 : 18, overflowWrap: 'anywhere', ...(animated ? {opacity: entrance} : {})}}>{c.kicker}</div>}
     <div style={{fontFamily: HEAD, fontWeight: 600, fontSize: size, lineHeight: 1.06, color, overflowWrap: 'anywhere'}}>
       {/* Вторая надпись «Смены надписи» — год и комплектация у обложки; в других сценах её нет, и приём сам
           становится построчным появлением. Текст на акцентной плашке — цветом фона, как у кнопки контакта */}
       {animated ? <MotionTitle text={c.title} kind={style.textMotion} t={t - delay} size={size} width={areaW}
-        colors={{accent: C.copper, onAccent: C.bg, panel: C.panel}} swap={c.kind === 'cover' ? c.subtitle : undefined} /> : c.title}
+        colors={{accent: C.copper, onAccent: C.onAccent ?? C.bg, panel: C.panel}} swap={c.kind === 'cover' ? c.subtitle : undefined} /> : c.title}
     </div>
   </>;
   const image = (box: React.CSSProperties, collage = false) => {
@@ -131,7 +134,7 @@ export const DesignSlide: React.FC<{content: DesignContent; design: DesignId; in
     <div style={{...(own ? {} : move), display: 'flex', flexDirection: 'column', gap: compact ? 14 : 24, minWidth: 0}}>
       {c.price && <div>
         <div style={{fontFamily: BODY, fontSize: compact ? 25 : 30, color: C.grey, marginBottom: 15, ...(price ? price.label : {})}}>{c.priceLabel}</div>
-        <div style={{fontFamily: HEAD, fontWeight: 700, fontSize: fit(c.price, availableWidth, compact ? 118 : 162, 42), lineHeight: 1.05, color: C.copper, whiteSpace: 'nowrap', ...(price ? price.mask : {})}}>
+        <div style={{fontFamily: HEAD, fontWeight: 700, fontSize: fit(c.price, availableWidth, compact ? 118 : 162, 42), lineHeight: 1.05, color: C.accentInk ?? C.copper, whiteSpace: 'nowrap', ...(price ? price.mask : {})}}>
           {price ? <span style={price.figure}>{c.price}</span> : c.price}
         </div>
       </div>}
@@ -141,7 +144,7 @@ export const DesignSlide: React.FC<{content: DesignContent; design: DesignId; in
       {c.contact && <div style={{...rest, marginTop: 15}}>
         <div style={{fontFamily: BODY, fontSize: compact ? 26 : 32, color: C.grey, marginBottom: 15}}>{c.contact.label}</div>
         <div style={{fontFamily: HEAD, fontWeight: 600, fontSize: fit(c.contact.value, availableWidth - 40, compact ? 60 : 78, 26), lineHeight: 1.2,
-          background: C.copper, color: C.bg, padding: '22px 20px', overflowWrap: 'anywhere'}}>{c.contact.value}</div>
+          background: C.copper, color: C.onAccent ?? C.bg, padding: '22px 20px', overflowWrap: 'anywhere'}}>{c.contact.value}</div>
         {c.contact.secondary && <div style={{fontFamily: BODY, fontSize: 28, color: C.grey, marginTop: 22, overflowWrap: 'anywhere'}}>{c.contact.secondary}</div>}
       </div>}
     </div>
@@ -161,7 +164,7 @@ export const DesignSlide: React.FC<{content: DesignContent; design: DesignId; in
           <div style={{marginTop: compact ? 26 : 40}}>{details(areaW, true)}</div>
         </div>
       </> : design === 'editorial' ? <>
-        <div style={{...safe, top: top + 115}}>{heading(titleSize, C.copper)}</div>
+        <div style={{...safe, top: top + 115}}>{heading(titleSize, C.accentInk ?? C.copper)}</div>
         {cover || gallery ? <>
           {image({left: direction ? left + areaW * .1 : left, right, top: top + below(compact ? 275 : 335), bottom: bottom + (c.price ? 390 : c.lines?.length ? 210 : 125)}, gallery || Boolean(direction))}
           <div style={{position: 'absolute', left, right, bottom: bottom + 100}}>{details(areaW, true)}</div>
@@ -173,11 +176,18 @@ export const DesignSlide: React.FC<{content: DesignContent; design: DesignId; in
       </> : <>
         {image({left: 0, right: 0, top: top + 105, height: areaH * (cover || gallery ? .48 : .29)}, gallery || Boolean(direction))}
         <div style={{position: 'absolute', left, right, top: top + 140 + areaH * (cover || gallery ? .48 : .29)}}>
-          {heading(titleSize, cover ? C.white : C.copper)}
+          {heading(titleSize, cover ? C.white : C.accentInk ?? C.copper)}
           <div style={{marginTop: compact ? 24 : 36}}>{details(areaW, true)}</div>
         </div>
       </>}
       {header}{footer}
     </AbsoluteFill>
   );
+};
+
+// Версию выбираем отдельным компонентом: число хуков старой вёрстки не меняется.
+export const DesignSlide: React.FC<React.ComponentProps<typeof LegacyDesignSlide>> = (props) => {
+  const scope = useFitScope();
+  if (scope.enabled && (props.design === 'cinema' || props.design === 'editorial')) return <LayeredFitSlide {...props} design={props.design} />;
+  return props.design === 'catalog' && scope.enabled ? <CatalogFitSlide {...props} /> : <LegacyDesignSlide {...props} />;
 };

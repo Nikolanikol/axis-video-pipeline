@@ -1,5 +1,7 @@
 // Общие части вёрстки семейств каруселей (пакет KOK_handoff_v1): размер слайда 4:5, фото в окне,
 // подгонка кегля по длине, пропсы слайда. Палитра и композиция — у каждого семейства свои.
+import {FitLogo} from '../../design/text/FitLogo';
+import {useFitScope} from '../../design/text/FitText';
 import React from 'react';
 import {AbsoluteFill, Img, staticFile} from 'remotion';
 import {BODY, HEAD, Logo} from '../../shared/ui';
@@ -23,7 +25,7 @@ export type FamilySlideProps = {slide: string; index: number; h: number; content
 /** Логотип бренда слева сверху; on — фон под ним (по нему Logo решает про подложку); line — черта под знаком */
 export const LogoCorner: React.FC<{on: string; line?: string; left?: number; top?: number}> = ({on, line, left = 44, top = 34}) =>
   <div style={{position: 'absolute', left, top, zIndex: 4, display: 'flex', flexDirection: 'column', gap: 10}}>
-    <Logo asset="logoHorizontal" height={50} width={230} on={on} style={{textAlign: 'left', objectPosition: 'left'}} />
+    <FitLogo height={50} width={230} on={on} />
     {line && <div style={{width: 56, height: 5, borderRadius: 3, background: line}} />}
   </div>;
 
@@ -51,10 +53,12 @@ export const photosOf = (car: CarouselCar) => {
 };
 
 /** Фото в окне со скруглением: снимок целиком с окружением (без вырезки машины), кадрирование — cover */
-export const Photo: React.FC<{src?: string | null; style: React.CSSProperties; position?: string}> = ({src, style, position = '50% 55%'}) =>
-  <div style={{position: 'absolute', overflow: 'hidden', background: '#C9D2DE', ...style}}>
-    {src && <Img src={asset(src)} style={{width: '100%', height: '100%', objectFit: 'cover', objectPosition: position}} />}
+export const Photo: React.FC<{src?: string | null; style: React.CSSProperties; position?: string}> = ({src, style, position = '50% 55%'}) => {
+  const {auditOnly} = useFitScope();
+  return <div style={{position: 'absolute', overflow: 'hidden', background: '#C9D2DE', ...style}}>
+    {src && !auditOnly && <Img src={asset(src)} style={{width: '100%', height: '100%', objectFit: 'cover', objectPosition: position}} />}
   </div>;
+};
 
 /** Координата доски 4:5 → высота текущего слайда (квадрат — 1080), и множитель для кегля,
  *  упирающегося в высоту. В 4:5 и 9:16 оба — без изменений */

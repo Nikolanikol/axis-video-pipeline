@@ -1,0 +1,35 @@
+:root { font-family: Manrope, sans-serif; color: #ededf0; background: #101113; color-scheme: dark; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, textarea, select { font: inherit; }
+button, select { cursor: pointer; }
+.preflight { max-width: 1180px; padding: 28px; margin: auto; }
+.preflight header a { color: #dec4cd; font-size: 13px; }
+.preflight-tag { float: right; font-size: 12px; color: #b9b9c0; }
+.preflight h1 { margin: 24px 0 10px; font-size: 30px; }
+.preflight header p { max-width: 760px; color: #b9b9c0; line-height: 1.6; }
+.preflight-controls { margin: 22px 0 16px; display: grid; grid-template-columns: 1fr 1.2fr 1.2fr 1fr; gap: 16px; }
+.preflight-controls label, .preflight-controls > div, .preflight-input { display: flex; flex-direction: column; gap: 8px; min-width: 0; font-size: 13px; }
+.preflight select, .preflight textarea { border: 1px solid #45454d; border-radius: 8px; padding: 12px; background: #1c1d22; color: inherit; max-width: 100%; }
+.preflight select { min-height: 44px; }
+.preflight small { color: #b9b9c0; font-size: 12px; }
+.preflight-presets { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 16px; }
+.preflight-presets button { background: #1c1d22; color: #d4d4db; border: 1px solid #45454d; border-radius: 6px; padding: 9px 12px; font-size: 12px; min-height: 40px; }
+.preflight-presets button[aria-pressed=true] { background: #58283b; border-color: #dd839f; color: #fff; }
+.preflight textarea { resize: vertical; line-height: 1.6; }
+.preflight-colors { display: flex; flex-wrap: wrap; gap: 12px 22px; padding: 20px 0 10px; font-size: 12px; }
+.preflight-colors span { display: inline-flex; align-items: center; gap: 7px; }
+.preflight-colors i { width: 18px; height: 18px; border-radius: 50%; border: 1px solid #777; }
+.preflight-colors code { color: #b9b9c0; }
+.preflight-contrast { margin-bottom: 22px; color: #b9b9c0; font-size: 12px; }
+.preflight-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; align-items: start; }
+.preflight-card { min-width: 0; border: 1px solid #37383f; border-radius: 12px; padding: 16px; background: #17181c; }
+.preflight-card-label { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 14px; }
+.preflight-card h2 { font-size: 16px; margin: 0; }
+.preflight-card-label > span { color: #bbd8c3; font-size: 12px; }
+.preflight-card[data-ready=true][data-fits=false] .preflight-card-label > span { color: #ffa4a4; }
+.preflight-sheet { width: 100%; display: block; }
+.preflight-measure { margin-top: 12px; font-size: 12px; line-height: 1.6; color: #b9b9c0; }
+.preflight-measure strong { display: block; color: #ffa4a4; font-weight: 400; }
+.preflight-note { padding: 12px; margin: 12px 0; color: #ffd4a0; background: #352918; border-radius: 8px; font-size: 13px; }
+@media (max-width: 700px) { .preflight { padding: 16px; } .preflight-controls, .preflight-cards { grid-template-columns: minmax(0, 1fr); } .preflight-tag { float: none; display: block; margin-top: 12px; } .preflight h1 { font-size: 24px; } .preflight textarea, .preflight select { font-size: 16px; } }

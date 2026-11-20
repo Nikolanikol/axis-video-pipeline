@@ -74,6 +74,28 @@ code { font-size: 12px; color: var(--accent-text); }
    телефоне адресная строка не съедала низ; vh — запас для старых браузеров */
 .shell { height: 100%; }
 .app { display: flex; flex-direction: column; height: 100vh; height: 100dvh; }
+.app-with-credits { height: calc(100vh - 44px); height: calc(100dvh - 44px); }
+/* Отдельная строка не пропадает, когда телефонный редактор подменяет свою шапку. */
+.credit-bar { position: sticky; top: 0; z-index: 45; height: 44px; box-sizing: border-box;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 0 20px;
+  background: var(--panel); border-bottom: 1px solid var(--line); color: var(--text); font-size: 13px; }
+.credit-bar-main { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.credit-bar-main > svg, .credit-bar-label { color: var(--muted); }
+.credit-bar-number { position: relative; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.credit-bar-number b { font-weight: 700; }
+.credit-bar-account { display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  min-height: 44px; flex-shrink: 0; color: var(--text); text-decoration: none; }
+.credit-bar-account:hover { color: var(--accent); }
+.credit-bar-delta { position: absolute; left: calc(100% + 10px); top: 0; border-radius: 5px;
+  padding: 1px 5px; font-weight: 700; animation: credit-delta 2.2s ease-out both; pointer-events: none; }
+.credit-bar-delta.spent { color: #ffb39e; background: #7b342e; }
+.credit-bar-delta.added { color: #b4ebc7; background: #28573c; }
+.credit-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden;
+  clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@keyframes credit-delta { 0% { opacity: 1; transform: translateY(4px); } 20%,75% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-7px); } }
+@media (max-width: 900px) { .credit-bar { padding: 0 12px; gap: 8px; } }
+@media (max-width: 359px) { .credit-bar-label { display: none; } }
+@media (prefers-reduced-motion: reduce) { .credit-bar-delta { animation: none; } }
 @media (max-width: 900px) { .land-foot.foot-no-phone { display: none; } }
 
 .top {
@@ -101,6 +123,18 @@ code { font-size: 12px; color: var(--accent-text); }
   margin: 10px 20px 0; padding: 10px 14px; border-radius: 6px; cursor: pointer;
   background: var(--danger-bg); border: 1px solid var(--danger-line); border-left: 3px solid var(--danger); color: var(--text);
 }
+.action-error { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; cursor: default; }
+.action-error > span { min-width: 0; overflow-wrap: anywhere; }
+.action-error .icon { flex: none; min-width: 44px; min-height: 44px; margin: -5px -8px -5px 0; }
+.slide-track img[role="button"] { cursor: zoom-in; }
+.slide-track img[role="button"]:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+.quick-link .action-error, .offer-build-actions .action-error { margin: 8px 0 0; }
+.offer-ready { padding: 14px; border: 1px solid var(--ok); border-radius: 10px; }
+.offer-ready .hint { margin: 6px 0 12px; }
+.offer-ready .btn-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.credit-help { margin-top: 16px; font-size: 13px; line-height: 1.5; }
+.credit-help summary { cursor: pointer; }
+.credit-help p { margin: 10px 0 0; color: var(--muted); }
 
 .grid {
   flex: 1; min-height: 0;
@@ -1498,18 +1532,15 @@ a.tab { text-decoration: none; }
    Вкладки разделов не помещались в строку и давали полосу прокрутки (владелец 01.10). Теперь
    в шапке логотип, остаток кредитов и кнопка меню; разделы и кабинет — в выпадающем листе.
    Граница та же, что у телефонной раскладки (900 px): под ней экран уже в одну колонку */
-.burger, .menu-sheet, .menu-scrim, .top-credits { display: none; }
+.burger, .menu-sheet, .menu-scrim { display: none; }
 @media (max-width: 900px) {
   /* z-index 40 — шапка и её меню выше выдвижных панелей (20) и затемнения (39) */
   .top { position: relative; z-index: 40; flex-wrap: nowrap; gap: 10px; padding: 8px 12px; }
   .top > .tabs, .top > .crumbs, .top > .account-chip, .top > .top-rates, .top > .top-lang { display: none; }
-  .top-credits { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; padding: 6px 11px; border-radius: 999px; background: var(--panel-2);
-    border: 1px solid var(--line); color: var(--text); font-size: 13px; font-weight: 700; text-decoration: none; white-space: nowrap; }
   .burger { display: grid; place-items: center; flex: none; width: 40px; height: 40px; padding: 0; border-radius: 10px; cursor: pointer;
     border: 1px solid var(--line); background: var(--panel-2); color: var(--text); transition: transform .12s ease-out, background .15s; }
-  /* Кнопка прижата вправо сама, а если перед ней остаток кредитов — вправо прижат он */
+  /* Кнопка прижата вправо, баланс находится отдельной строкой над шапкой. */
   .burger { margin-left: auto; }
-  .top-credits + .burger { margin-left: 0; }
   .burger:active { transform: scale(.94); }
   .burger[aria-expanded="true"] { background: var(--accent); border-color: var(--accent); }
   .menu-scrim { display: block; position: fixed; inset: 0; z-index: 39; background: #000a; opacity: 0; visibility: hidden;

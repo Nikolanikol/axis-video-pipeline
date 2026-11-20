@@ -245,10 +245,11 @@ const copper = (C: Theme) => (C.style?.gradient === false
   : `linear-gradient(115deg, ${C.copperDark} 0%, ${C.copper} 30%, ${C.copperLight} 55%, ${C.copper} 80%, ${C.copperDark} 100%)`);
 
 // Текст с медным градиентом
-export const CopperText: React.FC<{style?: React.CSSProperties; children: React.ReactNode}> = ({style, children}) => (
-  <span style={{backgroundImage: copper(useTheme()), WebkitBackgroundClip: 'text', backgroundClip: 'text',
-    WebkitTextFillColor: 'transparent', color: 'transparent', ...style}}>{children}</span>
-);
+export const CopperText: React.FC<{style?: React.CSSProperties; children: React.ReactNode}> = ({style, children}) => {
+  const theme = useTheme();
+  return <span style={{backgroundImage: theme.accentInk ? `linear-gradient(${theme.accentInk}, ${theme.accentInk})` : copper(theme),
+    WebkitBackgroundClip: 'text', backgroundClip: 'text', WebkitTextFillColor: 'transparent', color: 'transparent', ...style}}>{children}</span>;
+};
 
 // Медная плашка с текстурой шлифованного металла
 export const Metal: React.FC<{style?: React.CSSProperties; children?: React.ReactNode}> = ({style, children}) => (

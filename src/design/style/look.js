@@ -11,6 +11,7 @@
 import {PALETTE_KEYS} from '../../shared/contrast.js';
 import {isDesign} from '../../shared/design.js';
 import {resolveStyle, STYLE_CHOICES} from './registry.js';
+import {ACCENT_ROLE_KEYS} from '../../shared/visualThemes.js';
 
 /**
  * Снимок оформления темы для объявления. design: null — «Исходный» (прежние форматы), а не
@@ -21,6 +22,7 @@ export const pickLook = (theme) => ({
   design: theme.design ?? null,
   designVariant: theme.designVariant ?? 0,
   ...Object.fromEntries(PALETTE_KEYS.map((k) => [k, theme[k]])),
+  ...Object.fromEntries(ACCENT_ROLE_KEYS.filter((k) => theme[k] !== undefined).map((k) => [k, theme[k]])),
   fonts: theme.fonts,
   style: theme.style,
   ...resolveStyle(theme, theme.design),
@@ -34,6 +36,8 @@ export const applyLook = (theme, look) => {
   if (!look || typeof look !== 'object') return theme;
   const {design, designVariant, ...rest} = look;
   const next = {...theme, ...rest};
+  // Старый снимок не наследует новые цветовые роли от изменённого бренда.
+  for (const key of ACCENT_ROLE_KEYS) if (look[key] === undefined) delete next[key];
   if (isDesign(design)) return {...next, design, designVariant: designVariant === 1 ? 1 : 0};
   delete next.design;
   delete next.designVariant;

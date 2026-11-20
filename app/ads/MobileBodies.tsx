@@ -1,8 +1,8 @@
-// Части мобильной палитры (docs/palette-mobile.md, версия 3 — концепт владельца 20.10). Поля и
-// обработчики — общие с компьютером (LotForm, LookPanel, SettingsForms, реестр стиля); здесь только
-// мобильный вид: ленты под превью («Оформление» — варианты «композиция · цвет», «Текст / Фото /
-// Переход» — приёмы анимации) и тело панели «Настройки» (поля сцены, группа «О ролике»).
-import React, {useMemo} from 'react';
+// Общие тела редактора ролика: поля сцены, готовые виды и лента анимаций.
+// Компьютер и телефон используют прежние формы и один реестр стиля;
+// MotionTile показывает реальные приёмы композиции без замены движка рендера.
+import React, {useEffect, useMemo, useRef, useState} from 'react';
+import {ChevronLeft, ChevronRight} from 'lucide-react';
 import {Thumbnail} from '@remotion/player';
 import {applyDesignPreset, DESIGNS} from '../../src/shared/designs';
 import {PALETTE_KEYS} from '../../src/shared/contrast.js';
@@ -19,6 +19,7 @@ import {thumb} from '../thumb';
 import {lotTheme} from './LookPanel';
 import {MotionUnavailable, seconds, type BodyProps} from './Palette';
 import {tNow, useT, type Key} from '../i18n';
+import {MotionTile, motionFragment} from './MotionTile';
 
 
 const two = (n: number) => String(n).padStart(2, '0');
@@ -35,6 +36,7 @@ export const MobileContent: React.FC<BodyProps> = ({lot, market, format, onChang
   const t = useT();
   return <div className="mle-body-inner form">
     <h2 className="mle-scene-title">{t('palette.scene', {n: two(index + 1)})} · {t.cfg(current.title)}</h2>
+    {current.id === 'hook' && <CarFields lot={lot} market={market} onChange={onChange} />}
     {current.id === photoScene
       ? <section className="mle-photos-edit">
         {current.id === 'hook' && <MobileSceneFields sceneId={current.id} lot={lot} market={market} format={format} onChange={onChange} openPhotos={() => {}} />}
@@ -50,16 +52,16 @@ export const MobileContent: React.FC<BodyProps> = ({lot, market, format, onChang
  * сценарий (первым — владелец 20.10), данные автомобиля, источник объявления — разделами, без свёртывания. Заметки на телефоне
  * нет (владелец 20.10: не нужна); сама заметка в объявлении остаётся, на компьютере она видна
  */
-export const MobileAbout: React.FC<BodyProps> = ({lot, market, format, onChange, onFormat, photoSource}) => {
+export const MobileAbout: React.FC<BodyProps & {showFormat?: boolean}> = ({lot, market, format, onChange, onFormat, photoSource, showFormat = true}) => {
   const t = useT();
   return <div className="mle-body-inner form">
-  <section className="mle-sec"><h3>{t('palette.script')}</h3>
+  {showFormat && <section className="mle-sec"><h3>{t('palette.script')}</h3>
     <Field label={t('palette.scriptLabel')}>
       <select value={format.id} onChange={(e) => onFormat(e.target.value)}>
         {FORMATS.map((f) => <option key={f.id} value={f.id}>{t.cfg(f.title)} · {t('common.sec', {n: seconds(f)})}</option>)}
       </select>
     </Field>
-  </section>
+  </section>}
   <section className="mle-sec"><h3>{t('palette.carData')}</h3><CarFields lot={lot} market={market} onChange={onChange} /></section>
   {photoSource && <section className="mle-sec"><h3>{t('palette.source')}</h3>{photoSource}</section>}
 </div>;
@@ -167,12 +169,8 @@ export const PALETTE_TABS: {id: PaletteTab; title: Key}[] = [{id: 'look', title:
  * с соседней сценой; около 2,5 с и пауза. Общий у телефона и компьютера
  */
 export const playMotion = (player: PreviewControl | null, format: FormatMeta, sceneId: string, field: MotionTab) => {
-  const i = Math.max(0, format.scenes.findIndex((s) => s.id === sceneId));
-  const s = format.scenes[i];
-  if (field === 'sceneTransition') {
-    const next = format.scenes[i + 1] ?? format.scenes[1] ?? s;
-    player?.playFragment(next.from - Math.round(format.fps * .8), 2.4);
-  } else player?.playFragment(s.from, 2.6);
+  const fragment = motionFragment(format, sceneId, field);
+  player?.playFragment(fragment.from, fragment.seconds);
 };
 /** Подпись над лентой анимации: группа и выбранный приём («Появление текста · Из-под строки») */
 export const motionTitle = (brand: Theme, lot: LotEntry, tab: MotionTab) => {
@@ -188,21 +186,39 @@ export const motionTitle = (brand: Theme, lot: LotEntry, tab: MotionTab) => {
  * рядом с «Оформлением», а не спрятаны внутри «Анимации»). Все варианты квадратными плитками с фото
  * машины (потом заменим на анимированные превью). Выбор сразу показывает приём фрагментом в превью
  */
-export const MotionStrip: React.FC<BodyProps & {tab: MotionTab; onPicked: (field: MotionTab) => void}> =
-  ({lot, brand, onChange, tab, onPicked}) => {
+export const MotionStrip: React.FC<BodyProps & {input: AdProps; tab: MotionTab; onPicked: (field: MotionTab) => void}> =
+  ({lot, brand, onChange, tab, onPicked, input, format, scene}) => {
     const {theme, set} = useLook(brand, lot, onChange);
     const t = useT();
+    const rail = useRef<HTMLDivElement>(null);
+    const [active, setActive] = useState<string | null>(null);
+    const [reduced, setReduced] = useState(() => window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    useEffect(() => {
+      const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+      const update = () => { setReduced(media.matches); setActive(null); };
+      media.addEventListener('change', update); return () => media.removeEventListener('change', update);
+    }, []);
+    useEffect(() => setActive(null), [lot.id, tab, scene]);
     if (!theme.design) return <div className="mle-strip-note"><MotionUnavailable /></div>;
     const current = resolveStyle(theme, theme.design);
-    return <div className="mle-strip" role="radiogroup" aria-label={t.cfg(STYLE_CHOICES[tab].title)}>
-        {STYLE_CHOICES[tab].options.map((o, i) => {
-          const photo = lot.photos.length ? lot.photos[i % lot.photos.length] : '';
+    const step = (d: number) => rail.current?.scrollBy({left: d * rail.current.clientWidth * .8, behavior: reduced ? 'instant' : 'smooth'});
+    return <div className="motion-picker">
+      <div className="motion-picker-head"><span>{t.cfg(STYLE_CHOICES[tab].title)}</span><div>
+        <button type="button" className="icon" aria-label={t('workspace.previous')} onClick={() => step(-1)}><ChevronLeft size={16} /></button>
+        <button type="button" className="icon" aria-label={t('workspace.next')} onClick={() => step(1)}><ChevronRight size={16} /></button>
+      </div></div>
+      <div className="mle-strip motion-strip" ref={rail} role="radiogroup" aria-label={t.cfg(STYLE_CHOICES[tab].title)} onScroll={() => setActive(null)}>
+        {STYLE_CHOICES[tab].options.map((o) => {
           return <button key={o.id} type="button" role="radio" aria-checked={current[tab] === o.id}
-            className={`mle-comp mle-motion${current[tab] === o.id ? ' on' : ''}`} onClick={() => { set({...theme, [tab]: o.id}); onPicked(tab); }}>
-            <span className="mle-comp-frame">{photo && <img src={thumb(photo, 160)} alt="" loading="lazy" />}</span>
+            aria-label={t.cfg(o.title)} className={`mle-comp mle-motion${current[tab] === o.id ? ' on' : ''}`}
+            onMouseEnter={() => !reduced && setActive(o.id)} onMouseLeave={() => setActive((id) => id === o.id ? null : id)}
+            onFocus={() => !reduced && setActive(o.id)} onBlur={() => setActive((id) => id === o.id ? null : id)}
+            onClick={() => { set({...theme, [tab]: o.id}); if (!reduced) { setActive(o.id); onPicked(tab); } }}>
+            <MotionTile input={input} format={format} scene={scene} field={tab} theme={{...theme, [tab]: o.id}}
+              rail={rail} active={!reduced && active === o.id} onEnd={() => setActive((id) => id === o.id ? null : id)} />
             <span className="mle-motion-title">{t.cfg(o.title)}</span>
           </button>;
         })}
-      </div>;
+      </div></div>;
   };
 

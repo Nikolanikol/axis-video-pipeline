@@ -12,12 +12,14 @@ import {fmt} from '../../src/shared/model';
 import type {OfferMeta, OfferSettings} from '../../src/shared/types';
 import {api, errorText, LotEntry} from '../api';
 import {useConfig} from '../config';
+import {useSession} from '../auth';
 import {href} from '../router';
 import {toast} from '../Toast';
 import {useT} from '../i18n';
 import {useDeviceDraft} from '../deviceDraft';
 import {validOfferValues, type OfferValues} from './draft';
 import {SettingsSaveNotice} from '../SettingsSaveNotice';
+import {ActionError} from '../ActionError';
 
 type Extra = {label: string; amount: string};
 const hasAmounts = (d: OfferValues) => Object.values(d.amounts).some(Boolean) || d.extra.some((x) => Boolean(x.amount));
@@ -39,15 +41,22 @@ export const useOfferDraft = (lot: LotEntry) => {
   const currencyChanged = value.currency !== currency && hasAmounts(value);
   const [usdRates, setUsdRates] = useState<Record<string, number> | null>(null);
   const [list, setList] = useState<OfferMeta[]>([]);
+  const [historyError, setHistoryError] = useState('');
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyAttempt, setHistoryAttempt] = useState(0);
 
   useEffect(() => { api.rates().then((r) => setUsdRates(r.usdRates)).catch(() => setUsdRates({})); }, []);
   // История приходит отдельно от черновика. Поздний ответ прежней машины не меняет новую.
   useEffect(() => {
     let current = true;
     setList([]);
-    api.offers.list(lot.id).then((list) => { if (current) setList(list); }).catch(() => {});
+    setHistoryError(''); setHistoryLoading(true);
+    api.offers.list(lot.id).then((loaded) => {
+      if (current) setList((list) => [...list, ...loaded.filter((m) => !list.some((x) => x.id === m.id))]);
+    }).catch((e) => { if (current) setHistoryError(errorText(e)); })
+      .finally(() => { if (current) setHistoryLoading(false); });
     return () => { current = false; };
-  }, [key]);
+  }, [key, historyAttempt]);
 
   const carPrice = usdRates ? carPriceIn(lot, currency, usdRates) : null;
   const calc = calcOffer({carPrice, template: settings.template, amounts, extraLines: extra});
@@ -71,19 +80,48 @@ export const useOfferDraft = (lot: LotEntry) => {
   }, [usdRates, settings, profile, brand, lot, calc, client, currency]);
 
   return {lot, settings, currency, carPrice, calc, client, setClient, amounts, setAmounts, extra, setExtra, list, setList, preview,
-    persisted, reset, currencyChanged, previousCurrency: value.currency, acceptCurrency};
+    persisted, reset, currencyChanged, previousCurrency: value.currency, acceptCurrency,
+    historyError, historyLoading, reloadHistory: () => setHistoryAttempt((n) => n + 1)};
 };
 export type OfferDraft = ReturnType<typeof useOfferDraft>;
 
-export const OfferBuilder: React.FC<{draft: OfferDraft}> = ({draft}) => {
+// Состояние сборки общее у компактного окна и рабочего экрана; переключение вида его не сбрасывает.
+export const useOfferBuild = (draft: OfferDraft) => {
   const {config, unsaved, savingSettings} = useConfig();
+  const {isStaff} = useSession();
   const t = useT();
-  const {lot, settings, currency, carPrice, calc, client, setClient, amounts, setAmounts, extra, setExtra, list, setList} = draft;
-  const sign = currencySign(currency);
-  const cost = config.credits?.offers ?? 1;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const money = (n: number | null) => (n === null ? '—' : `${fmt(n)} ${sign}`);
+  const [ready, setReady] = useState<OfferMeta | null>(null);
+  useEffect(() => { setError(''); setReady(null); }, [draft.lot.id, draft.client, draft.amounts, draft.extra, draft.settings, draft.currency]);
+  const cost = config.credits?.offers ?? 2;
+  const canBuild = !busy && !unsaved && !savingSettings && !draft.currencyChanged && !draft.calc.missing.length;
+  const build = async () => {
+    if (!canBuild) return;
+    setBusy(true); setError(''); setReady(null);
+    try {
+      const meta = await api.offers.build(draft.lot.id, {client: draft.client, amounts: draft.amounts, extraLines: draft.extra});
+      draft.setList((list) => [meta, ...list]);
+      setReady(meta);
+      toast(t('of.ready', {n: meta.number}));
+    } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
+  };
+  const remove = async (meta: OfferMeta) => {
+    try {
+      await api.offers.remove(meta.id); draft.setList((list) => list.filter((x) => x.id !== meta.id));
+      setReady((r) => r?.id === meta.id ? null : r);
+    }
+    catch (e) { setError(errorText(e)); }
+  };
+  return {busy, error, clearError: () => setError(''), ready: ready?.lotId === draft.lot.id ? ready : null,
+    canBuild, build, remove, label: isStaff ? t('workspace.buildPdf') : t('of.build', {cost: t.n('unit.credit', cost)})};
+};
+export type OfferBuild = ReturnType<typeof useOfferBuild>;
+
+export const OfferFields: React.FC<{draft: OfferDraft; busy: boolean; context?: boolean}> = ({draft, busy, context = true}) => {
+  const t = useT();
+  const {lot, settings, currency, carPrice, client, setClient, amounts, setAmounts, extra, setExtra} = draft;
+  const sign = currencySign(currency);
   const placeholder = (id: string) => {
     const line = settings.template.costLines.find((l) => l.id === id);
     if (!line) return '';
@@ -92,24 +130,8 @@ export const OfferBuilder: React.FC<{draft: OfferDraft}> = ({draft}) => {
     if (line.type === 'percent' && carPrice !== null) return String(Math.round((carPrice * (line.percent ?? 0)) / 100));
     return '';
   };
-
-  const build = async () => {
-    if (busy || unsaved || savingSettings || draft.currencyChanged) return;
-    setBusy(true); setError('');
-    try {
-      const meta = await api.offers.build(lot.id, {client, amounts, extraLines: extra});
-      setList((l) => [meta, ...l]);
-      window.open(api.offers.pdfUrl(meta), '_blank', 'noopener');
-      toast(t('of.ready', {n: meta.number}));
-    } catch (e) { setError(errorText(e)); } finally { setBusy(false); }
-  };
-  const remove = async (m: OfferMeta) => {
-    try { await api.offers.remove(m.id); setList((l) => l.filter((x) => x.id !== m.id)); } catch (e) { setError(errorText(e)); }
-  };
-
-  return (
-    <div className="offer-builder">
-      <p className="hint">{[lot.brand, lot.model, lot.year].filter(Boolean).join(' ')} · <a href={href('settings', 'offer')}>{t('of.template')}</a></p>
+  return <div className="offer-fields">
+      {context && <p className="hint">{[lot.brand, lot.model, lot.year].filter(Boolean).join(' ')} · <a href={href('settings', 'offer')}>{t('of.template')}</a></p>}
       <SettingsSaveNotice />
       <div className="draft-status" role="status">
         <span>{t(draft.persisted ? 'draft.deviceSaved' : 'draft.memoryOnly')}</span>
@@ -146,27 +168,42 @@ export const OfferBuilder: React.FC<{draft: OfferDraft}> = ({draft}) => {
         {extra.length < 10 && <button type="button" className="btn ghost" onClick={() => setExtra([...extra, {label: '', amount: ''}])}><Plus size={16} /> {t('of.addExtra')}</button>}
       </div>
       <p className="hint">{t('of.amountsHint')}</p>
-
-      <div className="offer-total"><span>{settings.template.totalLabel}</span><b>{money(calc.total)}</b></div>
-      {calc.missing.length > 0 && <p className="hint">{t('of.missing', {what: calc.missing.join(', ')})}</p>}
-      {error && <p className="error">{error}</p>}
-      <button className="btn primary" disabled={busy || unsaved || savingSettings || draft.currencyChanged || calc.missing.length > 0} onClick={build}>
-        {busy ? t('of.building') : t('of.build', {cost: t.n('unit.credit', cost)})}
-      </button>
-
-      {list.length > 0 && (
-        <div className="offer-list">
-          <span className="label">{t('of.history')}</span>
-          {list.map((m) => (
-            <div className="offer-item" key={m.id}>
-              <a href={api.offers.pdfUrl(m)} target="_blank" rel="noreferrer">{m.number}</a>
-              <span className="muted">{[m.client, money(m.total), new Date(m.createdAt).toLocaleDateString()].filter(Boolean).join(' · ')}</span>
-              <a className="icon" href={api.offers.pdfUrl(m, true)} aria-label={t('of.download')}>↓</a>
-              <button type="button" className="icon" aria-label={t('of.remove')} onClick={() => remove(m)}><Trash2 size={14} /></button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+  </div>;
+};
+export const OfferActions: React.FC<{draft: OfferDraft; action: OfferBuild}> = ({draft, action}) => {
+  const t = useT();
+  return <div className="offer-build-actions">
+    <div className="offer-total"><span>{draft.settings.template.totalLabel}</span><b>{fmt(draft.calc.total)} {currencySign(draft.currency)}</b></div>
+    {draft.calc.missing.length > 0 && <p className="hint">{t('of.missing', {what: draft.calc.missing.join(', ')})}</p>}
+    {action.error && <ActionError message={action.error} onDismiss={action.clearError} />}
+    {action.ready && <div className="offer-ready" role="status">
+      <b>{t('of.ready', {n: action.ready.number})}</b>
+      <p className="hint">{t('of.readyHint')}</p>
+      <div className="btn-row">
+        <a className="btn primary" href={api.offers.pdfUrl(action.ready)} target="_blank" rel="noreferrer">{t('of.openPdf')}</a>
+        <a className="btn" href={api.offers.pdfUrl(action.ready, true)}>{t('of.download')}</a>
+      </div>
+    </div>}
+    <button type="button" className="btn primary" disabled={!action.canBuild} onClick={action.build}>{action.busy ? t('of.building') : action.label}</button>
+  </div>;
+};
+export const OfferHistory: React.FC<{draft: OfferDraft; action: OfferBuild}> = ({draft, action}) => {
+  const t = useT();
+  return <div className="offer-list">
+    <span className="label">{t('of.history')}</span>
+    {draft.historyLoading && <p className="hint" role="status">{t('of.historyLoading')}</p>}
+    {draft.historyError && <div className="notice warn" role="alert"><p>{draft.historyError}</p>
+      <button type="button" className="btn" onClick={draft.reloadHistory}>{t('common.retry')}</button></div>}
+    {draft.list.length ? draft.list.map((m) => <div className="offer-item" key={m.id}>
+      <a href={api.offers.pdfUrl(m)} target="_blank" rel="noreferrer">{m.number}</a>
+      <span className="muted">{[m.client, `${fmt(m.total)} ${currencySign(m.currency)}`, new Date(m.createdAt).toLocaleDateString()].filter(Boolean).join(' · ')}</span>
+      <a className="icon" href={api.offers.pdfUrl(m, true)} aria-label={t('of.download')}>↓</a>
+      <button type="button" className="icon" disabled={action.busy} aria-label={t('of.remove')} onClick={() => action.remove(m)}><Trash2 size={14} /></button>
+    </div>) : !draft.historyLoading && !draft.historyError && <p className="hint">{t('workspace.noOffers')}</p>}
+  </div>;
+};
+export const OfferBuilder: React.FC<{draft: OfferDraft; action: OfferBuild}> = ({draft, action}) => {
+  return <div className="offer-builder"><OfferFields draft={draft} busy={action.busy} /><OfferActions draft={draft} action={action} />
+    {draft.list.length > 0 && <OfferHistory draft={draft} action={action} />}
+  </div>;
 };

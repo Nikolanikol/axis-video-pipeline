@@ -1,17 +1,8 @@
-// Мобильная палитра ролика, версия 3 — концепт и правки владельца 20.10 (docs/palette-mobile.md).
-// Сверху вниз:
-//   шапка приложения со строкой ролика (headerSlot): значок списка объявлений · машина и статус с
-//   точкой · «Собрать» · бургер Shell
-//   → большое превью, поверх справа сверху — «Настройки» → панель плеера (SceneScrubber: ▶, время,
-//   полоса перемотки, «Смотреть целиком») → вкладки «Оформление | Текст | Фото | Переход» → одна
-//   лента квадратных плиток выбранной вкладки (постоянной высоты — превью не прыгает).
-// «Настройки» — панель справа на 90 % ширины: сцены сегментами и группа «О ролике»; в сцене — только
-// её поля (цена — «Рассчитать / Указать сумму», фото — только в «Галерее»).
-// Список объявлений и ролики — листы на весь экран. «Ролики» доступны с превью постоянно;
-// при начале и окончании сборки лист открывается сам.
-// Данные ролика — те же, что у компьютера: editLot / saveLot / beforeRender из LotTool, второй копии нет.
-// Состояние интерфейса (вкладка, лист, сцена, прокрутка листа, раскрытые группы) — в localStorage по
-// компании и объявлению; навигация ролик не меняет и сборку не запускает.
+// Мобильный редактор ролика: оформление, содержание и анимация (docs/palette-mobile.md).
+// Содержание и тонкая настройка открываются в правой панели; группы движения — в ленте
+// с короткими превью. Плеер и доступ к роликам сохраняются при переключении разделов.
+// Данные, автосохранение и запуск принадлежат LotTool; здесь только навигация и компоновка.
+// Прежний ключ состояния версии 3 сохранён: старые вкладки переводятся в новые разделы.
 import React, {useCallback, useEffect, useId, useLayoutEffect, useRef, useState} from 'react';
 import {ChevronRight, Film, List, X} from 'lucide-react';
 import type {AdProps, FormatMeta, Market, Theme} from '../../src/shared/types';
@@ -19,8 +10,9 @@ import type {FontPair, LotEntry, Palette as PaletteColors} from '../api';
 import {useConfig} from '../config';
 import {useHeaderSlot} from '../headerSlot';
 import {Preview, type PreviewControl, type SceneSeek} from '../Preview';
-import {compositionTitle, LookStrip, MobileAbout, MobileContent, motionTitle, MotionStrip, PALETTE_TABS as TABS, playMotion, type MotionTab, type PaletteTab} from './MobileBodies';
-import {lotTheme} from './LookPanel';
+import {MobileAbout, MobileContent, playMotion, type MotionTab, type PaletteTab} from './MobileBodies';
+import {LookPanel} from './LookPanel';
+import {VideoAppearance, VideoMotion, VideoTabs, type VideoSection} from './VideoPanel';
 import {SceneScrubber} from './SceneScrubber';
 import {SaveStatus, type SaveState} from './Palette';
 import {useT} from '../i18n';
@@ -37,7 +29,7 @@ type Props = {
   scene: string; onScene: (id: string) => void; seek: SceneSeek | null;
   /** Список открыт — LotTool закрывает его сам, когда объявление выбрано или создано */
   listOpen: boolean; onList: (open: boolean) => void;
-  /** Новое пустое объявление — сразу панель «Настройки» на группе «О ролике» (данные автомобиля) */
+  /** Новое пустое объявление — сразу «Содержание», группа «О ролике» (данные автомобиля). */
   openContent: boolean; onContentOpened: () => void;
   /** Ссылка, «Добавить вручную» и список — из LotTool, тот же путь импорта, что на компьютере */
   list: React.ReactNode;
@@ -51,11 +43,11 @@ type Props = {
 // ——— Состояние интерфейса, версия 3 ———
 // Вкладка ленты, открытый лист, сцена, вкладка анимации; своя позиция прокрутки у каждого листа
 // («Текст» — по сцене). Ключ — компания + объявление; из версии 2 берём сцену и раздел
-// Вкладки ленты: оформление и три группы анимации на одном уровне (владелец 20.10)
+// tab хранит прежнее значение; section задаёт новый верхний уровень, motionTab — группу движения.
 type Tab = PaletteTab;
-type Sheet = 'text';
+type Sheet = 'text' | 'look';
 // about — в панели открыта группа «О ролике», а не сцена
-type UI = {version: 3; tab: Tab; sheet: Sheet | null; about?: boolean; sceneId?: string; scrollByView: Record<string, number>; expandedGroups: Record<string, boolean>; motionTab?: MotionTab};
+type UI = {version: 3; tab: Tab; section?: VideoSection; sheet: Sheet | null; about?: boolean; sceneId?: string; scrollByView: Record<string, number>; expandedGroups: Record<string, boolean>; motionTab?: MotionTab};
 // Прежняя вкладка «Анимация» — та группа, что была открыта внутри неё
 const tabOf = (tab: string | undefined, motionTab?: MotionTab): Tab =>
   tab === 'motion' ? motionTab ?? 'textMotion' : (['textMotion', 'photoMotion', 'sceneTransition'] as string[]).includes(tab ?? '') ? tab as Tab : 'look';
@@ -65,7 +57,7 @@ const load = (key: string): UI => {
   try {
     const v3 = JSON.parse(localStorage.getItem(key) ?? 'null') as UI | null;
     // Ранняя версия 3 знала вкладку и лист «Фото» — теперь фото в панели «Текст»
-    if (v3?.version === 3) return {...fresh(), ...v3, tab: tabOf(v3.tab as string, v3.motionTab), sheet: (v3.sheet as string) === 'look' ? null : (v3.sheet as string) === 'photos' ? 'text' : v3.sheet};
+    if (v3?.version === 3) return {...fresh(), ...v3, tab: tabOf(v3.tab as string, v3.motionTab), sheet: (v3.sheet as string) === 'photos' ? 'text' : v3.sheet};
     const v2 = JSON.parse(localStorage.getItem(key.replace('.v3:', '.v2:')) ?? 'null') as {section?: string | null; sceneId?: string; motionTab?: MotionTab; expandedGroups?: Record<string, boolean>} | null;
     if (!v2) return fresh();
     return {...fresh(), sceneId: v2.sceneId, motionTab: v2.motionTab, expandedGroups: v2.expandedGroups ?? {},
@@ -94,6 +86,7 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
   const cost = useCost('ads', config.credits);
   const root = useRef<HTMLDivElement>(null);
   const body = useRef<HTMLDivElement>(null);
+  const side = useRef<HTMLElement>(null);
   const player = useRef<PreviewControl | null>(null);
   const storageKey = lot ? keyOf(config.workspace?.id ?? 'local', lot.id) : '';
   const [ui, setUi] = useState<UI>(() => (lot ? load(storageKey) : fresh()));
@@ -102,6 +95,7 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
   const [view, setView] = useState<'edit' | 'watch'>('edit');
   const [jobsOpen, setJobsOpen] = useState(false);
   const jobsId = useId();
+  const panelId = useId();
   const jobsButton = useRef<HTMLButtonElement>(null);
   const jobsSheet = useRef<HTMLDivElement>(null);
   // После смены объявления сводка прежнего может оставаться до первого эффекта новой панели.
@@ -118,6 +112,7 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
   const {sheet} = ui;
   // Через tabOf и здесь: в памяти может остаться прежняя «motion» (до обновления страницы)
   const tab = tabOf(ui.tab, ui.motionTab);
+  const section = ui.section ?? (sheet === 'text' ? 'content' : tab === 'look' ? 'look' : 'motion');
   const viewKey = sheet === 'text' ? (ui.about ? `about:${format.id}` : `content:${format.id}:${scene}`) : sheet ? `${sheet}:${format.id}` : '';
 
   // Запись в хранилище — с задержкой, не на каждый пиксель прокрутки; перед сменой контекста — сразу
@@ -170,8 +165,27 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
   };
 
   // Вкладка ленты закрывает лист; лист: нажали — открыть, нажали снова — закрыть
-  const pickTab = (id: Tab) => commit({...remember(), tab: id, sheet: null}, true);
-  const openSheet = (id: Sheet | null) => commit({...remember(), sheet: sheet === id ? null : id}, true);
+  const pickSection = (next: VideoSection) => commit({...remember(), section: next, sheet: next === 'content' ? 'text' : null,
+    tab: next === 'motion' ? ui.motionTab ?? (tab === 'look' ? 'textMotion' : tab) : 'look'}, true);
+  const openSheet = (id: Sheet | null) => {
+    const next = sheet === id ? null : id;
+    commit({...remember(), sheet: next, section: next === 'text' ? 'content' : 'look'}, true);
+  };
+  useEffect(() => {
+    if (!sheet) return;
+    const el = side.current;
+    el?.querySelector<HTMLButtonElement>('button')?.focus();
+    const keys = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.preventDefault(); commit({...uiRef.current, sheet: null, section: 'look'}, true); }
+      if (e.key !== 'Tab' || !el) return;
+      const nodes = [...el.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), textarea:not(:disabled), select:not(:disabled), a[href]')].filter((n) => n.getClientRects().length);
+      const first = nodes[0], last = nodes[nodes.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last?.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+    };
+    el?.addEventListener('keydown', keys);
+    return () => { el?.removeEventListener('keydown', keys); document.getElementById(`${panelId}-${uiRef.current.section ?? 'look'}`)?.focus(); };
+  }, [sheet, commit, panelId]);
   // Явный выбор сцены: плеер на её показательный кадр, а в «Тексте» — начало её полей
   const pickScene = (id: string) => {
     const saved = remember();
@@ -182,7 +196,7 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
   // Новое пустое объявление — панель «Настройки» на группе «О ролике» (данные автомобиля)
   useEffect(() => {
     if (!openContent || !lot) return;
-    commit({...uiRef.current, sheet: 'text', about: true}, true);
+    commit({...uiRef.current, sheet: 'text', section: 'content', about: true}, true);
     onContentOpened();
   }, [openContent, lot?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // При начале/возобновлении сборки видны этап и отмена; после завершения — результат.
@@ -293,9 +307,8 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
 
   const sceneIndex = format.scenes.findIndex((s) => s.id === scene);
   const current = format.scenes[Math.max(0, sceneIndex)];
-  const theme = lot ? lotTheme(brand, lot) : brand;
 
-  return <div ref={root} className={`mle${view === 'watch' ? ' watch' : ''}${sheet ? ' sheet-open' : ''}${keyboard ? ' kb' : ''}`}>
+  return <div ref={root} className={`mle video-mobile${view === 'watch' ? ' watch' : ''}${sheet ? ' sheet-open' : ''}${keyboard ? ' kb' : ''}`}>
     {props.notice}
     {lot && input ? <>
       <div className="mle-stage">
@@ -304,8 +317,7 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
         <Preview key={lot.id} input={input} format={format} autoPlay showScenes={false} controls={false} control={player}
           onPlaying={setIsPlaying} onFrame={(f) => frameFn.current?.(f)} seek={seek} />
         {view === 'watch' && <button type="button" className="btn primary mle-back" onClick={back}>{tr('mle.back')}</button>}
-        {/* «Настройки» — правка надписей, цены и фото (панель справа): серая плашка в правом верхнем
-            углу превью, по образцу владельца 20.10 */}
+        {/* История остаётся доступной на превью во всех разделах. */}
         {view === 'edit' && <div className="mle-stage-tools">
           <button ref={jobsButton} type="button" className="mle-text-btn mle-jobs-btn" aria-controls={jobsId} aria-expanded={jobsOpen}
             onClick={() => { onList(false); setJobsOpen(true); }}>
@@ -315,8 +327,6 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
               {activeJob.status === 'running' && <b>{activeJob.progress}%</b>}
             </span>}
           </button>
-          <button type="button" className={`mle-text-btn${sheet === 'text' ? ' on' : ''}`} aria-expanded={sheet === 'text'}
-            onClick={() => openSheet('text')}>{tr.cfg('Настройки')}</button>
         </div>}
       </div>
       {/* Панель плеера по образцу владельца: ▶, время, полоса перемотки, «Смотреть целиком» */}
@@ -325,37 +335,37 @@ export const MobileLotEditor: React.FC<Props> = (props) => {
 
         {/* Вкладки — подчёркиванием: оформление и три группы анимации на одном уровне (владелец 20.10) */}
         <div className="mle-tabs">
-          <div className="mle-tabs-list" role="tablist" aria-label={tr('palette.settingsAria')}>
-            {TABS.map((t) => <button key={t.id} type="button" role="tab" aria-selected={tab === t.id}
-              className={`mle-tab${tab === t.id ? ' on' : ''}`} onClick={() => pickTab(t.id)}>{tr(t.title)}</button>)}
-          </div>
+          <VideoTabs value={section} onChange={pickSection} panelId={panelId} />
         </div>
-        <div className="mle-panel" role="tabpanel" title={tab === 'look' ? compositionTitle(theme) : motionTitle(brand, lot, tab)}>
+        <div className="mle-panel video-mobile-panel" id={panelId} role="tabpanel" aria-labelledby={`${panelId}-${section}`}>
           {/* Строки «Появление текста · …» и «Весь ролик» над лентой нет (владелец 20.10: места мало) —
               выбранное видно по рамке плитки; полное название — в подсказке на ленте */}
-          {tab === 'look' && <LookStrip {...props} lot={lot} input={input} frame={current?.preview ?? 0} />}
-          {tab !== 'look' && <MotionStrip {...props} lot={lot} tab={tab} onPicked={showMotion} />}
+          {section === 'look' && <VideoAppearance {...props} lot={lot} input={input} frame={current?.preview ?? 0} onFine={() => openSheet('look')} />}
+          {section === 'motion' && <VideoMotion {...props} lot={lot} input={input} value={tab === 'look' ? 'textMotion' : tab}
+            onTab={(motionTab) => commit({...remember(), motionTab, tab: motionTab, section: 'motion'}, true)} onPicked={showMotion} />}
+          {section === 'content' && <button type="button" className="video-fine-open" onClick={() => openSheet('text')}>{tr('workspace.content')}</button>}
         </div>
 
       {/* Панель «Текст» справа (владелец 20.10: «как было у нас ранее»): 90 % ширины, слева видна
           полоска ролика — нажатие по ней закрывает. Сцену можно сменить прямо в панели */}
-      {sheet === 'text' && <>
+      {sheet && <>
         <button type="button" className="mle-scrim" aria-label={tr('mle.closeSettings')} onClick={() => openSheet(null)} />
-        <section className="mle-side" role="dialog" aria-label={tr('palette.settingsAria')}>
+        <section ref={side} className="mle-side" role="dialog" aria-modal="true" aria-label={tr(sheet === 'look' ? 'workspace.fine' : 'workspace.content')}>
           <div className="mle-side-head">
             <button type="button" className="mle-icon" aria-label={tr('mle.closeSettings')} onClick={() => openSheet(null)}><ChevronRight size={20} /></button>
-            <b>{tr.cfg('Настройки')}</b>
+            <b>{tr(sheet === 'look' ? 'workspace.fine' : 'workspace.content')}</b>
           </div>
-          <nav className="mle-side-scenes" aria-label={tr('mle.sceneAria')}>
+          {sheet === 'text' && <nav className="mle-side-scenes" aria-label={tr('mle.sceneAria')}>
             {format.scenes.map((s, i) => <button key={s.id} type="button" aria-pressed={!ui.about && i === sceneIndex}
               className={`mle-scene${!ui.about && i === sceneIndex ? ' edit' : ''}`} onClick={() => pickScene(s.id)}>
               <span>{String(i + 1).padStart(2, '0')}</span>{tr.cfg(s.title)}</button>)}
             {/* Общее для всего ролика — отдельной группой рядом со сценами (владелец 20.10) */}
             <button type="button" aria-pressed={!!ui.about} className={`mle-scene${ui.about ? ' edit' : ''}`}
               onClick={() => commit({...remember(), about: true}, true)}>{tr('palette.about')}</button>
-          </nav>
+          </nav>}
           <div className="mle-body" ref={body} onScroll={onScroll}>
-            {ui.about ? <MobileAbout {...props} lot={lot} /> : <MobileContent {...props} lot={lot} />}
+            {sheet === 'look' ? <LookPanel {...props} lot={lot} embedded detailsOnly />
+              : ui.about ? <MobileAbout {...props} lot={lot} showFormat={false} /> : <MobileContent {...props} lot={lot} />}
           </div>
         </section>
       </>}
